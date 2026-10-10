@@ -1,0 +1,80 @@
+{
+  "slug": "earth-elemental",
+  "desc": "",
+  "name": "Earth Elemental",
+  "size": "Large",
+  "type": "Elemental",
+  "subtype": "",
+  "group": "Elementals",
+  "alignment": "neutral",
+  "armor_class": 17,
+  "armor_desc": "natural armor",
+  "hit_points": 126,
+  "hit_dice": "12d10+60",
+  "speed": {
+    "walk": 30,
+    "burrow": 30
+  },
+  "strength": 20,
+  "dexterity": 8,
+  "constitution": 20,
+  "intelligence": 5,
+  "wisdom": 10,
+  "charisma": 5,
+  "strength_save": null,
+  "dexterity_save": null,
+  "constitution_save": null,
+  "intelligence_save": null,
+  "wisdom_save": null,
+  "charisma_save": null,
+  "perception": null,
+  "skills": {},
+  "damage_vulnerabilities": "thunder",
+  "damage_resistances": "bludgeoning, piercing, and slashing from nonmagical attacks",
+  "damage_immunities": "poison",
+  "condition_immunities": "exhaustion, paralyzed, petrified, poisoned, unconscious",
+  "senses": "darkvision 60 ft., tremorsense 60 ft., passive Perception 10",
+  "languages": "Terran",
+  "challenge_rating": "5",
+  "cr": 5,
+  "actions": [
+    {
+      "name": "Multiattack",
+      "desc": "The elemental makes two slam attacks."
+    },
+    {
+      "name": "Slam",
+      "desc": "Melee Weapon Attack: +8 to hit, reach 10 ft., one target. Hit: 14 (2d8 + 5) bludgeoning damage.",
+      "attack_bonus": 8,
+      "damage_dice": "2d8",
+      "damage_bonus": 5
+    }
+  ],
+  "bonus_actions": null,
+  "reactions": null,
+  "legendary_desc": "",
+  "legendary_actions": null,
+  "special_abilities": [
+    {
+      "name": "Earth Glide",
+      "desc": "The elemental can burrow through nonmagical, unworked earth and stone. While doing so, the elemental doesn't disturb the material it moves through."
+    },
+    {
+      "name": "Siege Monster",
+      "desc": "The elemental deals double damage to objects and structures."
+    }
+  ],
+  "spell_list": [],
+  "page_no": 306,
+  "environments": [
+    "Underdark",
+    "Laboratory",
+    "Plane Of Earth"
+  ],
+  "img_main": null,
+  "document__slug": "wotc-srd",
+  "document__title": "5e Core Rules",
+  "document__license_url": "http://open5e.com/legal",
+  "document__url": "http://dnd.wizards.com/articles/features/systems-reference-document-srd",
+  "v2_converted_path": "/v2/creatures/srd_earth-elemental/"
+}

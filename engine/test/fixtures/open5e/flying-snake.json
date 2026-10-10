@@ -1,0 +1,76 @@
+{
+  "slug": "flying-snake",
+  "desc": "A **flying snake** is a brightly colored, winged serpent found in remote jungles. Tribespeople and cultists sometimes domesticate flying snakes to serve as messengers that deliver scrolls wrapped in their coils.",
+  "name": "Flying Snake",
+  "size": "Tiny",
+  "type": "Beast",
+  "subtype": "",
+  "group": "Miscellaneous Creatures",
+  "alignment": "unaligned",
+  "armor_class": 14,
+  "armor_desc": null,
+  "hit_points": 5,
+  "hit_dice": "2d4",
+  "speed": {
+    "walk": 30,
+    "fly": 60,
+    "swim": 30
+  },
+  "strength": 4,
+  "dexterity": 18,
+  "constitution": 11,
+  "intelligence": 2,
+  "wisdom": 12,
+  "charisma": 5,
+  "strength_save": null,
+  "dexterity_save": null,
+  "constitution_save": null,
+  "intelligence_save": null,
+  "wisdom_save": null,
+  "charisma_save": null,
+  "perception": null,
+  "skills": {},
+  "damage_vulnerabilities": "",
+  "damage_resistances": "",
+  "damage_immunities": "",
+  "condition_immunities": "",
+  "senses": "blindsight 10 ft., passive Perception 11",
+  "languages": "",
+  "challenge_rating": "1/8",
+  "cr": 0.125,
+  "actions": [
+    {
+      "name": "Bite",
+      "desc": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 1 piercing damage plus 7 (3d4) poison damage.",
+      "attack_bonus": 6,
+      "damage_bonus": 1
+    }
+  ],
+  "bonus_actions": null,
+  "reactions": null,
+  "legendary_desc": "",
+  "legendary_actions": null,
+  "special_abilities": [
+    {
+      "name": "Flyby",
+      "desc": "The snake doesn't provoke opportunity attacks when it flies out of an enemy's reach."
+    }
+  ],
+  "spell_list": [],
+  "page_no": 372,
+  "environments": [
+    "Urban",
+    "Desert",
+    "Grassland",
+    "Forest",
+    "Jungle",
+    "Swamp",
+    "Feywild"
+  ],
+  "img_main": null,
+  "document__slug": "wotc-srd",
+  "document__title": "5e Core Rules",
+  "document__license_url": "http://open5e.com/legal",
+  "document__url": "http://dnd.wizards.com/articles/features/systems-reference-document-srd",
+  "v2_converted_path": "/v2/creatures/srd_flying-snake/"
+}
