@@ -1,0 +1,53 @@
+# Set lineup. Parsed by scripts/src/lib/issue-forms.ts. Tavern = issue author.
+name: Set lineup
+description: Choose your captain and three allies for a week.
+title: "[lineup] "
+labels: ["command", "set-lineup"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Four starters: one captain and three allies, all on your roster, with
+        total CR within the season budget. You can resubmit until the weekly
+        lock, and the latest valid submission counts. If you submit nothing,
+        last week's lineup carries over.
+  - type: dropdown
+    id: season
+    attributes:
+      label: Season
+      options:
+        - season-01
+    validations:
+      required: true
+  - type: dropdown
+    id: week
+    attributes:
+      label: Week
+      options: ["1", "2", "3", "4", "5", "6"]
+    validations:
+      required: true
+  - type: input
+    id: captain
+    attributes:
+      label: Captain
+      placeholder: bruno-the-bruiser
+    validations:
+      required: true
+  - type: input
+    id: ally-1
+    attributes:
+      label: Ally 1
+    validations:
+      required: true
+  - type: input
+    id: ally-2
+    attributes:
+      label: Ally 2
+    validations:
+      required: true
+  - type: input
+    id: ally-3
+    attributes:
+      label: Ally 3
+    validations:
+      required: true

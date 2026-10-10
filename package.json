@@ -1,0 +1,28 @@
+{
+  "name": "league-of-taverns",
+  "private": true,
+  "type": "module",
+  "description": "A fantasy-sports league where managers draft 5e monsters into taverns and send parties on weekly missions.",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p engine && tsc -p bots && tsc -p scripts && tsc -p sims && tsc -p .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "validate": "pnpm --filter @league-of-taverns/scripts validate",
+    "sim": "pnpm --filter @league-of-taverns/sims mock-season"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}

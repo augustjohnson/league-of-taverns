@@ -1,0 +1,29 @@
+# Draft pick. Parsed by scripts/src/lib/issue-forms.ts. Your tavern comes from
+# your GitHub account via managers.yaml, never from this form.
+name: Draft pick
+description: Make your draft pick when you are on the clock.
+title: "[draft] "
+labels: ["command", "draft-pick"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit only when you are on the clock. The Action checks that it is
+        your pick and that the character is still available, then records it
+        or replies with the reason it can't.
+  - type: dropdown
+    id: season
+    attributes:
+      label: Season
+      options:
+        - season-01
+    validations:
+      required: true
+  - type: input
+    id: character
+    attributes:
+      label: Character id
+      description: The character's id from the season pool, e.g. bruno-the-bruiser.
+      placeholder: bruno-the-bruiser
+    validations:
+      required: true

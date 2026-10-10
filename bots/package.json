@@ -1,0 +1,16 @@
+{
+  "name": "@league-of-taverns/bots",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless bot managers: draft, lineup and waiver strategies for mock seasons.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@league-of-taverns/engine": "workspace:*"
+  }
+}

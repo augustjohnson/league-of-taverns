@@ -1,0 +1,15 @@
+# Who may act in this season. The Actions allowlist (T11.2).
+# Identity is the GitHub numeric user id, which survives username changes.
+# The login is for humans reading this file (docs/decisions.md D-35).
+# Changing this file mid-season needs a PR approved by the commissioner.
+
+commissioner: { login: augustjohnson, githubId: null }   # TODO: fill githubId
+gm: { login: augustjohnson, githubId: null }             # OPEN D-09: may the GM also manage a tavern?
+
+taverns:
+  - id: the-gilded-flagon
+    name: The Gilded Flagon
+    manager: { login: example-manager, githubId: null }
+  # - id: the-drowned-rat
+  #   name: The Drowned Rat
+  #   manager: { bot: value }        # bot seats: OPEN D-36

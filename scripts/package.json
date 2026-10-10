@@ -1,0 +1,30 @@
+{
+  "name": "@league-of-taverns/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The I/O edge: read and write repo files, call the engine, and append events. Run by humans and by Actions.",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "snapshot": "tsx src/snapshot.ts",
+    "validate": "tsx src/validate.ts",
+    "draft-missions": "tsx src/draft-missions.ts",
+    "difficulty-report": "tsx src/difficulty-report.ts",
+    "draft-chrome": "tsx src/draft-chrome.ts",
+    "lock-check": "tsx src/lock-check.ts",
+    "seal": "tsx src/seal.ts",
+    "reveal": "tsx src/reveal.ts",
+    "apply-command": "tsx src/apply-command.ts",
+    "run-week": "tsx src/run-week.ts",
+    "offseason": "tsx src/offseason.ts",
+    "publish": "tsx src/publish.ts"
+  },
+  "dependencies": {
+    "@league-of-taverns/bots": "workspace:*",
+    "@league-of-taverns/engine": "workspace:*",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}

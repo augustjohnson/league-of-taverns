@@ -1,0 +1,8 @@
+{
+  // Bots are pure like the engine: they see public state and return a decision.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"]
+}

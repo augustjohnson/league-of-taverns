@@ -1,0 +1,17 @@
+{
+  "name": "@league-of-taverns/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure game engine: no I/O, no chrome, runs in Node and the browser.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "zod": "^4.6.5"
+  }
+}
