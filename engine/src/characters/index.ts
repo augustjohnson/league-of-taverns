@@ -11,9 +11,8 @@
  * Carryover (which characters a tavern keeps between seasons) is roster and
  * lifecycle business, not this module's. See T3.6 and T10.3.
  */
-import type { BaseStats } from '../adapters/open5e';
-import { notImplemented } from '../internal/not-implemented';
-import { ABILITIES, SENSES, SKILLS, SPEEDS } from '../vocabulary';
+import { abilityModifiers, type BaseStats } from '../adapters/open5e';
+import { ABILITIES, SENSES, SKILLS, SPEEDS, type SenseKind, type SpeedKind } from '../vocabulary';
 import { PRIMITIVE_RULES, type PrimitiveRule } from './registry';
 import type {
   CheckTarget,
@@ -193,13 +192,85 @@ export function validateTraitRegistry(traits: ReadonlyArray<TraitDefinition>): R
   return issues;
 }
 
-/** Base + modifiers → the stats the resolver uses. Pure and total for valid input. */
+/**
+ * Base + modifiers → the stats the resolver uses. Pure: the inputs are not
+ * mutated and the result shares no mutable state with them.
+ *
+ * Traits expand to their primitives. `skill_bonus`, `save_bonus` and
+ * `battle_bonus` add. `advantage` records `checkTargetKey(on)`.
+ * `grant_speed` and `grant_sense` keep the larger of the base and granted
+ * feet. CR is the base CR: modifiers never change it. `abilityMods` come from
+ * the base ability scores.
+ *
+ * Assumes input that passed `validateModifiers`, but never drops anything
+ * silently: an unknown trait or kind, or a base for a different slug, throws.
+ */
 export function effectiveStats(
-  _character: PooledCharacter,
-  _base: BaseStats,
-  _traits: ReadonlyArray<TraitDefinition>,
+  character: PooledCharacter,
+  base: BaseStats,
+  traits: ReadonlyArray<TraitDefinition>,
 ): EffectiveStats {
-  return notImplemented('effectiveStats', 'T3.3');
+  const characterId = character.ref.id;
+  if (character.ref.base !== base.slug) {
+    throw new Error(`${characterId}: base is "${character.ref.base}" but stats are for "${base.slug}"`);
+  }
+
+  const skills = { ...base.skills };
+  const saves = { ...base.saves };
+  const speeds: Partial<Record<SpeedKind, number>> = { ...base.speeds };
+  const senses: Partial<Record<SenseKind, number>> = { ...base.senses };
+  const advantages = new Set<string>();
+  let battleBonus = 0;
+
+  for (const { effect, from } of expandModifiers(character.modifiers, traits, characterId)) {
+    const fail = (message: string): never => {
+      throw new Error(`${characterId}: ${from} (${effect.kind}): ${message}`);
+    };
+    // Vocabulary guards: input is meant to be validated, but a bad term must
+    // not turn into a NaN stat or a stray key.
+    if (effect.kind === 'skill_bonus' && !isOneOf(SKILLS, effect.skill)) fail(`unknown skill "${String(effect.skill)}"`);
+    if (effect.kind === 'save_bonus' && !isOneOf(ABILITIES, effect.ability)) fail(`unknown ability "${String(effect.ability)}"`);
+    if (effect.kind === 'grant_speed' && !isOneOf(SPEEDS, effect.speed)) fail(`unknown speed "${String(effect.speed)}"`);
+    if (effect.kind === 'grant_sense' && !isOneOf(SENSES, effect.sense)) fail(`unknown sense "${String(effect.sense)}"`);
+
+    switch (effect.kind) {
+      case 'skill_bonus':
+        skills[effect.skill] += effect.value;
+        break;
+      case 'save_bonus':
+        saves[effect.ability] += effect.value;
+        break;
+      case 'advantage':
+        advantages.add(checkTargetKey(effect.on));
+        break;
+      case 'grant_speed':
+        speeds[effect.speed] = Math.max(speeds[effect.speed] ?? 0, effect.feet);
+        break;
+      case 'grant_sense':
+        senses[effect.sense] = Math.max(senses[effect.sense] ?? 0, effect.feet);
+        break;
+      case 'battle_bonus':
+        battleBonus += effect.value;
+        break;
+      default: {
+        const unknown: never = effect;
+        throw new Error(`${characterId}: ${from}: unknown modifier kind "${String((unknown as { readonly kind?: unknown }).kind)}"`);
+      }
+    }
+  }
+
+  return {
+    characterId,
+    base,
+    cr: base.cr,
+    skills,
+    saves,
+    abilityMods: abilityModifiers(base.abilities),
+    advantages,
+    speeds,
+    senses,
+    battleBonus,
+  };
 }
 
 // ── internals ──────────────────────────────────────────────────────────────
@@ -212,6 +283,24 @@ function ruleFor(kind: string): PrimitiveRule | undefined {
 
 function findTrait(traits: ReadonlyArray<TraitDefinition>, id: string): TraitDefinition | undefined {
   return traits.find((t) => t.id === id);
+}
+
+/**
+ * A modifier list as the primitives it applies, in order, each tagged with
+ * where it came from. Throws on an unknown trait.
+ */
+function expandModifiers(
+  modifiers: ReadonlyArray<Modifier>,
+  traits: ReadonlyArray<TraitDefinition>,
+  characterId: string,
+): Array<{ readonly effect: ModifierEffect; readonly from: string }> {
+  return modifiers.flatMap((modifier, i) => {
+    const at = `modifiers[${i}]`;
+    if (modifier.kind !== 'trait') return [{ effect: modifier, from: at }];
+    const trait = findTrait(traits, modifier.trait);
+    if (trait === undefined) throw new Error(`${characterId}: ${at}: unknown trait "${modifier.trait}"`);
+    return trait.effects.map((effect, j) => ({ effect, from: `${at} (trait ${trait.id}, effects[${j}])` }));
+  });
 }
 
 function isOneOf<T extends string>(values: ReadonlyArray<T>, x: unknown): x is T {
