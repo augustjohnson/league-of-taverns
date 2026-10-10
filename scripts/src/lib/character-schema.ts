@@ -5,7 +5,8 @@
  * reads chrome. Only `id` and `base` cross into the engine, via
  * `loadCharacterRef` in ./repo.ts.
  */
-import { kebabIdSchema, z } from '@league-of-taverns/engine';
+import { kebabIdSchema } from '@league-of-taverns/engine';
+import { z } from 'zod';
 import type { AssertTrue, SchemaMatches } from '@league-of-taverns/engine';
 
 export type CharacterStatus = 'active' | 'retired';
