@@ -19,6 +19,14 @@ import type { CrEighths } from '../vocabulary';
 import type { Mission } from './types';
 
 export type * from './types';
+export { checkTargetSchema, formatIssuePath, kebabIdSchema, missionSchema, parseMission, toSchemaIssues } from './schema';
+export type { AssertTrue, ParseResult, SchemaIssue, SchemaMatches } from './schema';
+/**
+ * The engine's zod instance, re-exported so scripts/ can build its own file
+ * schemas (character chrome, config) on the same instance and compose the
+ * engine's schemas. scripts/ has no direct zod dependency (TODO.md T0.2).
+ */
+export { z } from 'zod';
 
 export interface MissionRules {
   readonly dcBand: { readonly min: number; readonly max: number };
