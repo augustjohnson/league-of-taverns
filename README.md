@@ -108,6 +108,14 @@ content (docs/decisions.md D-17). That license requires this attribution:
 > licensed under the Creative Commons Attribution 4.0 International License
 > available at https://creativecommons.org/licenses/by/4.0/legalcode.
 
+Snapshot `open5e-v1-2026-10` contains only Open5e's `wotc-srd` document (SRD
+5.1, 322 monsters). Open5e's metadata titles it "5e Core Rules" and lists its
+license as the Open Game License (`document__license_url`
+`http://open5e.com/legal`). SRD 5.1 is published under both OGL 1.0a and
+CC-BY-4.0. This project relies on the CC-BY-4.0 release and the attribution
+above. The manifest keeps Open5e's license URL verbatim, so it reflects Open5e's
+metadata, not the license this project uses.
+
 Any document added under the Open Game License 1.0a must ship that license's
 text and Section 15 notices. The snapshot script (T1.1) is responsible for
 recording them.

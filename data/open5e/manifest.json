@@ -1,4 +1,21 @@
 {
   "$comment": "Pinned Open5e snapshots. Written by scripts/src/snapshot.ts (T1.1); entries are immutable once a season references them. Shape: engine/src/adapters/open5e/types.ts SnapshotManifestEntry.",
-  "snapshots": []
+  "snapshots": [
+    {
+      "id": "open5e-v1-2026-10",
+      "fetchedAt": "2026-10-10T21:35:34.494Z",
+      "sourceUrl": "https://api.open5e.com/v1/monsters/?document__slug=wotc-srd",
+      "apiVersion": "v1",
+      "documents": [
+        {
+          "slug": "wotc-srd",
+          "title": "5e Core Rules",
+          "licenseUrl": "http://open5e.com/legal"
+        }
+      ],
+      "count": 322,
+      "sha256": "9bdeb0530b700af9112c7e6b6ce208c4fcf4ddc8a554117b1ec094a9f2168d79",
+      "file": "open5e-v1-2026-10/monsters.json"
+    }
+  ]
 }
