@@ -54,7 +54,8 @@ export interface SeasonConfig {
   readonly missedLineup: 'carry_over';
   /** Actions cron expressions (UTC). The engine never evaluates them. They ride along for scripts. */
   readonly schedules: { readonly lineupLock: string; readonly weeklyRun: string; readonly waivers: string };
-  readonly secrecy: 'private_repo' | 'commit_reveal' | 'encrypted';
+  /** `open` (D-08, decided): missions are public in the repo. The others are kept in case secrecy returns. */
+  readonly secrecy: 'open' | 'private_repo' | 'commit_reveal' | 'encrypted';
   readonly seedSalt: 'none' | 'revealed_with_mission';
   readonly missions: Omit<MissionRules, 'partyCr'> & { readonly battleModel: string };
   readonly carryover: {

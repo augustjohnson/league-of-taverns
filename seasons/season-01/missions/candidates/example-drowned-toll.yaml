@@ -1,9 +1,8 @@
 # EXAMPLE, written by hand to show the shape. Schema: docs/schema.md § Mission.
 #
 # Structure only: no titles, no prose. Story text lives in
-# chrome/example-drowned-toll.yaml. In a real season, candidates are as secret
-# as selected missions (docs/decisions.md D-18), so this file would not sit in
-# a public repo in plaintext.
+# chrome/example-drowned-toll.yaml. Missions are open (docs/decisions.md D-08),
+# so candidates live here in plaintext.
 #
 #  rank 0      1            2              3             4             5
 #  start ─▶ find-path ─pass─▶ slip-past ─pass─▶ haul-chain ─pass──────────────▶ crossed-dry

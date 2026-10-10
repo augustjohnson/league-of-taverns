@@ -83,6 +83,15 @@ commands.
 after the run. Trades complete at any time but never touch a locked lineup.
 A character acquired mid-week first plays next week.
 
+**D-42 Public missions and pre-lock projections: OPEN (new, 2026-10-10).**
+With missions open (D-08), managers can read each week's structure, and anyone
+with the engine can compute exact projected points for every lineup before the
+lock. Lineup choice becomes an optimization problem, and only the real roll
+(D-13) adds variance. Options: (a) embrace it and publish a projection tool;
+(b) publish each mission only at its week's lock; (c) publish structure but
+hide DCs until the run. *Default:* (a), pending sims (T9.3) on how much skill
+vs luck decides weeks.
+
 **D-40 Roster-level CR cap: DEFAULTED.** None. B applies only to starters.
 Without a roster cap, drafting all high-CR characters is legal, but you can
 only start about 12 CR worth. Sims will show whether high-CR hoarding is a

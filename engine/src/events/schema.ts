@@ -132,7 +132,7 @@ export const seasonConfigSchema = z.strictObject({
   }),
   missedLineup: z.literal('carry_over'),
   schedules: z.strictObject({ lineupLock: text, weeklyRun: text, waivers: text }),
-  secrecy: z.enum(['private_repo', 'commit_reveal', 'encrypted']),
+  secrecy: z.enum(['open', 'private_repo', 'commit_reveal', 'encrypted']),
   seedSalt: z.enum(['none', 'revealed_with_mission']),
   missions: z.strictObject({
     dcBand: minMax,

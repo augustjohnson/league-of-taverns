@@ -1,14 +1,10 @@
 # missions/selected
 
-The GM's chosen missions, one per scheduled week. **Sealed until reveal.**
+The GM's chosen missions, one per scheduled week, as plaintext YAML.
 
-How they are sealed is OPEN (docs/decisions.md D-08):
+Missions are open (docs/decisions.md D-08): the repo is public, and anyone can
+read a selected mission before its week runs. Whether that changes lineup
+strategy too much is D-42.
 
-- `encrypted` (default): `<mission-id>.yaml.age`. The weekly Action decrypts it
-  with a repo secret. Plaintext (`*.plain.yaml`) is git-ignored.
-- `commit_reveal`: nothing here until reveal. Only the sha256 commitment is in
-  schedule.yaml and season.created.
-- `private_repo`: plaintext YAML, and the whole repo is private.
-
-In every mode, `scripts/seal` writes each mission's sha256 commitment, and
-`scripts/reveal` refuses a mission that does not match it.
+Once `season.created` is appended, selected missions are frozen, and CI flags
+any change to them.
