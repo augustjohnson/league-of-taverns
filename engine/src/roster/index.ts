@@ -41,9 +41,24 @@ export function validateLineup(
   return notImplemented('validateLineup', 'T4.2');
 }
 
-/** The tavern on the clock for overall pick `pickNumber` (0-based) in a snake draft. */
-export function snakePickOwner(_order: ReadonlyArray<string>, _pickNumber: number): string {
-  return notImplemented('snakePickOwner', 'T4.3');
+/**
+ * The tavern on the clock for overall pick `pickNumber` (0-based) in a snake
+ * draft. Round `floor(p / n)` runs in `order` when even and reversed when odd.
+ *
+ * Keeper-forfeited picks (docs/rules.md §4, docs/decisions.md D-11, still
+ * OPEN) are not modelled. When D-11 lands (T10.3), the hook is a caller-side
+ * step: walk overall picks in this order and skip any (tavern, round) slot
+ * a keeper has consumed, rather than changing this mapping.
+ */
+export function snakePickOwner(order: ReadonlyArray<string>, pickNumber: number): string {
+  const n = order.length;
+  if (n === 0) throw new Error('snakePickOwner: draft order is empty');
+  if (!Number.isInteger(pickNumber) || pickNumber < 0) {
+    throw new Error(`snakePickOwner: pick number must be a non-negative integer, got ${pickNumber}`);
+  }
+  const round = Math.floor(pickNumber / n);
+  const slot = pickNumber % n;
+  return order[round % 2 === 0 ? slot : n - 1 - slot]!;
 }
 
 /**
@@ -51,9 +66,37 @@ export function snakePickOwner(_order: ReadonlyArray<string>, _pickNumber: numbe
  * driven by `rng`, or the manual list. Callers pass
  * `rngFor(draftOrderSeed(season), 'order')`, and tests pass a fixed fake.
  * Taking `rng` as a parameter keeps this independent of the RNG implementation.
+ *
+ * Seeded mode draws exactly `taverns.length - 1` values. Manual mode draws
+ * none and throws unless the list is a permutation of `taverns`. The input is
+ * never mutated.
  */
-export function draftOrder(_taverns: ReadonlyArray<string>, _config: SeasonConfig, _rng: Rng): ReadonlyArray<string> {
-  return notImplemented('draftOrder', 'T4.3');
+export function draftOrder(taverns: ReadonlyArray<string>, config: SeasonConfig, rng: Rng): ReadonlyArray<string> {
+  const unique = new Set(taverns);
+  if (unique.size !== taverns.length) throw new Error('draftOrder: taverns contain duplicates');
+
+  const order = config.draft.order;
+  if (order.mode === 'manual') {
+    const manual = order.taverns;
+    const seen = new Set<string>();
+    for (const t of manual) {
+      if (!unique.has(t)) throw new Error(`draftOrder: manual order names unknown tavern "${t}"`);
+      if (seen.has(t)) throw new Error(`draftOrder: manual order lists tavern "${t}" more than once`);
+      seen.add(t);
+    }
+    const missing = taverns.filter((t) => !seen.has(t));
+    if (missing.length > 0) throw new Error(`draftOrder: manual order is missing tavern(s) ${missing.map((t) => `"${t}"`).join(', ')}`);
+    return [...manual];
+  }
+
+  const shuffled = [...taverns];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = shuffled[i]!;
+    shuffled[i] = shuffled[j]!;
+    shuffled[j] = tmp;
+  }
+  return shuffled;
 }
 
 export interface WaiverClaim {
