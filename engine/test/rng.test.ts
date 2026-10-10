@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cyrb128, rngFor, rollD20, sfc32, type Rng } from '../src/rng';
+import { cyrb128, draftOrderSeed, rngFor, rollD20, sfc32, weekSeed, type Rng } from '../src/rng';
 
 /** The next `n` outputs of a stream as the raw 32-bit words sfc32 produced. */
 function words(rng: Rng, n: number): number[] {
@@ -128,5 +128,47 @@ describe('rng', () => {
     expect(rollD20(() => 0.999_999_999)).toBe(20);
   });
 
-  it.todo('weekSeed formats (season, week, tavern[, salt]) canonically');
+});
+
+describe('seeds', () => {
+  it('weekSeed formats (season, week, tavern) canonically', () => {
+    expect(weekSeed({ season: 'season-01', week: 3, tavern: 'the-gilded-flagon' })).toBe(
+      'season-01/week-3/tavern:the-gilded-flagon',
+    );
+    expect(weekSeed({ season: 'season-01', week: 12, tavern: 'x' })).toBe('season-01/week-12/tavern:x');
+  });
+
+  it('weekSeed appends the salt when given, and the salt changes the seed and the dice', () => {
+    const input = { season: 'season-01', week: 3, tavern: 'the-gilded-flagon' } as const;
+    const salted = weekSeed({ ...input, salt: 'k3y' });
+    expect(salted).toBe('season-01/week-3/tavern:the-gilded-flagon/salt:k3y');
+    expect(salted).not.toBe(weekSeed(input));
+    expect(weekSeed({ ...input, salt: 'other' })).not.toBe(salted);
+    expect(words(rngFor(salted, 'roll:gate'), 5)).not.toEqual(words(rngFor(weekSeed(input), 'roll:gate'), 5));
+  });
+
+  it('weekSeed matches the seed pinned in the cyrb128 reference values', () => {
+    const seed = weekSeed({ season: 'season-01', week: 3, tavern: 'the-gilded-flagon' });
+    expect(cyrb128(seed + '::roll:gate')).toEqual([719188793, 749840358, 3553410637, 3967180041]);
+  });
+
+  it('weekSeed rejects a week that is not a positive integer', () => {
+    for (const week of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => weekSeed({ season: 'season-01', week, tavern: 't' }), String(week)).toThrow(/week must be a positive integer/);
+    }
+  });
+
+  it('weekSeed rejects an empty or slash-containing season or tavern, and an empty salt', () => {
+    expect(() => weekSeed({ season: '', week: 1, tavern: 't' })).toThrow(/season must be a non-empty string/);
+    expect(() => weekSeed({ season: 'a/b', week: 1, tavern: 't' })).toThrow(/season must not contain "\/"/);
+    expect(() => weekSeed({ season: 's', week: 1, tavern: '' })).toThrow(/tavern must be a non-empty string/);
+    expect(() => weekSeed({ season: 's', week: 1, tavern: 'x/salt:y' })).toThrow(/tavern must not contain "\/"/);
+    expect(() => weekSeed({ season: 's', week: 1, tavern: 't', salt: '' })).toThrow(/salt must be a non-empty string/);
+  });
+
+  it('draftOrderSeed is <season>/draft-order and validates the season', () => {
+    expect(draftOrderSeed('season-01')).toBe('season-01/draft-order');
+    expect(() => draftOrderSeed('')).toThrow(/season must be a non-empty string/);
+    expect(() => draftOrderSeed('season/01')).toThrow(/season must not contain "\/"/);
+  });
 });
