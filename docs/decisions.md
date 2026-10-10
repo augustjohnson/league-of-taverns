@@ -68,6 +68,14 @@ seeded coin (*default*);
 Also: a DNF scores 0 under every option, so a DNF vs DNF matchup always goes to
 the tiebreakers.
 
+**D-15 Best-fit tiebreak: DEFAULTED.** When two starters have the same best
+modifier for a check, the actor is chosen deterministically: the captain first,
+then the allies in lineup order. Ties are common because many monsters share
+ability modifiers. The rule decides who appears as `{actor}` in the story, and
+which advantage applies if only one of the tied starters has it. *Note:* with
+advantage in play, prefer the tied starter who has advantage, since that's
+strictly better for the party. T6.1 implements this.
+
 **D-26 Draft pick timeout: DEFAULTED.** 24 h, then autopick with the `value`
 bot. Alternatives: skip (pick later), or wait indefinitely.
 
