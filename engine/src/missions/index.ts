@@ -19,6 +19,8 @@ import type { CrEighths } from '../vocabulary';
 import type { Mission } from './types';
 
 export type * from './types';
+export { checkTargetSchema, formatIssuePath, kebabIdSchema, missionSchema, parseMission, toSchemaIssues } from './schema';
+export type { AssertTrue, ParseResult, SchemaIssue, SchemaMatches } from './schema';
 
 export interface MissionRules {
   readonly dcBand: { readonly min: number; readonly max: number };

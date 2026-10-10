@@ -22,7 +22,8 @@
   "dependencies": {
     "@league-of-taverns/bots": "workspace:*",
     "@league-of-taverns/engine": "workspace:*",
-    "yaml": "^2.9.1"
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "tsx": "^4.23.15"

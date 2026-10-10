@@ -5,5 +5,15 @@
 export type * from './types';
 export type * from './state';
 export { InvalidEventError, applyEvent, initialState } from './reducers';
-export { lineHash, parseLog, replay, serializeEvent, verifyResolutions } from './replay';
+export { LogParseError, lineHash, parseLog, replay, serializeEvent, verifyResolutions } from './replay';
+export {
+  crEighthsSchema,
+  eventSchema,
+  lineupSchema,
+  modifierSchema,
+  payloadSchemas,
+  runResultSchema,
+  seasonConfigSchema,
+  sha256HexSchema,
+} from './schema';
 export type { ResolutionMismatch } from './replay';
