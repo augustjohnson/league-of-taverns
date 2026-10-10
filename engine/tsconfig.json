@@ -1,0 +1,10 @@
+{
+  // No "node" or "dom" types on purpose: the engine is pure and must run in
+  // both Node and the browser. Reaching for fs, process or window fails here
+  // as well as in lint.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"]
+}

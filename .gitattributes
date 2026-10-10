@@ -1,0 +1,9 @@
+* text=auto eol=lf
+
+# Event logs are append-only and written only by Actions. Never let git
+# auto-merge two writers' appends: a conflict is a bug in the concurrency
+# group, not something to resolve by hand.
+seasons/*/events/** -merge
+
+# Image storage is OPEN (docs/decisions.md D-10). If Git LFS is chosen, the
+# track rules go here. Until then, do not commit binary images.

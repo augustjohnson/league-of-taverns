@@ -1,0 +1,7 @@
+packages:
+  - engine
+  - bots
+  - scripts
+  - sims
+allowBuilds:
+  esbuild: true

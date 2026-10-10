@@ -1,0 +1,9 @@
+{
+  // Type-checks tests and root tooling. Each package also has its own
+  // tsconfig.json for its src/ (see the root "typecheck" script).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["*/test/**/*.ts", "vitest.config.ts"]
+}

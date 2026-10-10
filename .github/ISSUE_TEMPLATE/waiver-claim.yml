@@ -1,0 +1,33 @@
+# Waiver claim. Parsed by scripts/src/lib/issue-forms.ts. Tavern = issue author.
+name: Waiver claim
+description: Claim a free agent, dropping a rostered character if your roster is full.
+title: "[waiver] "
+labels: ["command", "waiver-claim"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Claims resolve together once a week, after the weekly run, in rolling
+        priority order. A tavern that wins a claim moves to the back of the
+        order. You may file several claims, and earlier claims take precedence.
+  - type: dropdown
+    id: season
+    attributes:
+      label: Season
+      options:
+        - season-01
+    validations:
+      required: true
+  - type: input
+    id: add
+    attributes:
+      label: Add (character id)
+    validations:
+      required: true
+  - type: input
+    id: drop
+    attributes:
+      label: Drop (character id)
+      description: Required if your roster is full. Leave blank otherwise.
+    validations:
+      required: false

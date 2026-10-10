@@ -1,0 +1,17 @@
+# The season's draftable pool (~64 characters) and their season modifiers.
+# Schema: docs/schema.md § Pool.
+#
+# Mechanics live here, per season. Chrome lives in characters/<id>/.
+# Each character's modifiers must cost ≤ config.budget.modifierPointsPerCharacter
+# under modifier registry v1 (engine/src/characters/registry.ts).
+
+season: season-01
+registry: 1
+characters:
+  - id: bruno-the-bruiser
+    # base comes from characters/bruno-the-bruiser/character.yaml (ogre, CR 2)
+    modifiers:
+      - { kind: skill_bonus, skill: intimidation, value: 2 }   # cost 2
+      - { kind: trait, trait: thick-skull }                    # cost 1
+    # total: 3 / 3
+  # … ~63 more

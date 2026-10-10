@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+
+# Sim output is derived and never committed.
+sims/output/
+
+# Difficulty reports are derived, and they describe sealed missions.
+seasons/*/reports/
+
+# Plaintext of sealed content must never be committed (see docs/decisions.md D-08).
+*.plain.yaml
+*.plain.json
+.secrets/

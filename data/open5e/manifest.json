@@ -1,0 +1,4 @@
+{
+  "$comment": "Pinned Open5e snapshots. Written by scripts/src/snapshot.ts (T1.1); entries are immutable once a season references them. Shape: engine/src/adapters/open5e/types.ts SnapshotManifestEntry.",
+  "snapshots": []
+}

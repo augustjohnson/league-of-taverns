@@ -1,0 +1,20 @@
+{
+  "name": "@league-of-taverns/sims",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless mock seasons with bot managers, plus the balance report.",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "mock-season": "tsx src/mock-season.ts",
+    "balance-report": "tsx src/balance-report.ts"
+  },
+  "dependencies": {
+    "@league-of-taverns/bots": "workspace:*",
+    "@league-of-taverns/engine": "workspace:*",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}

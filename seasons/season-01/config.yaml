@@ -1,0 +1,71 @@
+# Season configuration. Schema: docs/schema.md § Season config.
+# Values marked OPEN are defaults pending docs/decisions.md. Every value is per
+# season. Copied into season.created at creation, and later edits to this file
+# have no effect on a running season (CI flags them).
+
+id: season-01
+name: Season One
+snapshot: open5e-v1-2026-10        # id in data/open5e/manifest.json (not yet pulled: T1.1)
+modifierRegistryVersion: 1          # engine/src/characters/registry.ts
+weeks: 6
+schedule: schedule.yaml
+pool: pool.yaml
+managers: managers.yaml
+
+budget:
+  partyCr: 12                       # B: captain + 3 allies, total CR ≤ B. Fractions allowed ("1/2").
+  modifierPointsPerCharacter: 3     # per-season modifier budget per pooled character (D-31)
+
+roster:
+  size: 7                           # OPEN D-03
+  starters: 4                       # 1 captain + 3 allies
+  ownership: exclusive              # OPEN D-01
+
+draft:
+  format: snake                     # OPEN D-02
+  rounds: 7                         # = roster.size minus keepers (D-11)
+  order: { mode: seeded }           # seeded from rngFor(draftOrderSeed(season), 'order') | { mode: manual, taverns: [...] }
+  pickWindowHours: 24
+  onTimeout: autopick               # OPEN D-26: autopick (bot strategy "value") | skip | wait
+
+matchups:
+  format: head_to_head              # OPEN D-04
+  playoffs: { enabled: false, teams: 4, weeks: [] }   # 6 weeks is short; OPEN D-04
+
+scoring:
+  pointsScale: 100                  # points = round(score × 100); OPEN D-14
+  tiebreakers: [projected, checks_passed, seeded_coin]   # OPEN D-14
+
+waivers:
+  priority: rolling                 # OPEN D-05: successful claim moves you to the back
+  initialOrder: reverse_draft
+
+trades:
+  vetoWindowHours: 24               # OPEN D-06
+  vetoBy: commissioner
+  deadlineWeek: 4                   # no trades accepted after week 4 locks
+
+missedLineup: carry_over            # OPEN D-07 (fallback when the carried lineup is illegal: D-27)
+
+schedules:                          # Actions cron, UTC
+  lineupLock: "0 18 * * 4"          # Thursdays 18:00: lineup.locked
+  weeklyRun: "15 18 * * 4"          # then reveal + run + finalize
+  waivers: "0 12 * * 5"             # Fridays 12:00: waiver.resolved
+
+secrecy: encrypted                  # OPEN D-08: private_repo | commit_reveal | encrypted
+seedSalt: revealed_with_mission     # OPEN D-13: none | revealed_with_mission
+
+missions:
+  dcBand: { min: 8, max: 20 }
+  maxNodes: 14
+  maxRank: 8
+  battlesPerPath: { min: 0, max: 3 }
+  encounterCrRatio: 1.0             # total encounter CR ≤ ratio × B
+  battleModel: ev-ttk-v0            # engine/src/resolution BattleModel id (T6.2)
+
+carryover:                          # OPEN D-11. Applies when season-02 is created.
+  mode: keeper
+  keepersPerTavern: 1
+  keeperCost: round_of_last_season_pick   # or: none | fixed_round
+  championBonusKeepers: 1
+  maxModifierChangePoints: 1        # a kept character's modifiers may shift by at most this many points
