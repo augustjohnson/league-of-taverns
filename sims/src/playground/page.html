@@ -1,0 +1,266 @@
+<title>League of Taverns Playground</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Public+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* Layout: a tavern ledger. One column of ruled panels under a run bar, tabs as ledger tabs; tables and graphs scroll in their own frames. */
+:root {
+  --bg: #e9eee8;
+  --surface: #f6f8f3;
+  --sunken: #dfe6de;
+  --ink: #1b2620;
+  --muted: #56665d;
+  --line: #c3cec4;
+  --brass: #8b6414;
+  --brass-ink: #fffaf0;
+  --brass-soft: #ecdfb9;
+  --good: #24704a;
+  --good-soft: #d3eadb;
+  --bad: #a8352a;
+  --bad-soft: #f3d8d3;
+  --node: #fbfcf9;
+  --font-display: 'IM Fell English SC', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-ui: 'Public Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 4px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111915;
+    --surface: #18231e;
+    --sunken: #0d1411;
+    --ink: #e6e3d4;
+    --muted: #93a197;
+    --line: #2b3a33;
+    --brass: #d5aa4c;
+    --brass-ink: #1a1408;
+    --brass-soft: #3b321c;
+    --good: #72c290;
+    --good-soft: #1d3527;
+    --bad: #ea7c69;
+    --bad-soft: #3c1f1a;
+    --node: #1e2a25;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111915;
+  --surface: #18231e;
+  --sunken: #0d1411;
+  --ink: #e6e3d4;
+  --muted: #93a197;
+  --line: #2b3a33;
+  --brass: #d5aa4c;
+  --brass-ink: #1a1408;
+  --brass-soft: #3b321c;
+  --good: #72c290;
+  --good-soft: #1d3527;
+  --bad: #ea7c69;
+  --bad-soft: #3c1f1a;
+  --node: #1e2a25;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 var(--font-ui);
+  margin: 0;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 48px; display: grid; gap: 14px; }
+.wrap > * { min-width: 0; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+h1 { font-size: 2rem; line-height: 1.1; }
+h2 { font-size: 1.35rem; }
+h3 { font-size: 1.1rem; }
+p { margin: 0; }
+.num, .mono { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-variant-ligatures: none; font-size: 0.92em; }
+pre, .die, .sum, td.n, .kv .v, .bar .num { font-variant-ligatures: none; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+a { color: var(--brass); }
+
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; border-bottom: 2px solid var(--brass); padding-bottom: 10px; }
+header.top .sub { color: var(--muted); font-size: 13px; }
+header.top .sub b { color: var(--ink); font-weight: 600; }
+
+button, input, select { font: inherit; color: inherit; }
+button {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 6px 12px; cursor: pointer; font-weight: 600;
+}
+button:hover:not(:disabled) { border-color: var(--brass); }
+button.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); }
+button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.link { background: none; border: none; padding: 0; color: var(--brass); font-weight: 600; }
+input[type="text"], input[type="number"], select {
+  background: var(--node); border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 8px; min-width: 0;
+}
+input[type="text"]:focus, input[type="number"]:focus, select:focus, button:focus-visible, summary:focus-visible, .tabs button:focus-visible {
+  outline: 2px solid var(--brass); outline-offset: 1px;
+}
+
+.runbar {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+}
+.runbar form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.runbar #seed { width: 14em; font-family: var(--font-num); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--bg); font-size: 12.5px; white-space: nowrap;
+}
+.chip .num { font-size: 12px; }
+.chip.ok { background: var(--good-soft); border-color: var(--good); color: var(--good); font-weight: 600; }
+.chip.fail { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); font-weight: 600; }
+.chip.brass { background: var(--brass-soft); border-color: var(--brass); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+.error { background: var(--bad-soft); color: var(--bad); border: 1px solid var(--bad); border-radius: var(--radius); padding: 10px 12px; white-space: pre-wrap; font-family: var(--font-num); font-size: 12.5px; }
+
+.tabs { display: flex; gap: 2px; overflow-x: auto; overflow-y: hidden; padding-top: 2px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
+.tabs button {
+  border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0;
+  background: none; color: var(--muted); padding: 7px 14px; white-space: nowrap; margin-bottom: -1px;
+}
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); border-color: var(--line); border-top: 2px solid var(--brass); }
+
+.panel { display: grid; gap: 16px; }
+.panel > * { min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.card > * { min-width: 0; }
+.cols { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; }
+.cols > * { min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.row > * { min-width: 0; }
+.stack { display: grid; gap: 8px; }
+.kv { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.kv > div { display: grid; }
+.kv .v { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 1.15rem; }
+
+.scroll { overflow-x: auto; max-width: 100%; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 5px 9px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; background: var(--sunken); position: sticky; top: 0; }
+td.n, th.n { text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+td.wrap-ok { white-space: normal; min-width: 14em; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--sunken); }
+tr.sel td { background: var(--brass-soft); }
+tr.champ td:first-child { box-shadow: inset 3px 0 0 var(--brass); }
+.win { font-weight: 700; }
+.pass { color: var(--good); font-weight: 600; }
+.fail { color: var(--bad); font-weight: 600; }
+.cap { display: inline-block; font-family: var(--font-num); font-size: 10.5px; font-weight: 600; background: var(--brass); color: var(--brass-ink); border-radius: 3px; padding: 0 4px; margin-right: 4px; vertical-align: 1px; }
+.tag { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; color: var(--muted); }
+.tag.brass { border-color: var(--brass); color: var(--brass); }
+.tag.bad { border-color: var(--bad); color: var(--bad); }
+
+/* Mission graph */
+.graph { overflow-x: auto; background: var(--sunken); border: 1px solid var(--line); border-radius: var(--radius); }
+.graph svg { display: block; }
+.graph .edge { fill: none; stroke: var(--muted); stroke-width: 1.3; opacity: 0.55; }
+.graph .edge.on { stroke: var(--brass); stroke-width: 3; opacity: 1; }
+.graph .elabel { font: 600 10px var(--font-ui); fill: var(--muted); paint-order: stroke; stroke: var(--sunken); stroke-width: 4px; }
+.graph .elabel.on { fill: var(--brass); }
+.graph .node rect { fill: var(--node); stroke: var(--line); stroke-width: 1.2; }
+.graph .node.battle rect { stroke-dasharray: 4 2; stroke: var(--muted); }
+.graph .node.on rect { stroke: var(--brass); stroke-width: 2.4; }
+.graph .node.lost rect { stroke: var(--bad); stroke-width: 2.4; fill: var(--bad-soft); }
+.graph .node .id { font: 600 11.5px var(--font-ui); fill: var(--ink); }
+.graph .node .detail { font: 10px var(--font-ui); fill: var(--muted); }
+.graph .node .reach { font: 600 10.5px var(--font-num); fill: var(--brass); }
+.graph .node .out { font: 700 10px var(--font-ui); }
+.graph .node .out.pass, .graph .node .out.win { fill: var(--good); }
+.graph .node .out.fail, .graph .node .out.lose { fill: var(--bad); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; background: var(--brass); }
+
+/* Dice */
+.die { display: inline-grid; place-items: center; min-width: 2.1em; height: 1.75em; padding: 0 3px; border: 1.5px solid var(--ink); border-radius: 4px; font: 600 12.5px var(--font-num); background: var(--node); }
+.die.hi { border-color: var(--good); color: var(--good); }
+.die.lo { border-color: var(--bad); color: var(--bad); }
+.sum { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* Bars */
+.bars { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: 3.4em 1fr 5.4em; gap: 8px; align-items: center; font-size: 12px; }
+.bar .track { height: 12px; background: var(--sunken); border-radius: 2px; position: relative; overflow: hidden; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; background: var(--brass); }
+.bar .fill.alt { background: var(--muted); opacity: 0.55; }
+.bar .track.two { height: 18px; }
+.bar .track.two .fill { height: 50%; }
+.bar .track.two .fill.alt { top: 50%; }
+.meter { height: 10px; background: var(--sunken); border-radius: 2px; overflow: hidden; border: 1px solid var(--line); }
+.meter > div { height: 100%; background: var(--good); }
+.meter.over > div { background: var(--bad); }
+
+.violations { margin: 0; padding-left: 1.2em; color: var(--bad); }
+.okline { color: var(--good); font-weight: 600; }
+details > summary { cursor: pointer; color: var(--brass); font-weight: 600; font-size: 12.5px; }
+pre.json { margin: 6px 0 0; padding: 10px; background: var(--sunken); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; font: 12px/1.45 var(--font-num); max-height: 420px; }
+textarea#ndjson-fallback { width: 100%; height: 160px; font: 11px var(--font-num); background: var(--sunken); color: var(--ink); border: 1px solid var(--line); }
+
+.progress { height: 8px; background: var(--sunken); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+.progress > div { height: 100%; background: var(--brass); width: 0; transition: width 0.15s; }
+@media (prefers-reduced-motion: reduce) { .progress > div { transition: none; } }
+
+/* Draft board */
+.draft td { min-width: 9.5em; white-space: normal; }
+.draft td.rd { min-width: 0; white-space: nowrap; font-family: var(--font-num); color: var(--muted); }
+.draft tr.rtl td:not(.rd) { background: color-mix(in srgb, var(--brass-soft) 45%, transparent); }
+.draft .pk { font: 600 10.5px var(--font-num); color: var(--brass); }
+.draft .ch { font-weight: 600; }
+.draft td.hot { box-shadow: inset 0 0 0 2px var(--brass); }
+
+.pick-list { display: grid; gap: 6px; }
+.slot { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--node); }
+.slot.empty { border-style: dashed; color: var(--muted); }
+.slot .who { min-width: 0; overflow-wrap: anywhere; }
+.hint { color: var(--muted); font-size: 12.5px; }
+footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="stack" style="gap:2px">
+      <h1>League of Taverns</h1>
+      <p class="sub" id="subtitle">Playground</p>
+    </div>
+    <button type="button" id="theme" title="Switch colour theme">Theme: auto</button>
+  </header>
+
+  <section class="runbar" aria-label="Run a season">
+    <form id="run-form">
+      <label class="label" for="seed">Seed</label>
+      <input type="text" id="seed" value="sim-1" spellcheck="false" autocomplete="off">
+      <button type="submit" class="primary" id="run">Run</button>
+      <button type="button" id="new-seed">New seed</button>
+    </form>
+    <div class="chips" id="status" aria-live="polite"><span class="chip">Loading the engine…</span></div>
+  </section>
+  <div id="run-error" class="error" hidden></div>
+
+  <nav class="tabs" role="tablist" id="tabs">
+    <button type="button" role="tab" data-tab="standings" aria-selected="true">Standings</button>
+    <button type="button" role="tab" data-tab="weeks" aria-selected="false">Weeks</button>
+    <button type="button" role="tab" data-tab="lab" aria-selected="false">Lineup lab</button>
+    <button type="button" role="tab" data-tab="draft" aria-selected="false">Draft board</button>
+    <button type="button" role="tab" data-tab="pool" aria-selected="false">Pool</button>
+    <button type="button" role="tab" data-tab="events" aria-selected="false">Event log</button>
+    <button type="button" role="tab" data-tab="batch" aria-selected="false">Batch</button>
+  </nav>
+
+  <main id="panel" class="panel"><p class="muted">Running seed sim-1…</p></main>
+
+  <footer>
+    Runs the real <span class="mono">@league-of-taverns/engine</span> and bots in your browser. A seed gives the same season as
+    <span class="mono">pnpm --filter @league-of-taverns/sims mock-season -- --seed &lt;seed&gt;</span>: the same draft, lineups, rolls,
+    points and champion. Projected values can differ from Node in the last decimal place, because JavaScript engines may round
+    <span class="mono">Math.exp</span> differently.
+    Monster data: System Reference Document 5.1 by Wizards of the Coast LLC, CC-BY-4.0.
+  </footer>
+</div>

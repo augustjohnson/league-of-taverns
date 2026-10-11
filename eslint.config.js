@@ -73,6 +73,12 @@ export default defineConfig(
     },
   },
 
+  // The sims playground runs in a browser (it may import the engine, unlike explorer/).
+  {
+    files: ['sims/src/playground/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+  },
+
   // Boundary: the explorer reads only published JSON.
   {
     files: ['explorer/**/*.{ts,tsx,js,jsx}'],

@@ -3,5 +3,7 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The browser playground has its own config with DOM types: src/playground/tsconfig.json.
+  "exclude": ["src/playground"]
 }
