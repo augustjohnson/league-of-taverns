@@ -31,20 +31,55 @@ portrait:
   # Canvas by the creature size of the character's base (Open5e), at the same
   # pixel scale: a Large creature gets a bigger card than a Small one. Cards
   # line up on their bottom edge, so big creatures stand taller in a lineup.
+  # `bleed` edges may cut the figure (besides the bottom); `framing` replaces
+  # the default framing text for that size.
   sizes:
-    tiny:       { width: 80,  height: 104 }
+    tiny:
+      width: 80
+      height: 104
+      # Tiny creatures mostly fly; a mug on the bar grounds them. Its base is
+      # narrower than the creature, hence the lower minFooting.
+      minFooting: 0.25
+      framing: >-
+        (perched on the rim of a large wooden beer mug:1.3), (whole creature
+        visible, centered:1.2), the mug continuing past the bottom edge
     small:      { width: 96,  height: 120 }
     medium:     { width: 112, height: 144 }
     large:      { width: 128, height: 160 }
-    huge:       { width: 144, height: 184 }
-    gargantuan: { width: 160, height: 200 }
+    huge:
+      width: 144
+      height: 184
+      bleed: [top, left]
+      framing: >-
+        (towering upper body entering the frame from the top left:1.3),
+        body continuing past the bottom edge
+    gargantuan:
+      width: 160
+      height: 200
+      bleed: [top, left]
+      framing: >-
+        (towering upper body entering the frame from the top left:1.3),
+        body continuing past the bottom edge
+  # Layering over the tavern scene (scripts/src/lib/images/framing.ts): every
+  # card stands behind the bar, which covers its bottom `counter` rows. Each
+  # figure is dropped onto the bottom edge; at the counter line it must be
+  # solid across minFooting of its width (no head on a stalk), and only the
+  # bottom edge, plus a size's bleed edges, may cut it. Proportions (a big
+  # head on a small body) are left to the GM, who sees the bar on the review page.
+  counter: 20
+  minFooting: 0.5
+  tolerance: 2
+  framing: >-
+    (upper body portrait:1.3), (centered, with empty space above the head and
+    on both sides:1.2), shoulders and chest continuing past the bottom edge
   cutout: true
   positive: >-
-    pixel art, (close-up headshot portrait:1.4), (head and shoulders only:1.3),
-    {{subject}}, three-quarter view, looking at viewer,
+    pixel art, {{framing}}, {{subject}}, three-quarter view, looking at viewer,
     (thick dark outline around the character:1.3), plain white background
   negative: >-
-    (full body:1.5), (legs, feet, standing:1.3), floor, shadow, text, letters,
+    (cropped:1.3), (out of frame:1.3), cut off, floating head, disembodied head,
+    (suit, necktie, blazer, business attire:1.3), close-up, (full body:1.3),
+    legs, feet, floor, shadow, text, letters,
     watermark, frame, border, blurry, photo, 3d render
 
 cover:

@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { ValidationFailure } from '../main';
 import { REPO_ROOT, issuesFailure, readYaml, rootDir } from '../repo';
 import type { RepoRoot } from '../repo';
+import { EDGES } from './framing';
+import type { FramingRules } from './framing';
 import { PALETTES } from './palette';
 import type { PaletteName, Rgb } from './palette';
 import type { PixelateOptions } from './pixelate';
@@ -24,15 +26,23 @@ export interface Size {
 }
 
 const SUBJECT = '{{subject}}';
+const FRAMING = '{{framing}}';
+const once = (token: string) => (s: string) => s.split(token).length === 2;
 
 const text = z.string().min(1);
 const size = z.strictObject({ width: z.number().int().positive(), height: z.number().int().positive() });
 
 const prompts = {
   cutout: z.boolean(),
-  positive: text.refine((s) => s.split(SUBJECT).length === 2, `must contain ${SUBJECT} exactly once`),
+  positive: text.refine(once(SUBJECT), `must contain ${SUBJECT} exactly once`),
   negative: text,
 };
+
+const portraitSize = size.extend({
+  bleed: z.array(z.enum(EDGES)).exactOptional(),
+  minFooting: z.number().min(0).max(1).exactOptional(),
+  framing: text.exactOptional(),
+});
 
 const styleSchema = z.strictObject({
   palette: z.enum(Object.keys(PALETTES) as [PaletteName, ...PaletteName[]]),
@@ -52,14 +62,20 @@ const styleSchema = z.strictObject({
     chromaWeight: z.number().positive(),
   }),
   portrait: z.strictObject({
-    sizes: z.strictObject(Object.fromEntries(CREATURE_SIZES.map((s) => [s, size])) as Record<CreatureSize, typeof size>),
+    sizes: z.strictObject(Object.fromEntries(CREATURE_SIZES.map((s) => [s, portraitSize])) as Record<CreatureSize, typeof portraitSize>),
+    counter: z.number().int().nonnegative(),
+    minFooting: z.number().min(0).max(1),
+    tolerance: z.number().int().nonnegative(),
+    framing: text,
     ...prompts,
+    positive: text
+      .refine(once(SUBJECT), `must contain ${SUBJECT} exactly once`)
+      .refine(once(FRAMING), `must contain ${FRAMING} exactly once`),
   }),
   cover: z.strictObject({ output: size, ...prompts }),
 });
 
 export type ImageStyle = z.infer<typeof styleSchema>;
-export type KindStyle = ImageStyle[ImageKind];
 
 export function stylePath(root: RepoRoot = REPO_ROOT): string {
   return join(rootDir(root), 'content', 'images', 'style.yaml');
@@ -93,7 +109,19 @@ export function creatureSize(openSize: string): CreatureSize | undefined {
 export function outputSize(style: ImageStyle, kind: ImageKind, size?: CreatureSize): Size {
   if (kind === 'cover') return style.cover.output;
   if (size === undefined) throw new Error('a portrait needs a creature size');
-  return style.portrait.sizes[size];
+  const { width, height } = style.portrait.sizes[size];
+  return { width, height };
+}
+
+/** How a portrait of this size must sit on its canvas (./framing.ts). */
+export function framingRules(style: ImageStyle, size: CreatureSize): FramingRules {
+  const entry = style.portrait.sizes[size];
+  return {
+    bleed: entry.bleed ?? [],
+    counter: style.portrait.counter,
+    minFooting: entry.minFooting ?? style.portrait.minFooting,
+    tolerance: style.portrait.tolerance,
+  };
 }
 
 /** The ComfyUI render size: the output times the pixel cell. */
@@ -106,9 +134,12 @@ export function paletteOf(style: ImageStyle): ReadonlyArray<Rgb> {
   return PALETTES[style.palette];
 }
 
-/** The full positive prompt for one subject. */
-export function positivePrompt(kind: KindStyle, subject: string): string {
-  return kind.positive.replace(SUBJECT, subject.trim().replace(/\.$/, ''));
+/** The full positive prompt for one subject; portraits also get their size's framing. */
+export function positivePrompt(style: ImageStyle, kind: ImageKind, subject: string, size?: CreatureSize): string {
+  const filled = style[kind].positive.replace(SUBJECT, subject.trim().replace(/\.$/, ''));
+  if (kind === 'cover') return filled;
+  if (size === undefined) throw new Error('a portrait needs a creature size');
+  return filled.replace(FRAMING, (style.portrait.sizes[size].framing ?? style.portrait.framing).trim());
 }
 
 export function pixelateOptions(style: ImageStyle, kind: ImageKind): PixelateOptions {

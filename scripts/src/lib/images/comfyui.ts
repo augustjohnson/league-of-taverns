@@ -40,7 +40,7 @@ export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
         clip: ['checkpoint', 1],
       },
     },
-    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(kind, request.subject), clip: ['lora', 1] } },
+    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(style, request.kind, request.subject, request.size), clip: ['lora', 1] } },
     negative: { class_type: 'CLIPTextEncode', inputs: { text: kind.negative, clip: ['lora', 1] } },
     latent: { class_type: 'EmptyLatentImage', inputs: { width: render.width, height: render.height, batch_size: 1 } },
     sample: {

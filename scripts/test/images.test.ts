@@ -8,6 +8,8 @@ import { renderGraph } from '../src/lib/images/comfyui';
 import { accept, coverTargets, defaultSeed, portraitTargets, stage, writeReviewPage } from '../src/lib/images/drafts';
 import { PALETTES } from '../src/lib/images/palette';
 import type { Rgb } from '../src/lib/images/palette';
+import { framingProblems } from '../src/lib/images/framing';
+import type { Edge } from '../src/lib/images/framing';
 import { PixelateError, checkSprite, pixelate } from '../src/lib/images/pixelate';
 import type { PixelateOptions } from '../src/lib/images/pixelate';
 import { PngError, decodePng, encodeIndexedPng } from '../src/lib/images/png';
@@ -176,6 +178,53 @@ describe('pixelate', () => {
   });
 });
 
+describe('framing', () => {
+  // 20×20 cards with a 4-row bar: the counter line is row 15.
+  const rules = { bleed: [] as Edge[], counter: 4, minFooting: 0.5, tolerance: 2 };
+  /** Opaque where `cell(x, y)` is true. */
+  const shape = (width: number, height: number, cell: (x: number, y: number) => boolean): RgbaImage => ({
+    width,
+    height,
+    data: Uint8Array.from({ length: width * height * 4 }, (_, i) => (i % 4 === 3 && cell((i >> 2) % width, Math.floor((i >> 2) / width)) ? 255 : 0)),
+  });
+
+  it('passes a bust that goes down behind the bar with room around it', () => {
+    expect(framingProblems(shape(20, 20, (x, y) => x >= 3 && x <= 16 && y >= 4), rules)).toEqual([]);
+  });
+
+  it("doesn't care how the figure ends behind the bar", () => {
+    // Wide at the counter line, tapering to a point under the bar.
+    expect(framingProblems(shape(20, 20, (x, y) => y >= 4 && Math.abs(x - 10) <= (y <= 15 ? 7 : 19 - y)), rules)).toEqual([]);
+  });
+
+  it('flags clipping on the top and sides, unless that edge may bleed', () => {
+    const tall = shape(20, 20, (x) => x <= 16);
+    expect(framingProblems(tall, rules)).toEqual(['is clipped at the top (17 pixels on the edge)', 'is clipped at the left (20 pixels on the edge)']);
+    expect(framingProblems(tall, { ...rules, bleed: ['top', 'left'] })).toEqual([]);
+  });
+
+  it('flags a floating head: a gap underneath, or a thin neck at the counter line', () => {
+    expect(framingProblems(shape(20, 20, (x, y) => x >= 4 && x <= 15 && y >= 4 && y <= 14), rules)).toEqual([
+      'floats: nothing reaches the bottom edge',
+    ]);
+    const neck = shape(20, 20, (x, y) => (x >= 4 && x <= 15 && y >= 4 && y <= 12) || (x >= 9 && x <= 10 && y > 12));
+    expect(framingProblems(neck, rules)).toEqual(['floats: only 17% of its width is solid at the counter line (needs 50%)']);
+  });
+
+  it('drops a portrait onto the bottom edge, so a rounded bust ends behind the bar', () => {
+    const moss = PALETTE[30]!;
+    const sprite = decodePng(
+      encodeIndexedPng(
+        pixelate(
+          blockRender(Array.from({ length: 6 }, (_, y) => Array.from({ length: 5 }, (_, x) => (x >= 1 && x <= 3 && y >= 1 && y <= 2 ? moss : null)))),
+          options({ cutout: true, anchorBottom: true }),
+        ),
+      ),
+    );
+    expect(framingProblems(sprite, { ...rules, counter: 1 })).toEqual([]);
+  });
+});
+
 describe('checkSprite', () => {
   it('reports size, partial alpha and off-palette colours', () => {
     const image: RgbaImage = { width: 2, height: 1, data: Uint8Array.from([1, 2, 3, 255, ...PALETTE[0]!, 128]) };
@@ -189,10 +238,17 @@ describe('checkSprite', () => {
 
 describe('style and graph', () => {
   it('fills the subject into the fixed wrapper', () => {
-    const prompt = positivePrompt(style.portrait, 'a green ogre in an apron. ');
+    const prompt = positivePrompt(style, 'portrait', 'a green ogre in an apron. ', 'medium');
     expect(prompt).toContain('pixel art');
     expect(prompt).toContain('a green ogre in an apron,');
-    expect(prompt).not.toContain('{{subject}}');
+    expect(prompt).toContain(style.portrait.framing.trim());
+    expect(prompt).not.toMatch(/\{\{/);
+  });
+
+  it("uses a size's own framing where it has one", () => {
+    expect(positivePrompt(style, 'portrait', 'a stirge', 'tiny')).toContain('beer mug');
+    expect(positivePrompt(style, 'portrait', 'a t-rex', 'huge')).toContain('from the top left');
+    expect(positivePrompt(style, 'cover', 'a bog')).toContain('a bog');
   });
 
   it('cuts portraits out with BiRefNet and saves covers straight from the decoder', () => {
@@ -228,6 +284,17 @@ describe('drafts and committed images', () => {
   const { width: pw, height: ph } = style.portrait.sizes.large;
   const sizeOf = (base: string) => (base === 'ogre' ? ('large' as const) : undefined);
   const { width: cw, height: ch } = style.cover.output;
+  /** A figure standing on the bottom edge with a 10-pixel margin on the other three sides. */
+  const figure = (width: number, height: number): Uint8Array =>
+    encodeIndexedPng({
+      width,
+      height,
+      indices: Uint8Array.from({ length: width * height }, (_, i) => (i % width >= 10 && i % width < width - 10 && i >= 10 * width ? 1 : 0)),
+      palette: [
+        [0, 0, 0, 0],
+        [...PALETTE[30]!, 255],
+      ],
+    });
   const solid = (width: number, height: number, transparentTop = 0): Uint8Array =>
     encodeIndexedPng({
       width,
@@ -274,9 +341,16 @@ describe('drafts and committed images', () => {
   it('accepts a staged portrait into the repo and records it, keeping comments', () => {
     const [target] = portraitTargets(['ogre-one'], sizeOf, root);
     expect(target!.size).toBe('large');
-    stage(target!, 42, new Uint8Array([1]), solid(pw, ph, 10), root);
+    expect(stage(target!, 42, new Uint8Array([1]), figure(pw, ph), style, root)).toEqual([]);
+    expect(stage(target!, 43, new Uint8Array([1]), solid(pw, ph, 10), style, root)).toEqual([
+      `is clipped at the left (${ph - 10} pixels on the edge)`,
+      `is clipped at the right (${ph - 10} pixels on the edge)`,
+    ]);
     expect(writeReviewPage(style, root)).toMatch(/index\.html$/);
-    expect(readFileSync(join(root, '.image-drafts', 'index.html'), 'utf8')).toContain('accept --character ogre-one --seed 42');
+    const page = readFileSync(join(root, '.image-drafts', 'index.html'), 'utf8');
+    expect(page).toContain('accept --character ogre-one --seed 42');
+    expect(page).toContain('✗ is clipped at the left');
+    expect(() => accept(target!, 43, style, root)).toThrow(/can't be layered cleanly/);
 
     expect(accept(target!, 42, style, root)).toBe('characters/ogre-one/portrait.png');
     const yaml = readFileSync(join(root, 'characters', 'ogre-one', 'character.yaml'), 'utf8');
@@ -288,7 +362,7 @@ describe('drafts and committed images', () => {
     expect(checkSeasonImages('s1', [{ id: 'ogre-one', size: 'medium' }], root)).toEqual([
       `characters/ogre-one/portrait.png: is ${pw}×${ph}, expected ${mw}×${mh}`,
     ]);
-    expect(() => accept(target!, 43, style, root)).toThrow(/no staged portrait/);
+    expect(() => accept(target!, 44, style, root)).toThrow(/no staged portrait/);
   });
 
   it('flags missing, wrong-sized and orphaned images', () => {

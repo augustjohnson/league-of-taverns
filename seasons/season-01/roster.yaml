@@ -6,6 +6,8 @@
 #             (content/images/style.yaml portrait.sizes)
 #   hook:     the joke, played straight
 #   look:     the portrait's subject text: colour, identifying marks, expression
+#   name:     creatures with a language other than Common are named in it;
+#             animals and the mindless keep the names tavern regulars gave them
 #   bodyPlan: portrait framing: humanoid | beast | winged | blob | swarm | object | plant | multihead
 
 season: season-01
@@ -100,7 +102,7 @@ characters:
     name: Gary Pell
     epithet: from Accounting
     hook: Died at his desk in 1102. Has not missed a day since.
-    look: grey-green zombie man in a loosened brown necktie, missing his left ear, ink-stained fingers holding a chipped coffee mug, (dead-eyed polite smile:1.3)
+    look: grey-green zombie man in a stained grey wool cardigan, missing his left ear, ink-stained fingers holding a chipped coffee mug, (dead-eyed polite smile:1.3)
     bodyPlan: humanoid
 
   - id: nell-malone
@@ -148,10 +150,10 @@ characters:
     look: fat green frog with a yellow throat, a gold hoop earring and a long pink tongue hanging out, (heavy-lidded smirk:1.3)
     bodyPlan: beast
 
-  - id: ormond
+  - id: ghhurzh
     base: dretch
     size: small
-    name: Ormond
+    name: "Ghh'ŭrzh"
     epithet: the Intern
     hook: Fired from the Abyss for incompetence, which is difficult to arrange.
     look: pot-bellied grey demon with one snapped-off horn and a crooked paper name tag pinned to his chest, (nervous sweaty grin:1.3)
@@ -185,10 +187,10 @@ characters:
     look: black squid-like darkmantle draped over a head like a floppy beret, one tentacle tip curled, (shifty eyes peeking out:1.3)
     bodyPlan: blob
 
-  - id: bran-hollis
+  - id: hyekh-kaa
     base: gnoll
     size: medium
-    name: Bran Hollis
+    name: "Hyekh!k'ka'a"
     epithet: Laughs First
     hook: Has never finished a joke. Starts laughing at the setup.
     look: spotted tan hyena-headed gnoll with a notched ear, a gold canine tooth and a loud striped vest, (wide-open howling laugh:1.3)
@@ -218,7 +220,7 @@ characters:
     name: Professor Albright
     epithet: Tenured
     hook: Lectures on decorum. Throws dung at anyone who asks a question.
-    look: grey-furred ape with a scarred upper lip, in a brown tweed jacket with elbow patches and a monocle on a chain, (pompous lecturing frown:1.3)
+    look: grey-furred ape with a scarred upper lip, in a moth-eaten black academic gown and a monocle on a chain, (pompous lecturing frown:1.3)
     bodyPlan: beast
 
   - id: rocco
@@ -236,7 +238,7 @@ characters:
     name: Randall Pike
     epithet: Wedding Guest
     hook: Has attended four hundred weddings. Was invited to none.
-    look: curly-haired satyr with one curled horn and one broken stub, a crooked red bow tie and a party blower in his mouth, (cheeky wink:1.3)
+    look: curly-haired satyr with one curled horn and one broken stub, a crooked paper party hat and a party blower in his mouth, (cheeky wink:1.3)
     bodyPlan: humanoid
 
   # ── CR 1 ────────────────────────────────────────────────────────────────
@@ -317,7 +319,7 @@ characters:
     size: medium
     name: Vincent
     epithet: Your Ex
-    hook: Shows up uninvited at three in the morning, through the wall, just to talk.
+    hook: Shows up uninvited at three in the morning, through the wall. Cannot speak. Stays anyway.
     look: translucent pale-blue ghost man with a droopy mustache, holding a wilted flower, (mournful puppy-dog eyes:1.3)
     bodyPlan: humanoid
 
@@ -382,13 +384,13 @@ characters:
     name: Ronnie Vermicelli
     epithet: Lounge Singer
     hook: Changes at the full moon. Does a full set every time, stage or no stage.
-    look: rat-man wererat with slicked-back black hair and a chipped front incisor, in a maroon velvet blazer, (crooning eyes-closed smile:1.3)
+    look: rat-man wererat with slicked-back black hair and a chipped front incisor, in a gaudy maroon ruffled shirt open at the collar, (crooning eyes-closed smile:1.3)
     bodyPlan: humanoid
 
-  - id: gerald
+  - id: krrth
     base: gargoyle
     size: medium
-    name: Gerald
+    name: Kʀʀṭh
     epithet: Never Convicted
     hook: Suspect in forty-one break-ins. Every witness describes a statue.
     look: grey stone gargoyle with one chipped horn, moss on his shoulders and folded wings, (sly guilty grin:1.3)
@@ -431,10 +433,10 @@ characters:
     look: brown-feathered owlbear with huge amber eyes, a cracked beak tip and a heart tattoo on one arm, (overjoyed beaming face:1.3)
     bodyPlan: beast
 
-  - id: bull-hornsby
+  - id: mhruugh
     base: minotaur
     size: large
-    name: Bull Hornsby
+    name: "Mhʀ'ūūgh"
     epithet: Maze Specialist
     hook: The league's leading expert on labyrinths. Gets lost in hallways.
     look: hulking brown bull-headed minotaur with a gold nose ring and one sawn-off horn, (confused squinting frown:1.3)
@@ -467,10 +469,10 @@ characters:
     look: dusty tan mummy with loose bandages trailing off one arm and one glowing green eye, (sheepish grin:1.3)
     bodyPlan: humanoid
 
-  - id: fido
+  - id: zhaal
     base: hell-hound
     size: medium
-    name: Fido
+    name: "Zh'aaʔl"
     epithet: Good Boy (Allegedly)
     hook: Fetches anything you throw. Sets it on fire first. Brings back the ashes.
     look: black hell-hound with a white patch over one eye, flames curling from its mouth and a spiked red collar, (happy panting dog smile:1.3)
@@ -495,10 +497,10 @@ characters:
     bodyPlan: humanoid
 
   # ── CR 4 ────────────────────────────────────────────────────────────────
-  - id: bert-and-albert
+  - id: hrok-and-hrok
     base: ettin
     size: large
-    name: Bert and Albert
+    name: Hrök and Hrøk
     epithet: the Coworkers
     hook: Two heads, one body, and a twenty-year argument about whose turn it is to scratch.
     look: two-headed grey-skinned ettin, one bald head with an eyepatch and one with a ginger beard, turned toward each other mid-argument, (both heads yelling:1.3)
@@ -513,10 +515,10 @@ characters:
     look: glossy black blob of pudding with a single red cherry on top, (gleeful gooey grin:1.3)
     bodyPlan: blob
 
-  - id: kowalski
+  - id: kluu
     base: chuul
     size: large
-    name: Kowalski
+    name: "Ḱʟʟuu'ʘ"
     epithet: Ill Repute
     hook: Runs a dice game under every bridge in the league. Wins by holding the dice.
     look: dark green lobster-like chuul with face tentacles, a gold tooth and a cracked claw, (shady dealmaker grin:1.3)
@@ -532,19 +534,19 @@ characters:
     bodyPlan: beast
 
   # ── CR 5 ────────────────────────────────────────────────────────────────
-  - id: ray
+  - id: vrraal
     base: troll
     size: large
-    name: Ray
+    name: Vʁʁaał
     epithet: Can't Stay Down
     hook: Has died nine times this season. Attended every post-match party.
     look: lanky mossy-green troll with a long hooked nose, bandages and one smaller regrowing arm, (cheerful unbothered grin:1.3)
     bodyPlan: humanoid
 
-  - id: tommy
+  - id: thungk
     base: hill-giant
     size: huge
-    name: Tommy
+    name: Thüŋk
     epithet: Eats for Two
     hook: Ate the opposing team's mascot, then their snacks, then their bench.
     look: fat ruddy hill giant with a cauliflower ear and gravy stains down his tunic, holding a turkey leg, (greedy mouth-full grin:1.3)
@@ -559,20 +561,20 @@ characters:
     look: grey-skinned stitched flesh golem with mismatched arms, a bolt in his neck and one blue and one brown eye, (bewildered lopsided smile:1.3)
     bodyPlan: humanoid
 
-  - id: otto
+  - id: otgh
     base: otyugh
     size: large
-    name: Otto
+    name: "Ö'tʰǧh"
     epithet: Sanitation
     hook: Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.
     look: lumpy brown three-legged otyugh with a single eyestalk and a banana peel draped on its head, (proud gap-toothed grin:1.3)
     bodyPlan: blob
 
   # ── CR 6–8 ──────────────────────────────────────────────────────────────
-  - id: the-committee
+  - id: rhaa-baeh-skraa
     base: chimera
     size: large
-    name: The Committee
+    name: Rhaa-Bǣh-Skʀaa
     epithet: No Consensus
     hook: Three heads. No agreement yet on direction, dinner or a name.
     look: chimera with a tawny lion head, a white goat head with a broken horn and a red dragon head, all glaring at each other, (three heads bickering:1.3)

@@ -30,6 +30,26 @@ Cards line up on their bottom edge, so big creatures stand taller in a lineup.
 | Huge | 144×184 | 1152×1472 |
 | Gargantuan | 160×200 | 1280×1600 |
 
+## Layering over the tavern
+
+Portraits are made to stand side by side behind the bar in a tavern scene:
+
+- **The bar hides the bottom.** The scene draws a counter across the bottom
+  `counter` rows (20) of every card. Every figure is dropped onto the bottom
+  edge, so however a bust or a pair of legs ends, it ends behind the bar.
+- **No clipping.** Only the bottom edge may cut a figure. Huge and
+  Gargantuan canvases may also bleed off the top and left (a T-rex entering
+  the frame); put those at the left end of a lineup.
+- **No floating.** At the counter line the figure must be solid across half
+  its width (`minFooting`), so a head on a thin neck fails. Tiny creatures
+  perch on a beer mug standing on the bar, with a lower threshold.
+
+`draft-images` checks every candidate (`scripts/src/lib/images/framing.ts`),
+the review page marks failures and draws the bar over each card, `accept`
+refuses failures without `--force`, and `validate` checks committed
+portraits. Proportions, such as a big head on a small body, are left to the
+GM's eye. Expect 2 or 3 of 4 candidates to pass for most sizes, fewer for Huge.
+
 ## How an image is made
 
 ```
@@ -94,6 +114,8 @@ prompt: >-
   too-small brown leather tavern apron
 ```
 
+- No suits, ties or blazers: the negative prompt already pushes against
+  them, and "man" alone drifts into office wear.
 - Name the skin or body colour. "Ogre" alone came out human-skinned in 3 of 4.
 - Weight the expression, as in `(… grin:1.3)`. The model scowls by default.
 - Use creature words SDXL knows. "Pseudodragon" came out as a man in a

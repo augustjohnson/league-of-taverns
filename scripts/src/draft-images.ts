@@ -4,7 +4,7 @@
  * Usage:
  *   draft-images portraits (--character <id>... | --all) [--snapshot <id>] [--candidates 4] [--seed <n>]
  *   draft-images covers --season <id> [--mission <id>...] [--candidates 4] [--seed <n>]
- *   draft-images accept --character <id> --seed <n>
+ *   draft-images accept --character <id> --seed <n> [--force]
  *   draft-images accept --season <id> --mission <id> --seed <n>
  *
  * A portrait's canvas follows its base's creature size, looked up in
@@ -13,7 +13,9 @@
  * `portraits` and `covers` render `--candidates` images per target with
  * consecutive seeds (from `--seed`, else a stable per-target seed), pixelate
  * them (lib/images/pixelate.ts), and stage them in .image-drafts/ with an
- * index.html to compare. `accept` copies one candidate into the repo and, for
+ * index.html to compare. Each portrait is checked against the framing rules
+ * (lib/images/framing.ts: no clipping, no floating) and the page marks the
+ * failures; `accept` refuses them without --force. `accept` copies one candidate into the repo and, for
  * a portrait, records path and seed in character.yaml with status draft.
  *
  * Needs a running ComfyUI (COMFYUI_URL, default http://127.0.0.1:8188).
@@ -33,7 +35,7 @@ import { REPO_ROOT, rootDir } from './lib/repo';
 const USAGE = `Usage:
   draft-images portraits (--character <id>... | --all) [--snapshot <id>] [--candidates 4] [--seed <n>]
   draft-images covers --season <id> [--mission <id>...] [--candidates 4] [--seed <n>]
-  draft-images accept --character <id> --seed <n>
+  draft-images accept --character <id> --seed <n> [--force]
   draft-images accept --season <id> --mission <id> --seed <n>`;
 
 function parse(argv: ReadonlyArray<string>) {
@@ -47,6 +49,7 @@ function parse(argv: ReadonlyArray<string>) {
       snapshot: { type: 'string' },
       candidates: { type: 'string' },
       seed: { type: 'string' },
+      force: { type: 'boolean' },
     },
     strict: true,
     allowPositionals: true,
@@ -68,6 +71,7 @@ function parse(argv: ReadonlyArray<string>) {
     snapshot: values.snapshot,
     candidates: integer('candidates', values.candidates, 1) ?? 4,
     seed: integer('seed', values.seed, 0),
+    force: values.force === true,
   };
 }
 
@@ -113,11 +117,16 @@ async function draft(args: Args): Promise<void> {
     (request) => console.log(`  ${++done}/${jobs.length} ${request.kind} ${request.prefix.split('/').pop()}`),
   );
 
+  const clean = new Map<string, number>();
   jobs.forEach(({ target, seed }, i) => {
     const render = renders[i]!;
     const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind)));
-    stage(target, seed, render, sprite);
+    const problems = stage(target, seed, render, sprite, style);
+    clean.set(target.id, (clean.get(target.id) ?? 0) + (problems.length === 0 ? 1 : 0));
   });
+  for (const target of targets) {
+    if (target.kind === 'portrait') console.log(`  ${target.id}: ${clean.get(target.id) ?? 0}/${args.candidates} layer cleanly`);
+  }
   const page = writeReviewPage(style);
   console.log(`Done in ${Math.round((Date.now() - started) / 1000)}s. Compare them in ${relative(rootDir(REPO_ROOT), page)}, then run its accept command.`);
 }
@@ -126,7 +135,7 @@ function acceptOne(args: Args): void {
   if (args.seed === undefined) throw new ValidationFailure(`accept needs --seed <n>.\n\n${USAGE}`);
   const targets = targetsFor(args);
   if (targets.length !== 1) throw new ValidationFailure(`accept takes exactly one --character, or one --season with one --mission.\n\n${USAGE}`);
-  const written = accept(targets[0]!, args.seed, loadImageStyle());
+  const written = accept(targets[0]!, args.seed, loadImageStyle(), REPO_ROOT, args.force);
   console.log(`Wrote ${written}.${targets[0]!.kind === 'portrait' ? ' Portrait status is draft: set it to final in review.' : ''}`);
 }
 

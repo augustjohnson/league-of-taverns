@@ -14,8 +14,8 @@
  *    between two palette entries.
  * 4. Despeckle: a pixel whose four neighbours all agree on another colour
  *    takes that colour.
- * 5. Frame: portraits are trimmed and re-anchored bottom-centre, so every
- *    lineup card sits the same way.
+ * 5. Frame: portraits are dropped onto the bottom edge, where the bar hides
+ *    how they end (./framing.ts), and centred unless they touch a side edge.
  *
  * Deterministic: the same render and options give the same bytes.
  */
@@ -162,7 +162,7 @@ function despeckle(index: Uint8Array, opaque: Uint8Array, width: number, height:
   }
 }
 
-/** Shift the opaque area so its bottom edge sits on the canvas bottom and it is centred horizontally. */
+/** Drop the opaque area onto the canvas bottom and centre it, unless it touches a side. */
 function anchorBottom(
   paletteIndex: Uint8Array,
   opaque: Uint8Array,
@@ -180,7 +180,8 @@ function anchorBottom(
     }
   }
   if (right < 0) return { paletteIndex, opaque };
-  const dx = Math.floor((width - (right - left + 1)) / 2) - left;
+  const touchesSide = left === 0 || right === width - 1;
+  const dx = touchesSide ? 0 : Math.floor((width - (right - left + 1)) / 2) - left;
   const dy = height - 1 - bottom;
   const movedIndex = new Uint8Array(width * height);
   const movedOpaque = new Uint8Array(width * height);

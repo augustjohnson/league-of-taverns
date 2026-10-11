@@ -18,9 +18,10 @@ import { ValidationFailure } from '../main';
 import { REPO_ROOT, loadCharacterChrome, loadCharacterRef, loadSnapshot, readYaml, rootDir } from '../repo';
 import type { RepoRoot } from '../repo';
 import { seasonDir } from '../season';
+import { framingProblems } from './framing';
 import { checkSprite } from './pixelate';
 import { decodePng, pngSize } from './png';
-import { creatureSize, outputSize, paletteOf } from './style';
+import { creatureSize, framingRules, outputSize, paletteOf } from './style';
 import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
 export interface DraftTarget {
@@ -128,16 +129,25 @@ export function defaultSeed(target: TargetKey): number {
   return (hash >>> 0) % 1_000_000_000;
 }
 
-export function stagedPaths(target: TargetKey, seed: number, root: RepoRoot = REPO_ROOT): { sprite: string; render: string } {
+export function stagedPaths(target: TargetKey, seed: number, root: RepoRoot = REPO_ROOT): { sprite: string; render: string; framing: string } {
   const dir = join(rootDir(root), DRAFTS_DIR, ...stagingSegments(target));
-  return { sprite: join(dir, `s${seed}.png`), render: join(dir, `s${seed}.render.png`) };
+  return { sprite: join(dir, `s${seed}.png`), render: join(dir, `s${seed}.render.png`), framing: join(dir, `s${seed}.framing.json`) };
 }
 
-export function stage(target: DraftTarget, seed: number, render: Uint8Array, sprite: Uint8Array, root: RepoRoot = REPO_ROOT): void {
+/** Problems that would stop a staged candidate from being layered cleanly (none for covers). */
+export function candidateProblems(target: DraftTarget, sprite: Uint8Array, style: ImageStyle): string[] {
+  return target.kind === 'portrait' && target.size !== undefined ? framingProblems(decodePng(sprite), framingRules(style, target.size)) : [];
+}
+
+/** Stage a candidate with its framing problems, for the review page. Returns the problems. */
+export function stage(target: DraftTarget, seed: number, render: Uint8Array, sprite: Uint8Array, style: ImageStyle, root: RepoRoot = REPO_ROOT): string[] {
   const paths = stagedPaths(target, seed, root);
+  const problems = candidateProblems(target, sprite, style);
   mkdirSync(dirname(paths.sprite), { recursive: true });
   writeFileSync(paths.render, render);
   writeFileSync(paths.sprite, sprite);
+  writeFileSync(paths.framing, `${JSON.stringify(problems)}\n`);
+  return problems;
 }
 
 // ── accept ─────────────────────────────────────────────────────────────────
@@ -147,13 +157,19 @@ export function stage(target: DraftTarget, seed: number, render: Uint8Array, spr
  * character.yaml (status draft, path, seed), keeping the file's comments.
  * Returns the destination, relative to the root.
  */
-export function accept(target: DraftTarget, seed: number, style: ImageStyle, root: RepoRoot = REPO_ROOT): string {
+export function accept(target: DraftTarget, seed: number, style: ImageStyle, root: RepoRoot = REPO_ROOT, force = false): string {
   const staged = stagedPaths(target, seed, root).sprite;
   if (!existsSync(staged)) {
     throw new ValidationFailure(`no staged ${target.kind} for ${target.id} with seed ${seed} (looked for ${relative(rootDir(root), staged)})`);
   }
   const problems = checkSprite(decodePng(readFileSync(staged)), outputSize(style, target.kind, target.size), paletteOf(style));
   if (problems.length > 0) throw new ValidationFailure(`${relative(rootDir(root), staged)} ${problems.join('; ')}`);
+  const framing = candidateProblems(target, readFileSync(staged), style);
+  if (framing.length > 0 && !force) {
+    throw new ValidationFailure(
+      `${relative(rootDir(root), staged)} can't be layered cleanly: it ${framing.join('; ')}. Pick another seed, or pass --force to accept it anyway.`,
+    );
+  }
   copyFileSync(staged, target.destination);
 
   if (target.kind === 'portrait') {
@@ -194,9 +210,12 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
       const src = `${segments.join('/')}/s${seed}`;
       // Portraits differ in size by creature size; show each at its own size so they compare as they'll appear.
       const { width, height } = pngSize(readFileSync(join(base, `${src}.png`)));
+      // Portraits show the bar the scene puts in front of them.
+      const bar = target.kind === 'portrait' ? `<div class="bar" style="height:${style.portrait.counter * scale}px"></div>` : '';
       return `<figure>
-  <img class="sprite" src="${src}.png" width="${width * scale}" height="${height * scale}" alt="${target.kind} ${target.id} seed ${seed}">
+  <div class="card"><img class="sprite" src="${src}.png" width="${width * scale}" height="${height * scale}" alt="${target.kind} ${target.id} seed ${seed}">${bar}</div>
   <img class="render" src="${src}.render.png" alt="raw render">
+  ${framingNote(join(base, `${src}.framing.json`))}
   <figcaption>seed ${seed}<code>pnpm draft-images accept ${which} --seed ${seed}</code></figcaption>
 </figure>`;
     });
@@ -212,8 +231,11 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
   h2 { font-weight: 600; margin: 24px 0 8px; }
   .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
   figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
-  .sprite { image-rendering: pixelated; background: var(--tavern); }
+  .sprite { image-rendering: pixelated; background: var(--tavern); display: block; }
+  .card { position: relative; }
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; background: #5a3a22; border-top: 3px solid #8a5a32; }
   .render { width: 120px; opacity: 0.8; }
+  .ok { color: #8c8; } .bad { color: #e88; max-width: 360px; }
   code { display: block; font-size: 11px; color: #9ab; user-select: all; max-width: 360px; overflow-wrap: anywhere; }
   label { position: sticky; top: 0; display: block; background: #141414; padding: 4px 0; }
 </style>
@@ -224,4 +246,10 @@ ${sections.join('\n') || '<p>No drafts staged.</p>'}
   mkdirSync(base, { recursive: true });
   writeFileSync(file, page);
   return file;
+}
+
+function framingNote(file: string): string {
+  if (!existsSync(file)) return '';
+  const problems = JSON.parse(readFileSync(file, 'utf8')) as string[];
+  return problems.length === 0 ? '<span class="ok">layers cleanly</span>' : `<span class="bad">${problems.map((p) => `✗ ${p}`).join('<br>')}</span>`;
 }

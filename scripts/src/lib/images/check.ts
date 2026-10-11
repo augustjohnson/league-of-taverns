@@ -6,6 +6,7 @@
  *   exist, be the style's output size (for a portrait, the canvas for its
  *   base's creature size), use only palette colours with no
  *   partial transparency, and stay under MAX_IMAGE_BYTES.
+ * - A portrait must also layer cleanly (./framing.ts): no clipping, no floating.
  * - A cover must sit next to its mission's chrome file.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -15,9 +16,10 @@ import { REPO_ROOT, loadCharacterChrome, rootDir } from '../repo';
 import type { RepoRoot } from '../repo';
 import { charactersRootDir, seasonDir } from '../season';
 import type { SeasonSource } from '../season';
+import { framingProblems } from './framing';
 import { checkSprite } from './pixelate';
 import { PngError, decodePng } from './png';
-import { loadImageStyle, outputSize, paletteOf } from './style';
+import { framingRules, loadImageStyle, outputSize, paletteOf } from './style';
 import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
 /** A palette sprite at league sizes is a few KB; anything near this is not one. */
@@ -74,7 +76,7 @@ export function checkSeasonImages(season: SeasonSource, characters: ReadonlyArra
     if (!(error instanceof ValidationFailure)) throw error;
     return [...issues, ...error.message.split('\n')];
   }
-  for (const { file, kind, size } of images) issues.push(...checkImageFile(file, outputSize(style, kind, size), kind, style, label));
+  for (const { file, kind, size } of images) issues.push(...checkImageFile(file, outputSize(style, kind, size), kind, size, style, label));
   return issues;
 }
 
@@ -82,6 +84,7 @@ function checkImageFile(
   file: string,
   expected: { readonly width: number; readonly height: number },
   kind: ImageKind,
+  size: CreatureSize | undefined,
   style: ImageStyle,
   label: (file: string) => string,
 ): string[] {
@@ -91,7 +94,10 @@ function checkImageFile(
     return [`${label(file)}: ${Math.round(bytes / 1024)} KB, over the ${MAX_IMAGE_BYTES / 1024} KB limit for a ${kind}; images must come from draft-images`];
   }
   try {
-    return checkSprite(decodePng(readFileSync(file)), expected, paletteOf(style)).map((p) => `${label(file)}: ${p}`);
+    const image = decodePng(readFileSync(file));
+    const problems = checkSprite(image, expected, paletteOf(style));
+    if (size !== undefined && problems.length === 0) problems.push(...framingProblems(image, framingRules(style, size)));
+    return problems.map((p) => `${label(file)}: ${p}`);
   } catch (error) {
     if (error instanceof PngError) return [`${label(file)}: ${error.message}`];
     throw error;
