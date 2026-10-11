@@ -372,7 +372,16 @@ export function runMockSeason(input: SeasonInput, options: RunOptions): MockSeas
       preseason + k++ * SECOND,
     );
   }
-  for (const tavern of input.taverns) {
+  // Join order feeds the seeded draft-order shuffle, which is keyed by season
+  // only. Shuffling join order per sim seed varies each seat's draft slot
+  // across runs, so per-bot results aren't confounded with a fixed slot.
+  const joinOrder = [...input.taverns];
+  const joinRng = rngFor(simSeed, 'join-order');
+  for (let i = joinOrder.length - 1; i > 0; i--) {
+    const j = Math.floor(joinRng() * (i + 1));
+    [joinOrder[i], joinOrder[j]] = [joinOrder[j]!, joinOrder[i]!];
+  }
+  for (const tavern of joinOrder) {
     log.append('tavern.joined', { tavern: tavern.id, name: tavern.name, manager: { bot: tavern.bot } }, setupActor, preseason + k++ * SECOND);
   }
 
