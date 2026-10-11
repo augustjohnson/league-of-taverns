@@ -13,10 +13,13 @@ import {
   battleOdds,
   checkOdds,
   evTtkBreakdown,
+  freeAgents,
+  headToHeadSchedule,
   lineHash,
   projectMission,
   rngFor,
   runMission,
+  seasonStandings,
   weekResults,
   weekSeed,
   validateLineup,
@@ -32,7 +35,7 @@ import type {
   Projection,
   RunResult,
 } from '@league-of-taverns/engine';
-import { aggregate, runMockSeason, runSeed, type MockSeasonResult, type RunSummary } from '../season-runner';
+import { SeasonSession, aggregate, decideMatchups, runMockSeason, runSeed, type MockSeasonResult, type RunSummary } from '../season-runner';
 import { seasonInputFromData, type PlaygroundData } from './data';
 import {
   actorLabel,
@@ -77,7 +80,7 @@ const crOf = (id: string): CrEighths => {
 };
 const tavernById = new Map(input.taverns.map((t) => [t.id, t]));
 const tavernName = (id: string): string => tavernById.get(id)?.name ?? id;
-const botOf = (id: string): string => tavernById.get(id)?.bot ?? '?';
+const botOf = (id: string): string => run?.result.summary.taverns.find((t) => t.tavern === id)?.bot ?? tavernById.get(id)?.bot ?? '?';
 const layouts = new Map<number, GraphLayout>(WEEKS.map((w) => [w, layoutMission(missionOf(w))]));
 
 function missionOf(week: number): Mission {
@@ -91,14 +94,16 @@ function environmentOf(week: number): string {
 
 // ── page state ─────────────────────────────────────────────────────────────
 
-type Tab = 'standings' | 'weeks' | 'lab' | 'draft' | 'pool' | 'events' | 'batch';
-const TABS: ReadonlyArray<Tab> = ['standings', 'weeks', 'lab', 'draft', 'pool', 'events', 'batch'];
+type Tab = 'play' | 'standings' | 'weeks' | 'lab' | 'draft' | 'pool' | 'events' | 'batch';
+const TABS: ReadonlyArray<Tab> = ['play', 'standings', 'weeks', 'lab', 'draft', 'pool', 'events', 'batch'];
 
 interface Run {
   readonly seed: string;
   readonly result: MockSeasonResult;
   readonly ms: number;
   readonly sha256: string;
+  /** True for a season played on the Play tab rather than run from a seed. */
+  readonly played?: boolean;
 }
 
 let run: Run | null = null;
@@ -304,6 +309,7 @@ function renderStatus(error: string | null, ms: number): void {
       ? `<span class="chip ok" title="verifyResolutions found no mismatches"><span class="dot"></span>Verify: 0 mismatches</span>`
       : `<span class="chip fail"><span class="dot"></span>Verify: ${audit.mismatches.length} mismatches</span>`;
   status.innerHTML =
+    (run.played === true ? `<span class="chip brass" title="Played on the Play tab: your moves plus seed ${esc(run.seed)}">Your season</span>` : '') +
     `<span class="chip">${num(summary.events)} events</span>${replayChip}${verifyChip}` +
     `<span class="chip">${num(run.ms.toFixed(0))} ms</span>` +
     `<span class="chip" title="sha256 of events.ndjson. Matches the CLI's events-1.ndjson for the same seed.">ndjson ${num(run.sha256.slice(0, 12))}</span>` +
@@ -342,6 +348,10 @@ function setTab(next: Tab): void {
 }
 
 function renderTab(): void {
+  if (tab === 'play') {
+    panel.innerHTML = renderPlay();
+    return;
+  }
   if (tab === 'batch') {
     panel.innerHTML = renderBatch();
     return;
@@ -975,12 +985,434 @@ function startBatch(): void {
   setTimeout(step, 0);
 }
 
+// ── play vs bots ───────────────────────────────────────────────────────────
+
+const play = {
+  session: null as SeasonSession | null,
+  tavern: input.taverns[0]?.id ?? '',
+  seed: '',
+  error: null as string | null,
+  filter: '',
+  /** The lineup builder, captain first once submitted. */
+  picks: [] as string[],
+  captain: null as string | null,
+  /** The week the builder was loaded for. */
+  builderWeek: 0,
+  add: '',
+  drop: '',
+  /** The week just played, to show its result. */
+  played: null as number | null,
+};
+
+function startPlay(): void {
+  const seed = play.seed.trim() || seedWords(cryptoRand);
+  play.error = null;
+  try {
+    const session = new SeasonSession(input, { seed, human: { tavern: play.tavern, login: 'you', githubId: 1 } });
+    session.advanceDraft();
+    Object.assign(play, { session, seed, filter: '', picks: [], captain: null, builderWeek: 0, add: '', drop: '', played: null });
+  } catch (e) {
+    play.error = e instanceof Error ? e.message : String(e);
+  }
+  renderTab();
+}
+
+/** Run a move against the session; an engine refusal shows as an error and changes nothing. */
+function playAct(move: (s: SeasonSession) => void): void {
+  const s = play.session;
+  if (s === null) return;
+  play.error = null;
+  try {
+    move(s);
+  } catch (e) {
+    play.error = e instanceof Error ? e.message : String(e);
+  }
+  if (s.stage.kind === 'complete' && run?.result.state !== s.state) openPlayed(s);
+  renderTab();
+}
+
+/** Load the finished season into the other tabs, like a seed run. */
+function openPlayed(s: SeasonSession): void {
+  const started = performance.now();
+  let error: string | null = null;
+  try {
+    const result = s.finish();
+    run = { seed: s.seed, result, ms: performance.now() - started, sha256: lineHash(result.ndjson), played: true };
+    lab.roll = null;
+    lab.sample = null;
+    lab.seeded = false;
+    eventsUi.open.clear();
+    seedLab();
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+  }
+  renderStatus(error, performance.now() - started);
+}
+
+function myRoster(s: SeasonSession): ReadonlyArray<string> {
+  return s.state.taverns.get(s.human!.tavern)?.roster ?? [];
+}
+
+/** Point the builder at the next week: the submitted lineup, else last week's, else the advisor's. Drops anyone no longer on the roster. */
+function syncBuilder(s: SeasonSession, week: number): void {
+  const roster = new Set(myRoster(s));
+  if (play.builderWeek !== week) {
+    play.builderWeek = week;
+    const me = s.human!.tavern;
+    const lineup = s.pendingLineup() ?? s.state.lockedLineups.get(week - 1)?.find((l) => l.tavern === me)?.lineup ?? s.suggestLineup();
+    play.picks = lineup === null ? [] : [lineup.captain, ...lineup.allies];
+    play.captain = lineup?.captain ?? null;
+  }
+  play.picks = play.picks.filter((id) => roster.has(id));
+  if (play.captain === null || !play.picks.includes(play.captain)) play.captain = play.picks[0] ?? null;
+  if (!roster.has(play.drop)) play.drop = '';
+  if (!freeAgents(s.state).includes(play.add)) play.add = '';
+}
+
+function builderLineup(): Lineup | null {
+  if (play.captain === null) return null;
+  return { captain: play.captain, allies: play.picks.filter((p) => p !== play.captain) } as unknown as Lineup;
+}
+
+function charRow(id: string, action: string, extra = ''): string {
+  const s = input.statsOf(id);
+  const moves = Object.entries(s.speeds)
+    .filter(([k]) => k !== 'walk')
+    .map(([k, v]) => `${k} ${v}`)
+    .join(', ');
+  return (
+    `<tr><td>${action}</td><td><b>${esc(id)}</b><div class="muted small">${esc(s.base.typeName)}</div></td><td class="n">${formatCr(crOf(id))}</td>` +
+    `<td class="small">${topSkills(s)
+      .map((t) => `${esc(t.skill.replaceAll('_', ' '))} ${signed(t.modifier)}`)
+      .join(', ')}</td><td class="small muted">${esc(moves || '-')}</td><td class="n small">${s.base.ac} / ${s.base.hp}</td>${extra}</tr>`
+  );
+}
+const CHAR_HEAD = '<th></th><th>character</th><th class="n">CR</th><th>best skills</th><th>moves</th><th class="n">AC / HP</th>';
+
+function matchesFilter(id: string, q: string): boolean {
+  if (q === '') return true;
+  const s = input.statsOf(id);
+  return id.includes(q) || s.base.slug.includes(q) || s.base.typeName.toLowerCase().includes(q) || topSkills(s).some((t) => t.skill.includes(q));
+}
+
+function renderPlay(): string {
+  const s = play.session;
+  const err = play.error === null ? '' : `<div class="error">${esc(play.error)}</div>`;
+  if (s === null) return renderPlaySetup() + err;
+  const stage = s.stage;
+  if (stage.kind === 'draft') return playHeader(s) + err + renderPlayDraft(s, stage.pick);
+  if (stage.kind === 'week') syncBuilder(s, stage.week);
+  return (
+    playHeader(s) +
+    err +
+    (play.played === null ? '' : renderPlayResult(s, play.played)) +
+    (stage.kind === 'week' ? renderPlayWeek(s, stage.week) : '') +
+    renderPlayStandings(s)
+  );
+}
+
+function renderPlaySetup(): string {
+  const options = input.taverns.map((t) => `<option value="${esc(t.id)}" ${t.id === play.tavern ? 'selected' : ''}>${esc(t.name)} (advisor: ${esc(t.bot)})</option>`).join('');
+  return (
+    `<section class="card"><h2>Play vs bots</h2>` +
+    `<p>Manage one tavern yourself against ${input.taverns.length - 1} bot taverns. Draft when you are on the clock, then before each week set a lineup and make waiver claims, and play the week. ` +
+    `Every move goes through the engine's reducers, so an illegal one is refused with the engine's reason.</p>` +
+    `<div class="row"><label class="label" for="play-tavern">Your tavern</label><select id="play-tavern" data-action="play-tavern">${options}</select>` +
+    `<label class="label" for="play-seed">Seed</label><input type="text" id="play-seed" data-action="play-seed" placeholder="random" value="${esc(play.seed)}" spellcheck="false" autocomplete="off">` +
+    `<button type="button" class="primary" data-action="play-start">Start season</button></div>` +
+    `<p class="hint">Your tavern's bot stays on as your advisor and can suggest a pick, a lineup or waiver claims. The seed drives the draft order, the bots and the dice, so the same seed and the same moves give the same season. ` +
+    `When the season ends it loads into the other tabs.</p></section>`
+  );
+}
+
+function playHeader(s: SeasonSession): string {
+  const me = s.human!.tavern;
+  const stage = s.stage;
+  const total = config.draft.rounds * input.taverns.length;
+  const where =
+    stage.kind === 'draft' ? `Draft, pick ${stage.pick + 1} of ${total}` : stage.kind === 'week' ? `Week ${stage.week} of ${config.weeks}` : 'Season complete';
+  const rows = seasonStandings(s.state);
+  const i = rows.findIndex((r) => r.tavern === me);
+  const rec = i < 0 || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip">${ordinal(i + 1)} of ${rows.length} · ${rows[i]!.wins}-${rows[i]!.losses}-${rows[i]!.ties}</span>`;
+  return (
+    `<section class="card"><div class="row" style="justify-content:space-between"><div class="row"><h2>${esc(tavernName(me))}</h2><span class="tag brass">you</span>` +
+    `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}<button type="button" data-action="play-reset">New season</button></div></div></section>`
+  );
+}
+
+function ordinal(n: number): string {
+  const tail = n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+  return `${n}${tail}`;
+}
+
+function renderPlayDraft(s: SeasonSession, pick: number): string {
+  const me = s.human!.tavern;
+  const n = input.taverns.length;
+  const picks = s.events.flatMap((e) => (e.type === 'draft.pick' ? [e.payload] : []));
+  const mine = myRoster(s);
+  const since = picks.slice(picks.map((p) => p.tavern).lastIndexOf(me) + 1);
+  const advice = s.suggestPick();
+  const q = play.filter.trim().toLowerCase();
+  const rows = freeAgents(s.state)
+    .filter((id) => matchesFilter(id, q))
+    .map((id) => charRow(id, `<button type="button" class="primary small" data-action="play-draft" data-id="${esc(id)}">draft</button>`))
+    .join('');
+  const board = draftBoard(
+    s.state.draft.order,
+    picks.map((p) => ({ ...p, bot: p.tavern === me ? 'human' : botOf(p.tavern) })),
+  );
+  const boardRows = board
+    .map(
+      (row) =>
+        `<tr class="${row.direction}"><td class="rd">R${row.round}</td>${row.cells
+          .map((c) => (c === null ? '<td></td>' : `<td class="${c.tavern === me ? 'hot' : ''}"><span class="pk">#${c.pick + 1}</span> <span class="ch">${esc(c.character)}</span></td>`))
+          .join('')}</tr>`,
+    )
+    .join('');
+  return (
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>You are on the clock</h2><span class="muted small">pick #${pick + 1}, round ${Math.floor(pick / n) + 1} of ${config.draft.rounds}</span></div>` +
+    (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(p.character)}</b>`).join('; ')}.</p>`) +
+    `<p class="small">Advisor (${esc(tavernById.get(me)?.bot ?? '?')}) suggests <b>${esc(advice)}</b> <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
+    `<button type="button" class="small" data-action="play-draft" data-id="${esc(advice)}">Take it</button></p>` +
+    `<div class="cols"><div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
+    (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<ul class="stack" style="list-style:none;margin:0;padding:0">${mine.map((id) => `<li>${charLabel(id)}</li>`).join('')}</ul>`) +
+    `<p class="hint">Each week you start ${config.roster.starters} with total CR at most ${formatCr(BUDGET)}.</p></div>` +
+    `<div class="stack"><div class="row"><span class="label">Free agents</span><input type="text" id="play-filter" placeholder="Filter by id, base or skill" value="${esc(play.filter)}" data-action="play-filter"></div>` +
+    `<div id="play-fa" class="scroll" style="max-height:420px;overflow-y:auto"><table><thead><tr>${CHAR_HEAD}</tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">No match.</td></tr>'}</tbody></table></div></div></div></section>` +
+    `<section class="card"><h3>Draft board</h3><div class="scroll"><table class="draft"><thead><tr><th>round</th>${s.state.draft.order
+      .map((t) => `<th class="${t === me ? 'hot' : ''}">${esc(tavernName(t))}</th>`)
+      .join('')}</tr></thead><tbody>${boardRows || `<tr><td colspan="${n + 1}" class="muted">No picks yet.</td></tr>`}</tbody></table></div></section>`
+  );
+}
+
+function renderPlayWeek(s: SeasonSession, week: number): string {
+  const me = s.human!.tavern;
+  const mission = missionOf(week);
+  const opp = headToHeadSchedule([...s.state.taverns.keys()], config.weeks).find((m) => m.week === week && (m.home === me || m.away === me));
+  const oppId = opp === undefined ? null : opp.home === me ? opp.away : opp.home;
+  const roster = myRoster(s);
+  const lineup = builderLineup();
+  const pending = s.pendingLineup();
+  const violations = lineup === null ? [] : validateLineup(lineup, { tavern: me, characters: roster }, crOf, config);
+  const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.captain, lineup.allies, input.statsOf), mission, input.baseOf, input.battleModel);
+  const same = pending !== null && lineup !== null && pending.captain === lineup.captain && pending.allies.join() === lineup.allies.join();
+  const total = play.picks.reduce((t, id) => t + crOf(id), 0);
+
+  const rosterRows = roster
+    .map((id) => {
+      const on = play.picks.includes(id);
+      const isCap = id === play.captain;
+      const btn = on
+        ? `<button type="button" class="small" data-action="play-lu-remove" data-id="${esc(id)}">bench</button>`
+        : `<button type="button" class="primary small" data-action="play-lu-add" data-id="${esc(id)}" ${play.picks.length >= config.roster.starters ? 'disabled' : ''}>start</button>`;
+      const cap = isCap ? '<span class="cap" title="captain">C</span>' : on ? `<button type="button" class="link small" data-action="play-lu-captain" data-id="${esc(id)}">make C</button>` : '';
+      return charRow(id, btn, `<td>${cap}</td>`).replace('<tr>', `<tr class="${on ? 'sel' : ''}">`);
+    })
+    .join('');
+
+  const status =
+    pending === null
+      ? '<span class="muted">No lineup submitted: at the lock your last lineup carries over (or a legal fallback).</span>'
+      : same
+        ? '<span class="pass">Submitted.</span>'
+        : `<span class="fail">Changed since you submitted</span> <span class="muted">(submitted: C ${esc(pending.captain)}, ${pending.allies.map(esc).join(', ')})</span>`;
+
+  const lineupCardHtml =
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))}${
+      oppId === null ? ' · bye' : ` · vs <b>${esc(tavernName(oppId))}</b> <span class="tag">${esc(botOf(oppId))}</span>`
+    }</span></div>` +
+    `<div class="scroll"><table><thead><tr>${CHAR_HEAD}<th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` +
+    `<p class="small">Starting ${play.picks.length} of ${config.roster.starters} · CR ${num(formatCr(total))} of ${num(formatCr(BUDGET))}</p>${crMeter(total)}` +
+    (lineup === null
+      ? ''
+      : violations.length === 0
+        ? '<p class="okline">validateLineup: legal</p>'
+        : `<ul class="violations">${violations.map((v) => `<li><span class="mono">${esc(v.code)}</span>: ${esc(v.message)}</li>`).join('')}</ul>`) +
+    (projection === null
+      ? ''
+      : `<div class="kv"><div><span class="label">expected points</span><span class="v">${(projection.expectedScore * SCALE).toFixed(1)}</span></div>` +
+        `<div><span class="label">P(DNF)</span><span class="v">${pct(projection.pDnf)}</span></div></div>`) +
+    `<div class="row"><button type="button" class="primary" data-action="play-lu-submit" ${lineup === null || violations.length > 0 || same ? 'disabled' : ''}>Submit lineup</button>` +
+    `<button type="button" data-action="play-lu-advice">Advisor's lineup</button><span class="small">${status}</span></div>` +
+    (projection === null ? '' : graphSvg(layouts.get(week)!, { reach: projection.reach }) + graphLegend({ reach: projection.reach })) +
+    `</section>`;
+
+  let waivers = '';
+  if (week < config.weeks) {
+    const fa = freeAgents(s.state);
+    const claims = s.pendingClaims().filter((c) => c.tavern === me);
+    const advice = s.suggestClaims();
+    waivers =
+      `<section class="card"><h2>Waivers</h2>` +
+      `<p class="small muted">Claims resolve after week ${week}'s run, in waiver priority order (yours: ${s.state.waivers.priority.indexOf(me) + 1} of ${s.state.waivers.priority.length}). A claim cannot be withdrawn.</p>` +
+      `<div class="row"><label class="label" for="play-add">Add</label><select id="play-add" data-action="play-add"><option value="">choose a free agent</option>${fa
+        .map((id) => `<option value="${esc(id)}" ${id === play.add ? 'selected' : ''}>${esc(id)} (CR ${formatCr(crOf(id))})</option>`)
+        .join('')}</select>` +
+      `<label class="label" for="play-drop">Drop</label><select id="play-drop" data-action="play-drop"><option value="">nobody${roster.length >= config.roster.size ? ' (roster is full)' : ''}</option>${roster
+        .map((id) => `<option value="${esc(id)}" ${id === play.drop ? 'selected' : ''}>${esc(id)} (CR ${formatCr(crOf(id))})</option>`)
+        .join('')}</select>` +
+      `<button type="button" data-action="play-claim" ${play.add === '' ? 'disabled' : ''}>Claim</button></div>` +
+      `<p class="small">Advisor: ${
+        advice.length === 0
+          ? '<span class="muted">no claims</span>'
+          : advice.map((c) => `+${esc(c.add)}${c.drop === null ? '' : ` -${esc(c.drop)}`}`).join(', ') +
+            ` <button type="button" class="small" data-action="play-claim-advice">Make these claims</button>`
+      }</p>` +
+      (claims.length === 0 ? '' : `<p class="small">Your pending claims: ${claims.map((c) => `+<b>${esc(c.add)}</b>${c.drop === null ? '' : ` -${esc(c.drop)}`}`).join('; ')}</p>`) +
+      `</section>`;
+  }
+
+  return (
+    lineupCardHtml +
+    waivers +
+    `<section class="card"><div class="row" style="justify-content:space-between"><span class="muted small">The bots set their lineups and claims when you play the week.</span>` +
+    `<button type="button" class="primary" data-action="play-week">Play week ${week}</button></div></section>`
+  );
+}
+
+function renderPlayResult(s: SeasonSession, week: number): string {
+  const me = s.human!.tavern;
+  const results = new Map(weekResults(s.state, week).map((r) => [r.tavern, r]));
+  const matchups = decideMatchups(s.state).get(week) ?? [];
+  const mine = matchups.find((m) => m.home === me || m.away === me);
+  const res = s.state.results.get(week)?.get(me);
+  const mission = missionOf(week);
+  let headline = '<span class="muted">Bye week.</span>';
+  if (mine !== undefined) {
+    const oppId = mine.home === me ? mine.away : mine.home;
+    const verdict = mine.winner === me ? '<span class="pass">Won</span>' : mine.winner === null ? '<span class="muted">Tied</span>' : '<span class="fail">Lost</span>';
+    const by = decidedBy(results.get(mine.home)!, results.get(mine.away)!, config.scoring.tiebreakers);
+    headline = `<b>${verdict}</b> ${num(results.get(me)?.points ?? 0)} - ${num(results.get(oppId)?.points ?? 0)} vs ${esc(tavernName(oppId))}${by === 'points' ? '' : ` <span class="tag brass">${esc(by)}</span>`}`;
+  }
+  const others = matchups
+    .filter((m) => m !== mine)
+    .map((m) => {
+      const cell = (t: string): string => `<span class="${m.winner === t ? 'win' : ''}">${esc(tavernName(t))}</span>`;
+      return `<tr><td>${cell(m.home)} <span class="muted">vs</span> ${cell(m.away)}</td><td class="n">${results.get(m.home)?.points ?? 0} - ${results.get(m.away)?.points ?? 0}</td></tr>`;
+    })
+    .join('');
+  const waivers = s.events
+    .flatMap((e) => (e.type === 'waiver.resolved' && e.payload.week === week ? e.payload.outcomes : []))
+    .filter((o) => o.claim.includes(`-${me}-`));
+  return (
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week} result</h2><span class="small">${headline}</span></div>` +
+    (res === undefined
+      ? '<p class="muted">You fielded no lineup and scored 0.</p>'
+      : graphSvg(layouts.get(week)!, { path: res.run.path, outcomes: outcomesOf(res.run) }) + `<details><summary>Your roll log</summary>${rollLog(mission, res.run)}</details>`) +
+    (others === '' ? '' : `<h3>Around the league</h3><div class="scroll"><table><tbody>${others}</tbody></table></div>`) +
+    (waivers.length === 0 ? '' : `<p class="small">Your claims: ${waivers.map((o) => `<span class="${o.awarded ? 'pass' : 'fail'}">${esc(o.reason)}</span>`).join(', ')}</p>`) +
+    `</section>`
+  );
+}
+
+function renderPlayStandings(s: SeasonSession): string {
+  const me = s.human!.tavern;
+  const rows = seasonStandings(s.state);
+  if (s.state.finalizedWeeks.size === 0) return '';
+  const done = s.stage.kind === 'complete';
+  const body = rows
+    .map(
+      (r, i) =>
+        `<tr class="${r.tavern === me ? 'sel' : ''} ${done && i === 0 ? 'champ' : ''}"><td class="n">${i + 1}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
+        `<td><span class="tag ${r.tavern === me ? 'brass' : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.wins}-${r.losses}-${r.ties}</td><td class="n">${r.pointsFor}</td><td class="n">${r.pointsAgainst}</td></tr>`,
+    )
+    .join('');
+  const banner = !done
+    ? ''
+    : rows[0]?.tavern === me
+      ? `<p><span class="chip ok"><span class="dot"></span>Champions!</span> ${esc(tavernName(me))} wins the season.</p>`
+      : `<p>${esc(tavernName(rows[0]?.tavern ?? ''))} wins the season. You finish ${ordinal(rows.findIndex((r) => r.tavern === me) + 1)}.</p>`;
+  return (
+    `<section class="card"><h2>${done ? 'Final standings' : 'Standings'}</h2>${banner}` +
+    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">W-L-T</th><th class="n">PF</th><th class="n">PA</th></tr></thead><tbody>${body}</tbody></table></div>` +
+    (done ? '<p class="hint">The season is loaded into the other tabs: Standings, Weeks, Draft board, Pool and Event log.</p>' : '') +
+    `</section>`
+  );
+}
+
+function playClick(action: string, id: string | undefined): boolean {
+  switch (action) {
+    case 'play-start':
+      startPlay();
+      return true;
+    case 'play-reset':
+      play.session = null;
+      play.error = null;
+      play.seed = '';
+      renderTab();
+      return true;
+    case 'play-draft':
+      if (id !== undefined) {
+        playAct((s) => {
+          s.draftPick(id);
+          s.advanceDraft();
+        });
+      }
+      return true;
+    case 'play-lu-add':
+      if (id !== undefined && play.picks.length < config.roster.starters && !play.picks.includes(id)) {
+        play.picks.push(id);
+        renderTab();
+      }
+      return true;
+    case 'play-lu-remove':
+      if (id !== undefined) {
+        play.picks = play.picks.filter((p) => p !== id);
+        renderTab();
+      }
+      return true;
+    case 'play-lu-captain':
+      if (id !== undefined) {
+        play.captain = id;
+        play.picks = [id, ...play.picks.filter((p) => p !== id)];
+        renderTab();
+      }
+      return true;
+    case 'play-lu-advice':
+      playAct((s) => {
+        const lineup = s.suggestLineup();
+        if (lineup === null) throw new Error('The advisor finds no legal lineup on this roster.');
+        play.picks = [lineup.captain, ...lineup.allies];
+        play.captain = lineup.captain;
+      });
+      return true;
+    case 'play-lu-submit':
+      playAct((s) => {
+        const lineup = builderLineup();
+        if (lineup !== null) s.setLineup(lineup);
+      });
+      return true;
+    case 'play-claim':
+      playAct((s) => {
+        s.claimWaiver(play.add, play.drop === '' ? null : play.drop);
+        play.add = '';
+        play.drop = '';
+      });
+      return true;
+    case 'play-claim-advice':
+      playAct((s) => {
+        for (const { add, drop } of s.suggestClaims()) s.claimWaiver(add, drop);
+      });
+      return true;
+    case 'play-week':
+      playAct((s) => {
+        const stage = s.stage;
+        if (stage.kind !== 'week') return;
+        s.playWeek();
+        play.played = stage.week;
+      });
+      return true;
+  }
+  return false;
+}
+
 // ── events wiring ──────────────────────────────────────────────────────────
 
 panel.addEventListener('click', (ev) => {
   const target = (ev.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (target === null) return;
   const { action, id, tavern } = target.dataset;
+  if (action !== undefined && playClick(action, id)) return;
   switch (action) {
     case 'pick-tavern':
       if (tavern !== undefined) {
@@ -1072,6 +1504,16 @@ panel.addEventListener('click', (ev) => {
 panel.addEventListener('change', (ev) => {
   const target = ev.target as HTMLInputElement | HTMLSelectElement;
   switch (target.dataset.action) {
+    case 'play-tavern':
+      play.tavern = target.value;
+      break;
+    case 'play-add':
+      play.add = target.value;
+      renderTab();
+      break;
+    case 'play-drop':
+      play.drop = target.value;
+      break;
     case 'wk-week':
       weeksUi.week = Number(target.value);
       renderTab();
@@ -1112,6 +1554,18 @@ panel.addEventListener('change', (ev) => {
 panel.addEventListener('input', (ev) => {
   const target = ev.target as HTMLInputElement;
   switch (target.dataset.action) {
+    case 'play-seed':
+      play.seed = target.value;
+      break;
+    case 'play-filter': {
+      play.filter = target.value;
+      const at = target.selectionStart;
+      renderTab();
+      const box = document.getElementById('play-filter') as HTMLInputElement | null;
+      box?.focus();
+      if (at !== null) box?.setSelectionRange(at, at);
+      break;
+    }
     case 'lab-filter':
       lab.filter = target.value;
       refreshLab({ cands: true });
