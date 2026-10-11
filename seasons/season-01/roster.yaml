@@ -130,7 +130,7 @@ characters:
     name: Wren Ashby
     epithet: the Lifter
     hook: Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.
-    look: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and dragonfly wings, in a sweat-stained sleeveless linen tunic, (intense focused stare:1.3)
+    look: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and small folded dragonfly wings, (fully clothed in a plain brown linen tunic:1.3), (intense focused stare:1.3)
     bodyPlan: winged
 
   - id: mike
@@ -532,7 +532,7 @@ characters:
     name: Peanut
     epithet: Remembers Everything
     hook: Keeps a written list of everyone who has ever wronged her. The list has a second volume.
-    look: grey elephant with one broken tusk and a tiny leather-bound journal tucked behind her ear, (narrow-eyed grudge-holding glare:1.3)
+    look: (close view of the head, ears and shoulders of a huge elephant with natural grey skin:1.4), one broken tusk and a tiny leather-bound journal tucked behind her ear, (narrow-eyed grudge-holding glare:1.3)
     bodyPlan: beast
 
   # ── CR 5 ────────────────────────────────────────────────────────────────

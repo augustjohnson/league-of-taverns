@@ -11,5 +11,5 @@ chrome:
   tagline: Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.
   portrait:
     status: prompt
-    prompt: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and dragonfly wings, in a sweat-stained sleeveless linen tunic, (intense focused stare:1.3)
+    prompt: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and small folded dragonfly wings, (fully clothed in a plain brown linen tunic:1.3), (intense focused stare:1.3)
     bodyPlan: winged

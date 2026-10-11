@@ -161,7 +161,7 @@ portrait:
   # Every portrait shares one camera: eye level, straight on, matching the bar.
   # A view from above made a cube look like it floated behind the counter.
   positive: >-
-    pixel art, (vibrant full color:1.3), {{anchor}}, {{framing}}, {{subject}},
+    pixel art, (full color, natural colors:1.2), {{anchor}}, {{framing}}, {{subject}},
     (eye-level front view:1.2), three-quarter view, looking at viewer, (bold
     expressive face:1.2), (soft even light from the upper left:1.1), (thick
     dark outline around the character:1.3), plain white background
@@ -171,6 +171,7 @@ portrait:
     washed out, flat colors, low contrast,
     (monochrome, grayscale, black and white, desaturated, sketch, line art,
     ink drawing:1.4),
+    (cleavage, bikini, lingerie, revealing clothing, bare midriff, nsfw:1.5),
     (sprite sheet, character sheet, multiple characters, multiple views,
     grid, collection, many copies:1.4),
     (oversized head, big head, chibi, bobblehead, caricature:1.4),
