@@ -21,6 +21,7 @@ import {
   missionFor,
   resolution,
   schedule,
+  waiverResolution,
 } from './support/league-log';
 
 const season = miniSeason();
@@ -132,10 +133,19 @@ describe('mini-season replay', () => {
     expect(s.pendingLineups.get(1)?.get(A)).toEqual(second);
   });
 
-  it('applies waiver outcomes and rolls priority', () => {
+  it('applies waiver outcomes from resolveWaivers and rolls priority', () => {
     expect(at.claimsPending.waivers.pending.map((c) => c.claim)).toEqual(['claim-1', 'claim-2']);
+    const recorded = log.events.find((e) => e.type === 'waiver.resolved')!.payload;
+    expect(recorded).toEqual({
+      week: 1,
+      outcomes: [
+        { claim: 'claim-1', awarded: true, reason: 'awarded' },
+        { claim: 'claim-2', awarded: false, reason: 'add_unavailable' },
+      ],
+      priorityAfter: [...at.claimsPending.waivers.priority.filter((t) => t !== A), A],
+    });
     expect(roster(at.waiversResolved, A)).toEqual([...roster(at.w1Finalized, A), season.claimed]);
-    expect(roster(at.waiversResolved, B)).toEqual(roster(at.w1Finalized, B));
+    expect(roster(at.waiversResolved, C)).toEqual(roster(at.w1Finalized, C));
     expect(at.waiversResolved.owner.get(season.claimed)).toBe(A);
     expect(at.waiversResolved.waivers.pending).toEqual([]);
     expect(at.waiversResolved.waivers.priority.at(-1)).toBe(A);
@@ -246,11 +256,12 @@ const entries = (state: LeagueState, week: number) =>
 const w1Entries = entries(at.w1Pending, 1);
 
 const claim1 = at.claimsPending.waivers.pending[0]!;
-const claim2 = at.claimsPending.waivers.pending[1]!;
 const waiverPriority = at.claimsPending.waivers.priority;
 const resolved = (outcomes: PayloadByType['waiver.resolved']['outcomes'], priorityAfter = waiverPriority) =>
   ({ week: 1, outcomes, priorityAfter }) as const;
 const awarded = (claim: string) => ({ claim, awarded: true, reason: 'test' });
+const expectedW1 = waiverResolution(at.claimsPending, 1);
+const edited = (patch: Partial<PayloadByType['waiver.resolved']>): PayloadByType['waiver.resolved'] => ({ ...expectedW1, ...patch });
 
 const aRoster = roster(at.waiversResolved, A);
 const bRoster2 = roster(at.waiversResolved, B);
@@ -367,14 +378,13 @@ const cases: ReadonlyArray<Case> = [
   ['outcome for an unknown claim', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', resolved([awarded('claim-1'), awarded('claim-2'), awarded('claim-9')])), 'waiver.unknown_claim'],
   ['two outcomes for one claim', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', resolved([awarded('claim-1'), awarded('claim-1'), awarded('claim-2')])), 'waiver.duplicate_outcome'],
   ['priority missing a tavern', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', resolved([awarded('claim-1'), { ...awarded('claim-2'), awarded: false }], waiverPriority.slice(1))), 'waiver.bad_priority'],
-  ['award of a character already awarded', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', resolved([awarded('claim-1'), awarded('claim-2')])), 'waiver.add_not_free'],
-  [
-    'award whose drop has left the roster',
-    { ...at.claimsPending, waivers: { ...at.claimsPending.waivers, pending: [claim1, { ...claim2, drop: roster(at.claimsPending, A)[0]! }] } },
-    candidate(at.claimsPending, 'waiver.resolved', resolved([{ ...awarded('claim-1'), awarded: false }, awarded('claim-2')])),
-    'waiver.drop_not_owned',
-  ],
-  ['award into a full roster', withConfig(at.claimsPending, { roster: { ...config.roster, size: 5 } }), candidate(at.claimsPending, 'waiver.resolved', resolved([awarded('claim-1'), { ...awarded('claim-2'), awarded: false }])), 'waiver.roster_full'],
+  // A hand-edited log: each outcome or priority differs from what resolveWaivers decides.
+  ['an award to the wrong tavern', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', edited({ outcomes: [{ ...expectedW1.outcomes[0]!, awarded: false, reason: 'add_unavailable' }, { ...expectedW1.outcomes[1]!, awarded: true, reason: 'awarded' }] })), 'waiver.outcome_mismatch'],
+  ['two awards of one character', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', edited({ outcomes: [expectedW1.outcomes[0]!, { ...expectedW1.outcomes[1]!, awarded: true, reason: 'awarded' }] })), 'waiver.outcome_mismatch'],
+  ['outcomes out of decision order', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', edited({ outcomes: [...expectedW1.outcomes].reverse() })), 'waiver.outcome_mismatch'],
+  ['an outcome with another reason', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', edited({ outcomes: [expectedW1.outcomes[0]!, { ...expectedW1.outcomes[1]!, reason: 'already claimed' }] })), 'waiver.outcome_mismatch'],
+  ['an award into a full roster', withConfig(at.claimsPending, { roster: { ...config.roster, size: 5 } }), candidate(at.claimsPending, 'waiver.resolved', expectedW1), 'waiver.outcome_mismatch'],
+  ['priority not rolled after an award', at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', edited({ priorityAfter: waiverPriority })), 'waiver.outcome_mismatch'],
 
   // trade.proposed
   ['trade before the draft completes', at.drafting, candidate(at.drafting, 'trade.proposed', terms({ give: [], receive: [] })), 'trade.draft_incomplete'],
@@ -385,7 +395,8 @@ const cases: ReadonlyArray<Case> = [
   ['trade listing a piece twice', at.waiversResolved, candidate(at.waiversResolved, 'trade.proposed', terms({ give: [roster(at.waiversResolved, C)[1]!, roster(at.waiversResolved, C)[1]!] })), 'trade.duplicate_piece'],
   ['trade giving what the proposer does not own', at.waiversResolved, candidate(at.waiversResolved, 'trade.proposed', terms({ give: [aRoster[0]!] })), 'trade.not_owned'],
   ['trade asking for what the other side does not own', at.waiversResolved, candidate(at.waiversResolved, 'trade.proposed', terms({ receive: [bRoster2[0]!] })), 'trade.not_owned'],
-  ['trade overfilling a roster', at.waiversResolved, candidate(at.waiversResolved, 'trade.proposed', terms({ from: A, to: B, give: [], receive: [bRoster2[0]!] })), 'trade.roster_size'],
+  ['trade where one side gives nothing', at.waiversResolved, candidate(at.waiversResolved, 'trade.proposed', terms({ receive: [] })), 'trade.empty'],
+  ['uneven trade overfilling a roster', at.waiversResolved, candidate(at.waiversResolved, 'trade.proposed', terms({ from: A, to: B, give: [aRoster[0]!], receive: [bRoster2[0]!, bRoster2[1]!] })), 'trade.roster_size'],
   ['trade proposed after the deadline lock', at.w2Locked, candidate(at.w2Locked, 'trade.proposed', terms()), 'trade.past_deadline'],
 
   // trade.accepted / vetoed / completed / cancelled
@@ -396,7 +407,6 @@ const cases: ReadonlyArray<Case> = [
   ['vetoing a completed trade', at.tradeCompleted, candidate(at.tradeCompleted, 'trade.vetoed', { trade: 'trade-1', reason: 'late' }, COMMISSIONER), 'trade.not_accepted'],
   ['completing a trade not yet accepted', proposedX, candidate(proposedX, 'trade.completed', { trade: 'trade-x' }), 'trade.not_accepted'],
   ['completing a trade whose pieces moved', tradeStale, candidate(tradeStale, 'trade.completed', { trade: 'trade-1' }), 'trade.not_owned'],
-  ['completing a trade that overfills a roster', withConfig(at.tradeAccepted, { roster: { ...config.roster, size: 5 } }), candidate(at.tradeAccepted, 'trade.completed', { trade: 'trade-1' }), 'trade.roster_size'],
   ['completing after the deadline lock', withConfig(at.tradeAccepted, { trades: { ...config.trades, deadlineWeek: 1 } }), candidate(at.tradeAccepted, 'trade.completed', { trade: 'trade-1' }), 'trade.past_deadline'],
   ['cancelling a completed trade', at.tradeCompleted, candidate(at.tradeCompleted, 'trade.cancelled', { trade: 'trade-1', reason: 'withdrawn' }), 'trade.not_open'],
 
@@ -454,6 +464,97 @@ describe('preconditions', () => {
     b.append('tavern.joined', { tavern: A, name: 'A', manager: { bot: 'v' } }, COMMISSIONER);
     const swapped = [b.events[1]!, b.events[0]!];
     expect(() => replay(swapped)).toThrow(InvalidEventError);
+  });
+});
+
+describe('waiver.resolved is checked against resolveWaivers', () => {
+  it('rejects a hand-edited log that awards the claimed character to the wrong tavern', () => {
+    // claim-1 (A) is ahead of claim-2 (C) in priority; the edit hands the character to C.
+    const tampered = log.events.map((e) =>
+      e.type === 'waiver.resolved' && e.payload.week === 1
+        ? {
+            ...e,
+            payload: {
+              ...e.payload,
+              outcomes: [
+                { claim: 'claim-1', awarded: false, reason: 'add_unavailable' },
+                { claim: 'claim-2', awarded: true, reason: 'awarded' },
+              ],
+              priorityAfter: [...waiverPriority.filter((t) => t !== C), C],
+            },
+          }
+        : e,
+    );
+    const seq = log.events.find((e) => e.type === 'waiver.resolved')!.seq;
+    let error: unknown;
+    try {
+      replay(tampered);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(InvalidEventError);
+    const invalid = error as InvalidEventError;
+    expect(invalid.code).toBe('waiver.outcome_mismatch');
+    expect(invalid.seq).toBe(seq);
+    expect(invalid.message).toMatch(/outcome 1 records "claim-1" not awarded .*resolveWaivers decides "claim-1" awarded \(awarded\)/);
+  });
+
+  it('names a priorityAfter that differs', () => {
+    const error = rejection(at.claimsPending, candidate(at.claimsPending, 'waiver.resolved', { ...expectedW1, priorityAfter: waiverPriority }));
+    expect(error.message).toContain(`should be [${expectedW1.priorityAfter.join(', ')}]`);
+  });
+
+  it('applies the computed awards: an awarded drop becomes a free agent', () => {
+    // B is first in priority.
+    const free = freeAgents(at.w1Finalized)[1]!;
+    const dropped = roster(at.w1Finalized, B)[0]!;
+    let s = applyEvent(at.w1Finalized, candidate(at.w1Finalized, 'waiver.claimed', { claim: 'claim-b', tavern: B, add: free, drop: dropped }, MANAGER));
+    s = applyEvent(s, candidate(s, 'waiver.resolved', waiverResolution(s, 1)));
+    expect(s.owner.get(free)).toBe(B);
+    expect(s.owner.has(dropped)).toBe(false);
+    expect(freeAgents(s)).toContain(dropped);
+    expect(s.waivers.priority.at(-1)).toBe(B);
+  });
+});
+
+describe('trades are re-checked at completion', () => {
+  /** Propose and accept `trade` from `state`. */
+  function accepted(state: LeagueState, trade: PayloadByType['trade.proposed']): LeagueState {
+    const s = applyEvent(state, candidate(state, 'trade.proposed', trade, MANAGER));
+    return applyEvent(s, candidate(s, 'trade.accepted', { trade: trade.trade }, MANAGER));
+  }
+
+  it('rejects a trade an earlier waiver award made illegal (roster now full), and takes trade.cancelled instead', () => {
+    // An uneven 2-for-1 into A's open sixth slot, legal when proposed...
+    const bR = roster(at.claimsPending, B);
+    const trade = { trade: 'trade-w', from: B, to: A, give: [bR[0]!, bR[1]!], receive: [roster(at.claimsPending, A)[0]!] };
+    let s = accepted(at.claimsPending, trade);
+    // ...until the week-1 waivers award claim-1 and fill that slot.
+    s = applyEvent(s, candidate(s, 'waiver.resolved', waiverResolution(s, 1)));
+    expect(roster(s, A)).toHaveLength(config.roster.size);
+    const error = rejection(s, candidate(s, 'trade.completed', { trade: 'trade-w' }));
+    expect(error.code).toBe('trade.roster_size');
+    expect(error.message).toContain('"trade-w"');
+    const cancelled = applyEvent(s, candidate(s, 'trade.cancelled', { trade: 'trade-w', reason: 'invalid' }));
+    expect(cancelled.trades.get('trade-w')?.status).toBe('cancelled');
+    expect(cancelled.taverns).toBe(s.taverns);
+  });
+
+  it('rejects a trade whose piece an earlier waiver award dropped', () => {
+    const piece = roster(at.w1Finalized, B)[0]!;
+    let s = accepted(at.w1Finalized, { trade: 'trade-d', from: B, to: D, give: [piece], receive: [roster(at.w1Finalized, D)[0]!] });
+    s = applyEvent(s, candidate(s, 'waiver.claimed', { claim: 'claim-b', tavern: B, add: freeAgents(s)[0]!, drop: piece }, MANAGER));
+    s = applyEvent(s, candidate(s, 'waiver.resolved', waiverResolution(s, 1)));
+    expect(s.owner.has(piece)).toBe(false);
+    expect(rejection(s, candidate(s, 'trade.completed', { trade: 'trade-d' })).code).toBe('trade.not_owned');
+  });
+
+  it('completes an uneven trade into an open slot (D-06)', () => {
+    const cR = roster(at.waiversResolved, C);
+    const open = accepted(at.waiversResolved, terms({ trade: 'trade-u', give: [cR[1]!, cR[2]!] }));
+    const s = applyEvent(open, candidate(open, 'trade.completed', { trade: 'trade-u' }));
+    expect(roster(s, C)).toHaveLength(4);
+    expect(roster(s, D)).toHaveLength(6);
   });
 });
 

@@ -14,7 +14,7 @@ import { freeAgents, onTheClock } from '../../src/events/selectors';
 import type { LeagueState } from '../../src/events/state';
 import type { Actor, EventOf, EventType, LeagueEvent, PayloadByType } from '../../src/events/types';
 import { rngFor, weekSeed } from '../../src/rng';
-import { carriedLineup, type Lineup } from '../../src/roster';
+import { carriedLineup, resolveWaivers, type Lineup, type WaiverClaim } from '../../src/roster';
 import type { CrEighths } from '../../src/vocabulary';
 import { baseOf, battle, constantModel, edge, end, member, partyOf, skillCheck, start } from './builders';
 
@@ -161,6 +161,27 @@ export function resolution(state: LeagueState, week: number, tavern: string, lin
   };
 }
 
+/**
+ * The `waiver.resolved` payload the waivers Action would build for `week`:
+ * `resolveWaivers` over the pending claims (log order as seq), the current
+ * priority, every roster and the free agents.
+ */
+export function waiverResolution(state: LeagueState, week: number): PayloadByType['waiver.resolved'] {
+  const ids = new Map<WaiverClaim, string>();
+  const claims = state.waivers.pending.map((c, seq) => {
+    const claim: WaiverClaim = { tavern: c.tavern, add: c.add, drop: c.drop, seq };
+    ids.set(claim, c.claim);
+    return claim;
+  });
+  const rosters = [...state.taverns.values()].map((t) => ({ tavern: t.id, characters: t.roster }));
+  const { awards, priority } = resolveWaivers(claims, state.waivers.priority, rosters, new Set(freeAgents(state)), state.config!);
+  return {
+    week,
+    outcomes: awards.map((a) => ({ claim: ids.get(a.claim)!, awarded: a.awarded, reason: a.reason })),
+    priorityAfter: priority,
+  };
+}
+
 export interface MiniSeason {
   readonly log: LogBuilder;
   /** States at named points, for precondition tests. */
@@ -189,9 +210,9 @@ export interface MiniSeason {
 
 /**
  * A whole 2-week season: created → pooled → joined → full snake draft →
- * week 1 (all submitted) → waivers (one award, one loss) → trades (one
- * completed, one cancelled, one vetoed) → week 2 (submitted, carried, and one
- * tavern with no lineup) → complete.
+ * week 1 (all submitted) → waivers (one award, one loss, from
+ * `resolveWaivers`) → trades (one completed, one cancelled, one vetoed) →
+ * week 2 (submitted, carried, and one tavern with no lineup) → complete.
  */
 export function miniSeason(): MiniSeason {
   const log = new LogBuilder();
@@ -231,20 +252,14 @@ export function miniSeason(): MiniSeason {
   log.append('week.finalized', { week: 1 });
   const w1Finalized = log.state;
 
-  // Waivers: a claims a free agent outright; b claims the same one (dropping) and loses.
+  // Waivers: a claims a free agent outright; c claims the same one (dropping)
+  // and loses, since the seeded priority (reverse draft order) puts a ahead
+  // of c (and behind b and d).
   const claimed = freeAgents(log.state)[0]!;
   log.append('waiver.claimed', { claim: 'claim-1', tavern: a, add: claimed, drop: null }, MANAGER);
-  log.append('waiver.claimed', { claim: 'claim-2', tavern: b, add: claimed, drop: log.state.taverns.get(b)!.roster.at(-1)! }, MANAGER);
+  log.append('waiver.claimed', { claim: 'claim-2', tavern: c, add: claimed, drop: log.state.taverns.get(c)!.roster.at(-1)! }, MANAGER);
   const claimsPending = log.state;
-  const priority = log.state.waivers.priority;
-  log.append('waiver.resolved', {
-    week: 1,
-    outcomes: [
-      { claim: 'claim-1', awarded: true, reason: 'free agent' },
-      { claim: 'claim-2', awarded: false, reason: 'already claimed' },
-    ],
-    priorityAfter: [...priority.filter((t) => t !== a), a],
-  });
+  log.append('waiver.resolved', waiverResolution(log.state, 1));
   const waiversResolved = log.state;
 
   // Trades: trade-1 completes, trade-2 is withdrawn, trade-3 is vetoed.
@@ -259,7 +274,9 @@ export function miniSeason(): MiniSeason {
   const dPiece = log.state.taverns.get(d)!.roster[0]!;
   log.append('trade.proposed', { trade: 'trade-2', from: c, to: d, give: [cPiece], receive: [dPiece] }, MANAGER);
   log.append('trade.cancelled', { trade: 'trade-2', reason: 'withdrawn' }, MANAGER);
-  log.append('trade.proposed', { trade: 'trade-3', from: c, to: d, give: [cPiece], receive: [] }, MANAGER);
+  // An uneven 2-for-1 (D-06): d has an open slot.
+  const cSecond = log.state.taverns.get(c)!.roster[1]!;
+  log.append('trade.proposed', { trade: 'trade-3', from: c, to: d, give: [cPiece, cSecond], receive: [dPiece] }, MANAGER);
   log.append('trade.accepted', { trade: 'trade-3' }, MANAGER);
   log.append('trade.vetoed', { trade: 'trade-3', reason: 'lopsided' }, COMMISSIONER);
 
@@ -283,7 +300,7 @@ export function miniSeason(): MiniSeason {
     if (entry.lineup !== null) log.append('mission.resolved', resolution(log.state, 2, entry.tavern, entry.lineup));
   }
   log.append('week.finalized', { week: 2 });
-  log.append('waiver.resolved', { week: 2, outcomes: [], priorityAfter: log.state.waivers.priority });
+  log.append('waiver.resolved', waiverResolution(log.state, 2));
   const final = log.state;
 
   return {
