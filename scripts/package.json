@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "The I/O edge: read and write repo files, call the engine, and append events. Run by humans and by Actions.",
+  "exports": {
+    "./lib/*": "./src/lib/*.ts"
+  },
   "scripts": {
     "typecheck": "tsc -p .",
     "snapshot": "tsx src/snapshot.ts",

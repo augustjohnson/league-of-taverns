@@ -12,6 +12,7 @@
   "dependencies": {
     "@league-of-taverns/bots": "workspace:*",
     "@league-of-taverns/engine": "workspace:*",
+    "@league-of-taverns/scripts": "workspace:*",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
