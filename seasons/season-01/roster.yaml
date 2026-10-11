@@ -120,7 +120,7 @@ characters:
     name: Doug
     epithet: Fully Grown
     hook: The size of a loaf of bread. Does not want to discuss loaves.
-    look: tiny red pseudodragon with a torn left wing, a scar across his snout and a tiny studded leather jerkin, (tough-guy scowl:1.3)
+    look: (tiny red dragon with scales:1.4), a torn left wing, a scar across his snout and a small studded leather collar, (tough-guy scowl:1.3)
     bodyPlan: winged
 
   - id: wren-ashby
@@ -339,7 +339,7 @@ characters:
     name: Wendell
     epithet: Lost and Found
     hook: Contains three hundred items, sixty coins and a man named Phil, who says he's fine.
-    look: translucent green jelly cube with a boot, gold coins and a startled man's face floating inside, (placid expression:1.2)
+    look: (a big perfectly clear gelatinous cube like a giant ice cube:1.4), faintly green, sharp straight edges, a boot, gold coins and a startled man's face suspended inside it, (placid:1.2)
     bodyPlan: blob
 
   - id: dolores
@@ -568,7 +568,7 @@ characters:
     epithet: Sanitation
     hook: Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.
     look: lumpy brown three-legged otyugh with a single eyestalk and a rotten cabbage leaf draped on its head, (proud gap-toothed grin:1.3)
-    bodyPlan: blob
+    bodyPlan: beast   # three legs and tentacles; blob's no-limbs rule would fight it
 
   # ── CR 6–8 ──────────────────────────────────────────────────────────────
   - id: rhaa-baeh-skraa

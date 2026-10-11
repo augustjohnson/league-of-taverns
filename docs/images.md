@@ -139,9 +139,15 @@ prompt: >-
   them, and "man" alone drifts into office wear.
 - Name the skin or body colour. "Ogre" alone came out human-skinned in 3 of 4.
 - Weight the expression, as in `(… grin:1.3)`. The model scowls by default.
-- Use creature words SDXL knows. "Pseudodragon" came out as a man in a
-  leather jacket; "tiny red dragon" doesn't. Non-humanoid framing is still
-  open (the style asks for head and shoulders).
+- Use creature words SDXL knows, and weight the creature itself:
+  "pseudodragon" came out as a man, then as a white bird;
+  "(tiny red dragon with scales:1.4)" is a dragon.
+- Set `chrome.portrait.bodyPlan` for anything that isn't a person: humanoid
+  (default), beast, winged, blob, swarm, object, plant or multihead. It picks
+  the prompt's opening and framing, and every non-humanoid plan pushes away
+  from people. Without it, "tavern patron" turned a tiny dragon into a
+  dragon-knight. Don't dress small creatures: a leather jerkin pulled Doug
+  back toward a person.
 - One or two props at most. They have to read at 112×144.
 
 **Covers:** the place only: landmarks, weather, time of day, sky. No people

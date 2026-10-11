@@ -22,6 +22,7 @@ import { framingProblems } from './framing';
 import { checkSprite } from './pixelate';
 import { decodePng, pngSize } from './png';
 import { creatureSize, framingRules, outputSize, paletteOf } from './style';
+import type { BodyPlan } from './body-plans';
 import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
 export interface DraftTarget {
@@ -32,6 +33,8 @@ export interface DraftTarget {
   readonly season?: string;
   /** Portraits only: the base's creature size, which sets the canvas. */
   readonly size?: CreatureSize;
+  /** Portraits only: the character's body plan. */
+  readonly bodyPlan?: BodyPlan;
   readonly subject: string;
   /** Where an accepted image goes, absolute. */
   readonly destination: string;
@@ -79,7 +82,7 @@ export function portraitTargets(
     const { base } = loadCharacterRef(id, root);
     const size = sizeOf(base);
     if (size === undefined) throw new ValidationFailure(`characters/${id}/character.yaml: base ${JSON.stringify(base)} is not in the snapshot, so its size is unknown`);
-    targets.push({ kind: 'portrait', id, size, subject: portrait.prompt, destination: join(charactersDir, id, 'portrait.png') });
+    targets.push({ kind: 'portrait', id, size, bodyPlan: portrait.bodyPlan ?? 'humanoid', subject: portrait.prompt, destination: join(charactersDir, id, 'portrait.png') });
   }
   return targets;
 }

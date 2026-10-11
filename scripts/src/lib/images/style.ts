@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { ValidationFailure } from '../main';
 import { REPO_ROOT, issuesFailure, readYaml, rootDir } from '../repo';
 import type { RepoRoot } from '../repo';
+import { BODY_PLANS } from './body-plans';
+import type { BodyPlan } from './body-plans';
 import { EDGES } from './framing';
 import type { FramingRules } from './framing';
 import { PALETTES } from './palette';
@@ -27,6 +29,7 @@ export interface Size {
 
 const SUBJECT = '{{subject}}';
 const FRAMING = '{{framing}}';
+const ANCHOR = '{{anchor}}';
 const once = (token: string) => (s: string) => s.split(token).length === 2;
 
 const text = z.string().min(1);
@@ -37,6 +40,8 @@ const prompts = {
   positive: text.refine(once(SUBJECT), `must contain ${SUBJECT} exactly once`),
   negative: text,
 };
+
+const bodyPlan = z.strictObject({ anchor: text, framing: text, negative: text.exactOptional() });
 
 const portraitSize = size.extend({
   bleed: z.array(z.enum(EDGES)).exactOptional(),
@@ -67,11 +72,14 @@ const styleSchema = z.strictObject({
     counter: z.number().int().nonnegative(),
     minFooting: z.number().min(0).max(1),
     tolerance: z.number().int().nonnegative(),
-    framing: text,
+    bodyPlans: z.strictObject(
+      Object.fromEntries(BODY_PLANS.map((p) => [p, bodyPlan])) as Record<BodyPlan, typeof bodyPlan>,
+    ),
     ...prompts,
     positive: text
       .refine(once(SUBJECT), `must contain ${SUBJECT} exactly once`)
-      .refine(once(FRAMING), `must contain ${FRAMING} exactly once`),
+      .refine(once(FRAMING), `must contain ${FRAMING} exactly once`)
+      .refine(once(ANCHOR), `must contain ${ANCHOR} exactly once`),
   }),
   cover: z.strictObject({ output: size, ...prompts }),
 });
@@ -135,12 +143,22 @@ export function paletteOf(style: ImageStyle): ReadonlyArray<Rgb> {
   return PALETTES[style.palette];
 }
 
-/** The full positive prompt for one subject; portraits also get their size's framing. */
-export function positivePrompt(style: ImageStyle, kind: ImageKind, subject: string, size?: CreatureSize): string {
+/**
+ * The full positive prompt for one subject. Portraits get their body plan's
+ * anchor, and its framing unless the size has its own (a Tiny flagon).
+ */
+export function positivePrompt(style: ImageStyle, kind: ImageKind, subject: string, size?: CreatureSize, plan: BodyPlan = 'humanoid'): string {
   const filled = style[kind].positive.replace(SUBJECT, subject.trim().replace(/\.$/, ''));
   if (kind === 'cover') return filled;
   if (size === undefined) throw new Error('a portrait needs a creature size');
-  return filled.replace(FRAMING, (style.portrait.sizes[size].framing ?? style.portrait.framing).trim());
+  const { anchor, framing } = style.portrait.bodyPlans[plan];
+  return filled.replace(ANCHOR, anchor.trim()).replace(FRAMING, (style.portrait.sizes[size].framing ?? framing).trim());
+}
+
+/** The negative prompt, plus the body plan's own for portraits. */
+export function negativePrompt(style: ImageStyle, kind: ImageKind, plan: BodyPlan = 'humanoid'): string {
+  const extra = kind === 'portrait' ? style.portrait.bodyPlans[plan].negative : undefined;
+  return extra === undefined ? style[kind].negative : `${style[kind].negative}, ${extra.trim()}`;
 }
 
 export function pixelateOptions(style: ImageStyle, kind: ImageKind): PixelateOptions {

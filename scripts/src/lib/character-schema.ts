@@ -7,6 +7,8 @@
  */
 import { kebabIdSchema } from '@league-of-taverns/engine';
 import { z } from 'zod';
+import { BODY_PLANS } from './images/body-plans';
+import type { BodyPlan } from './images/body-plans';
 import type { AssertTrue, SchemaMatches } from '@league-of-taverns/engine';
 
 export type CharacterStatus = 'active' | 'retired';
@@ -28,6 +30,8 @@ export interface CharacterChrome {
     readonly path?: string;
     /** ComfyUI seed of the accepted image, so it can be re-rendered. */
     readonly seed?: number;
+    /** What shape the character is, for framing (docs/images.md). Default humanoid. */
+    readonly bodyPlan?: BodyPlan;
   };
   readonly history?: ReadonlyArray<string>;
 }
@@ -58,6 +62,7 @@ const chromeSchema = z.strictObject({
       prompt: text.exactOptional(),
       path: text.exactOptional(),
       seed: z.number().int().nonnegative().exactOptional(),
+      bodyPlan: z.enum(BODY_PLANS).exactOptional(),
     })
     .exactOptional(),
   history: z.array(z.string()).exactOptional(),

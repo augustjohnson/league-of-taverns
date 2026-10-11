@@ -110,6 +110,7 @@ async function draft(args: Args): Promise<void> {
     jobs.map(({ target, seed }) => ({
       kind: target.kind,
       ...(target.size === undefined ? {} : { size: target.size }),
+      ...(target.bodyPlan === undefined ? {} : { bodyPlan: target.bodyPlan }),
       subject: target.subject,
       seed,
       prefix: `league-of-taverns/${target.kind}/${target.id}-s${seed}`,

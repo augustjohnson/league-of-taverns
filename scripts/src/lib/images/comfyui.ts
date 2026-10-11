@@ -6,7 +6,8 @@
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ValidationFailure } from '../main';
-import { positivePrompt, renderSize } from './style';
+import type { BodyPlan } from './body-plans';
+import { negativePrompt, positivePrompt, renderSize } from './style';
 import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
 export const DEFAULT_COMFYUI_URL = 'http://127.0.0.1:8188';
@@ -15,6 +16,8 @@ export interface RenderRequest {
   readonly kind: ImageKind;
   /** Portraits: the creature size, which sets the canvas. */
   readonly size?: CreatureSize;
+  /** Portraits: the body plan, which sets anchor, framing and extra negatives. Default humanoid. */
+  readonly bodyPlan?: BodyPlan;
   readonly subject: string;
   readonly seed: number;
   /** ComfyUI output filename prefix, e.g. "league-of-taverns/portrait/bruno-the-bruiser-s42". */
@@ -40,8 +43,8 @@ export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
         clip: ['checkpoint', 1],
       },
     },
-    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(style, request.kind, request.subject, request.size), clip: ['lora', 1] } },
-    negative: { class_type: 'CLIPTextEncode', inputs: { text: kind.negative, clip: ['lora', 1] } },
+    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(style, request.kind, request.subject, request.size, request.bodyPlan), clip: ['lora', 1] } },
+    negative: { class_type: 'CLIPTextEncode', inputs: { text: negativePrompt(style, request.kind, request.bodyPlan), clip: ['lora', 1] } },
     latent: { class_type: 'EmptyLatentImage', inputs: { width: render.width, height: render.height, batch_size: 1 } },
     sample: {
       class_type: 'KSampler',

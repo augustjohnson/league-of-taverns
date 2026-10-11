@@ -20,6 +20,7 @@ import {
   loadImageStyle,
   outputSize,
   pixelateOptions,
+  negativePrompt,
   positivePrompt,
   renderSize,
   stylePath,
@@ -241,14 +242,27 @@ describe('style and graph', () => {
     const prompt = positivePrompt(style, 'portrait', 'a green ogre in an apron. ', 'medium');
     expect(prompt).toContain('pixel art');
     expect(prompt).toContain('a green ogre in an apron,');
-    expect(prompt).toContain(style.portrait.framing.trim());
+    expect(prompt).toContain(style.portrait.bodyPlans.humanoid.framing.trim());
+    expect(prompt).toContain('tavern patron');
     expect(prompt).not.toMatch(/\{\{/);
   });
 
   it("uses a size's own framing where it has one", () => {
-    expect(positivePrompt(style, 'portrait', 'a stirge', 'tiny')).toContain('wooden flagon');
+    expect(positivePrompt(style, 'portrait', 'a stirge', 'tiny')).toContain('pewter beer tankard');
     expect(positivePrompt(style, 'portrait', 'a t-rex', 'huge')).toContain('from the top left');
     expect(positivePrompt(style, 'cover', 'a bog')).toContain('a bog');
+  });
+
+  it('anchors non-humanoids as creatures and keeps people out of them', () => {
+    const bear = positivePrompt(style, 'portrait', 'a brown bear', 'large', 'beast');
+    expect(bear).toContain('animal anatomy');
+    expect(bear).not.toContain('tavern patron');
+    expect(negativePrompt(style, 'portrait', 'beast')).toMatch(/human, person/);
+    expect(negativePrompt(style, 'portrait', 'humanoid')).not.toMatch(/human, person/);
+    // A size's framing wins over the body plan's: a tiny dragon still perches on a flagon.
+    expect(positivePrompt(style, 'portrait', 'a tiny dragon', 'tiny', 'winged')).toContain('pewter beer tankard');
+    const graph = renderGraph(style, { kind: 'portrait', size: 'large', bodyPlan: 'blob', subject: 'a jelly cube', seed: 1, prefix: 'b' });
+    expect(graph['negative']!.inputs['text']).toMatch(/humanoid body/);
   });
 
   it('cuts portraits out with BiRefNet and saves covers straight from the decoder', () => {

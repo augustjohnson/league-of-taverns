@@ -31,8 +31,9 @@ portrait:
   # Canvas by the creature size of the character's base (Open5e), at the same
   # pixel scale: a Large creature gets a bigger card than a Small one. Cards
   # line up on their bottom edge, so big creatures stand taller in a lineup.
-  # `bleed` edges may cut the figure (besides the bottom); `framing` replaces
-  # the default framing text for that size.
+  # `bleed` edges may cut the figure (besides the bottom); a size's `framing`
+  # replaces the body plan's framing (a Tiny creature always perches on a
+  # flagon, whatever its shape).
   sizes:
     tiny:
       width: 80
@@ -43,8 +44,9 @@ portrait:
       counter: 0
       minFooting: 0.25
       framing: >-
-        (perched on the rim of a large wooden flagon:1.3), (the whole flagon
-        visible down to its base:1.2), (whole creature visible, centered:1.2)
+        (perched on the rim of a large pewter beer tankard:1.3), (the whole
+        tankard visible down to its base:1.2), (whole creature visible,
+        centered:1.2)
     small:      { width: 96,  height: 120 }
     medium:     { width: 112, height: 144 }
     large:      { width: 128, height: 160 }
@@ -71,15 +73,72 @@ portrait:
   counter: 20
   minFooting: 0.5
   tolerance: 2
-  framing: >-
-    (waist-up view:1.3), (realistic adult proportions, small head, broad
-    shoulders:1.2), (centered, with empty space above the head and on both
-    sides:1.2), torso continuing past the bottom edge
+  # Body plans (chrome.portrait.bodyPlan, default humanoid). `anchor` opens
+  # the prompt and says what kind of thing this is; `framing` is used unless
+  # the size has its own; `negative` is added to the negative prompt. Every
+  # non-humanoid plan pushes away from people: "tavern patron" alone turned a
+  # tiny dragon into a dragon-knight.
+  bodyPlans:
+    humanoid:
+      anchor: medieval fantasy tavern patron
+      framing: >-
+        (waist-up view:1.3), (realistic adult proportions, small head, broad
+        shoulders:1.2), (centered, with empty space above the head and on both
+        sides:1.2), torso continuing past the bottom edge
+    beast:
+      anchor: (fantasy animal with true animal anatomy:1.3)
+      framing: >-
+        (head, neck and front shoulders of the animal:1.3), (centered, with
+        empty space above the head and on both sides:1.2), the animal's body
+        continuing past the bottom edge
+      negative: &not-a-person >-
+        (human, person, man, woman, humanoid body, knight, armor:1.4)
+    winged:
+      anchor: (small winged fantasy creature:1.3)
+      framing: >-
+        (head, body and folded wings of the creature:1.3), (centered, with
+        empty space above the head and on both sides:1.2), body continuing
+        past the bottom edge
+      negative: *not-a-person
+    blob:
+      anchor: (fantasy ooze monster with no limbs and no head:1.3)
+      framing: >-
+        (the whole creature, wide and low, resting on the bottom edge:1.3),
+        (centered, with empty space above and on both sides:1.2)
+      negative: >-
+        (human, person, man, woman, humanoid body, knight, armor:1.4),
+        (legs, arms, frog, toad, lizard, salamander, animal:1.3)
+    swarm:
+      anchor: (a swarm of many small creatures heaped together:1.3)
+      framing: >-
+        (the whole heap, wide and low, resting on the bottom edge:1.3),
+        (centered, with empty space above and on both sides:1.2)
+      negative: *not-a-person
+    object:
+      anchor: (an animated object, a living thing that is still an object:1.3)
+      framing: >-
+        (the whole object, resting on the bottom edge:1.3), (centered, with
+        empty space above and on both sides:1.2)
+      negative: *not-a-person
+    plant:
+      anchor: (living fantasy plant creature:1.3)
+      framing: >-
+        (upper part of the plant creature:1.3), (centered, with empty space
+        above and on both sides:1.2), its trunk or stalk continuing past the
+        bottom edge
+      negative: *not-a-person
+    multihead:
+      anchor: (fantasy monster with several heads on one body:1.3)
+      framing: >-
+        (all heads and the shoulders they share:1.3), (centered, with empty
+        space above the heads and on both sides:1.2), body continuing past
+        the bottom edge
+      negative: *not-a-person
   cutout: true
   # One fixed light for every portrait. Tavern lighting is applied per scene
   # when the cards are composed (docs/images.md § Lighting), never baked in.
   positive: >-
-    pixel art, medieval fantasy tavern patron, {{framing}}, {{subject}},
+    pixel art, {{anchor}}, {{framing}}, {{subject}},
     three-quarter view, looking at viewer, (soft even light from the upper
     left:1.1), (thick dark outline around the character:1.3), plain white
     background
