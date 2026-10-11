@@ -39,11 +39,29 @@
  * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `duplicate`, `not_owned`, `unknown_character`, `over_budget`) |
  * | `lineup.locked` | `lock.draft_incomplete`, `lock.bad_week`, `lock.already_locked`, `lock.previous_not_finalized`, `lock.unknown_tavern`, `lock.duplicate_tavern`, `lock.missing_tavern`, `lock.source_mismatch`, `lock.illegal_lineup` |
  * | `waiver.claimed` | `waiver.draft_incomplete`, `waiver.unknown_tavern`, `waiver.duplicate_claim`, `waiver.not_pooled`, `waiver.not_free_agent`, `waiver.drop_not_owned` |
- * | `waiver.resolved` | `waiver.bad_week`, `waiver.week_not_finalized`, `waiver.already_resolved`, `waiver.unknown_claim`, `waiver.duplicate_outcome`, `waiver.missing_outcome`, `waiver.bad_priority`, `waiver.add_not_free`, `waiver.drop_not_owned`, `waiver.roster_full` |
- * | `trade.*` | `trade.draft_incomplete`, `trade.duplicate_id`, `trade.unknown_tavern`, `trade.self`, `trade.empty`, `trade.duplicate_piece`, `trade.past_deadline`, `trade.not_owned`, `trade.roster_size`, `trade.unknown`, `trade.not_proposed`, `trade.not_accepted`, `trade.not_open` |
+ * | `waiver.resolved` | `waiver.bad_week`, `waiver.week_not_finalized`, `waiver.already_resolved`, `waiver.unknown_claim`, `waiver.duplicate_outcome`, `waiver.missing_outcome`, `waiver.bad_priority`, `waiver.outcome_mismatch` |
+ * | `trade.*` | `trade.draft_incomplete`, `trade.duplicate_id`, `trade.unknown_tavern`, `trade.unknown`, `trade.not_proposed`, `trade.not_accepted`, `trade.not_open`, `trade.past_deadline` (at acceptance), and the `validateTrade` codes below |
  * | `mission.revealed` | `reveal.bad_week`, `reveal.week_not_locked`, `reveal.already_revealed`, `reveal.wrong_season`, `reveal.commitment_mismatch`, `reveal.invalid_mission` |
  * | `mission.resolved` | `resolve.bad_week`, `resolve.week_not_locked`, `resolve.not_revealed`, `resolve.wrong_mission`, `resolve.week_finalized`, `resolve.unknown_tavern`, `resolve.duplicate`, `resolve.no_lineup`, `resolve.lineup_mismatch`, `resolve.counts_mismatch`, `resolve.score_mismatch` |
  * | `week.finalized` | `finalize.bad_week`, `finalize.already_finalized`, `finalize.week_not_locked`, `finalize.missing_result` |
+ *
+ * `trade.proposed` and `trade.completed` run `validateTrade` and report its
+ * first violation (in its order) under these codes:
+ *
+ * | `validateTrade` | Event code |
+ * |---|---|
+ * | `same_tavern` | `trade.self` |
+ * | `empty_side` | `trade.empty` |
+ * | `duplicate` | `trade.duplicate_piece` |
+ * | `give_not_owned`, `receive_not_owned` | `trade.not_owned` |
+ * | `roster_size` | `trade.roster_size` |
+ * | `past_deadline` | `trade.past_deadline` |
+ * | anything added later | `trade.<code>` |
+ *
+ * `waiver.add_not_free`, `waiver.drop_not_owned` and `waiver.roster_full` are
+ * no longer raised by `waiver.resolved`: an award that breaks them disagrees
+ * with `resolveWaivers` and is `waiver.outcome_mismatch`.
+ * (`waiver.drop_not_owned` is still `waiver.claimed`'s.)
  *
  * ## Interpretations
  *
@@ -64,16 +82,31 @@
  * - Weeks are checked against `1..config.weeks` everywhere.
  * - `lineup.locked`: a null lineup must have source `none`, and a non-null
  *   one must not.
- * - Trades: the deadline is "week `deadlineWeek` is locked", enforced at
- *   proposal, acceptance and completion (rules §10). Roster sizes are
- *   checked against `≤ roster.size` at proposal and completion. The veto
+ * - Trades: `validateTrade` decides legality at proposal and again at
+ *   completion (rules §10, D-06), with `week` = the next lineup week, 1 + the
+ *   number of locked weeks. So the deadline is "week `deadlineWeek` is
+ *   locked", and acceptance checks that alone. Both sides must give at least
+ *   one character (`empty_side`); an uneven trade must leave each changed
+ *   roster between 1 and `roster.size`; an even one always fits. The veto
  *   window can't be timed without a clock (D-41), so "within the window"
  *   means the trade is still `accepted`, and `trade.completed` itself marks
  *   the window's end.
- * - `waiver.resolved` and `trade.completed` apply their recorded outcome
- *   (D-20) and check only basic legality. Waiver awards apply in outcome
- *   order. TODO(T4.5): also check the outcomes against `resolveWaivers` and
- *   the trade against `validateTrade` once W4 lands them.
+ * - `trade.completed` on a trade that is no longer legal (pieces moved by an
+ *   earlier trade or waiver, a roster filled up, the deadline passed) is
+ *   rejected. The Action emits `trade.cancelled` with reason `invalid`
+ *   instead.
+ * - `waiver.resolved` must be exactly what `resolveWaivers` decides from the
+ *   state: the pending claims (in log order, which ranks them as their seqs
+ *   would), `waivers.priority`, every roster, and `freeAgents`. `outcomes`
+ *   must list the same claims, `awarded` flags and reasons (a `WaiverReason`)
+ *   in the same order (decision order: round by round, priority order within
+ *   a round), and `priorityAfter` must equal the computed priority. Otherwise
+ *   `waiver.outcome_mismatch`, naming the first differing outcome. The
+ *   computed awards are what get applied. Unlike a mission run (D-20),
+ *   nothing random is involved, so the record is checked rather than
+ *   trusted. The cost: replay is tied to today's `resolveWaivers`, so a
+ *   change to its rules must be versioned in the season config, or older
+ *   logs stop replaying.
  * - `waiver.resolved` runs once per week (`waiver.already_resolved`).
  * - `mission.revealed`: `sha256` must equal the schedule commitment only when
  *   one was made (D-08 made missions open, so commitments are null). The
@@ -94,10 +127,20 @@ import type { SeasonConfig } from '../league';
 import { validateMission } from '../missions';
 import { runScore } from '../resolution';
 import { draftOrderSeed, rngFor } from '../rng';
-import { draftOrder, snakePickOwner, validateLineup, type Lineup, type RosterView } from '../roster';
+import {
+  draftOrder,
+  resolveWaivers,
+  snakePickOwner,
+  validateLineup,
+  validateTrade,
+  type Lineup,
+  type RosterView,
+  type WaiverClaim,
+} from '../roster';
 import type { CrEighths } from '../vocabulary';
+import { freeAgents } from './selectors';
 import type { LeagueState, TavernState, TradeState } from './state';
-import type { EventOf, EventType, LeagueEvent } from './types';
+import type { EventOf, EventType, LeagueEvent, PayloadByType } from './types';
 
 export class InvalidEventError extends Error {
   constructor(
@@ -349,18 +392,25 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       fail(event, 'waiver.bad_priority', 'priorityAfter must list every tavern exactly once');
     }
 
-    // TODO(T4.5): check `outcomes` and `priorityAfter` against `resolveWaivers`.
+    const computed = computeWaivers(state, config);
+    computed.outcomes.forEach((expected, i) => {
+      const recorded = outcomes[i]!;
+      if (recorded.claim !== expected.claim || recorded.awarded !== expected.awarded || recorded.reason !== expected.reason) {
+        fail(
+          event,
+          'waiver.outcome_mismatch',
+          `outcome ${i + 1} records ${describeOutcome(recorded)}, but resolveWaivers decides ${describeOutcome(expected)} at that place`,
+        );
+      }
+    });
+    if (!priorityAfter.every((t, i) => t === computed.priority[i])) {
+      fail(event, 'waiver.outcome_mismatch', `priorityAfter [${priorityAfter.join(', ')}] should be [${computed.priority.join(', ')}]`);
+    }
+
     let next: Pick<LeagueState, 'owner' | 'taverns'> = state;
-    for (const outcome of outcomes) {
+    for (const outcome of computed.outcomes) {
       if (!outcome.awarded) continue;
       const claim = pending.get(outcome.claim)!;
-      const t = next.taverns.get(claim.tavern)!;
-      if (next.owner.has(claim.add)) fail(event, 'waiver.add_not_free', `claim "${claim.claim}": "${claim.add}" is no longer a free agent`);
-      if (claim.drop !== null && !t.roster.includes(claim.drop)) {
-        fail(event, 'waiver.drop_not_owned', `claim "${claim.claim}": "${claim.drop}" is no longer on "${claim.tavern}"'s roster`);
-      }
-      const size = t.roster.length + 1 - (claim.drop === null ? 0 : 1);
-      if (size > config.roster.size) fail(event, 'waiver.roster_full', `claim "${claim.claim}": "${claim.tavern}" would hold ${size} > ${config.roster.size}`);
       if (claim.drop !== null) next = release(next, claim.tavern, claim.drop);
       next = acquire(next, claim.tavern, claim.add);
     }
@@ -368,7 +418,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       ...state,
       owner: next.owner,
       taverns: next.taverns,
-      waivers: { pending: [], priority: priorityAfter, resolvedWeeks: setAdd(state.waivers.resolvedWeeks, week) },
+      waivers: { pending: [], priority: computed.priority, resolvedWeeks: setAdd(state.waivers.resolvedWeeks, week) },
     };
   },
 
@@ -379,11 +429,6 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     if (state.trades.has(terms.trade)) fail(event, 'trade.duplicate_id', `trade "${terms.trade}" already exists`);
     tavernOr(state, event, terms.from, 'trade.unknown_tavern');
     tavernOr(state, event, terms.to, 'trade.unknown_tavern');
-    if (terms.from === terms.to) fail(event, 'trade.self', 'a tavern cannot trade with itself');
-    if (terms.give.length + terms.receive.length === 0) fail(event, 'trade.empty', 'a trade must move at least one character');
-    const pieces = [...terms.give, ...terms.receive];
-    if (new Set(pieces).size !== pieces.length) fail(event, 'trade.duplicate_piece', 'a character is listed twice');
-    deadlineOr(state, config, event);
     tradeLegalOr(state, config, event, terms);
     return { ...state, trades: mapSet(state.trades, terms.trade, { terms, status: 'proposed' }) };
   },
@@ -405,8 +450,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     const config = configOf(state);
     const trade = tradeOr(state, event, event.payload.trade);
     if (trade.status !== 'accepted') fail(event, 'trade.not_accepted', `trade "${trade.terms.trade}" is ${trade.status}, not accepted`);
-    deadlineOr(state, config, event);
-    // TODO(T4.5): re-check with `validateTrade` once W4 lands it.
+    // Still legal now? If not, the Action emits `trade.cancelled` (reason `invalid`) instead.
     tradeLegalOr(state, config, event, trade.terms);
     const { from, to, give, receive } = trade.terms;
     let next: Pick<LeagueState, 'owner' | 'taverns'> = state;
@@ -535,32 +579,72 @@ function tradeOr(state: LeagueState, event: LeagueEvent, id: string): TradeState
   return trade;
 }
 
-/** No trade is proposed, accepted or completed once week `deadlineWeek` has locked. */
+/**
+ * The first week whose lineups a roster change now would affect: the next
+ * week to lock. Weeks lock in order (`lock.previous_not_finalized`), so the
+ * locked weeks are exactly 1..n.
+ */
+function nextLineupWeek(state: LeagueState): number {
+  return state.lockedLineups.size + 1;
+}
+
+/** No trade is accepted once the next lineup week is past `deadlineWeek`, i.e. once week `deadlineWeek` has locked. */
 function deadlineOr(state: LeagueState, config: SeasonConfig, event: LeagueEvent): void {
   const deadline = config.trades.deadlineWeek;
-  if (deadline !== null && state.lockedLineups.has(deadline)) {
+  if (deadline !== null && nextLineupWeek(state) > deadline) {
     fail(event, 'trade.past_deadline', `the trade deadline passed when week ${deadline} locked`);
   }
 }
 
-/** Both sides still own their pieces, and both rosters stay within `roster.size` afterwards. */
+/** `validateTrade` violation code → `InvalidEventError` code. See the table in the header. */
+const TRADE_CODES: Readonly<Record<string, string>> = {
+  same_tavern: 'trade.self',
+  empty_side: 'trade.empty',
+  duplicate: 'trade.duplicate_piece',
+  give_not_owned: 'trade.not_owned',
+  receive_not_owned: 'trade.not_owned',
+  roster_size: 'trade.roster_size',
+  past_deadline: 'trade.past_deadline',
+};
+
+/**
+ * `validateTrade` against the current rosters, for the next lineup week. The
+ * code is the first violation's (in `validateTrade`'s order), and the message
+ * lists every violation.
+ */
 function tradeLegalOr(state: LeagueState, config: SeasonConfig, event: LeagueEvent, terms: TradeState['terms']): void {
-  for (const [tavern, pieces] of [
-    [terms.from, terms.give],
-    [terms.to, terms.receive],
-  ] as const) {
-    for (const c of pieces) {
-      if (state.owner.get(c) !== tavern) fail(event, 'trade.not_owned', `"${c}" is not on "${tavern}"'s roster`);
-    }
+  const rosters = [...state.taverns.values()].map(rosterView);
+  const violations = validateTrade(terms, rosters, config, { week: nextLineupWeek(state) });
+  const first = violations[0];
+  if (first !== undefined) {
+    fail(event, TRADE_CODES[first.code] ?? `trade.${first.code}`, `trade "${terms.trade}": ${violations.map((v) => v.message).join('; ')}`);
   }
-  const delta = terms.receive.length - terms.give.length;
-  for (const [tavern, change] of [
-    [terms.from, delta],
-    [terms.to, -delta],
-  ] as const) {
-    const size = state.taverns.get(tavern)!.roster.length + change;
-    if (size > config.roster.size) fail(event, 'trade.roster_size', `"${tavern}" would hold ${size} > ${config.roster.size}`);
-  }
+}
+
+type WaiverOutcome = PayloadByType['waiver.resolved']['outcomes'][number];
+
+/**
+ * `resolveWaivers` over the pending claims, as `waiver.resolved` outcomes in
+ * decision order. Pending claims are in log order, so their index ranks them
+ * exactly as their event seqs would.
+ */
+function computeWaivers(state: LeagueState, config: SeasonConfig): { readonly outcomes: ReadonlyArray<WaiverOutcome>; readonly priority: ReadonlyArray<string> } {
+  const ids = new Map<WaiverClaim, string>();
+  const claims = state.waivers.pending.map((c, seq): WaiverClaim => {
+    const claim = { tavern: c.tavern, add: c.add, drop: c.drop, seq };
+    ids.set(claim, c.claim);
+    return claim;
+  });
+  const rosters = [...state.taverns.values()].map(rosterView);
+  const result = resolveWaivers(claims, state.waivers.priority, rosters, new Set(freeAgents(state)), config);
+  return {
+    outcomes: result.awards.map((a) => ({ claim: ids.get(a.claim)!, awarded: a.awarded, reason: a.reason })),
+    priority: result.priority,
+  };
+}
+
+function describeOutcome(o: WaiverOutcome): string {
+  return `"${o.claim}" ${o.awarded ? 'awarded' : 'not awarded'} (${o.reason})`;
 }
 
 function withTradeStatus(state: LeagueState, trade: TradeState, status: TradeState['status']): LeagueState {
