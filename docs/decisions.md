@@ -41,9 +41,12 @@ initial order reverse draft. Alternatives: a fixed reverse-standings order, or
 a FAAB budget in CR units.
 
 **D-06 Trades: DEFAULTED.** Proposal by form, `/accept` by the counterparty,
-24 h commissioner veto window, deadline after week 4. *Open sub-question:*
-are 2-for-1 trades allowed when one roster would drop below 7? *Default:* no.
-Trades must keep both rosters at size.
+24 h commissioner veto window, deadline after week 4. *Sub-question:* are
+uneven trades allowed? *Default (as implemented in T4.5):* a trade passes if
+each roster either keeps its size or ends between 1 and `roster.size`. So
+between two full rosters an uneven trade always fails, because the receiver
+would overflow. A 2-for-1 is allowed when the receiving roster has an open
+slot, which leaves the giver one short until it claims a free agent.
 
 **D-07 Missed lineup: DEFAULTED.** Last week's lineup carries over. See D-27
 for the fallback.
