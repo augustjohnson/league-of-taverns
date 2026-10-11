@@ -4,6 +4,7 @@ import {
   TRAITS,
   effectiveStats,
   evTtkV0,
+  initialState,
   projectMission,
   rngFor,
   snakePickOwner,
@@ -130,6 +131,7 @@ function stateOf(
   const owner = new Map<string, string>();
   for (const [tavern, roster] of Object.entries(rosters)) for (const id of roster) owner.set(id, tavern);
   return {
+    ...initialState(),
     lastSeq: 0,
     lastHash: null,
     phase: 'regular',
@@ -140,7 +142,7 @@ function stateOf(
     draft: { order: Object.keys(rosters), picks: owner.size, complete: false },
     pendingLineups: new Map(),
     lockedLineups: new Map((extra.locked ?? []).map((w) => [w, []] as const)),
-    waivers: { pending: [], priority: Object.keys(rosters) },
+    waivers: { pending: [], priority: Object.keys(rosters), resolvedWeeks: new Set() },
     trades: new Map(),
     revealed: new Map(),
     results: new Map(),
