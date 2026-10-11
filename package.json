@@ -9,7 +9,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p engine && tsc -p bots && tsc -p scripts && tsc -p sims && tsc -p .",
+    "typecheck": "tsc -p engine && tsc -p bots && tsc -p scripts && tsc -p sims && tsc -p sims/src/playground && tsc -p .",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm lint && pnpm typecheck && pnpm test",

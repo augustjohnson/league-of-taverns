@@ -68,6 +68,8 @@ scripts/             the I/O edge: snapshot, validate, draft-missions, difficult
                      draft-chrome, lock-check, seal, reveal, apply-command, run-week,
                      offseason, publish
 sims/                mock-season runner + balance report (output git-ignored)
+  src/playground/      browser playground: one HTML page running the real engine and
+                       bots. Unlike explorer/, it may import the engine.
 data/open5e/         raw pinned snapshots + manifest
 characters/<id>/     character.yaml (id, base, chrome, status) + backstory.md
 seasons/season-01/   config, managers, schedule, pool, missions, chrome, events

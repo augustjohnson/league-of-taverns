@@ -1,0 +1,10 @@
+{
+  // The browser playground: DOM types here only. The engine and bots it
+  // imports are still checked DOM-free by their own configs.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["."]
+}

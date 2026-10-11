@@ -1,6 +1,6 @@
 /**
  * The I/O half of the mock season: read a season folder through the scripts
- * loaders and hand `prepareSeason` plain data.
+ * loaders and hand `seasonParts` plain data.
  *
  * The folder keeps its own characters/ (like sims/fixtures/mock-season/), and
  * every *.yaml directly in its missions/ (or missions/selected/) is a
@@ -15,12 +15,17 @@ import { ValidationFailure } from '@league-of-taverns/scripts/lib/main';
 import { REPO_ROOT, displayPath, loadMission, rootDir } from '@league-of-taverns/scripts/lib/repo';
 import { loadSeason, missionFiles, snapshotCrIndex } from '@league-of-taverns/scripts/lib/season';
 import type { SeasonLocation } from '@league-of-taverns/scripts/lib/season';
-import { prepareSeason, type SeasonInput } from './season-runner';
+import { seasonInput, seasonParts, type SeasonInput, type SeasonParts } from './season-runner';
 
 export const DEFAULT_SEASON_DIR = 'sims/fixtures/mock-season';
 
 /** Load `dir` (relative to the repo root, or absolute) as a `SeasonInput`. Throws a `ValidationFailure` naming the file on bad input. */
 export function loadMockSeason(dir: string = DEFAULT_SEASON_DIR): SeasonInput {
+  return seasonInput(loadMockSeasonParts(dir));
+}
+
+/** Load `dir` as plain `SeasonParts` (the full snapshot included). `loadMockSeason` is `seasonInput` of this. */
+export function loadMockSeasonParts(dir: string = DEFAULT_SEASON_DIR): SeasonParts {
   const location: SeasonLocation = { dir, charactersRoot: dir };
   const season = loadSeason(location);
   const { config } = season;
@@ -43,5 +48,5 @@ export function loadMockSeason(dir: string = DEFAULT_SEASON_DIR): SeasonInput {
   const configText = readFileSync(join(season.dir, 'config.yaml'), 'utf8');
   const engine = JSON.parse(readFileSync(join(rootDir(REPO_ROOT), 'engine', 'package.json'), 'utf8')) as { version?: unknown };
   if (typeof engine.version !== 'string') throw new ValidationFailure('engine/package.json: no version');
-  return prepareSeason(season, missions, configText, engine.version);
+  return seasonParts(season, missions, configText, engine.version);
 }

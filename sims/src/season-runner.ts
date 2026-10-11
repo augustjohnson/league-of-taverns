@@ -1,10 +1,12 @@
 /**
  * The mock season loop (T9.2), as pure functions over in-memory data.
  *
- * - `prepareSeason` turns a loaded season (scripts' `loadSeason`), its
- *   missions and the raw config text into a `SeasonInput`: everything a run
- *   needs, with one `statsOf` and one `baseOf` shared by every run, so the
- *   bots' per-(statsOf, pool) cache keeps hitting.
+ * - `seasonParts` checks a loaded season (scripts' `loadSeason`) and its
+ *   missions and reduces them to `SeasonParts`: plain, JSON-safe data.
+ *   `seasonInput` turns parts into a `SeasonInput`: everything a run needs,
+ *   with one `statsOf` and one `baseOf` shared by every run, so the bots'
+ *   per-(statsOf, pool) cache keeps hitting. `prepareSeason` does both. The
+ *   browser playground ships parts as JSON and calls `seasonInput` itself.
  * - `runMockSeason` plays one whole season headless with bot managers and
  *   returns the event log, the folded state and a summary. Every event goes
  *   through the engine's `applyEvent` as it is built, so bots obey the real
@@ -21,7 +23,6 @@
  * reproducible. The draft order is the engine's (`draftOrderSeed(config.id)`),
  * so it does not vary with the sim seed.
  */
-import { isDeepStrictEqual } from 'node:util';
 import { BOT_IDS, botManager } from '@league-of-taverns/bots';
 import type { BotId, BotManager, PublicView } from '@league-of-taverns/bots';
 import {
@@ -61,13 +62,15 @@ import type {
   LeagueState,
   Lineup,
   Mission,
+  Open5eMonster,
   Party,
   PayloadByType,
   PooledCharacter,
+  ResolutionMismatch,
   SeasonConfig,
   WaiverClaim,
 } from '@league-of-taverns/engine';
-import type { LoadedSeason } from '@league-of-taverns/scripts/lib/season';
+import { deepEqual } from './deep-equal';
 
 // ── input ──────────────────────────────────────────────────────────────────
 
@@ -98,51 +101,72 @@ export interface SeasonInput {
 }
 
 /**
- * Build a `SeasonInput` from a loaded season. Each schedule week is matched to
- * the one mission with its environment. Throws if a week has no mission or
- * several, if a tavern is managed by a human (sims seat only bots), or if the
- * battle model is unknown. Pure: the caller reads the files.
+ * What `seasonParts` reads from a loaded season. Scripts' `LoadedSeason`
+ * satisfies it; it is spelled out here so this module (and the browser
+ * bundle) never imports the I/O layer.
  */
-export function prepareSeason(
-  loaded: Pick<LoadedSeason, 'config' | 'snapshot' | 'pool' | 'managers' | 'schedule'>,
+export interface SeasonSource {
+  readonly config: SeasonConfig;
+  readonly snapshot: ReadonlyArray<Open5eMonster>;
+  readonly pool: { readonly characters: ReadonlyArray<PooledCharacter>; readonly cr: ReadonlyMap<string, CrEighths> };
+  readonly managers: {
+    readonly commissioner: { readonly login: string; readonly githubId: number | null };
+    readonly taverns: ReadonlyArray<{
+      readonly id: string;
+      readonly name: string;
+      readonly manager: { readonly bot: BotId } | { readonly login: string; readonly githubId: number | null };
+    }>;
+  };
+  readonly schedule: { readonly weeks: ReadonlyArray<ScheduleEntry> };
+}
+
+/**
+ * A season as plain data: no Maps, no functions, so it round-trips through
+ * JSON. `seasonInput` builds the run-ready `SeasonInput` from it.
+ */
+export interface SeasonParts {
+  readonly config: SeasonConfig;
+  /** sha256 of config.yaml's text, for `season.created`. */
+  readonly configSha256: string;
+  /** engine/package.json `version`. */
+  readonly engineVersion: string;
+  /** The public schedule, with every `commitment` null (missions are open, D-08). */
+  readonly schedule: ReadonlyArray<ScheduleEntry>;
+  /** In pool-file order. */
+  readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
+  /** In managers-file order. */
+  readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string; readonly bot: BotId }>;
+  readonly commissioner: { readonly githubId: number; readonly login: string } | null;
+  /** One mission per schedule week, in week order. */
+  readonly missions: ReadonlyArray<{ readonly week: number; readonly mission: Mission; readonly sha256: string }>;
+  /** Verbatim Open5e records, covering at least every pool base and encounter creature. The first record per slug wins. */
+  readonly snapshot: ReadonlyArray<Open5eMonster>;
+}
+
+/**
+ * Check a loaded season and reduce it to `SeasonParts`. Each schedule week is
+ * matched to the one mission with its environment. Throws if a week has no
+ * mission or several, if a tavern is managed by a human (sims seat only
+ * bots), or if a pooled character has no CR. Pure: the caller reads the files.
+ */
+export function seasonParts(
+  loaded: SeasonSource,
   missions: ReadonlyArray<Mission>,
   configText: string,
   engineVersion: string,
-): SeasonInput {
-  const { config } = loaded;
-  const battleModel = BATTLE_MODELS[config.missions.battleModel];
-  if (battleModel === undefined) {
-    throw new Error(`unknown battle model "${config.missions.battleModel}" (known: ${Object.keys(BATTLE_MODELS).join(', ')})`);
-  }
-
-  const bases = new Map<string, BaseStats>();
-  for (const record of loaded.snapshot) if (!bases.has(record.slug)) bases.set(record.slug, toBaseStats(record).stats);
-  const baseOf = (slug: string): BaseStats => {
-    const base = bases.get(slug);
-    if (base === undefined) throw new Error(`"${slug}" is not in snapshot ${config.snapshot}`);
-    return base;
-  };
-
-  const stats = new Map<string, EffectiveStats>();
+): SeasonParts {
   const pool = loaded.pool.characters.map((character) => {
     const cr = loaded.pool.cr.get(character.ref.id);
     if (cr === undefined) throw new Error(`pool: no CR for "${character.ref.id}"`);
-    stats.set(character.ref.id, effectiveStats(character, baseOf(character.ref.base), TRAITS));
     return { character, cr };
   });
-  const statsOf = (id: string): EffectiveStats => {
-    const s = stats.get(id);
-    if (s === undefined) throw new Error(`"${id}" is not pooled`);
-    return s;
-  };
 
   const taverns = loaded.managers.taverns.map((tavern) => {
     if (!('bot' in tavern.manager)) throw new Error(`tavern "${tavern.id}" has a human manager; mock seasons seat only bots`);
     return { id: tavern.id, name: tavern.name, bot: tavern.manager.bot };
   });
 
-  const byWeek = new Map<number, { mission: Mission; sha256: string }>();
-  for (const week of loaded.schedule.weeks) {
+  const byWeek = loaded.schedule.weeks.map((week) => {
     const matching = missions.filter((m) => m.environment === week.environment);
     if (matching.length !== 1) {
       throw new Error(
@@ -151,12 +175,12 @@ export function prepareSeason(
       );
     }
     const mission = matching[0]!;
-    byWeek.set(week.week, { mission, sha256: missionSha256(mission) });
-  }
+    return { week: week.week, mission, sha256: missionSha256(mission) };
+  });
 
   const { githubId, login } = loaded.managers.commissioner;
   return {
-    config,
+    config: loaded.config,
     configSha256: lineHash(configText),
     engineVersion,
     schedule: loaded.schedule.weeks.map((week) => ({ ...week, commitment: null })),
@@ -164,10 +188,62 @@ export function prepareSeason(
     taverns,
     commissioner: githubId === null ? null : { githubId, login },
     missions: byWeek,
+    snapshot: loaded.snapshot,
+  };
+}
+
+/**
+ * Build the run-ready `SeasonInput` from `SeasonParts`: base stats from the
+ * snapshot records, effective stats per pooled character, the missions by
+ * week and the battle model. Throws if the battle model is unknown or a pool
+ * base is missing from the snapshot. Pure, and safe in a browser.
+ */
+export function seasonInput(parts: SeasonParts): SeasonInput {
+  const { config } = parts;
+  const battleModel = BATTLE_MODELS[config.missions.battleModel];
+  if (battleModel === undefined) {
+    throw new Error(`unknown battle model "${config.missions.battleModel}" (known: ${Object.keys(BATTLE_MODELS).join(', ')})`);
+  }
+
+  const bases = new Map<string, BaseStats>();
+  for (const record of parts.snapshot) if (!bases.has(record.slug)) bases.set(record.slug, toBaseStats(record).stats);
+  const baseOf = (slug: string): BaseStats => {
+    const base = bases.get(slug);
+    if (base === undefined) throw new Error(`"${slug}" is not in snapshot ${config.snapshot}`);
+    return base;
+  };
+
+  const stats = new Map<string, EffectiveStats>();
+  for (const { character } of parts.pool) stats.set(character.ref.id, effectiveStats(character, baseOf(character.ref.base), TRAITS));
+  const statsOf = (id: string): EffectiveStats => {
+    const s = stats.get(id);
+    if (s === undefined) throw new Error(`"${id}" is not pooled`);
+    return s;
+  };
+
+  return {
+    config,
+    configSha256: parts.configSha256,
+    engineVersion: parts.engineVersion,
+    schedule: parts.schedule,
+    pool: parts.pool,
+    taverns: parts.taverns,
+    commissioner: parts.commissioner,
+    missions: new Map(parts.missions.map(({ week, mission, sha256 }) => [week, { mission, sha256 }])),
     baseOf,
     statsOf,
     battleModel,
   };
+}
+
+/** `seasonInput(seasonParts(...))`: build a `SeasonInput` from a loaded season. See both. */
+export function prepareSeason(
+  loaded: SeasonSource,
+  missions: ReadonlyArray<Mission>,
+  configText: string,
+  engineVersion: string,
+): SeasonInput {
+  return seasonInput(seasonParts(loaded, missions, configText, engineVersion));
 }
 
 /**
@@ -271,6 +347,21 @@ export interface MockSeasonResult {
   /** The folded state, with `lastHash` set as `replayLog` sets it. */
   readonly state: LeagueState;
   readonly summary: RunSummary;
+  /** The self-check every run passes before it returns (a failure throws instead). */
+  readonly audit: SeasonAudit;
+}
+
+/** The replay and resolution audit `runMockSeason` runs on every season. */
+export interface SeasonAudit {
+  /** `replayLog(ndjson)` deep-equals the state built event by event. */
+  readonly replayMatches: boolean;
+  /** `verifyResolutions(events)`: empty when every `mission.resolved` checks out. */
+  readonly mismatches: ReadonlyArray<ResolutionMismatch>;
+}
+
+/** Replay `ndjson` and compare it to `state`, then audit every resolution. Reports mismatches; never throws on one. */
+export function auditSeason(events: ReadonlyArray<LeagueEvent>, ndjson: string, state: LeagueState): SeasonAudit {
+  return { replayMatches: deepEqual(replayLog(ndjson), state), mismatches: verifyResolutions(events) };
 }
 
 // ── the season loop ────────────────────────────────────────────────────────
@@ -500,9 +591,9 @@ export function runMockSeason(input: SeasonInput, options: RunOptions): MockSeas
 
   // Replay and audit: the log alone must rebuild the same state.
   const ndjson = log.ndjson;
-  const replayed = replayLog(ndjson);
-  if (!isDeepStrictEqual(replayed, log.state)) throw new Error(`seed ${simSeed}: replayLog(ndjson) differs from the state built event by event`);
-  const mismatches = verifyResolutions(log.events);
+  const audit = auditSeason(log.events, ndjson, log.state);
+  if (!audit.replayMatches) throw new Error(`seed ${simSeed}: replayLog(ndjson) differs from the state built event by event`);
+  const { mismatches } = audit;
   if (mismatches.length > 0) {
     throw new Error(
       `seed ${simSeed}: verifyResolutions found ${mismatches.length} mismatch(es):\n` +
@@ -510,7 +601,7 @@ export function runMockSeason(input: SeasonInput, options: RunOptions): MockSeas
     );
   }
 
-  return { events: log.events, ndjson, state: log.state, summary: summarize(input, simSeed, log.state, log.events, waiverLog) };
+  return { events: log.events, ndjson, state: log.state, summary: summarize(input, simSeed, log.state, log.events, waiverLog), audit };
 }
 
 function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats): Party {

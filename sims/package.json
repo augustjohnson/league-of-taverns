@@ -5,8 +5,9 @@
   "type": "module",
   "description": "Headless mock seasons with bot managers, plus the balance report.",
   "scripts": {
-    "typecheck": "tsc -p .",
+    "typecheck": "tsc -p . && tsc -p src/playground",
     "mock-season": "tsx src/mock-season.ts",
+    "playground": "tsx src/build-playground.ts",
     "balance-report": "tsx src/balance-report.ts"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15"
   }
 }
