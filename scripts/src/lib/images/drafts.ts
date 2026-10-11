@@ -15,13 +15,13 @@ import { kebabIdSchema } from '@league-of-taverns/engine';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
 import { ValidationFailure } from '../main';
-import { REPO_ROOT, loadCharacterChrome, readYaml, rootDir } from '../repo';
+import { REPO_ROOT, loadCharacterChrome, loadCharacterRef, loadSnapshot, readYaml, rootDir } from '../repo';
 import type { RepoRoot } from '../repo';
 import { seasonDir } from '../season';
 import { checkSprite } from './pixelate';
-import { decodePng } from './png';
-import { paletteOf } from './style';
-import type { ImageKind, ImageStyle } from './style';
+import { decodePng, pngSize } from './png';
+import { creatureSize, outputSize, paletteOf } from './style';
+import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
 export interface DraftTarget {
   readonly kind: ImageKind;
@@ -29,6 +29,8 @@ export interface DraftTarget {
   readonly id: string;
   /** Covers only: the season the mission belongs to. */
   readonly season?: string;
+  /** Portraits only: the base's creature size, which sets the canvas. */
+  readonly size?: CreatureSize;
   readonly subject: string;
   /** Where an accepted image goes, absolute. */
   readonly destination: string;
@@ -39,11 +41,30 @@ export const DRAFTS_DIR = '.image-drafts';
 // ── targets ────────────────────────────────────────────────────────────────
 
 /**
+ * Creature size by base slug, from a pinned snapshot: the one named, else the
+ * newest in data/open5e/manifest.json (entries are appended in order).
+ */
+export function snapshotSizes(snapshotId?: string, root: RepoRoot = REPO_ROOT): (base: string) => CreatureSize | undefined {
+  let id = snapshotId;
+  if (id === undefined) {
+    const manifest = JSON.parse(readFileSync(join(rootDir(root), 'data', 'open5e', 'manifest.json'), 'utf8')) as { snapshots?: Array<{ id: string }> };
+    id = manifest.snapshots?.at(-1)?.id;
+    if (id === undefined) throw new ValidationFailure('data/open5e/manifest.json lists no snapshots, so creature sizes are unknown');
+  }
+  const sizes = new Map(loadSnapshot(id, root).map((record) => [record.slug, creatureSize(record.size)]));
+  return (base) => sizes.get(base);
+}
+
+/**
  * Portrait targets. Named characters are drafted whatever their status (an
  * explicit redo of a final portrait is allowed); `all` takes every character
  * whose portrait is at `prompt` or `draft`.
  */
-export function portraitTargets(ids: ReadonlyArray<string> | 'all', root: RepoRoot = REPO_ROOT): DraftTarget[] {
+export function portraitTargets(
+  ids: ReadonlyArray<string> | 'all',
+  sizeOf: (base: string) => CreatureSize | undefined,
+  root: RepoRoot = REPO_ROOT,
+): DraftTarget[] {
   const charactersDir = join(rootDir(root), 'characters');
   const all = ids === 'all';
   const names = all ? readdirSync(charactersDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort() : ids;
@@ -54,7 +75,10 @@ export function portraitTargets(ids: ReadonlyArray<string> | 'all', root: RepoRo
     if (portrait?.prompt === undefined) {
       throw new ValidationFailure(`characters/${id}/character.yaml: chrome.portrait.prompt is not set, so there is nothing to draw`);
     }
-    targets.push({ kind: 'portrait', id, subject: portrait.prompt, destination: join(charactersDir, id, 'portrait.png') });
+    const { base } = loadCharacterRef(id, root);
+    const size = sizeOf(base);
+    if (size === undefined) throw new ValidationFailure(`characters/${id}/character.yaml: base ${JSON.stringify(base)} is not in the snapshot, so its size is unknown`);
+    targets.push({ kind: 'portrait', id, size, subject: portrait.prompt, destination: join(charactersDir, id, 'portrait.png') });
   }
   return targets;
 }
@@ -128,7 +152,7 @@ export function accept(target: DraftTarget, seed: number, style: ImageStyle, roo
   if (!existsSync(staged)) {
     throw new ValidationFailure(`no staged ${target.kind} for ${target.id} with seed ${seed} (looked for ${relative(rootDir(root), staged)})`);
   }
-  const problems = checkSprite(decodePng(readFileSync(staged)), style[target.kind].output, paletteOf(style));
+  const problems = checkSprite(decodePng(readFileSync(staged)), outputSize(style, target.kind, target.size), paletteOf(style));
   if (problems.length > 0) throw new ValidationFailure(`${relative(rootDir(root), staged)} ${problems.join('; ')}`);
   copyFileSync(staged, target.destination);
 
@@ -164,11 +188,12 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
       .map((f) => /^s(\d+)\.png$/.exec(f)?.[1])
       .filter((seed): seed is string => seed !== undefined)
       .sort((a, b) => Number(a) - Number(b));
-    const { width, height } = style[target.kind].output;
     const scale = target.kind === 'portrait' ? 3 : 4;
     const which = target.kind === 'portrait' ? `--character ${target.id}` : `--season ${target.season} --mission ${target.id}`;
     const cards = seeds.map((seed) => {
       const src = `${segments.join('/')}/s${seed}`;
+      // Portraits differ in size by creature size; show each at its own size so they compare as they'll appear.
+      const { width, height } = pngSize(readFileSync(join(base, `${src}.png`)));
       return `<figure>
   <img class="sprite" src="${src}.png" width="${width * scale}" height="${height * scale}" alt="${target.kind} ${target.id} seed ${seed}">
   <img class="render" src="${src}.render.png" alt="raw render">
@@ -185,7 +210,7 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
   :root { color-scheme: dark; --tavern: #2b3a67; }
   body { margin: 0; padding: 16px; background: #141414; color: #ddd; font: 14px system-ui, sans-serif; }
   h2 { font-weight: 600; margin: 24px 0 8px; }
-  .row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
   figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
   .sprite { image-rendering: pixelated; background: var(--tavern); }
   .render { width: 120px; opacity: 0.8; }

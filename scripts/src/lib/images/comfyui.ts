@@ -6,13 +6,15 @@
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ValidationFailure } from '../main';
-import { positivePrompt } from './style';
-import type { ImageKind, ImageStyle } from './style';
+import { positivePrompt, renderSize } from './style';
+import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
 export const DEFAULT_COMFYUI_URL = 'http://127.0.0.1:8188';
 
 export interface RenderRequest {
   readonly kind: ImageKind;
+  /** Portraits: the creature size, which sets the canvas. */
+  readonly size?: CreatureSize;
   readonly subject: string;
   readonly seed: number;
   /** ComfyUI output filename prefix, e.g. "league-of-taverns/portrait/bruno-the-bruiser-s42". */
@@ -25,6 +27,7 @@ type Graph = Record<string, { readonly class_type: string; readonly inputs: Reco
 export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
   const { model } = style;
   const kind = style[request.kind];
+  const render = renderSize(style, request.kind, request.size);
   const graph: Graph = {
     checkpoint: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: model.checkpoint } },
     lora: {
@@ -39,7 +42,7 @@ export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
     },
     positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(kind, request.subject), clip: ['lora', 1] } },
     negative: { class_type: 'CLIPTextEncode', inputs: { text: kind.negative, clip: ['lora', 1] } },
-    latent: { class_type: 'EmptyLatentImage', inputs: { width: kind.render.width, height: kind.render.height, batch_size: 1 } },
+    latent: { class_type: 'EmptyLatentImage', inputs: { width: render.width, height: render.height, batch_size: 1 } },
     sample: {
       class_type: 'KSampler',
       inputs: {
@@ -55,7 +58,12 @@ export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
         latent_image: ['latent', 0],
       },
     },
-    decode: { class_type: 'VAEDecode', inputs: { samples: ['sample', 0], vae: ['checkpoint', 2] } },
+    // Tiled: a whole-image decode of a Huge canvas wants ~6 GB at once, which ran out of memory and then
+    // crashed ROCm on a 16 GB card with SDXL resident. Seams vanish when pixelated to the 8-pixel grid.
+    decode: {
+      class_type: 'VAEDecodeTiled',
+      inputs: { samples: ['sample', 0], vae: ['checkpoint', 2], tile_size: 512, overlap: 64, temporal_size: 64, temporal_overlap: 8 },
+    },
     save: { class_type: 'SaveImage', inputs: { filename_prefix: request.prefix, images: ['decode', 0] } },
   };
   if (kind.cutout) {

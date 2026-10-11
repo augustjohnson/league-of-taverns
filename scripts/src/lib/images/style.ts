@@ -14,18 +14,25 @@ import type { PixelateOptions } from './pixelate';
 export const IMAGE_KINDS = ['portrait', 'cover'] as const;
 export type ImageKind = (typeof IMAGE_KINDS)[number];
 
+/** Open5e creature sizes, lower-cased. */
+export const CREATURE_SIZES = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'] as const;
+export type CreatureSize = (typeof CREATURE_SIZES)[number];
+
+export interface Size {
+  readonly width: number;
+  readonly height: number;
+}
+
 const SUBJECT = '{{subject}}';
 
 const text = z.string().min(1);
 const size = z.strictObject({ width: z.number().int().positive(), height: z.number().int().positive() });
 
-const kindSchema = z.strictObject({
-  render: size,
-  output: size,
+const prompts = {
   cutout: z.boolean(),
   positive: text.refine((s) => s.split(SUBJECT).length === 2, `must contain ${SUBJECT} exactly once`),
   negative: text,
-});
+};
 
 const styleSchema = z.strictObject({
   palette: z.enum(Object.keys(PALETTES) as [PaletteName, ...PaletteName[]]),
@@ -44,8 +51,11 @@ const styleSchema = z.strictObject({
     colorGroups: z.number().int().min(2).max(256),
     chromaWeight: z.number().positive(),
   }),
-  portrait: kindSchema,
-  cover: kindSchema,
+  portrait: z.strictObject({
+    sizes: z.strictObject(Object.fromEntries(CREATURE_SIZES.map((s) => [s, size])) as Record<CreatureSize, typeof size>),
+    ...prompts,
+  }),
+  cover: z.strictObject({ output: size, ...prompts }),
 });
 
 export type ImageStyle = z.infer<typeof styleSchema>;
@@ -55,23 +65,41 @@ export function stylePath(root: RepoRoot = REPO_ROOT): string {
   return join(rootDir(root), 'content', 'images', 'style.yaml');
 }
 
-/** Load and check the style, including that each render divides into its output on the pixel grid. */
+/** Load and check the style, including that every render (output × cell) is a multiple of 64 for SDXL. */
 export function loadImageStyle(root: RepoRoot = REPO_ROOT): ImageStyle {
   const label = 'content/images/style.yaml';
   const result = styleSchema.safeParse(readYaml(stylePath(root), label));
-  if (!result.success) {
-    throw issuesFailure(label, toSchemaIssues(result.error));
-  }
+  if (!result.success) throw issuesFailure(label, toSchemaIssues(result.error));
   const style = result.data;
   const { cell } = style.pixelate;
-  const problems = IMAGE_KINDS.flatMap((kind) => {
-    const { render, output } = style[kind];
-    return render.width === output.width * cell && render.height === output.height * cell
-      ? []
-      : [`${label}: ${kind}: render ${render.width}×${render.height} must be output ${output.width}×${output.height} times the ${cell}-pixel cell`];
-  });
+  const outputs: Array<[string, Size]> = [
+    ...CREATURE_SIZES.map((s): [string, Size] => [`portrait.sizes.${s}`, style.portrait.sizes[s]]),
+    ['cover.output', style.cover.output],
+  ];
+  const problems = outputs
+    .filter(([, { width, height }]) => (width * cell) % 64 !== 0 || (height * cell) % 64 !== 0)
+    .map(([path, { width, height }]) => `${label}: ${path}: ${width}×${height} renders at ${width * cell}×${height * cell}, which must be multiples of 64`);
   if (problems.length > 0) throw new ValidationFailure(problems.join('\n'));
   return style;
+}
+
+/** Normalise an Open5e size ("Large") to a `CreatureSize`, or undefined if it isn't one. */
+export function creatureSize(openSize: string): CreatureSize | undefined {
+  const lower = openSize.toLowerCase();
+  return (CREATURE_SIZES as ReadonlyArray<string>).includes(lower) ? (lower as CreatureSize) : undefined;
+}
+
+/** The committed image's size in art pixels. Portraits need the creature size. */
+export function outputSize(style: ImageStyle, kind: ImageKind, size?: CreatureSize): Size {
+  if (kind === 'cover') return style.cover.output;
+  if (size === undefined) throw new Error('a portrait needs a creature size');
+  return style.portrait.sizes[size];
+}
+
+/** The ComfyUI render size: the output times the pixel cell. */
+export function renderSize(style: ImageStyle, kind: ImageKind, size?: CreatureSize): Size {
+  const { width, height } = outputSize(style, kind, size);
+  return { width: width * style.pixelate.cell, height: height * style.pixelate.cell };
 }
 
 export function paletteOf(style: ImageStyle): ReadonlyArray<Rgb> {

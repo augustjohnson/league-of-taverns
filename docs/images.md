@@ -8,12 +8,27 @@ as one set.
 
 | Image | Size | Committed at | Subject comes from |
 |---|---|---|---|
-| Portrait | 112×144, transparent background | `characters/<id>/portrait.png` | `chrome.portrait.prompt` in `character.yaml` |
+| Portrait | by creature size (below), transparent background | `characters/<id>/portrait.png` | `chrome.portrait.prompt` in `character.yaml` |
 | Mission cover | 216×72 (3:1) | `seasons/<s>/chrome/<mission>.cover.png` | `imagePrompts.cover` in the mission's chrome |
 
 The UI scales them up with `image-rendering: pixelated` and puts the tavern's
 colours behind portraits, so a character's portrait doesn't change when they
 change taverns.
+
+Portrait canvases follow the base's Open5e creature size, at the same pixel
+scale, so a Large creature's card is literally bigger than a Small one's.
+Cards line up on their bottom edge, so big creatures stand taller in a lineup.
+`draft-images` looks the size up in the newest pinned snapshot (or
+`--snapshot <id>`); `validate` checks it against the season's snapshot.
+
+| Size | Canvas | Render |
+|---|---|---|
+| Tiny | 80×104 | 640×832 |
+| Small | 96×120 | 768×960 |
+| Medium | 112×144 | 896×1152 |
+| Large | 128×160 | 1024×1280 |
+| Huge | 144×184 | 1152×1472 |
+| Gargantuan | 160×200 | 1280×1600 |
 
 ## How an image is made
 
@@ -81,6 +96,9 @@ prompt: >-
 
 - Name the skin or body colour. "Ogre" alone came out human-skinned in 3 of 4.
 - Weight the expression, as in `(… grin:1.3)`. The model scowls by default.
+- Use creature words SDXL knows. "Pseudodragon" came out as a man in a
+  leather jacket; "tiny red dragon" doesn't. Non-humanoid framing is still
+  open (the style asks for head and shoulders).
 - One or two props at most. They have to read at 112×144.
 
 **Covers:** the place only: landmarks, weather, time of day, sky. No people
@@ -95,7 +113,8 @@ encounter.
 | Weighted framing, `(full body:1.5)` in the negative | The only way to get head-and-shoulders out of this LoRA. |
 | "thick dark outline" + BiRefNet cutout | BiRefNet alone erases a white shirt on a white background: there is no edge to find. The outline gives it one. A magenta background was tried and rejected: SDXL ignored it and painted magenta onto lips and eyelids. |
 | 12 colour groups, chroma weight 3 | More groups split one material (a leather strap) across two palette hues, which reads as speckle. Chroma weight 3 keeps hue over lightness when snapping. |
-| 896×1152 and 1728×576 renders | SDXL training resolutions that divide by 8 into the output sizes. 1728×576 is exactly 3:1. |
+| Renders are output × 8, multiples of 64 | SDXL needs multiples of 64. Medium (896×1152) and covers (1728×576, exactly 3:1) are SDXL training sizes; Huge (1152×1472) is past them but held up in testing. |
+| Tiled VAE decode | Decoding a Huge canvas in one piece wants about 6 GB at once; it ran out of memory and crashed. Tile seams vanish in the pixel grid. |
 
 **Known quirks:** some seeds draw the outline in white, and the cutout keeps
 it as a light halo, so skip those candidates. Very wide covers sometimes repeat
@@ -136,13 +155,13 @@ Models, by file name as `content/images/style.yaml` expects them:
 
 Check each model card's license before publishing images (see D-33).
 
-Start it with the models kept on the GPU:
+Start it with async offloading off:
 
 ```bash
-python main.py --listen 127.0.0.1 --port 8188 --highvram --disable-async-offload
+python main.py --listen 127.0.0.1 --port 8188 --disable-async-offload
 ```
 
-Without those two flags, ComfyUI partly unloads SDXL after each image and
-reloads it with async offloading, and on the RX 7800 XT the second image of a
-batch crashed with `Memory access fault by GPU`. SDXL, its text encoders and
-BiRefNet fit in 16 GB together. A render takes about 14 s at 28 steps.
+On the RX 7800 XT, async weight offloading crashed the second image of a
+batch with `Memory access fault by GPU`. Don't add `--highvram`: keeping SDXL,
+its text encoders and BiRefNet all resident left BiRefNet out of memory. A
+render takes 8–26 s at 28 steps, Tiny to Huge.

@@ -32,6 +32,15 @@ export class PngError extends Error {
   override name = 'PngError';
 }
 
+/** Width and height from the IHDR chunk, without decoding the image. */
+export function pngSize(bytes: Uint8Array): { width: number; height: number } {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (buf.length < 24 || !buf.subarray(0, 8).equals(SIGNATURE) || buf.toString('latin1', 12, 16) !== 'IHDR') {
+    throw new PngError('not a PNG file');
+  }
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
 export function decodePng(bytes: Uint8Array): RgbaImage {
   const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (buf.length < 8 || !buf.subarray(0, 8).equals(SIGNATURE)) throw new PngError('not a PNG file');

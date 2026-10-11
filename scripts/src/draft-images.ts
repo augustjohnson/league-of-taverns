@@ -2,10 +2,13 @@
  * Draft pixel-art images on a local ComfyUI, then accept the ones to keep.
  *
  * Usage:
- *   draft-images portraits (--character <id>... | --all) [--candidates 4] [--seed <n>]
+ *   draft-images portraits (--character <id>... | --all) [--snapshot <id>] [--candidates 4] [--seed <n>]
  *   draft-images covers --season <id> [--mission <id>...] [--candidates 4] [--seed <n>]
  *   draft-images accept --character <id> --seed <n>
  *   draft-images accept --season <id> --mission <id> --seed <n>
+ *
+ * A portrait's canvas follows its base's creature size, looked up in
+ * `--snapshot` (default: the newest pinned snapshot).
  *
  * `portraits` and `covers` render `--candidates` images per target with
  * consecutive seeds (from `--seed`, else a stable per-target seed), pixelate
@@ -19,7 +22,7 @@
 import { relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ComfyUi } from './lib/images/comfyui';
-import { accept, coverTargets, defaultSeed, portraitTargets, stage, writeReviewPage } from './lib/images/drafts';
+import { accept, coverTargets, defaultSeed, portraitTargets, snapshotSizes, stage, writeReviewPage } from './lib/images/drafts';
 import type { DraftTarget } from './lib/images/drafts';
 import { pixelate } from './lib/images/pixelate';
 import { decodePng, encodeIndexedPng } from './lib/images/png';
@@ -28,7 +31,7 @@ import { ValidationFailure, runMain } from './lib/main';
 import { REPO_ROOT, rootDir } from './lib/repo';
 
 const USAGE = `Usage:
-  draft-images portraits (--character <id>... | --all) [--candidates 4] [--seed <n>]
+  draft-images portraits (--character <id>... | --all) [--snapshot <id>] [--candidates 4] [--seed <n>]
   draft-images covers --season <id> [--mission <id>...] [--candidates 4] [--seed <n>]
   draft-images accept --character <id> --seed <n>
   draft-images accept --season <id> --mission <id> --seed <n>`;
@@ -41,6 +44,7 @@ function parse(argv: ReadonlyArray<string>) {
       all: { type: 'boolean' },
       season: { type: 'string' },
       mission: { type: 'string', multiple: true },
+      snapshot: { type: 'string' },
       candidates: { type: 'string' },
       seed: { type: 'string' },
     },
@@ -61,6 +65,7 @@ function parse(argv: ReadonlyArray<string>) {
     all: values.all === true,
     season: values.season,
     missions: values.mission ?? [],
+    snapshot: values.snapshot,
     candidates: integer('candidates', values.candidates, 1) ?? 4,
     seed: integer('seed', values.seed, 0),
   };
@@ -76,7 +81,7 @@ function targetsFor(args: Args): DraftTarget[] {
   }
   if (args.season !== undefined || args.missions.length > 0) throw new ValidationFailure(`--season and --mission are for covers.\n\n${USAGE}`);
   if (args.all === args.characters.length > 0) throw new ValidationFailure(`Pass --character <id> (repeatable) or --all.\n\n${USAGE}`);
-  return portraitTargets(args.all ? 'all' : args.characters);
+  return portraitTargets(args.all ? 'all' : args.characters, snapshotSizes(args.snapshot));
 }
 
 async function draft(args: Args): Promise<void> {
@@ -100,6 +105,7 @@ async function draft(args: Args): Promise<void> {
     style,
     jobs.map(({ target, seed }) => ({
       kind: target.kind,
+      ...(target.size === undefined ? {} : { size: target.size }),
       subject: target.subject,
       seed,
       prefix: `league-of-taverns/${target.kind}/${target.id}-s${seed}`,

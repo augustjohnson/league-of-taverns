@@ -12,7 +12,16 @@ import { PixelateError, checkSprite, pixelate } from '../src/lib/images/pixelate
 import type { PixelateOptions } from '../src/lib/images/pixelate';
 import { PngError, decodePng, encodeIndexedPng } from '../src/lib/images/png';
 import type { RgbaImage } from '../src/lib/images/png';
-import { loadImageStyle, pixelateOptions, positivePrompt, stylePath } from '../src/lib/images/style';
+import {
+  CREATURE_SIZES,
+  creatureSize,
+  loadImageStyle,
+  outputSize,
+  pixelateOptions,
+  positivePrompt,
+  renderSize,
+  stylePath,
+} from '../src/lib/images/style';
 import { ValidationFailure } from '../src/lib/main';
 
 const PALETTE = PALETTES['resurrect-64'];
@@ -187,19 +196,28 @@ describe('style and graph', () => {
   });
 
   it('cuts portraits out with BiRefNet and saves covers straight from the decoder', () => {
-    const portrait = renderGraph(style, { kind: 'portrait', subject: 'an ogre', seed: 7, prefix: 'p' });
+    const portrait = renderGraph(style, { kind: 'portrait', size: 'large', subject: 'an ogre', seed: 7, prefix: 'p' });
     expect(portrait['save']!.inputs['images']).toEqual(['rgba', 0]);
     expect(portrait['cutoutModel']!.inputs['bg_removal_name']).toBe(style.model.backgroundRemoval);
     expect(portrait['sample']!.inputs['seed']).toBe(7);
-    expect(portrait['latent']!.inputs).toMatchObject(style.portrait.render);
+    expect(portrait['latent']!.inputs).toMatchObject(renderSize(style, 'portrait', 'large'));
 
     const cover = renderGraph(style, { kind: 'cover', subject: 'a swamp', seed: 1, prefix: 'c' });
     expect(cover['save']!.inputs['images']).toEqual(['decode', 0]);
     expect(cover['cutoutModel']).toBeUndefined();
-    expect(cover['latent']!.inputs).toMatchObject(style.cover.render);
+    expect(cover['latent']!.inputs).toMatchObject({ width: 1728, height: 576 });
   });
 
-  it('keeps every output on the pixel grid of its render', () => {
+  it('gives bigger creatures bigger canvases at the same pixel scale', () => {
+    const heights = CREATURE_SIZES.map((size) => outputSize(style, 'portrait', size).height);
+    expect(heights).toEqual([...heights].sort((a, b) => a - b));
+    expect(new Set(heights).size).toBe(CREATURE_SIZES.length);
+    expect(renderSize(style, 'portrait', 'medium')).toEqual({ width: 896, height: 1152 });
+    expect(creatureSize('Gargantuan')).toBe('gargantuan');
+    expect(creatureSize('Colossal')).toBeUndefined();
+  });
+
+  it('pixelates portraits with a cutout and covers without', () => {
     expect(pixelateOptions(style, 'portrait')).toMatchObject({ cutout: true, anchorBottom: true });
     expect(pixelateOptions(style, 'cover')).toMatchObject({ cutout: false, anchorBottom: false });
   });
@@ -207,7 +225,8 @@ describe('style and graph', () => {
 
 describe('drafts and committed images', () => {
   let root: string;
-  const { width: pw, height: ph } = style.portrait.output;
+  const { width: pw, height: ph } = style.portrait.sizes.large;
+  const sizeOf = (base: string) => (base === 'ogre' ? ('large' as const) : undefined);
   const { width: cw, height: ch } = style.cover.output;
   const solid = (width: number, height: number, transparentTop = 0): Uint8Array =>
     encodeIndexedPng({
@@ -241,8 +260,8 @@ describe('drafts and committed images', () => {
   });
 
   it('finds portrait and cover targets', () => {
-    expect(portraitTargets('all', root).map((t) => t.id)).toEqual(['ogre-one']);
-    expect(() => portraitTargets(['no-prompt'], root)).toThrow(ValidationFailure);
+    expect(portraitTargets('all', sizeOf, root).map((t) => t.id)).toEqual(['ogre-one']);
+    expect(() => portraitTargets(['no-prompt'], sizeOf, root)).toThrow(ValidationFailure);
     expect(coverTargets('s1', [], root)).toMatchObject([{ kind: 'cover', id: 'bog', season: 's1', subject: 'a misty bog at dusk' }]);
     expect(() => coverTargets('s1', ['moor'], root)).toThrow(/moor/);
   });
@@ -253,7 +272,8 @@ describe('drafts and committed images', () => {
   });
 
   it('accepts a staged portrait into the repo and records it, keeping comments', () => {
-    const [target] = portraitTargets(['ogre-one'], root);
+    const [target] = portraitTargets(['ogre-one'], sizeOf, root);
+    expect(target!.size).toBe('large');
     stage(target!, 42, new Uint8Array([1]), solid(pw, ph, 10), root);
     expect(writeReviewPage(style, root)).toMatch(/index\.html$/);
     expect(readFileSync(join(root, '.image-drafts', 'index.html'), 'utf8')).toContain('accept --character ogre-one --seed 42');
@@ -263,7 +283,11 @@ describe('drafts and committed images', () => {
     expect(yaml).toContain('status: draft # none | prompt | draft | final');
     expect(yaml).toContain('path: portrait.png');
     expect(yaml).toContain('seed: 42');
-    expect(checkSeasonImages('s1', ['ogre-one'], root)).toEqual([]);
+    expect(checkSeasonImages('s1', [{ id: 'ogre-one', size: 'large' }], root)).toEqual([]);
+    const { width: mw, height: mh } = style.portrait.sizes.medium;
+    expect(checkSeasonImages('s1', [{ id: 'ogre-one', size: 'medium' }], root)).toEqual([
+      `characters/ogre-one/portrait.png: is ${pw}×${ph}, expected ${mw}×${mh}`,
+    ]);
     expect(() => accept(target!, 43, style, root)).toThrow(/no staged portrait/);
   });
 
@@ -274,7 +298,7 @@ describe('drafts and committed images', () => {
     );
     writeFileSync(join(root, 'seasons', 's1', 'chrome', 'bog.cover.png'), solid(cw, ch - 1));
     writeFileSync(join(root, 'seasons', 's1', 'chrome', 'moor.cover.png'), solid(cw, ch));
-    expect(checkSeasonImages('s1', ['ogre-one'], root)).toEqual([
+    expect(checkSeasonImages('s1', [{ id: 'ogre-one', size: 'large' }], root)).toEqual([
       'characters/ogre-one/character.yaml: chrome.portrait: status is final but no path is set',
       'seasons/s1/chrome/moor.cover.png: no moor.yaml chrome file next to it',
       `seasons/s1/chrome/bog.cover.png: is ${cw}×${ch - 1}, expected ${cw}×${ch}`,

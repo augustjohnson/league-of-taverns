@@ -21,6 +21,7 @@ import { basename, extname } from 'node:path';
 import { indexSnapshot, validateMission } from '@league-of-taverns/engine';
 import type { Mission, MissionRules } from '@league-of-taverns/engine';
 import { checkSeasonImages } from './images/check';
+import { creatureSize } from './images/style';
 import { ValidationFailure } from './main';
 import { REPO_ROOT, displayPath, loadMission } from './repo';
 import type { RepoRoot } from './repo';
@@ -108,7 +109,11 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
     }
   }
 
-  issues.push(...checkSeasonImages(season, loaded.pool.characters.map((c) => c.ref.id), root));
+  const portraits = loaded.pool.characters.map(({ ref }) => {
+    const record = bySlug.get(ref.base);
+    return { id: ref.id, size: record === undefined ? undefined : creatureSize(record.size) };
+  });
+  issues.push(...checkSeasonImages(season, portraits, root));
 
   return {
     issues,
