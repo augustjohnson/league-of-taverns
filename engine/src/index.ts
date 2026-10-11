@@ -13,6 +13,7 @@ export * from './roster';
 export * from './league';
 export * from './missions';
 export * from './resolution';
+export * from './resolution/battle';
 export * from './projection';
 export * from './events';
 // Scaffold helper, shared with other packages' stubs. Remove once nothing throws it.
