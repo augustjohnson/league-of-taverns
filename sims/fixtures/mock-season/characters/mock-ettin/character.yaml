@@ -1,0 +1,5 @@
+id: mock-ettin
+base: ettin
+status: active
+chrome:
+  name: Mock Ettin

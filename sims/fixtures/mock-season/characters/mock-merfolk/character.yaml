@@ -1,0 +1,5 @@
+id: mock-merfolk
+base: merfolk
+status: active
+chrome:
+  name: Mock Merfolk

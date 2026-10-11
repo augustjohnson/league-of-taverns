@@ -1,0 +1,5 @@
+id: mock-gargoyle
+base: gargoyle
+status: active
+chrome:
+  name: Mock Gargoyle

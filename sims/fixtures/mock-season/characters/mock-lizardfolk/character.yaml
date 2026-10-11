@@ -1,0 +1,5 @@
+id: mock-lizardfolk
+base: lizardfolk
+status: active
+chrome:
+  name: Mock Lizardfolk

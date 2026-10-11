@@ -1,0 +1,5 @@
+id: mock-scout
+base: scout
+status: active
+chrome:
+  name: Mock Scout

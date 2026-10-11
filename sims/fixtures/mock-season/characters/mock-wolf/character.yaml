@@ -1,0 +1,5 @@
+id: mock-wolf
+base: wolf
+status: active
+chrome:
+  name: Mock Wolf

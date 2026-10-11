@@ -1,0 +1,5 @@
+id: mock-brown-bear
+base: brown-bear
+status: active
+chrome:
+  name: Mock Brown Bear

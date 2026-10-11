@@ -1,0 +1,5 @@
+id: mock-chimera
+base: chimera
+status: active
+chrome:
+  name: Mock Chimera

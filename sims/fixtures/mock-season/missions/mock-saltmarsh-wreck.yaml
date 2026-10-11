@@ -1,0 +1,68 @@
+# Mock season, week 2 (coast). Two battles; failing a check drops the party into one.
+#
+#  rank 0     1             2             3              4              5           6          7
+#  start ─▶ spot-lights ─pass─▶ row-out ─always─▶ board-wreck ─pass─▶ search-hold ─pass───────────────────────▶ salvaged
+#                │                              ▲      │                  │                                     ▲
+#                fail─▶ wreckers ─win───────────┘      fail─▶ guardians ◀─fail                                  │
+#                                                              (rank 5) ─win─▶ haul-out ─pass───────────────────┘
+#                                                                                  └─fail─▶ battered
+
+schemaVersion: 1
+id: mock-saltmarsh-wreck
+season: mock-season
+environment: coast
+
+nodes:
+  - { id: start, rank: 0, kind: start }
+  - id: spot-lights
+    rank: 1
+    kind: check
+    check: { type: skill, skill: perception, dc: 13 }
+  - id: row-out
+    rank: 2
+    kind: check
+    check: { type: skill, skill: athletics, dc: 12 }
+  - id: wreckers
+    rank: 2
+    kind: battle
+    encounter:
+      creatures:
+        - { ref: bandit-captain, count: 1 }
+        - { ref: thug, count: 2 }
+        - { ref: bandit, count: 4 }
+  - id: board-wreck
+    rank: 3
+    kind: check
+    check: { type: skill, skill: acrobatics, dc: 12 }
+  - id: search-hold
+    rank: 4
+    kind: check
+    check: { type: skill, skill: investigation, dc: 12 }
+  - id: guardians
+    rank: 5
+    kind: battle
+    encounter:
+      creatures:
+        - { ref: sahuagin, count: 4 }
+        - { ref: reef-shark, count: 2 }
+        - { ref: giant-crab, count: 4 }
+  - id: haul-out
+    rank: 6
+    kind: check
+    check: { type: save, ability: str, dc: 12 }
+  - { id: salvaged, rank: 7, kind: end }
+  - { id: battered, rank: 7, kind: end }
+
+edges:
+  - { from: start,       to: spot-lights, on: always }
+  - { from: spot-lights, to: row-out,     on: pass }
+  - { from: spot-lights, to: wreckers,    on: fail }
+  - { from: row-out,     to: board-wreck, on: always }
+  - { from: wreckers,    to: board-wreck, on: win }
+  - { from: board-wreck, to: search-hold, on: pass }
+  - { from: board-wreck, to: guardians,   on: fail }
+  - { from: search-hold, to: salvaged,    on: pass }
+  - { from: search-hold, to: guardians,   on: fail }
+  - { from: guardians,   to: haul-out,    on: win }
+  - { from: haul-out,    to: salvaged,    on: pass }
+  - { from: haul-out,    to: battered,    on: fail }

@@ -1,0 +1,5 @@
+id: mock-gladiator
+base: gladiator
+status: active
+chrome:
+  name: Mock Gladiator

@@ -1,0 +1,5 @@
+id: mock-hippogriff
+base: hippogriff
+status: active
+chrome:
+  name: Mock Hippogriff
