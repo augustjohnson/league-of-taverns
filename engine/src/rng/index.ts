@@ -11,7 +11,6 @@
  *
  * Never use Math.random anywhere (lint enforces this in engine/).
  */
-import { notImplemented } from '../internal/not-implemented';
 
 /** A uniform float stream in [0, 1). Each call advances the stream. */
 export type Rng = () => number;
@@ -77,27 +76,63 @@ export function rollD20(rng: Rng): number {
 
 /** Inputs to the seed for one tavern's run of one week. */
 export interface WeekSeedInput {
+  /** Season id, e.g. `season-01`. Non-empty, no `/`. */
   readonly season: string;
+  /** Week number, a positive integer. */
   readonly week: number;
+  /** Tavern id. Non-empty, no `/`. */
   readonly tavern: string;
   /**
-   * Per-week secret revealed with the mission. Whether it is used is OPEN
-   * (docs/decisions.md D-13). `undefined` means the seed is
-   * (season, week, tavern) only.
+   * Optional per-week secret, appended as `/salt:<salt>`. `undefined` means
+   * the seed is (season, week, tavern) only. Non-empty when given.
    */
   readonly salt?: string;
 }
 
-/**
- * Canonical seed string for one tavern's weekly run, e.g.
- * `season-01/week-3/tavern:the-gilded-flagon`. Per-node dice then come from
- * `rngFor(weekSeed, 'roll:' + nodeId)`.
- */
-export function weekSeed(_input: WeekSeedInput): string {
-  return notImplemented('weekSeed', 'T2.2');
+/** Throws unless `value` is a non-empty string with no `/` (the seed separator). */
+function assertSeedPart(fn: string, field: string, value: string): void {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`${fn}: ${field} must be a non-empty string, got ${JSON.stringify(value)}`);
+  }
+  if (value.includes('/')) {
+    throw new Error(`${fn}: ${field} must not contain "/", got ${JSON.stringify(value)}`);
+  }
 }
 
-/** Seed for the snake-draft order when the season config says `order: seeded`. */
-export function draftOrderSeed(_season: string): string {
-  return notImplemented('draftOrderSeed', 'T2.2');
+/**
+ * Canonical seed string for one tavern's weekly run (docs/schema.md § Seeds):
+ * `<season>/week-<n>/tavern:<tavern>`, plus `/salt:<salt>` when a salt is
+ * given, e.g. `season-01/week-3/tavern:the-gilded-flagon`. Per-node dice come
+ * from `rngFor(weekSeed, 'roll:' + nodeId)`.
+ *
+ * Per docs/decisions.md D-13, a live week's result may instead be a single
+ * real random roll recorded in the event. This seed still drives sims, tests
+ * and the difficulty report.
+ *
+ * Throws if `week` is not a positive integer, if `season` or `tavern` is empty
+ * or contains `/`, or if `salt` is given but empty.
+ */
+export function weekSeed(input: WeekSeedInput): string {
+  const { season, week, tavern, salt } = input;
+  assertSeedPart('weekSeed', 'season', season);
+  if (!Number.isInteger(week) || week < 1) {
+    throw new Error(`weekSeed: week must be a positive integer, got ${String(week)}`);
+  }
+  assertSeedPart('weekSeed', 'tavern', tavern);
+  const base = `${season}/week-${week}/tavern:${tavern}`;
+  if (salt === undefined) return base;
+  if (typeof salt !== 'string' || salt.length === 0) {
+    throw new Error(`weekSeed: salt must be a non-empty string when given, got ${JSON.stringify(salt)}`);
+  }
+  return `${base}/salt:${salt}`;
+}
+
+/**
+ * Seed for the snake-draft order when the season config says `order: seeded`:
+ * `<season>/draft-order`. Callers draw from `rngFor(draftOrderSeed(season), 'order')`.
+ * Throws if `season` is empty or contains `/`.
+ */
+export function draftOrderSeed(season: string): string {
+  assertSeedPart('draftOrderSeed', 'season', season);
+  return `${season}/draft-order`;
 }
