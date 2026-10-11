@@ -1,10 +1,169 @@
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { projectMission, type Projection } from '../src/projection';
+// The engine has no YAML parser, so the example mission is read through the
+// scripts loader, as in missions.test.ts.
+import { loadMission } from '../../scripts/src/lib/repo';
+import { baseOf, battle, check, constantModel, crModel, edge, end, member, missionOf, partyOf, skillCheck, start } from './support/builders';
 
-// T6.4, T6.5.
+const EXAMPLE_MISSION = 'seasons/season-01/missions/candidates/example-drowned-toll.yaml';
+
+/** Σ probability over the distribution. */
+const total = (projection: Projection): number => projection.distribution.reduce((sum, [, p]) => sum + p, 0);
+
+function expectDistribution(projection: Projection, expected: ReadonlyArray<readonly [number, number]>): void {
+  expect(projection.distribution.map(([score]) => score)).toEqual(expected.map(([score]) => score));
+  projection.distribution.forEach(([, p], i) => expect(p).toBeCloseTo(expected[i]?.[1] ?? Number.NaN, 12));
+}
+
+// T6.4.
 describe('projection', () => {
-  it.todo('a single check with p = 0.55 projects 0.55');
-  it.todo('expected score is E[passed / attempted], not E[passed] / E[attempted]');
-  it.todo('any lost battle contributes 0 to the expectation');
-  it.todo('reach probabilities at end nodes plus P(DNF) sum to 1');
+  const zero = partyOf([member('a')]);
+
+  it('a single check with p = 0.55 projects 0.55', () => {
+    // +2 vs DC 12: (21 − 10) / 20.
+    const party = partyOf([member('a', { skills: { stealth: 2 } })]);
+    const mission = missionOf(
+      [start(), skillCheck('c', 1, 'stealth', 12), end('done', 2)],
+      [edge('start', 'c', 'always'), edge('c', 'done', 'pass'), edge('c', 'done', 'fail')],
+    );
+    const projection = projectMission(party, mission, baseOf, constantModel(1));
+    expect(projection.expectedScore).toBeCloseTo(0.55, 12);
+    expect(projection.pDnf).toBe(0);
+    expect(projection.reach).toEqual({ start: 1, c: 1, done: 1 });
+    expectDistribution(projection, [
+      [0, 0.45],
+      [1, 0.55],
+    ]);
+  });
+
+  it('expected score is E[passed / attempted], not E[passed] / E[attempted]', () => {
+    // start → a ─pass→ done
+    //           └fail→ b → c → done      every check at p = 0.5 (+0 vs DC 11)
+    const mission = missionOf(
+      [start(), skillCheck('a', 1, 'stealth', 11), skillCheck('b', 2, 'stealth', 11), skillCheck('c', 3, 'stealth', 11), end('done', 4)],
+      [
+        edge('start', 'a', 'always'),
+        edge('a', 'done', 'pass'),
+        edge('a', 'b', 'fail'),
+        edge('b', 'c', 'always'),
+        edge('c', 'done', 'pass'),
+        edge('c', 'done', 'fail'),
+      ],
+    );
+    const projection = projectMission(zero, mission, baseOf, constantModel(1));
+    // Pass a: 1/1 at 0.5. Fail a: 3 attempted, b + c ~ Bin(2, 0.5) passed.
+    // E = 0.5 × 1 + 0.5 × (1/3) = 2/3, while E[passed] / E[attempted] = 1 / 2.
+    expect(projection.expectedScore).toBeCloseTo(2 / 3, 12);
+    const ePassed = 0.5 * 1 + 0.5 * 1;
+    const eAttempted = 0.5 * 1 + 0.5 * 3;
+    expect(ePassed / eAttempted).toBe(0.5);
+    expect(projection.reach).toEqual({ start: 1, a: 1, b: 0.5, c: 0.5, done: 1 });
+    expectDistribution(projection, [
+      [0, 0.125],
+      [1 / 3, 0.25],
+      [2 / 3, 0.125],
+      [1, 0.5],
+    ]);
+  });
+
+  it('any lost battle contributes 0 to the expectation', () => {
+    // A certain check, then a battle at p(win) = 0.3.
+    const mission = missionOf(
+      [start(), skillCheck('c', 1, 'stealth', 1), battle('fight', 2), end('done', 3)],
+      [edge('start', 'c', 'always'), edge('c', 'fight', 'pass'), edge('c', 'fight', 'fail'), edge('fight', 'done', 'win')],
+    );
+    const projection = projectMission(zero, mission, baseOf, constantModel(0.3));
+    expect(projection.expectedScore).toBeCloseTo(0.3, 12);
+    expect(projection.pDnf).toBeCloseTo(0.7, 12);
+    expect(projection.reach).toEqual({ start: 1, c: 1, fight: 1, done: 0.3 });
+    expectDistribution(projection, [
+      [0, 0.7],
+      [1, 0.3],
+    ]);
+  });
+
+  it('matches a hand computation on the example mission', () => {
+    // All modifiers 0: survival DC 12 → 0.45, stealth DC 14 → 0.35,
+    // athletics DC 13 → 0.4, Con save DC 12 → 0.45. Every battle at 0.5.
+    const projection = projectMission(zero, loadMission(EXAMPLE_MISSION), baseOf, constantModel(0.5));
+    // Find the path (0.45): slip past (0.35) then haul the chain, or fail into the toll fight.
+    const viaPath = 0.35 * (0.4 * 1 + 0.6 * (0.45 * (3 / 4) + 0.55 * (2 / 4))) + 0.65 * 0.5 * (1 / 2);
+    // Miss it (0.55): the bog ambush (0.5), then haul the chain (1/2), or wade with 0 of 2 so far.
+    const viaBog = 0.5 * (0.4 * (1 / 2) + 0.6 * (0.45 * (1 / 3) + 0.55 * 0));
+    expect(projection.expectedScore).toBeCloseTo(0.45 * viaPath + 0.55 * viaBog, 12);
+    expect(projection.pDnf).toBeCloseTo(0.45 * 0.65 * 0.5 + 0.55 * 0.5, 12);
+    expect(projection.reach['toll-seized']).toBeCloseTo(0.45 * 0.65 * 0.5, 12);
+    expect(projection.reach['haul-chain']).toBeCloseTo(0.45 * 0.35 + 0.55 * 0.5, 12);
+    expect(projection.reach['wade-across']).toBeCloseTo((0.45 * 0.35 + 0.55 * 0.5) * 0.6, 12);
+  });
+
+  it('reach probabilities at end nodes plus P(DNF) sum to 1', () => {
+    const party = partyOf([member('a', { skills: { survival: 3 } }), member('b', { skills: { athletics: 5 }, saves: { con: 2 } })]);
+    for (const model of [constantModel(0.5), constantModel(0), constantModel(1), crModel]) {
+      const projection = projectMission(party, loadMission(EXAMPLE_MISSION), baseOf, model);
+      const endReach = ['crossed-dry', 'crossed-wet', 'toll-seized'].reduce((sum, id) => sum + (projection.reach[id] ?? 0), 0);
+      expect(endReach + projection.pDnf).toBeCloseTo(1, 12);
+      expect(total(projection)).toBeCloseTo(1, 12);
+      expect(projection.reach.start).toBe(1);
+    }
+  });
+
+  it('merges equal scores by reduced fraction and sorts by score', () => {
+    // a ─pass→ b → done: 1/2 or 2/2.   a ─fail→ c → d → e → done: k/4.
+    // 1 of 2 and 2 of 4 are the same score, so they share one entry.
+    const mission = missionOf(
+      [
+        start(),
+        skillCheck('a', 1, 'stealth', 11),
+        skillCheck('b', 2, 'stealth', 11),
+        skillCheck('c', 2, 'stealth', 11),
+        skillCheck('d', 3, 'stealth', 11),
+        skillCheck('e', 4, 'stealth', 11),
+        end('done', 5),
+      ],
+      [
+        edge('start', 'a', 'always'),
+        edge('a', 'b', 'pass'),
+        edge('a', 'c', 'fail'),
+        edge('b', 'done', 'always'),
+        edge('c', 'd', 'always'),
+        edge('d', 'e', 'always'),
+        edge('e', 'done', 'always'),
+      ],
+    );
+    const projection = projectMission(zero, mission, baseOf, constantModel(1));
+    // Fail a (0.5), then c, d, e ~ Bin(3, 0.5) of 4: 0, 1/4, 2/4, 3/4 at 1/8, 3/8, 3/8, 1/8.
+    // Pass a (0.5), then b: 1/2 or 1 at 1/2 each.
+    expectDistribution(projection, [
+      [0, 0.0625],
+      [0.25, 0.1875],
+      [0.5, 0.1875 + 0.25],
+      [0.75, 0.0625],
+      [1, 0.25],
+    ]);
+  });
+
+  it('projects a gated check nobody qualifies for as a certain fail', () => {
+    const mission = missionOf(
+      [start(), check('c', 1, { type: 'skill', skill: 'stealth', dc: 2, requires: { sense: 'truesight' } }), skillCheck('x', 2, 'stealth', 1), end('done', 3)],
+      [edge('start', 'c', 'always'), edge('c', 'done', 'pass'), edge('c', 'x', 'fail'), edge('x', 'done', 'always')],
+    );
+    const projection = projectMission(zero, mission, baseOf, constantModel(1));
+    expect(projection.reach).toEqual({ start: 1, c: 1, x: 1, done: 1 });
+    expect(projection.expectedScore).toBe(0.5);
+    expect(projection.distribution).toEqual([[0.5, 1]]);
+  });
+
+  it('lists unreachable branches with reach 0', () => {
+    const mission = missionOf(
+      [start(), skillCheck('c', 1, 'stealth', 1), battle('fight', 2), end('done', 3)],
+      [edge('start', 'c', 'always'), edge('c', 'done', 'pass'), edge('c', 'fight', 'fail'), edge('fight', 'done', 'win')],
+    );
+    const projection = projectMission(zero, mission, baseOf, constantModel(0));
+    expect(projection.reach).toEqual({ start: 1, c: 1, fight: 0, done: 1 });
+    expect(projection.pDnf).toBe(0);
+    expect(projection.distribution).toEqual([[1, 1]]);
+  });
+
   it.todo('property: propagated mean equals the sampled mean of 20k seeded runs within 4 standard errors, over random legal missions and parties');
 });
