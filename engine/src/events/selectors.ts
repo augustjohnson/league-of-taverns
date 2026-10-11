@@ -1,0 +1,77 @@
+/**
+ * Selectors: derived views over `LeagueState`. Pure, never stored
+ * (docs/schema.md § Reducers, "Derived views").
+ */
+import { headToHeadSchedule, standings, type StandingRow, type WeekResult } from '../league';
+import { draftOrderSeed, rngFor } from '../rng';
+import { draftOrder, snakePickOwner } from '../roster';
+import type { LeagueState } from './state';
+
+/** Pooled characters nobody owns, in pooling order. */
+export function freeAgents(state: LeagueState): ReadonlyArray<string> {
+  return [...state.pool.keys()].filter((id) => !state.owner.has(id));
+}
+
+/**
+ * The tavern whose draft pick is next, or null when no pick is possible
+ * (no season, no taverns, or the draft is over).
+ *
+ * Before the first pick the order isn't frozen yet, so this returns the
+ * tavern that would pick first if the draft started now, from the same
+ * `draftOrder` call the first `draft.pick` makes. It can change while
+ * taverns are still joining. Null if that order can't be built (a manual
+ * order that doesn't match the joined taverns).
+ */
+export function onTheClock(state: LeagueState): string | null {
+  const config = state.config;
+  if (config === null || state.draft.complete) return null;
+  if (state.phase !== 'preseason' && state.phase !== 'drafting') return null;
+  let order = state.draft.order;
+  if (state.draft.picks === 0) {
+    const joined = [...state.taverns.keys()];
+    if (joined.length === 0) return null;
+    try {
+      order = draftOrder(joined, config, rngFor(draftOrderSeed(config.id), 'order'));
+    } catch {
+      return null;
+    }
+  }
+  return snakePickOwner(order, state.draft.picks);
+}
+
+/**
+ * One finalized week's results, one row per tavern in the locked lineup
+ * list (join order): points, projected points and checks passed, read from
+ * the recorded `mission.resolved` (D-20). A tavern locked with no lineup
+ * scores 0 on every count (rules §5). Empty unless the week is finalized,
+ * so standings never count a half-run week.
+ */
+export function weekResults(state: LeagueState, week: number): ReadonlyArray<WeekResult> {
+  if (!state.finalizedWeeks.has(week)) return [];
+  const locked = state.lockedLineups.get(week) ?? [];
+  const results = state.results.get(week);
+  const order = [...state.taverns.keys()];
+  return [...locked]
+    .sort((a, b) => order.indexOf(a.tavern) - order.indexOf(b.tavern))
+    .map(({ tavern }) => {
+      const r = results?.get(tavern);
+      return r === undefined
+        ? { week, tavern, points: 0, projected: 0, checksPassed: 0 }
+        : { week, tavern, points: r.points, projected: r.projectedPoints, checksPassed: r.run.checksPassed };
+    });
+}
+
+/**
+ * Season standings over every finalized week. The head-to-head schedule is
+ * `headToHeadSchedule(taverns in join order, config.weeks)`, since rules §8
+ * publishes it before the draft. The `seeded_coin` tiebreak draws from
+ * `rngFor(season + '/standings', 'coin')`. Playoffs are not modelled.
+ */
+export function seasonStandings(state: LeagueState): ReadonlyArray<StandingRow> {
+  const config = state.config;
+  if (config === null) return [];
+  const matchups = headToHeadSchedule([...state.taverns.keys()], config.weeks);
+  const weeks = [...state.finalizedWeeks].sort((a, b) => a - b);
+  const results = weeks.flatMap((week) => weekResults(state, week));
+  return standings(matchups, results, config, rngFor(`${config.id}/standings`, 'coin'));
+}
