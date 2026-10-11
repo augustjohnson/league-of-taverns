@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: wren-ashby
+base: sprite
+status: active
+debut: season-01
+chrome:
+  name: Wren Ashby
+  epithet: the Lifter
+  tagline: Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.
+  portrait:
+    status: prompt
+    prompt: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and dragonfly wings, in a sweat-stained sleeveless linen tunic, (intense focused stare:1.3)
+    bodyPlan: winged

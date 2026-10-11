@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: sir-nobody
+base: animated-armor
+status: active
+debut: season-01
+chrome:
+  name: Sir Nobody
+  epithet: the Empty Suit
+  tagline: There is no one inside. He has never been more sure of anything.
+  portrait:
+    status: prompt
+    prompt: dented silver plate armour with a deep dent in the breastplate, the visor open on darkness and a limp blue plume, (puffed-out heroic pose:1.2)
+    bodyPlan: humanoid

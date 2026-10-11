@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: herb
+base: rhinoceros
+status: active
+debut: season-01
+chrome:
+  name: Herb
+  epithet: the Speed Bump
+  tagline: Cannot stop or turn. Has not been asked to do either.
+  portrait:
+    status: prompt
+    prompt: grey rhinoceros with a chipped horn with a dented iron cooking pot stuck on his horn, (determined charging glare:1.3)
+    bodyPlan: beast

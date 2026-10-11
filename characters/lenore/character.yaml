@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: lenore
+base: giant-frog
+status: active
+debut: season-01
+chrome:
+  name: Lenore
+  epithet: the Tongue
+  tagline: Has caught flies, coins, a lute and, on two occasions, the bard.
+  portrait:
+    status: prompt
+    prompt: fat green frog with a yellow throat, a gold hoop earring and a long pink tongue hanging out, (heavy-lidded smirk:1.3)
+    bodyPlan: beast

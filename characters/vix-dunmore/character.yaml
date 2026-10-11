@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: vix-dunmore
+base: kobold
+status: active
+debut: season-01
+chrome:
+  name: Vix Dunmore
+  epithet: the Landlord
+  tagline: Has declared ownership of eleven caves. Collects rent from the bats.
+  portrait:
+    status: prompt
+    prompt: small rust-red kobold with a chipped left horn and a brass ring through one nostril, wearing a battered felt hat, a ledger under one arm, (flat businesslike stare:1.3)
+    bodyPlan: humanoid

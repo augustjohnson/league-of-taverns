@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: pierre
+base: darkmantle
+status: active
+debut: season-01
+chrome:
+  name: Pierre
+  epithet: Probably a Hat
+  tagline: Hangs on hat racks. Is hurt when nobody tries him on.
+  portrait:
+    status: prompt
+    prompt: black squid-like darkmantle draped over a head like a floppy beret, one tentacle tip curled, (shifty eyes peeking out:1.3)
+    bodyPlan: blob

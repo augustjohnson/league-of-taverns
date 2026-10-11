@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: oakley
+base: awakened-tree
+status: active
+debut: season-01
+chrome:
+  name: Oakley
+  epithet: the Rookie
+  tagline: Three hundred years old and still the newest member of the team. Sensitive about it.
+  portrait:
+    status: prompt
+    prompt: gnarled brown oak with a bark face, a bird's nest on its head and a carved heart with initials on its trunk, (shy hopeful smile:1.3)
+    bodyPlan: plant

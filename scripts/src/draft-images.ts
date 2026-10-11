@@ -21,10 +21,11 @@
  * Needs a running ComfyUI (COMFYUI_URL, default http://127.0.0.1:8188).
  * Offline and human-triggered; never in CI. Setup and style: docs/images.md.
  */
+import { existsSync } from 'node:fs';
 import { relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ComfyUi } from './lib/images/comfyui';
-import { accept, coverTargets, defaultSeed, portraitTargets, snapshotSizes, stage, writeReviewPage } from './lib/images/drafts';
+import { accept, coverTargets, defaultSeed, portraitTargets, snapshotSizes, stage, stagedPaths, writeReviewPage } from './lib/images/drafts';
 import type { DraftTarget } from './lib/images/drafts';
 import { pixelate } from './lib/images/pixelate';
 import { decodePng, encodeIndexedPng } from './lib/images/png';
@@ -98,14 +99,24 @@ async function draft(args: Args): Promise<void> {
   const comfy = new ComfyUi();
   await comfy.checkReady(style);
 
-  const jobs = targets.flatMap((target) => {
+  const all = targets.flatMap((target) => {
     const first = args.seed ?? defaultSeed(target);
     return Array.from({ length: args.candidates }, (_, i) => ({ target, seed: first + i }));
   });
+  // Already-staged candidates are kept, so an interrupted batch resumes where it stopped.
+  const jobs = all.filter(({ target, seed }) => !existsSync(stagedPaths(target, seed).sprite));
+  if (jobs.length < all.length) console.log(`Skipping ${all.length - jobs.length} already staged.`);
+  if (jobs.length === 0) {
+    console.log(`Nothing left to render. Compare them in ${relative(rootDir(REPO_ROOT), writeReviewPage(style))}.`);
+    return;
+  }
   console.log(`Rendering ${jobs.length} image${jobs.length === 1 ? '' : 's'} on ${comfy.baseUrl} …`);
   const started = Date.now();
+  const clean = new Map<string, number>();
   let done = 0;
-  const renders = await comfy.render(
+  // Stage each image as it arrives (and refresh the review page every so often),
+  // so a crash part-way keeps everything finished so far.
+  await comfy.render(
     style,
     jobs.map(({ target, seed }) => ({
       kind: target.kind,
@@ -115,18 +126,20 @@ async function draft(args: Args): Promise<void> {
       seed,
       prefix: `league-of-taverns/${target.kind}/${target.id}-s${seed}`,
     })),
-    (request) => console.log(`  ${++done}/${jobs.length} ${request.kind} ${request.prefix.split('/').pop()}`),
+    (_request, render) => {
+      const { target, seed } = jobs[done]!;
+      const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind, target.translucent)));
+      const problems = stage(target, seed, render, sprite, style);
+      clean.set(target.id, (clean.get(target.id) ?? 0) + (problems.length === 0 ? 1 : 0));
+      done++;
+      const eta = Math.round(((Date.now() - started) / done) * (jobs.length - done) / 60_000);
+      console.log(`  ${done}/${jobs.length} ${target.id} s${seed}: ${problems.length === 0 ? 'layers cleanly' : problems.join('; ')}${done < jobs.length ? ` (about ${eta} min left)` : ''}`);
+      if (done % 16 === 0) writeReviewPage(style);
+    },
   );
 
-  const clean = new Map<string, number>();
-  jobs.forEach(({ target, seed }, i) => {
-    const render = renders[i]!;
-    const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind, target.translucent)));
-    const problems = stage(target, seed, render, sprite, style);
-    clean.set(target.id, (clean.get(target.id) ?? 0) + (problems.length === 0 ? 1 : 0));
-  });
   for (const target of targets) {
-    if (target.kind === 'portrait') console.log(`  ${target.id}: ${clean.get(target.id) ?? 0}/${args.candidates} layer cleanly`);
+    if (target.kind === 'portrait' && clean.has(target.id)) console.log(`  ${target.id}: ${clean.get(target.id)} new candidate(s) layer cleanly`);
   }
   const page = writeReviewPage(style);
   console.log(`Done in ${Math.round((Date.now() - started) / 1000)}s. Compare them in ${relative(rootDir(REPO_ROOT), page)}, then run its accept command.`);

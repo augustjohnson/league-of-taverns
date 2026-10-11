@@ -100,8 +100,16 @@ export class ComfyUi {
     }
   }
 
-  /** Queue renders, wait for each, and return its PNG bytes in request order. */
-  async render(style: ImageStyle, requests: ReadonlyArray<RenderRequest>, onDone?: (request: RenderRequest) => void): Promise<Uint8Array[]> {
+  /**
+   * Queue renders, wait for each, and return its PNG bytes in request order.
+   * `onDone` gets each image as soon as it finishes, so a long batch can save
+   * as it goes and survive a crash part-way.
+   */
+  async render(
+    style: ImageStyle,
+    requests: ReadonlyArray<RenderRequest>,
+    onDone?: (request: RenderRequest, png: Uint8Array) => void,
+  ): Promise<Uint8Array[]> {
     const ids: string[] = [];
     for (const request of requests) {
       const queued = (await this.json('/prompt', { prompt: renderGraph(style, request) })) as { prompt_id?: string; node_errors?: unknown };
@@ -110,8 +118,9 @@ export class ComfyUi {
     }
     const images: Uint8Array[] = [];
     for (const [i, id] of ids.entries()) {
-      images.push(await this.waitForImage(id));
-      onDone?.(requests[i]!);
+      const png = await this.waitForImage(id);
+      images.push(png);
+      onDone?.(requests[i]!, png);
     }
     return images;
   }

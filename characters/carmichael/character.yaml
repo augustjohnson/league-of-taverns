@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: carmichael
+base: giant-crab
+status: active
+debut: season-01
+chrome:
+  name: Carmichael
+  epithet: Sideways
+  tagline: Has never moved forward. Describes this as a strategy, when asked and when not.
+  portrait:
+    status: prompt
+    prompt: big orange crab with one oversized barnacle-crusted claw, a cracked shell plate and a knotted cloth headband, (blank beady stare:1.3)
+    bodyPlan: beast

@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: gloria
+base: gray-ooze
+status: active
+debut: season-01
+chrome:
+  name: Gloria
+  epithet: Aisle Four
+  tagline: Has been mopped up eleven times. Comes back a little angrier each time.
+  portrait:
+    status: prompt
+    prompt: glossy grey puddle of ooze with two eyes, an old mop head stuck in it and an overturned wooden bucket beside it, (smug smirk:1.3)
+    bodyPlan: blob

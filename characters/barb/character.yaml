@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: barb
+base: black-bear
+status: active
+debut: season-01
+chrome:
+  name: Barb
+  epithet: the Duchess
+  tagline: Controls every tavern bin within forty miles. Accepts tribute in pie crusts.
+  portrait:
+    status: prompt
+    prompt: black bear with a white chest blaze, a crushed wicker bread basket worn as a crown and crumbs in her fur, (regal calm stare:1.3)
+    bodyPlan: beast

@@ -1,0 +1,15 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: doug
+base: pseudodragon
+status: active
+debut: season-01
+chrome:
+  name: Doug
+  epithet: Fully Grown
+  tagline: The size of a loaf of bread. Does not want to discuss loaves.
+  portrait:
+    status: prompt
+    prompt: (tiny red dragon with scales:1.4), a torn left wing, a scar across his snout and a small studded leather collar, (tough-guy scowl:1.3)
+    bodyPlan: winged
