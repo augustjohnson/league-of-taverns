@@ -52,6 +52,7 @@
  * count for nothing. Casters (mage, archmage, lich, priest, druid) and
  * poison-rider creatures look far weaker than their CR.
  */
+import { detLn, detLogistic } from '../internal/det-math';
 import type { BaseStats } from '../adapters/open5e';
 import type { BattleModel, Party } from './index';
 
@@ -116,9 +117,9 @@ export function evTtkBreakdown(party: Party, foes: Foes): EvTtkBreakdown {
   if (partyDpr === 0 && foeEhp > 0) logit = -Infinity;
   else if (foeDpr === 0 || foeEhp === 0) logit = Infinity;
   else if (partyEhp === 0) logit = -Infinity;
-  else logit = EV_TTK_V0_K * Math.log(ttkFoe / ttkParty);
+  else logit = EV_TTK_V0_K * detLn(ttkFoe / ttkParty);
 
-  const pWin = clamp(1 / (1 + Math.exp(-logit)), P_WIN_RANGE.min, P_WIN_RANGE.max);
+  const pWin = clamp(detLogistic(logit), P_WIN_RANGE.min, P_WIN_RANGE.max);
   return { partyDpr, foeDpr, partyEhp, foeEhp, partyTargetAc, foeTargetAc, ttkParty, ttkFoe, logit, pWin };
 }
 

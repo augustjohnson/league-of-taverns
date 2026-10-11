@@ -69,6 +69,14 @@ export default defineConfig(
       'no-restricted-properties': [
         'error',
         { object: 'Math', property: 'random', message: 'Use rngFor(seed, key) from engine/src/rng.' },
+        // Implementation-approximated in ECMAScript: results differ across JS engines.
+        ...['exp', 'expm1', 'log', 'log1p', 'log2', 'log10', 'pow', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh', 'cbrt', 'hypot'].map(
+          (property) => ({ object: 'Math', property, message: 'Not bit-identical across JS engines. Use engine/src/internal/det-math.' }),
+        ),
+      ],
+      'no-restricted-syntax': [
+        'error',
+        { selector: "BinaryExpression[operator='**']", message: '** is Math.pow under the hood. Use detExp/detLn or repeated multiplication.' },
       ],
     },
   },

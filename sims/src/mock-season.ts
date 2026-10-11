@@ -8,7 +8,7 @@
  * - `--runs`: seasons to play. Run 1 uses `--seed` itself and run n > 1 uses
  *   `<seed>~<n>` (`runSeed`), so `--runs 1 --seed X` reproduces any run.
  * - `--seed`: the sim seed. It drives bot randomness, the per-week dice salt
- *   and the timestamps. The draft order is the engine's, fixed by the season id.
+ *   the timestamps, and the tavern join order (and so each seat's draft slot).
  * - `--out`: output folder, relative to the repo root. Default
  *   `sims/output/<seed>-x<runs>`. Gets `events-<n>.ndjson` per run and
  *   `summary.json` (per run and aggregate). Output is git-ignored.

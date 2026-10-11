@@ -83,10 +83,9 @@ loaders (`loadMockSeasonParts`), serializes it with `serializeSeason`
 only the snapshot records used), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI
-uses, so a seed gives the same season. Projected values (`projectedPoints`,
-`pDnf`) can differ from Node in the last bit, because `Math.exp` in the battle
-model is not bit-identical across JavaScript engines; that changes the NDJSON
-bytes and hash but not the draft, lineups, rolls, points or champion.
+uses, so a seed gives the same season, byte for byte: the engine avoids
+`Math.exp`/`Math.log` (not bit-identical across JS engines) in favor of
+`engine/src/internal/det-math.ts`, so the page's NDJSON hash matches the CLI's.
 
 The page is written as an Artifact body: it starts with `<title>`, has no
 doctype, html, head or body tags, makes no requests beyond Google Fonts, and
