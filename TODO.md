@@ -465,7 +465,7 @@ Owns `bots/`, `sims/`.
   cr-greedy, skill-coverage, value), lineup (max-cr, environment-fit), waivers
   (best-available).
 - **Acceptance:** `bots/test` todos replaced; every decision is legal per W4;
-  deterministic given the view and rng; `PublicView` has no mission structure.
+  deterministic given the view and rng; `PublicView` exposes only public knowledge, which includes open missions (D-08, D-42).
 - **Depends:** T4.2, T3.3 (can start against types).
 
 #### T9.2 ★ Mock season runner · L

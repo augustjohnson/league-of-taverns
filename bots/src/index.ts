@@ -9,5 +9,22 @@
  * live league (docs/decisions.md D-36).
  */
 export type * from './types';
-export { BOT_IDS, botManager } from './strategies';
+export {
+  BOT_IDS,
+  DRAFT_STRATEGIES,
+  LINEUP_STRATEGIES,
+  bestAvailable,
+  botManager,
+  crGreedyDraft,
+  environmentFitLineup,
+  keepsLineupPossible,
+  maxCrLineup,
+  projectionLineup,
+  randomDraft,
+  skillCoverageDraft,
+  valueDraft,
+} from './strategies';
 export type { BotId } from './strategies';
+export { battleStrength, coveredSkills, poolInfo, referenceFoe, valueOf } from './metrics';
+export type { PoolInfo } from './metrics';
+export { checkFit, fitWeights } from './environment';
