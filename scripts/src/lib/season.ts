@@ -88,6 +88,11 @@ export function seasonDir(season: SeasonSource, root: RepoRoot = REPO_ROOT): str
   return seasonContext(season, root).dir;
 }
 
+/** Absolute directory whose characters/ folder a source's pool resolves against. */
+export function charactersRootDir(season: SeasonSource, root: RepoRoot = REPO_ROOT): string {
+  return seasonContext(season, root).charactersRoot;
+}
+
 // ── shared helpers ─────────────────────────────────────────────────────────
 
 const text = z.string().min(1);

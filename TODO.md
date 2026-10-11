@@ -415,7 +415,8 @@ Owns `scripts/src/difficulty-report.ts` and its lib.
 
 Owns `scripts/src/lib/chrome.ts`, `scripts/src/draft-chrome.ts`,
 `scripts/src/lock-check.ts`, `content/prompts/mission-chrome.md`,
-`content/prompts/season-throughlines.md`, `seasons/*/chrome/` schema.
+`content/prompts/season-throughlines.md`, `seasons/*/chrome/` schema,
+`scripts/src/draft-images.ts`, `scripts/src/lib/images/`, `content/images/`.
 
 #### T8.1 Chrome schema + loader · S
 - **Goal:** zod schema for mission chrome and through-lines, with status states.
@@ -453,6 +454,15 @@ Owns `scripts/src/lib/chrome.ts`, `scripts/src/draft-chrome.ts`,
 - **Acceptance:** every token filled from data; correct variant per outcome;
   DNF ends at the `lose` beat; `{allies}` lists names naturally.
 - **Depends:** T8.2, T6.3, T3.1.
+
+#### T8.7 Portraits and covers · M
+- **Goal:** pixel-art portraits and mission covers, generated locally and
+  committed small (D-10). See docs/images.md.
+- *Built (2026-10-11):* `draft-images` (ComfyUI client, pixelate to the
+  Resurrect 64 palette, staging and accept), `content/images/style.yaml`, and
+  image checks in `validate`.
+- **Left:** generate the season's portraits once the pool's subject prompts
+  are written; show images in `publish` and the explorer.
 
 ---
 
@@ -588,7 +598,6 @@ Each task here can be specified but not finished until its decision in
 | **T10.3 Offseason carryover** · M | D-11 carryover | `offseason`: keeper eligibility, `character.retained`, keeper cost in draft order (T4.3 hook), modifier drift cap. |
 | **T6.1 captain effect** · S | D-12 | The captain's mechanical role. Ship behind a config switch. |
 | **T5.4 / T8.5 live provider** · S | D-32 | The real `LlmClient`. Everything else in those tasks uses the fake. |
-| **T8.7 Portraits and images** · M | D-10 | Storage, the `portrait.path` convention, and any image generation script. |
 | **T11.2 GM-as-manager rule** · S | D-09 | Whether the allowlist lets the GM hold a tavern. |
 | **T1.1 document scope** · S | D-17 | Adding non-SRD documents (license text and notices). SRD-only is unblocked. |
 | **Registry costs** · S | D-31 | Final modifier costs. The mechanism (T3.2) is unblocked. |

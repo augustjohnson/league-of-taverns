@@ -17,9 +17,10 @@ chrome:
   tagline: Has never once used the door.
   backstory: backstory.md
   portrait:
-    status: none          # none | prompt | draft | final
+    status: prompt        # none | prompt | draft | final
+    # The subject only; content/images/style.yaml adds the style. docs/images.md.
     prompt: >-
-      A hulking, good-natured ogre in a too-small tavern apron, holding a
-      splintered barrel stave like a club, warm lantern light, painterly.
-    # path: set once image storage is decided (docs/decisions.md D-10)
+      a hulking good-natured ogre with green skin, small tusks and a heavy brow,
+      (friendly lopsided grin:1.3), wearing a white linen shirt under a
+      too-small brown leather tavern apron
   history: []             # optional cosmetic notes per season, e.g. "Season 1: carried the Gilded Flagon"

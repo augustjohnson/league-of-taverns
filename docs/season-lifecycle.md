@@ -18,7 +18,9 @@ offseason ─▶ candidates ─▶ validate + report ─▶ select ─▶ chrome
    immutable.
 2. **Characters.** Add `characters/<id>/` for new characters (base +
    chrome). Returning characters keep their folder. Chrome may evolve, and the
-   id never changes.
+   id never changes. New characters get a portrait: write
+   `chrome.portrait.prompt`, run `draft-images portraits`, accept one
+   candidate each ([images.md](images.md)).
 3. **Pool.** Write `pool.yaml` with about 64 character ids and this season's
    modifiers. `validate` checks bases against the snapshot and modifiers against
    the registry and budget.
@@ -79,6 +81,9 @@ possibly for reuse later.
   through-lines and image prompts.
 - Output starts as `status: draft`. The GM edits it by hand, sets `reviewed`,
   and finally `locked`.
+- Covers: `draft-images covers --season <id>` renders each
+  `imagePrompts.cover`, and the GM accepts one per mission as
+  `chrome/<mission>.cover.png` ([images.md](images.md)).
 - The coverage check and lints run on every save. See
   [schema.md § Mission chrome](schema.md#mission-chrome).
 

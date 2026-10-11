@@ -44,7 +44,8 @@ outros:
   toll-seized: "{tavern} goes home with the keeper's strongbox and an argument about who carries it."
 
 throughlines: [the-bridge-keepers-debt]   # see chrome/throughlines.yaml
-imagePrompts:
+imagePrompts:                 # the place only; content/images/style.yaml adds the style
   cover: >-
-    A half-sunken toll bridge at dusk in a misty swamp, lanterns on a crooked
-    gate, reeds and black water, painterly fantasy illustration.
+    a half-sunken stone toll bridge at dusk in a misty swamp, crooked wooden
+    gate with hanging lanterns, reeds and still black water, distant dead trees,
+    moody purple and amber sky

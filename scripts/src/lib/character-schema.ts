@@ -22,9 +22,12 @@ export interface CharacterChrome {
   readonly backstory?: string;
   readonly portrait?: {
     readonly status: PortraitStatus;
+    /** The subject only (who, wearing what, expression); content/images/style.yaml adds the style. */
     readonly prompt?: string;
-    /** Storage location, once decided (docs/decisions.md D-10). */
+    /** The accepted image, relative to the character's folder: `portrait.png` (D-10). */
     readonly path?: string;
+    /** ComfyUI seed of the accepted image, so it can be re-rendered. */
+    readonly seed?: number;
   };
   readonly history?: ReadonlyArray<string>;
 }
@@ -54,6 +57,7 @@ const chromeSchema = z.strictObject({
       status: z.enum(['none', 'prompt', 'draft', 'final']),
       prompt: text.exactOptional(),
       path: text.exactOptional(),
+      seed: z.number().int().nonnegative().exactOptional(),
     })
     .exactOptional(),
   history: z.array(z.string()).exactOptional(),

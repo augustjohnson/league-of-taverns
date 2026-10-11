@@ -53,10 +53,11 @@ chrome:                      # everything below is cosmetic and never reaches th
   pronouns: { subject: he, object: him, possessive: his }   # optional; story rendering
   tagline: string            # optional
   backstory: backstory.md    # optional, path relative to this folder
-  portrait:
+  portrait:                  # optional; docs/images.md
     status: none             # none | prompt | draft | final
-    prompt: string           # image prompt (not generated during scaffolding)
-    path: string             # storage location per D-10
+    prompt: string           # the subject only; content/images/style.yaml adds the style
+    path: portrait.png       # set by draft-images accept; required at draft and final
+    seed: integer            # ComfyUI seed of the accepted image
   history: [string]          # optional cosmetic notes
 ```
 
@@ -197,7 +198,7 @@ beats:
 outros:
   <end-node-id>: string
 throughlines: [throughline-id]  # optional, ids from chrome/throughlines.yaml
-imagePrompts: { cover: string } # optional; generation is out of scope
+imagePrompts: { cover: string } # optional; the place only. draft-images → <mission>.cover.png (docs/images.md)
 ```
 
 **Coverage (T8.2):** every check node needs `pass` and `fail`, every battle

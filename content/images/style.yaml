@@ -1,0 +1,47 @@
+# The fixed style for every generated image: model, prompt wrapper and sizes.
+# Per-image text supplies only {{subject}}: a character's chrome.portrait.prompt
+# or a mission's chrome imagePrompts.cover.
+#
+# Changing anything here changes every image generated afterwards. Treat it
+# like the rulebook: change it by PR, and expect to regenerate the set.
+# How it's used, and why each setting is what it is: docs/images.md.
+
+palette: resurrect-64
+
+model:
+  checkpoint: sd_xl_base_1.0.safetensors
+  lora: pixel-art-xl.safetensors
+  loraStrength: 0.7               # 1.0 pulls every subject into a full-body game sprite
+  steps: 28
+  cfg: 6.5
+  sampler: dpmpp_2m
+  scheduler: karras
+  backgroundRemoval: birefnet.safetensors
+
+pixelate:
+  cell: 8                         # SDXL's latent grid; the LoRA paints on it exactly
+  colorGroups: 12                 # k-means groups before snapping; more splits one material across two palette hues
+  chromaWeight: 3                 # keep hue over lightness when snapping
+
+portrait:
+  render: { width: 896, height: 1152 }
+  output: { width: 112, height: 144 }
+  cutout: true
+  positive: >-
+    pixel art, (close-up headshot portrait:1.4), (head and shoulders only:1.3),
+    {{subject}}, three-quarter view, looking at viewer,
+    (thick dark outline around the character:1.3), plain white background
+  negative: >-
+    (full body:1.5), (legs, feet, standing:1.3), floor, shadow, text, letters,
+    watermark, frame, border, blurry, photo, 3d render
+
+cover:
+  render: { width: 1728, height: 576 }
+  output: { width: 216, height: 72 }
+  cutout: false
+  positive: >-
+    pixel art, wide panoramic landscape, {{subject}}, no people, establishing
+    shot, side-scrolling game background
+  negative: >-
+    people, person, character, creature, monster, text, letters, watermark,
+    frame, border, blurry, photo, 3d render

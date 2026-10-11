@@ -12,12 +12,15 @@
  *   `spellcasters.maxPerEncounter` (D-43; moves into the engine with T5.6).
  *   A selected mission's environment must be one the schedule uses. Which
  *   week it runs is lock-check's business (T8.4).
+ * - Images (D-10): pooled characters' portraits and the season's mission
+ *   covers are the style's size and palette (./images/check.ts).
  *
  * Not yet: chrome coverage and lints (T8.x).
  */
 import { basename, extname } from 'node:path';
 import { indexSnapshot, validateMission } from '@league-of-taverns/engine';
 import type { Mission, MissionRules } from '@league-of-taverns/engine';
+import { checkSeasonImages } from './images/check';
 import { ValidationFailure } from './main';
 import { REPO_ROOT, displayPath, loadMission } from './repo';
 import type { RepoRoot } from './repo';
@@ -104,6 +107,8 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
       }
     }
   }
+
+  issues.push(...checkSeasonImages(season, loaded.pool.characters.map((c) => c.ref.id), root));
 
   return {
     issues,

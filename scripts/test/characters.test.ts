@@ -45,7 +45,7 @@ describe('character files', () => {
     expect(chrome.name).toBe('Bruno');
     expect(chrome.epithet).toBe('the Bruiser');
     expect(chrome.pronouns).toEqual({ subject: 'he', object: 'him', possessive: 'his' });
-    expect(chrome.portrait?.status).toBe('none');
+    expect(chrome.portrait?.status).toBe('prompt');
     expect(chrome.history).toEqual([]);
   });
 
