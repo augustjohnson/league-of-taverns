@@ -232,8 +232,9 @@ describe('runMission', () => {
 
   // start → a ─pass→ b ─pass/fail→ done
   //           └fail→ fight ─win→ b
+  // a banks 40 and b banks 60, so the haul is 100.
   const branching = missionOf(
-    [start(), skillCheck('a', 1, 'stealth', 12), battle('fight', 2), skillCheck('b', 3, 'athletics', 10), end('done', 4)],
+    [start(), skillCheck('a', 1, 'stealth', 12, 40), battle('fight', 2), skillCheck('b', 3, 'athletics', 10, 60), end('done', 4)],
     [
       edge('start', 'a', 'always'),
       edge('a', 'b', 'pass'),
@@ -266,7 +267,7 @@ describe('runMission', () => {
     expect(routes).toEqual(new Set(['start a b done', 'start a fight b done']));
   });
 
-  it('records each check, and scores passed / attempted', () => {
+  it('records each check, and scores loot banked / haul', () => {
     // a: d20 10 + 2 = 12 ≥ 12 passes. b: d20 6 + 3 = 9 < 10 fails.
     const run = runMission(party, branching, scripted({ a: [0.45], b: [0.25] }), baseOf, constantModel(0.6));
     expect(run).toEqual({
@@ -278,7 +279,8 @@ describe('runMission', () => {
       dnf: false,
       checksPassed: 1,
       checksAttempted: 2,
-      score: 0.5,
+      loot: 40,
+      score: 0.4,
     });
   });
 
@@ -288,11 +290,12 @@ describe('runMission', () => {
     const won = at(0.4999);
     expect(won.nodes[1]).toEqual({ node: 'fight', kind: 'battle', pWin: 0.5, roll: 0.4999, outcome: 'win' });
     expect(won.path).toEqual(['start', 'a', 'fight', 'b', 'done']);
-    expect(won.score).toBe(0.5);
+    expect(won.loot).toBe(60);
+    expect(won.score).toBe(0.6);
     expect(at(0.5).nodes[1]).toMatchObject({ outcome: 'lose' });
   });
 
-  it('a lost battle is a DNF: the run stops there and scores 0', () => {
+  it('a lost battle is a DNF: the run stops there, here with nothing banked', () => {
     const run = runMission(party, branching, scripted({ a: [0], fight: [0.3] }), baseOf, constantModel(0.2));
     expect(run).toEqual({
       path: ['start', 'a', 'fight'],
@@ -303,10 +306,21 @@ describe('runMission', () => {
       dnf: true,
       checksPassed: 0,
       checksAttempted: 1,
+      loot: 0,
       score: 0,
     });
     // pWin 0 always loses, even on a roll of 0.
     expect(runMission(party, branching, scripted({ a: [0], fight: [0] }), baseOf, constantModel(0)).dnf).toBe(true);
+  });
+
+  it('a DNF keeps the loot banked before the lost battle (D-46)', () => {
+    // start → a (30) → fight → b (70) → done: haul 100.
+    const late = missionOf(
+      [start(), skillCheck('a', 1, 'stealth', 12, 30), battle('fight', 2), skillCheck('b', 3, 'athletics', 10, 70), end('done', 4)],
+      [edge('start', 'a', 'always'), edge('a', 'fight', 'always'), edge('fight', 'b', 'win'), edge('b', 'done', 'always')],
+    );
+    const run = runMission(party, late, scripted({ a: [0.45], fight: [0.9] }), baseOf, constantModel(0.5));
+    expect(run).toMatchObject({ path: ['start', 'a', 'fight'], dnf: true, checksPassed: 1, loot: 30, score: 0.3 });
   });
 
   it('with advantage, draws a second d20 from the same stream and keeps the higher', () => {
@@ -363,7 +377,7 @@ describe('runMission', () => {
     const seed = weekSeed({ season: 'season-01', week: 1, tavern: 'bruno-solo' });
     const run = runMission(partyOf([bruno]), loadMission(EXAMPLE_MISSION), seeded(seed), baseOf, constantModel(0.5));
     // Survival −2 vs DC 12 fails on a 12, the bog ambush is won (0.347 < 0.5),
-    // and Athletics +4 vs DC 13 passes on a 14: 1 of 2.
+    // and Athletics +4 vs DC 13 passes on a 14, banking haul-chain's 50 of 100.
     expect(run).toEqual({
       path: ['start', 'find-path', 'bog-ambush', 'haul-chain', 'crossed-dry'],
       nodes: [
@@ -374,6 +388,7 @@ describe('runMission', () => {
       dnf: false,
       checksPassed: 1,
       checksAttempted: 2,
+      loot: 50,
       score: 0.5,
     });
   });

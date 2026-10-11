@@ -127,8 +127,8 @@ problem.
 
 ### Story and scoring (2026-10-11)
 
-The story behind these is in [lore.md](lore.md). None of them are in the
-engine yet.
+The story behind these is in [lore.md](lore.md). D-45 and D-46 are in the
+engine. D-47 and D-48 are not yet.
 
 **D-44 Story frame: DECIDED (2026-10-11).**
 - Managers play barkeeps, each pushed around by a different god.
@@ -149,8 +149,10 @@ engine yet.
 - Branches may pay different amounts. A failure branch paying less is
   intended.
 - Projected points become expected loot, which is still exact by propagation.
-- *Needs:* a `loot` field on check nodes (schema), a scoring change in
-  `resolution/` and `projection/`, and a fixed-haul validator rule.
+- *Implemented:* `loot` on check nodes, `missions.haul` in the season config,
+  the `haul` validator rule, and `missionHaul`. Score = loot ÷ haul in
+  `resolution/` and `projection/`, and the reducers and `verifyResolutions`
+  check `run.loot`.
 - *Open:* the haul amount, and how loot is spread across a path. Rising loot
   late in the path is an idea (lore.md).
 
@@ -159,8 +161,11 @@ engine yet.
 before the battle. The penalty for a DNF is the loot it didn't reach, so
 where battles sit in a mission sets the penalty. Sims (200 seasons, mock
 missions, old scoring) showed about 21% DNF, which is the target, and a score
-spread of about ±34 points that came mostly from DNFs scoring 0. Banking is
-expected to cut that substantially. Confirm with T9.3.
+spread of about ±34 points that came mostly from DNFs scoring 0. *Implemented.*
+Re-run on the mock missions (same seed): DNFs stay at 20%, and runs scoring
+0 fall from 21% to 7%. The spread only falls to about ±32, because the mock
+missions' battles come early, so a DNF has banked little. Late battles and
+rising loot (lore.md) are the levers for cutting it further.
 
 **D-47 Home bonus ×1.25: DECIDED (2026-10-11).** On its sponsor's mission, a
 tavern's loot is multiplied by 1.25.
@@ -169,7 +174,9 @@ tavern's loot is multiplied by 1.25.
   time, against a baseline of 17%.
 - ×2 was rejected: the home tavern topped the week about 67% of the time, so
   weekly wins would mostly rotate through the home taverns.
-- Re-measure after D-45 and D-46.
+- Re-measured under D-45 and D-46 on the mock missions: ×1.25 beats a given
+  rival 62% of the time and tops the week 39% of the time. (This is a
+  post-hoc multiplier on sim results. The engine doesn't apply it yet.)
 - *Needs:* a sponsor per tavern and per week in the season config.
 
 **D-48 One mission per sponsor: DECIDED (2026-10-11).** The season has as many

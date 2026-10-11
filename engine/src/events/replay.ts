@@ -17,9 +17,9 @@
  */
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
-import type { Mission, MissionNode } from '../missions';
+import { missionHaul, type Mission, type MissionNode } from '../missions';
 import { formatIssuePath } from '../missions/schema';
-import { missionGraph, runScore } from '../resolution';
+import { lootScore, missionGraph } from '../resolution';
 import { InvalidEventError, applyEvent, initialState } from './reducers';
 import { eventSchema } from './schema';
 import type { LeagueState } from './state';
@@ -204,8 +204,9 @@ export interface ResolutionMismatch {
  *   (`requires`) may fail on a high roll, since nobody may have met the gate
  *   (D-39), and that needs stats this audit doesn't have.
  * - Each battle's outcome is `roll < pWin`, and a lost battle ends the path.
- * - `dnf`, `checksPassed`, `checksAttempted` and `score` (`runScore`, 0 on a
- *   DNF) match the walk.
+ * - `dnf`, `checksPassed`, `checksAttempted`, `loot` (the `loot` of each
+ *   passed check) and `score` (`lootScore(loot, missionHaul(mission))`, DNF
+ *   or not) match the walk.
  * - `points` = round(score × `scoring.pointsScale`) from `season.created`.
  *
  * Returns one entry per mismatch, in log order. If the walk itself breaks (a
@@ -244,6 +245,7 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
     let index = 0;
     let passed = 0;
     let attempted = 0;
+    let loot = 0;
     let dnf = false;
     let walked = true;
     try {
@@ -267,7 +269,10 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
         }
         if (record.kind === 'check' && node.kind === 'check') {
           attempted++;
-          if (record.outcome === 'pass') passed++;
+          if (record.outcome === 'pass') {
+            passed++;
+            loot += node.loot;
+          }
           if (!starters.has(record.actor)) report(`${at}.actor`, `"${record.actor}" is not in the lineup`);
           if (record.dc !== node.check.dc) report(`${at}.dc`, `dc ${record.dc} but the mission says ${node.check.dc}`);
           const total = record.d20 + record.modifier;
@@ -303,7 +308,8 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
     if (run.dnf !== dnf) report('run.dnf', `dnf is ${run.dnf}, but the walk ${dnf ? 'loses a battle' : 'reaches an end'}`);
     if (run.checksPassed !== passed) report('run.checksPassed', `${run.checksPassed}, but ${passed} check(s) passed`);
     if (run.checksAttempted !== attempted) report('run.checksAttempted', `${run.checksAttempted}, but ${attempted} check(s) attempted`);
-    const score = dnf ? 0 : runScore(passed, attempted);
+    if (run.loot !== loot) report('run.loot', `${run.loot}, but the passed checks bank ${loot}`);
+    const score = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - score) > 1e-9) report('run.score', `score ${run.score} should be ${score}`);
   }
   return mismatches;

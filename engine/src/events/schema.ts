@@ -82,6 +82,7 @@ export const runResultSchema = z.strictObject({
   dnf: z.boolean(),
   checksPassed: z.number().int().nonnegative(),
   checksAttempted: z.number().int().nonnegative(),
+  loot: z.number().int().nonnegative(),
   score: probability,
 });
 
@@ -140,6 +141,7 @@ export const seasonConfigSchema = z.strictObject({
     maxRank: z.number().int().nonnegative(),
     battlesPerPath: minMax,
     encounterCrRatio: z.number().positive(),
+    haul: z.number().int().positive(),
     battleModel: text,
   }),
   carryover: z.strictObject({

@@ -18,10 +18,12 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: perception, dc: 13 }
+    loot: 15
   - id: row-out
     rank: 2
     kind: check
     check: { type: skill, skill: athletics, dc: 12 }
+    loot: 15
   - id: wreckers
     rank: 2
     kind: battle
@@ -34,10 +36,12 @@ nodes:
     rank: 3
     kind: check
     check: { type: skill, skill: acrobatics, dc: 12 }
+    loot: 30
   - id: search-hold
     rank: 4
     kind: check
     check: { type: skill, skill: investigation, dc: 12 }
+    loot: 40
   - id: guardians
     rank: 5
     kind: battle
@@ -50,6 +54,7 @@ nodes:
     rank: 6
     kind: check
     check: { type: save, ability: str, dc: 12 }
+    loot: 30
   - { id: salvaged, rank: 7, kind: end }
   - { id: battered, rank: 7, kind: end }
 

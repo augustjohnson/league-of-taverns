@@ -57,7 +57,8 @@ export interface SeasonConfig {
   /** `open` (D-08, decided): missions are public in the repo. The others are kept in case secrecy returns. */
   readonly secrecy: 'open' | 'private_repo' | 'commit_reveal' | 'encrypted';
   readonly seedSalt: 'none' | 'revealed_with_mission';
-  readonly missions: Omit<MissionRules, 'partyCr'> & { readonly battleModel: string };
+  /** Mission rules. `haul` is required here: every season has a fixed haul (docs/decisions.md D-45). */
+  readonly missions: Omit<MissionRules, 'partyCr' | 'haul'> & { readonly haul: number; readonly battleModel: string };
   readonly carryover: {
     readonly mode: 'none' | 'keeper';
     readonly keepersPerTavern: number;

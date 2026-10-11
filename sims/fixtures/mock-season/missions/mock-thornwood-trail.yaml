@@ -19,18 +19,22 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: survival, dc: 12 }
+    loot: 15
   - id: sneak-camp
     rank: 2
     kind: check
     check: { type: skill, skill: stealth, dc: 13 }
+    loot: 20
   - id: read-signs
     rank: 2
     kind: check
     check: { type: skill, skill: perception, dc: 12 }
+    loot: 20
   - id: dodge-snare
     rank: 3
     kind: check
     check: { type: save, ability: dex, dc: 12 }
+    loot: 25
   - id: camp-brawl
     rank: 3
     kind: battle
@@ -43,6 +47,7 @@ nodes:
     rank: 4
     kind: check
     check: { type: skill, skill: athletics, dc: 13 }
+    loot: 40
   - { id: cleared, rank: 5, kind: end }
   - { id: scraped, rank: 5, kind: end }
 

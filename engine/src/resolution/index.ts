@@ -10,16 +10,17 @@
  *   attempt; if nobody qualifies the check auto-fails (D-39).
  * - Battle odds: a black-box `p(win)` from party vs encounter, using an
  *   expected-value model (docs/specs/05). Swappable behind `BattleModel`.
- * - The weekly run: walk the DAG once with per-node dice. Losing any battle is
- *   a DNF and scores 0. Otherwise score = checks passed / checks attempted on
- *   the path.
+ * - The weekly run: walk the DAG once with per-node dice. Each passed check
+ *   banks its loot. Losing a battle ends the run (DNF) and keeps the loot
+ *   banked so far. Score = loot banked ÷ the mission's haul (docs/decisions.md
+ *   D-45, D-46).
  *
  * Projection (exact expectation) lives in ../projection. Both must use these
  * same odds functions so they agree by construction.
  */
 import type { BaseStats } from '../adapters/open5e';
 import { checkTargetKey, type EffectiveStats } from '../characters';
-import type { CheckSpec, Encounter, Mission, MissionNode, Requirement } from '../missions';
+import { missionHaul, type CheckSpec, type Encounter, type Mission, type MissionNode, type Requirement } from '../missions';
 import { rollD20, type Rng } from '../rng';
 
 /**
@@ -133,7 +134,9 @@ export interface RunResult {
   readonly dnf: boolean;
   readonly checksPassed: number;
   readonly checksAttempted: number;
-  /** 0 on DNF, else checksPassed / checksAttempted. */
+  /** Loot banked: the sum of `loot` over passed checks, DNF or not (D-45, D-46). */
+  readonly loot: number;
+  /** `lootScore(loot, missionHaul(mission))`: in [0, 1], and 1 on the best path. */
   readonly score: number;
 }
 
@@ -150,7 +153,8 @@ export interface RunResult {
  * `roll < pWin` from `battleOdds`. Losing ends the run as a DNF.
  *
  * `path` lists every visited node, start and end included (on a DNF it ends at
- * the lost battle). Score is `checksPassed / checksAttempted`, or 0 on a DNF.
+ * the lost battle). Each passed check banks its `loot`, and a DNF keeps what
+ * was banked. Score is `lootScore(loot, missionHaul(mission))`.
  *
  * `rngForNode` is a factory so each node's dice depend only on its id, never
  * on path order. Sims, tests and the difficulty report pass
@@ -174,6 +178,8 @@ export function runMission(
   const nodes: NodeRecord[] = [];
   let checksPassed = 0;
   let checksAttempted = 0;
+  let loot = 0;
+  const haul = missionHaul(mission);
 
   let node: MissionNode | undefined = graph.start;
   while (node !== undefined) {
@@ -199,7 +205,10 @@ export function runMission(
           outcome: passed ? 'pass' : 'fail',
         });
         checksAttempted++;
-        if (passed) checksPassed++;
+        if (passed) {
+          checksPassed++;
+          loot += node.loot;
+        }
         node = graph.next(node, passed ? 'pass' : 'fail');
         break;
       }
@@ -208,7 +217,7 @@ export function runMission(
         const roll = rngForNode(node.id)();
         const won = roll < pWin;
         nodes.push({ node: node.id, kind: 'battle', pWin, roll, outcome: won ? 'win' : 'lose' });
-        if (!won) return { path, nodes, dnf: true, checksPassed, checksAttempted, score: 0 };
+        if (!won) return { path, nodes, dnf: true, checksPassed, checksAttempted, loot, score: lootScore(loot, haul) };
         node = graph.next(node, 'win');
         break;
       }
@@ -217,16 +226,15 @@ export function runMission(
         break;
     }
   }
-  return { path, nodes, dnf: false, checksPassed, checksAttempted, score: runScore(checksPassed, checksAttempted) };
+  return { path, nodes, dnf: false, checksPassed, checksAttempted, loot, score: lootScore(loot, haul) };
 }
 
 /**
- * The score of a run that reached an end: `passed / attempted`, or 0 if no
- * check was attempted (the validator's `scored` rule forbids such a path).
- * Shared with projection.
+ * A run's score: `loot / haul`, or 0 when the haul is 0. Shared with
+ * projection, the reducers and replay.
  */
-export function runScore(passed: number, attempted: number): number {
-  return attempted === 0 ? 0 : passed / attempted;
+export function lootScore(loot: number, haul: number): number {
+  return haul === 0 ? 0 : loot / haul;
 }
 
 /** A mission indexed for walking. Shared by `runMission` and `projectMission`. */

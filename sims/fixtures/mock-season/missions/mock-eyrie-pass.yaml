@@ -19,26 +19,32 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: survival, dc: 12 }
+    loot: 20
   - id: soar-gap
     rank: 2
     kind: check
     check: { type: skill, skill: acrobatics, dc: 11, requires: { speed: fly } }
+    loot: 30
   - id: brace-storm
     rank: 2
     kind: check
     check: { type: save, ability: con, dc: 12 }
+    loot: 10
   - id: climb-face
     rank: 3
     kind: check
     check: { type: skill, skill: athletics, dc: 13 }
+    loot: 30
   - id: ledge-watch
     rank: 4
     kind: check
     check: { type: skill, skill: perception, dc: 12 }
+    loot: 40
   - id: plant-banner
     rank: 5
     kind: check
     check: { type: skill, skill: intimidation, dc: 12 }
+    loot: 50
   - id: ambush
     rank: 5
     kind: battle

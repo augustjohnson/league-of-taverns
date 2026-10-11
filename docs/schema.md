@@ -141,6 +141,7 @@ nodes:
       # ability: con         # for type: save | ability
       dc: 12
       # requires: { speed: fly } | { sense: darkvision }   # OPEN D-39
+    loot: 20                 # banked on a pass (D-45); whole number ≥ 0
   - id: bog-ambush
     rank: 2
     kind: battle
@@ -165,6 +166,7 @@ edges:
 | `edges.battle` | a battle has exactly one `win`. `lose` edges don't exist: losing is a DNF |
 | `edges.start` | start has exactly one `always` |
 | `scored` | every start→end path attempts ≥ 1 check |
+| `haul` | the most loot any start→end path can bank equals `missions.haul` (D-45). A check's loot counts when the path leaves it by `pass` or `always` |
 | `dc` | `dcBand.min ≤ dc ≤ dcBand.max` |
 | `encounter.ref` | every creature ref exists in the pinned snapshot |
 | `encounter.budget` | Σ count × CR ≤ `encounterCrRatio × B` per battle |
@@ -240,7 +242,7 @@ The annotated example in the file is the reference. Key groups:
 | `missedLineup` | `carry_over` |
 | `schedules` | cron for `lineupLock`, `weeklyRun`, `waivers` |
 | `secrecy`, `seedSalt` | D-08, D-13 |
-| `missions` | `dcBand`, `maxNodes`, `maxRank`, `battlesPerPath`, `encounterCrRatio`, `battleModel` |
+| `missions` | `dcBand`, `maxNodes`, `maxRank`, `battlesPerPath`, `encounterCrRatio`, `haul` (D-45), `battleModel` |
 | `carryover` | `mode`, `keepersPerTavern`, `keeperCost`, `championBonusKeepers`, `maxModifierChangePoints` |
 
 The config is copied into `season.created`. From then on the **event's copy**
@@ -300,7 +302,8 @@ governs, and CI flags later edits to the file.
 `mission.resolved.run` holds the full `RunResult`: `path`, and for each node
 `{node, kind, actor, d20, modifier, dc, advantage, outcome}` (checks) or
 `{node, kind, pWin, roll, outcome}` (battles), plus `dnf`, `checksPassed`,
-`checksAttempted` and `score`.
+`checksAttempted`, `loot` (banked by passed checks, kept on a DNF) and `score`
+(loot ÷ the mission's haul, D-45, D-46).
 
 ### What's recorded vs derived [D-20]
 

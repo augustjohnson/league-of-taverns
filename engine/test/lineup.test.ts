@@ -27,6 +27,7 @@ function configWithBudget(partyCr: number): SeasonConfig {
       maxRank: 8,
       battlesPerPath: { min: 0, max: 3 },
       encounterCrRatio: 1,
+      haul: 100,
       battleModel: 'ev-ttk-v0',
     },
     carryover: {

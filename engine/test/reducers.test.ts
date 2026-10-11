@@ -430,7 +430,8 @@ const cases: ReadonlyArray<Case> = [
   ['result for a tavern with no lineup', w2Revealed, candidate(w2Revealed, 'mission.resolved', { ...resultA, week: 2, tavern: D, mission: 'mission-w2' }), 'resolve.no_lineup'],
   ['result with a different lineup', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, lineup: { ...lineupA, captain: lineupA.allies[0], allies: [lineupA.captain, lineupA.allies[1], lineupA.allies[2]] } }), 'resolve.lineup_mismatch'],
   ['result whose counts disagree with its nodes', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ checksAttempted: resultA.run.checksAttempted + 1 })), 'resolve.counts_mismatch'],
-  ['result whose score disagrees with its counts', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ score: resultA.run.score === 0.5 ? 0.25 : 0.5 })), 'resolve.score_mismatch'],
+  ['result whose score disagrees with its loot', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ score: resultA.run.score === 0.5 ? 0.25 : 0.5 })), 'resolve.score_mismatch'],
+  ['result whose loot disagrees with its nodes', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ loot: resultA.run.loot + 1 })), 'resolve.score_mismatch'],
 
   // week.finalized
   ['finalize past the last week', at.w1Resolved, candidate(at.w1Resolved, 'week.finalized', { week: 3 }), 'finalize.bad_week'],

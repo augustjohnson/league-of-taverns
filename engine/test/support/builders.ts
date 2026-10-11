@@ -63,9 +63,10 @@ export function partyOf(members: ReadonlyArray<EffectiveStats>, captain = member
 
 export const start = (id = 'start'): MissionNode => ({ id, rank: 0, kind: 'start' });
 export const end = (id: string, rank: number): MissionNode => ({ id, rank, kind: 'end' });
-export const check = (id: string, rank: number, spec: CheckSpec): CheckNode => ({ id, rank, kind: 'check', check: spec });
-export const skillCheck = (id: string, rank: number, skill: Skill, dc: number): CheckNode =>
-  check(id, rank, { type: 'skill', skill, dc });
+/** A check banking `loot` on a pass (1 by default, so a mission's haul is its most passable checks). */
+export const check = (id: string, rank: number, spec: CheckSpec, loot = 1): CheckNode => ({ id, rank, kind: 'check', check: spec, loot });
+export const skillCheck = (id: string, rank: number, skill: Skill, dc: number, loot = 1): CheckNode =>
+  check(id, rank, { type: 'skill', skill, dc }, loot);
 export const battle = (id: string, rank: number, creatures: Encounter['creatures'] = [{ ref: 'bat', count: 1 }]): BattleNode => ({
   id,
   rank,

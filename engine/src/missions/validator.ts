@@ -15,6 +15,7 @@
  * | `edges.battle`     | a battle has exactly one `win` |
  * | `edges.start`      | start has exactly one `always` |
  * | `scored`           | every start→end path attempts ≥ 1 check |
+ * | `haul`             | the most loot any start→end path can bank equals the season's fixed `haul` (D-45) |
  * | `dc`               | `dcBand.min ≤ dc ≤ dcBand.max` |
  * | `encounter.ref`    | every creature ref exists in the pinned snapshot |
  * | `encounter.budget` | Σ count × CR ≤ `floor(encounterCrRatio × B)` per battle, in eighths |
@@ -32,7 +33,7 @@
  * path analysis, and with a rank violation (a possible cycle) there is no path
  * analysis, but DC, encounter and size checks always run.
  *
- * Path rules (`scored`, battles per path) are computed by dynamic programming
+ * Path rules (`scored`, `haul`, battles per path) are computed by dynamic programming
  * over the layered DAG, not by enumerating paths, so they stay linear in the
  * number of edges. Each issue names one offending end node and an example path.
  */
@@ -47,6 +48,11 @@ export interface MissionRules {
   /** Encounter difficulty cap: total encounter CR ≤ ratio × B, floored to whole eighths. */
   readonly encounterCrRatio: number;
   readonly partyCr: CrEighths;
+  /**
+   * The fixed haul (D-45): the loot every mission's best path must pay. Omit
+   * to skip the `haul` rule (candidate drafting, tests).
+   */
+  readonly haul?: number;
 }
 
 export interface MissionIssue {
@@ -66,6 +72,7 @@ export type MissionIssueCode =
   | 'edges.battle'
   | 'edges.start'
   | 'scored'
+  | 'haul'
   | 'dc'
   | 'encounter.ref'
   | 'encounter.budget'
@@ -81,6 +88,46 @@ export interface ValidateMissionOptions {
 /** Node ids in rank order, ties broken by id. Shared by resolution, projection and coverage checks. */
 export function topologicalOrder(mission: Mission): ReadonlyArray<string> {
   return sortByRankThenId(mission.nodes).map((node) => node.id);
+}
+
+/**
+ * The haul: the most loot any start→end path can bank (D-45). A check banks
+ * its loot when the path leaves it by `pass` or `always`, and nothing when it
+ * leaves by `fail`. Only nodes reached from the start through edges that go
+ * up in rank count, so it never throws; it is 0 when no end is reached.
+ * Scores are loot ÷ haul, so a mission that passed the `haul` rule scores
+ * loot ÷ the season's fixed haul.
+ */
+export function missionHaul(mission: Mission): number {
+  let haul = haulCache.get(mission);
+  if (haul === undefined) {
+    haul = computeHaul(mission);
+    haulCache.set(mission, haul);
+  }
+  return haul;
+}
+
+/** Missions are immutable values, so a mission object's haul never changes. Runs and replays call `missionHaul` per run. */
+const haulCache = new WeakMap<Mission, number>();
+
+function computeHaul(mission: Mission): number {
+  const start = mission.nodes.find((node) => node.kind === 'start');
+  if (start === undefined) return 0;
+  const byId = new Map<string, MissionNode>();
+  for (const node of mission.nodes) if (!byId.has(node.id)) byId.set(node.id, node);
+  const ordered = sortByRankThenId([...byId.values()]);
+  const edges = mission.edges.filter((edge) => {
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    return from !== undefined && to !== undefined && to.rank > from.rank;
+  });
+  const best = maxLoot(start, ordered, edges);
+  let haul = 0;
+  for (const node of ordered) {
+    const stat = node.kind === 'end' ? best.get(node.id) : undefined;
+    if (stat !== undefined && stat.value > haul) haul = stat.value;
+  }
+  return haul;
 }
 
 /**
@@ -240,7 +287,7 @@ export function validateMission(
     }
   }
 
-  // scored and size (battles per path): only on a DAG with a single start.
+  // scored, haul and size (battles per path): only on a DAG with a single start.
   if (start && !rankBroken) {
     for (const issue of pathIssues(start, ordered, liveEdges, rules)) report(issue.code, issue.message, issue.nodeId);
   }
@@ -337,7 +384,40 @@ interface PathStat {
 }
 
 /**
- * `scored` and battles-per-path, by DP in (rank, id) order. Requires every live
+ * For each node reached from start, the most loot banked on any path from
+ * start up to it, with the predecessor that achieved it. Loot is added on the
+ * edge out of a check that passed (`pass` or `always`). `edges` must all go up
+ * in rank, so (rank, id) order is topological.
+ */
+function maxLoot(
+  start: MissionNode,
+  ordered: ReadonlyArray<MissionNode>,
+  edges: ReadonlyArray<MissionEdge>,
+): ReadonlyMap<string, PathStat> {
+  const byId = new Map(ordered.map((node) => [node.id, node] as const));
+  const incoming = new Map<string, MissionEdge[]>();
+  for (const edge of edges) {
+    const list = incoming.get(edge.to);
+    if (list) list.push(edge);
+    else incoming.set(edge.to, [edge]);
+  }
+  const best = new Map<string, PathStat>();
+  for (const node of ordered) {
+    if (node.id === start.id) {
+      best.set(node.id, { value: 0, prev: undefined });
+      continue;
+    }
+    for (const edge of incoming.get(node.id) ?? []) {
+      const from = byId.get(edge.from);
+      const banked = from?.kind === 'check' && edge.on !== 'fail' ? from.loot : 0;
+      relax(best, node.id, edge.from, banked, (a, b) => a > b);
+    }
+  }
+  return best;
+}
+
+/**
+ * `scored`, `haul` and battles-per-path, by DP in (rank, id) order. Requires every live
  * edge to increase rank, so that order is topological.
  */
 function pathIssues(
@@ -376,6 +456,24 @@ function pathIssues(
 
   const issues: Array<{ code: MissionIssueCode; nodeId: string; message: string }> = [];
   const { min, max } = rules.battlesPerPath;
+
+  if (rules.haul !== undefined) {
+    const loot = maxLoot(start, ordered, liveEdges);
+    let bestEnd: { readonly id: string; readonly value: number } | undefined;
+    for (const end of ordered) {
+      const stat = end.kind === 'end' ? loot.get(end.id) : undefined;
+      if (stat !== undefined && (bestEnd === undefined || stat.value > bestEnd.value)) bestEnd = { id: end.id, value: stat.value };
+    }
+    if (bestEnd !== undefined && bestEnd.value !== rules.haul) {
+      issues.push({
+        code: 'haul',
+        nodeId: bestEnd.id,
+        message:
+          `The best path ${tracePath(loot, bestEnd.id)} banks ${bestEnd.value} loot, but every mission this season must pay a ` +
+          `fixed haul of ${rules.haul} on its best path. Adjust the checks' \`loot\` so the best path sums to ${rules.haul}.`,
+      });
+    }
+  }
   for (const end of ordered) {
     if (end.kind !== 'end') continue;
     const checks = minChecks.get(end.id);

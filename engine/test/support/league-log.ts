@@ -50,6 +50,7 @@ export function miniConfig(overrides: Partial<SeasonConfig> = {}): SeasonConfig 
       maxRank: 8,
       battlesPerPath: { min: 0, max: 3 },
       encounterCrRatio: 1,
+      haul: 100,
       battleModel: 'constant-0.6',
     },
     carryover: { mode: 'keeper', keepersPerTavern: 1, keeperCost: 'round_of_last_season_pick', championBonusKeepers: 1, maxModifierChangePoints: 1 },
@@ -77,14 +78,14 @@ export function schedule(): PayloadByType['season.created']['schedule'] {
   ];
 }
 
-/** start → survival check; pass → end, fail → battle → end. */
+/** start → survival check (100 loot, the haul); pass → end, fail → battle → end. */
 export function missionFor(week: number): Mission {
   return {
     schemaVersion: 1,
     id: `mission-w${week}`,
     season: SEASON,
     environment: 'swamp',
-    nodes: [start(), skillCheck('find-path', 1, 'survival', 11), battle('bog', 2), end('crossed', 3)],
+    nodes: [start(), skillCheck('find-path', 1, 'survival', 11, 100), battle('bog', 2), end('crossed', 3)],
     edges: [edge('start', 'find-path', 'always'), edge('find-path', 'crossed', 'pass'), edge('find-path', 'bog', 'fail'), edge('bog', 'crossed', 'win')],
   };
 }
