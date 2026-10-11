@@ -37,6 +37,20 @@ import type {
   RunResult,
 } from '@league-of-taverns/engine';
 import { SeasonSession, aggregate, runMockSeason, runSeed, type MockSeasonResult, type RunSummary } from '../season-runner';
+import {
+  ReportContext,
+  aggregateLuck,
+  benchReport,
+  luckReport,
+  luckSeason,
+  titleOdds,
+  type BenchOption,
+  type BenchRow,
+  type LuckAggregate,
+  type LuckRow,
+  type LuckSeason,
+  type TitleOddsPoint,
+} from '../reports';
 import { seasonInputFromData, type PlaygroundData } from './data';
 import {
   actorLabel,
@@ -94,8 +108,8 @@ function environmentOf(week: number): string {
 
 // ── page state ─────────────────────────────────────────────────────────────
 
-type Tab = 'play' | 'standings' | 'weeks' | 'lab' | 'draft' | 'pool' | 'events' | 'batch';
-const TABS: ReadonlyArray<Tab> = ['play', 'standings', 'weeks', 'lab', 'draft', 'pool', 'events', 'batch'];
+type Tab = 'play' | 'standings' | 'reports' | 'weeks' | 'lab' | 'draft' | 'pool' | 'events' | 'batch';
+const TABS: ReadonlyArray<Tab> = ['play', 'standings', 'reports', 'weeks', 'lab', 'draft', 'pool', 'events', 'batch'];
 
 interface Run {
   readonly seed: string;
@@ -121,6 +135,8 @@ const lab = {
   seeded: false,
 };
 const draftUi = { hot: null as string | null };
+/** The bench detail's tavern, and the run it was picked in (a new run resets it to your tavern, else the top row). */
+const reportsUi = { tavern: '', run: null as Run | null };
 const poolUi = { filter: '', sort: 'pool' as 'pool' | 'cr' | 'owner' };
 const eventsUi = { type: 'all', text: '', open: new Set<number>() };
 const batchUi = {
@@ -130,6 +146,7 @@ const batchUi = {
   total: 0,
   seed: '',
   summaries: [] as RunSummary[],
+  luck: [] as LuckSeason[],
   ms: 0,
   token: 0,
   error: null as string | null,
@@ -364,6 +381,9 @@ function renderTab(): void {
     case 'standings':
       panel.innerHTML = renderStandings(run);
       break;
+    case 'reports':
+      panel.innerHTML = renderReports(run);
+      break;
     case 'weeks':
       panel.innerHTML = renderWeeks(run);
       break;
@@ -427,6 +447,253 @@ function renderStandings(r: Run): string {
     `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>bot</th><th class="n">loot</th><th class="n">weekly</th></tr></thead><tbody>${rows}</tbody></table></div>` +
     `<p class="hint">Ranked by total loot. Equal totals share a rank; there are no tiebreakers.</p></section>` +
     `<section class="card"><h2>Weekly tables</h2>${weeks}</section>`
+  );
+}
+
+// ── reports ────────────────────────────────────────────────────────────────
+
+interface Reports {
+  readonly odds: ReadonlyArray<TitleOddsPoint>;
+  readonly luck: ReadonlyArray<LuckRow>;
+  readonly bench: ReadonlyArray<BenchRow>;
+  readonly ms: number;
+}
+/** One report per run object, computed when the Reports tab first shows it. */
+const reportCache = new WeakMap<Run, Reports>();
+
+function reportsOf(r: Run): Reports {
+  let rep = reportCache.get(r);
+  if (rep === undefined) {
+    const started = performance.now();
+    const ctx = new ReportContext(input, r.result.summary.taverns, r.result.events, r.result.state);
+    rep = { odds: titleOdds(ctx, { seed: r.seed }), luck: luckReport(ctx), bench: benchReport(ctx), ms: performance.now() - started };
+    reportCache.set(r, rep);
+  }
+  return rep;
+}
+
+/** Each tavern's series colour (`--s1`…`--s8`), fixed by managers-file order so it never follows rank. */
+function seriesVar(tavern: string): string {
+  const i = input.taverns.findIndex((t) => t.id === tavern);
+  return `var(--s${(i < 0 ? 0 : i % 8) + 1})`;
+}
+
+function swatch(tavern: string): string {
+  return `<i class="swatch" style="background:${seriesVar(tavern)}"></i>`;
+}
+
+const signedFixed = (x: number, digits = 1): string => (Math.abs(x) < 0.5 * 10 ** -digits ? (0).toFixed(digits) : signed(Number(x.toFixed(digits))));
+
+function renderReports(r: Run): string {
+  const rep = reportsOf(r);
+  return (
+    `<p class="hint">${r.played === true ? 'Your played season' : `Seed ${esc(r.seed)}`}, ${config.weeks} weeks. Computed in ${num(rep.ms.toFixed(0))} ms.</p>` +
+    renderTitleOdds(rep.odds) +
+    renderLuck(rep.luck) +
+    renderBench(rep.bench)
+  );
+}
+
+function renderTitleOdds(odds: ReadonlyArray<TitleOddsPoint>): string {
+  const head = '<h2>Title odds</h2>';
+  if (odds.length === 0) return `<section class="card">${head}<p class="muted">After the draft.</p></section>`;
+  const weeks = config.weeks;
+  const taverns = input.taverns.map((t) => t.id);
+  const last = odds.at(-1)!;
+  const order = [...taverns].sort((a, b) => last.odds.get(b)! - last.odds.get(a)! || taverns.indexOf(a) - taverns.indexOf(b));
+  const label = (k: number): string => (k === 0 ? 'draft' : `W${k}`);
+
+  // Chart: x = after the draft, after each week; y = P(title).
+  const W = 720;
+  const H = 260;
+  const m = { l: 40, r: 150, t: 12, b: 28 };
+  const x = (k: number): number => m.l + ((W - m.l - m.r) * k) / Math.max(1, weeks);
+  const y = (p: number): number => m.t + (H - m.t - m.b) * (1 - p);
+  const grid = [0, 0.25, 0.5, 0.75, 1]
+    .map((p) => `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${y(p)}" y2="${y(p)}"/><text class="tick" x="${m.l - 6}" y="${y(p) + 4}" text-anchor="end">${p * 100}%</text>`)
+    .join('');
+  const xTicks = Array.from({ length: weeks + 1 }, (_, k) => `<text class="tick" x="${x(k)}" y="${H - 8}" text-anchor="middle">${label(k)}</text>`).join('');
+  const lines = taverns
+    .map((t) => {
+      const pts = odds.map((p) => `${x(p.afterWeek).toFixed(1)},${y(p.odds.get(t)!).toFixed(1)}`).join(' ');
+      const dots = odds.map((p) => `<circle cx="${x(p.afterWeek).toFixed(1)}" cy="${y(p.odds.get(t)!).toFixed(1)}" r="3.5"/>`).join('');
+      return `<g class="series" style="--c:${seriesVar(t)}"><polyline points="${pts}"/>${dots}</g>`;
+    })
+    .join('');
+  // Direct labels at the latest point, pushed apart and kept inside the plot.
+  const ends = order.map((t) => ({ t, y: y(last.odds.get(t)!) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) ends[i]!.y = Math.max(ends[i]!.y, ends[i - 1]!.y + 13);
+  for (let i = ends.length - 1; i >= 0; i--) ends[i]!.y = Math.min(ends[i]!.y, i === ends.length - 1 ? H - m.b : ends[i + 1]!.y - 13);
+  const endLabels = ends
+    .map(({ t, y: ly }) => `<text class="end" x="${x(last.afterWeek) + 8}" y="${(ly + 4).toFixed(1)}">${esc(clip(tavernName(t), 18))} ${pct(last.odds.get(t)!, 0)}</text>`)
+    .join('');
+  // Hover: one hit column per point, with every tavern's odds in its tooltip.
+  const colW = (W - m.l - m.r) / Math.max(1, weeks);
+  const hits = odds
+    .map((p) => {
+      const tip = `After ${p.afterWeek === 0 ? 'the draft' : `week ${p.afterWeek}`}\n${[...taverns]
+        .sort((a, b) => p.odds.get(b)! - p.odds.get(a)!)
+        .map((t) => `${tavernName(t)}: ${pct(p.odds.get(t)!)} · ${p.expectedPoints.get(t)!.toFixed(0)} loot expected`)
+        .join('\n')}`;
+      return `<rect class="hit" x="${x(p.afterWeek) - colW / 2}" y="${m.t}" width="${colW}" height="${H - m.t - m.b}"><title>${esc(tip)}</title></rect>`;
+    })
+    .join('');
+  const svg = `<div class="scroll"><svg class="odds" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Title odds after the draft and each week">${grid}${xTicks}${lines}${endLabels}${hits}</svg></div>`;
+  const legend = `<div class="legend">${taverns.map((t) => `<span>${swatch(t)}${esc(tavernName(t))}</span>`).join('')}</div>`;
+
+  const cols = odds.map((p) => `<th class="n">${label(p.afterWeek)}</th>`).join('');
+  const rows = order
+    .map((t) => {
+      const cells = odds
+        .map((p, i) => {
+          const v = p.odds.get(t)!;
+          const prev = i === 0 ? null : odds[i - 1]!.odds.get(t)!;
+          const move = prev === null || Math.abs(v - prev) < 0.005 ? '' : ` <span class="small ${v > prev ? 'pass' : 'fail'}">${v > prev ? '▲' : '▼'}</span>`;
+          return `<td class="n" style="background:color-mix(in srgb, var(--brass-soft) ${(100 * v).toFixed(0)}%, transparent)">${pct(v, 0)}${move}</td>`;
+        })
+        .join('');
+      return `<tr><td>${swatch(t)}<b>${esc(tavernName(t))}</b> <span class="tag">${esc(botOf(t))}</span></td>${cells}<td class="n">${last.expectedPoints.get(t)!.toFixed(0)}</td></tr>`;
+    })
+    .join('');
+  return (
+    `<section class="card">${head}${legend}${svg}` +
+    `<div class="scroll"><table><thead><tr><th>tavern</th>${cols}<th class="n">final loot</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+    `<p class="hint">After the draft and after each week, 2,000 simulated finishes. Played weeks count as played. Each remaining week every tavern fields what its own lineup strategy would pick from its roster at that point (yours: the best projection) and draws its loot from that lineup's exact distribution, home bonus included. Future waivers aren't modeled. The top total wins; a tie shares the title. <b>Final loot</b> is the expected season total from the latest point.</p></section>`
+  );
+}
+
+function renderLuck(luck: ReadonlyArray<LuckRow>): string {
+  const head = '<h2>Luck index</h2>';
+  if (luck.every((l) => l.weeks.length === 0)) return `<section class="card">${head}<p class="muted">After the first week.</p></section>`;
+  const span = Math.max(1, ...luck.map((l) => Math.abs(l.pointsAbove)));
+  const bar = (v: number): string => {
+    const w = (50 * Math.abs(v)) / span;
+    return `<div class="dbar" title="${signedFixed(v)} loot vs projection"><i class="${v >= 0 ? 'up' : 'down'}" style="${v >= 0 ? 'left:50%' : 'right:50%'};width:${w.toFixed(1)}%"></i></div>`;
+  };
+  const rows = luck
+    .map((l) => {
+      const weekly = l.weeks
+        .map(
+          (w) =>
+            `<span title="Week ${w.week}: ${w.points} vs ${w.projected.toFixed(1)} projected${w.home ? ' (home)' : ''}${w.percentile === null ? '' : `, ${pct(w.percentile, 0)} percentile`}" class="${w.points >= w.projected ? 'pass' : 'fail'}">${signedFixed(w.points - w.projected, 0)}</span>`,
+        )
+        .join(' ');
+      const moved = l.projectedRank - l.rank;
+      return (
+        `<tr><td>${swatch(l.tavern)}<b>${esc(tavernName(l.tavern))}</b></td>` +
+        `<td class="n">${signedFixed(l.pointsAbove)}</td><td style="min-width:120px">${bar(l.pointsAbove)}</td>` +
+        `<td class="n">${l.meanPercentile === null ? '–' : pct(l.meanPercentile, 0)}</td>` +
+        `<td class="n">${signedFixed(l.checksAbove, 2)}</td><td class="n">${signedFixed(l.battlesAbove, 2)}</td>` +
+        `<td class="n">${ordinal(l.rank)}</td><td class="n">${ordinal(l.projectedRank)}${moved === 0 ? '' : ` <span class="small ${moved > 0 ? 'pass' : 'fail'}">${moved > 0 ? '▲' : '▼'}${Math.abs(moved)}</span>`}</td>` +
+        `<td class="num small">${weekly}</td></tr>`
+      );
+    })
+    .join('');
+  return (
+    `<section class="card">${head}` +
+    `<div class="scroll"><table><thead><tr><th>tavern</th><th class="n">loot vs proj.</th><th></th><th class="n">pctile</th><th class="n">checks ±</th><th class="n">battles ±</th><th class="n">rank</th><th class="n">proj. rank</th><th>by week</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+    `<p class="hint"><b>Loot vs proj.</b> is the luck index: loot banked minus the exact projection, summed. <b>Pctile</b> is where each week's loot fell in that lineup's own distribution, averaged (50% = average dice). <b>Checks ±</b> and <b>battles ±</b> are rolls won minus their chances, over the rolls actually made. <b>Proj. rank</b> is where the tavern would stand had every tavern banked exactly its projection; the arrow is how far luck moved it.</p></section>`
+  );
+}
+
+function renderBench(bench: ReadonlyArray<BenchRow>): string {
+  const head = '<h2>Loot on the bench</h2>';
+  if (bench.every((b) => b.weeks.length === 0)) return `<section class="card">${head}<p class="muted">After the first week.</p></section>`;
+  const human = run?.result.summary.taverns.find((t) => t.bot === 'human')?.tavern;
+  if (reportsUi.run !== run || !bench.some((b) => b.tavern === reportsUi.tavern)) {
+    reportsUi.tavern = human ?? bench[0]!.tavern;
+    reportsUi.run = run;
+  }
+  const sameDice = bench.every((b) => b.weeks.every((w) => w.sameDice || w.played === null));
+  const rows = bench
+    .map(
+      (b) =>
+        `<tr class="click ${b.tavern === reportsUi.tavern ? 'sel' : ''}" data-action="rep-tavern" data-tavern="${esc(b.tavern)}">` +
+        `<td>${swatch(b.tavern)}<b>${esc(tavernName(b.tavern))}</b> <span class="tag">${esc(botOf(b.tavern))}</span></td>` +
+        `<td class="n">${b.projectedOnBench.toFixed(1)}</td><td class="n">${b.swapOnBench}</td><td class="n">${b.sameDiceOnBench}</td>` +
+        `<td class="n">${ordinal(b.rank)}${b.rankWithBest < b.rank ? ` <span class="pass">→ ${ordinal(b.rankWithBest)}</span>` : ''}</td></tr>`,
+    )
+    .join('');
+  const sel = bench.find((b) => b.tavern === reportsUi.tavern)!;
+  const ids = (xs: ReadonlyArray<string>): string => xs.map(esc).join(', ');
+  const diff = (o: BenchOption, points: number, projected: number, showStarters = true): string => {
+    const d = o.points === null ? null : o.points - points;
+    const dp = o.projected - projected;
+    return (
+      `${o.points === null ? '' : `${num(o.points)} <span class="small ${d! > 0 ? 'pass' : 'muted'}">(${signed(d!)})</span>`} ` +
+      `<span class="muted small">proj ${o.projected.toFixed(1)}${Math.abs(dp) >= 0.05 ? ` (${signedFixed(dp)})` : ''}</span>` +
+      (showStarters ? `<div class="small muted">${ids(o.starters)}</div>` : '')
+    );
+  };
+  const detail = sel.weeks
+    .map((w) => {
+      const same = (o: BenchOption): boolean => w.played !== null && o.starters.every((id) => w.played!.includes(id));
+      const better = (o: BenchOption): boolean => (o.points === null ? o.projected > w.projected + 0.05 : o.points > w.points);
+      const alt = (o: BenchOption | null): string =>
+        o === null
+          ? '<span class="muted">–</span>'
+          : same(o)
+            ? '<span class="muted">what was played</span>'
+            : !better(o)
+              ? '<span class="muted">none better</span>'
+              : diff(o, w.points, w.projected);
+      const swap =
+        w.bestSwap === null
+          ? '<span class="muted">no legal swap</span>'
+          : !better(w.bestSwap)
+            ? '<span class="muted">none better</span>'
+            : `<span class="fail">−${esc(w.bestSwap.out)}</span> <span class="pass">+${esc(w.bestSwap.in)}</span><div>${diff(w.bestSwap, w.points, w.projected, false)}</div>`;
+      const rank =
+        `${ordinal(w.rank)}` +
+        (w.rankWithBest !== null && w.rankWithBest < w.rank ? ` <span class="pass" title="With the best same-dice lineup, everyone else unchanged">→ ${ordinal(w.rankWithBest)}</span>` : '');
+      return (
+        `<tr><td class="n">${w.week}${w.home ? ' <span class="tag brass">home</span>' : ''}</td>` +
+        `<td class="wrap-ok">${w.played === null ? '<span class="muted">nobody</span>' : ids(w.played)}<div class="small muted">bench: ${w.bench.length === 0 ? '–' : ids(w.bench)}</div></td>` +
+        `<td class="n">${w.points}<div class="small muted">proj ${w.projected.toFixed(1)}</div></td>` +
+        `<td>${swap}</td><td class="wrap-ok">${alt(w.bestSameDice)}</td><td class="wrap-ok">${alt(w.bestProjected && { ...w.bestProjected, points: null })}</td><td class="n">${rank}</td></tr>`
+      );
+    })
+    .join('');
+  return (
+    `<section class="card">${head}` +
+    `<div class="scroll"><table><thead><tr><th>tavern</th><th class="n" title="Σ projected loot the best projected lineup had over the one played">proj. left</th><th class="n" title="Σ same-dice loot the best single swap would have added">best swap</th><th class="n" title="Σ same-dice loot the best lineup would have added">hindsight</th><th class="n" title="Season rank, and with every week's best same-dice lineup">rank</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+    `<h3>${swatch(sel.tavern)}${esc(tavernName(sel.tavern))} by week <span class="muted small">click a tavern above</span></h3>` +
+    `<div class="scroll"><table><thead><tr><th class="n">wk</th><th>played</th><th class="n">loot</th><th>best swap</th><th>best lineup, same dice</th><th>best lineup, projected</th><th class="n">week rank</th></tr></thead><tbody>${detail}</tbody></table></div>` +
+    `<p class="hint">A benched character never rolled, so there are two lenses. <b>Projected</b> compares exact expected loot: what the roster at the lock could have been expected to bank, the call you could have made before the dice. <b>Same dice</b> reruns the week's seed: every node of the mission has its own fixed roll, so another party meets the same d20s at the same nodes (it may take a different path and meet other nodes' rolls). That is hindsight with the luck held fixed. <b>Best swap</b> trades one starter for one bench character. The arrows show the rank the best same-dice lineup would have reached, everyone else unchanged. Bots already field the best projection, so their <b>proj. left</b> is 0.` +
+    (sameDice ? '' : ' Some weeks could not be replayed from their seed, so they show projections only.') +
+    `</p></section>`
+  );
+}
+
+function renderBatchLuck(l: LuckAggregate): string {
+  if (l.seasons === 0) return '';
+  const par = 1 / Math.max(1, l.taverns);
+  const top = Math.max(par, ...l.titlesByLuckRank, ...l.titlesBySkillRank);
+  const w = (x: number): string => `${((100 * x) / top).toFixed(1)}%`;
+  const bars = l.titlesByLuckRank
+    .map(
+      (luck, i) =>
+        `<div class="bar" title="The ${ordinal(i + 1)} luckiest tavern won ${pct(luck)} of titles; the ${ordinal(i + 1)} strongest by projection won ${pct(l.titlesBySkillRank[i]!)}">` +
+        `<span class="num">${ordinal(i + 1)}</span>` +
+        `<div class="track two"><div class="fill" style="width:${w(luck)}"></div><div class="fill alt" style="width:${w(l.titlesBySkillRank[i]!)}"></div><i class="par" style="left:${w(par)}"></i></div>` +
+        `<span class="num">${pct(luck, 0)} · ${pct(l.titlesBySkillRank[i]!, 0)}</span></div>`,
+    )
+    .join('');
+  const v = l.variance;
+  const botRows = Object.entries(l.byBot)
+    .map(([bot, b]) => `<tr><td>${esc(bot)}</td><td class="n">${b.seats}</td><td class="n">${signedFixed(b.pointsAbove)}</td><td class="n">${pct(b.percentile, 0)}</td></tr>`)
+    .join('');
+  return (
+    `<h3>Luck</h3>` +
+    `<div class="kv"><div><span class="label">luck's share of the table</span><span class="v">${pct(v.luck, 0)}</span></div>` +
+    `<div><span class="label">strength's share</span><span class="v">${pct(v.skill, 0)}</span></div>` +
+    `<div><span class="label">champion vs projection</span><span class="v">${signedFixed(l.champion.pointsAbove)} loot</span></div>` +
+    `<div><span class="label">champion's dice</span><span class="v">${pct(l.champion.percentile, 0)} pctile</span></div></div>` +
+    `<p class="small muted">A season's total loot is exactly its projected loot (strength) plus its loot above projection (luck). The shares split the spread of totals within a season${Math.abs(v.cov) >= 0.005 ? `, and add up to 100% with twice their covariance (${signedFixed(200 * v.cov, 0)}%)` : ''}.</p>` +
+    `<p class="small">Who won the title, by rank within the season. <span class="legend" style="display:inline-flex"><span><i></i>by luck (loot above projection)</span><span><i class="alt"></i>by strength (projected loot)</span><span><i class="par"></i>par ${pct(par, 0)}</span></span></p>` +
+    `<div class="bars luck-ranks">${bars}</div>` +
+    `<div class="scroll"><table><thead><tr><th>bot</th><th class="n">seats</th><th class="n">loot vs proj.</th><th class="n">pctile</th></tr></thead><tbody>${botRows}</tbody></table></div>` +
+    `<p class="hint">Per tavern-season means. Luck should wash out by manager: loot vs proj. near 0 and pctile near 50% for every bot. A bot that stays lucky over many seasons points to a bias in the projection, not a skill. Shared titles split between co-champions.</p>`
   );
 }
 
@@ -925,7 +1192,8 @@ function renderBatch(): string {
       `<p>Titles by seat: ${Object.entries(totals.titlesByTavern)
         .map(([t, n]) => `${esc(tavernName(t))} ${num(Number.isInteger(n) ? n : n.toFixed(1))}`)
         .join(', ')}</p>` +
-      `<p class="hint">${totals.runs} seasons from seed ${esc(b.seed)} in ${(b.ms / 1000).toFixed(2)} s (${(b.ms / totals.runs).toFixed(1)} ms/season). Same as <span class="mono">mock-season -- --runs ${totals.runs} --seed ${esc(b.seed)}</span>.</p>`;
+      `<p class="hint">${totals.runs} seasons from seed ${esc(b.seed)} in ${(b.ms / 1000).toFixed(2)} s (${(b.ms / totals.runs).toFixed(1)} ms/season, luck included). Same as <span class="mono">mock-season -- --runs ${totals.runs} --seed ${esc(b.seed)}</span>.</p>` +
+      renderBatchLuck(aggregateLuck(b.luck));
   }
   const progress = b.total === 0 ? 0 : (100 * b.done) / b.total;
   return (
@@ -948,6 +1216,7 @@ function startBatch(): void {
   b.total = n;
   b.done = 0;
   b.summaries = [];
+  b.luck = [];
   b.error = null;
   b.running = true;
   b.ms = 0;
@@ -958,7 +1227,9 @@ function startBatch(): void {
     const sliceStart = performance.now();
     try {
       while (b.done < b.total && performance.now() - sliceStart < 40) {
-        b.summaries.push(runMockSeason(input, { seed: runSeed(b.seed, b.done + 1) }).summary);
+        const res = runMockSeason(input, { seed: runSeed(b.seed, b.done + 1) });
+        b.summaries.push(res.summary);
+        b.luck.push(luckSeason(res.summary, luckReport(new ReportContext(input, res.summary.taverns, res.events, res.state))));
         b.done++;
       }
     } catch (e) {
@@ -1470,6 +1741,12 @@ panel.addEventListener('click', (ev) => {
       break;
     case 'lab-sample':
       labSample();
+      break;
+    case 'rep-tavern':
+      if (tavern !== undefined) {
+        reportsUi.tavern = tavern;
+        renderTab();
+      }
       break;
     case 'draft-hot':
       if (tavern !== undefined) {

@@ -28,3 +28,5 @@ export type { BotId } from './strategies';
 export { battleStrength, coveredSkills, poolInfo, referenceFoe, valueOf } from './metrics';
 export type { PoolInfo } from './metrics';
 export { checkFit, fitWeights } from './environment';
+export { legalSubsets, lineupFrom } from './view';
+export type { Subset } from './view';
