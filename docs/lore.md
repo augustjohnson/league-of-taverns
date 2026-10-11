@@ -58,6 +58,19 @@ These are not decided. Each one would need its own decision before it goes in.
 - **Mission shape.** Loot that grows with each check, and the hard battle late
   in the mission. A DNF then costs roughly half the haul, and the scrying ball
   gets a climax.
+- **Round-by-round battles.** Replace the black-box `pWin` (ev-ttk-v0) with
+  a battle simulated round by round, with real HP per combatant, so the log
+  knows who dropped and when. That opens rules like injuries: the last party
+  member standing in a TPK is unavailable the following week. Costs: the
+  exact projection no longer works (it would need sampling or a much harder
+  calculation), and injuries are a rules change with a knock-on to lineups.
+- **Sponsor gifts.** At season start each sponsor offers its tavern a choice
+  of one of three magic items (say a headband of intellect, a belt of
+  dwarvenkind, or Blackrazor), held by one character. Simple items map onto
+  the modifier registry (skill and save bonuses, advantage, senses,
+  `battle_bonus`). Ability-score items like the headband need the engine to
+  set ability scores. Items with active effects (Blackrazor) only make sense
+  with round-by-round battles. Close kin of boons and hexes above.
 - **Gods' tastes.** Each god's trial leans on its domain: the sea god writes
   swimming checks. That gives each tavern a reason to draft for its own week
   without adding a rule.
