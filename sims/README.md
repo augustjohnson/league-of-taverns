@@ -9,7 +9,9 @@ league doesn't use.
   `seasonParts` (a loaded season as plain JSON-safe data), `seasonInput`
   (parts → a run-ready `SeasonInput`), `prepareSeason` (both),
   `runMockSeason(input, { seed }) → { events, ndjson, state, summary, audit }`
-  and `aggregate`. Tests call it directly. It imports nothing from Node, so
+  and `aggregate`. `SeasonSession` is the same loop a step at a time, with
+  an optional human seat (player vs bots); `runMockSeason` is a session with
+  no human, driven straight through. Tests call it directly. It imports nothing from Node, so
   the browser playground bundles it.
 - `src/load.ts` reads a season folder through the scripts loaders
   (`@league-of-taverns/scripts/lib/*`, a workspace dependency).
@@ -60,6 +62,14 @@ Then open `sims/output/playground/index.html` directly in a browser (no server
 needed). The file is git-ignored and about 0.7 MB. It loads seed `sim-1` on
 open. The tabs:
 
+- **Play vs bots:** manage one tavern yourself against the bots. Pick a
+  tavern and a seed and start; draft when you are on the clock, then before
+  each week set a lineup (with `validateLineup`, the projection and the
+  mission graph live) and make waiver claims, and press Play week. The bots
+  draft, set lineups and claim through the same `SeasonSession`. Your tavern's
+  bot stays on as an advisor that can suggest a pick, a lineup or claims.
+  Your events carry a `manager` actor. When the season ends it is audited
+  like any run and loads into the other tabs.
 - **Run bar:** any seed, Run, New seed; event count, the replay check
   (`replayLog` deep-equals the built state), the verify check
   (`verifyResolutions` finds no mismatches), run time, the NDJSON sha256 and
