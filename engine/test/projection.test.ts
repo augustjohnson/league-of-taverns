@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { projectMission, type Projection } from '../src/projection';
+import { checkOdds, runMission } from '../src/resolution';
+import { rngFor } from '../src/rng';
+import { randomMission, randomParty } from './support/generators';
 // The engine has no YAML parser, so the example mission is read through the
 // scripts loader, as in missions.test.ts.
 import { loadMission } from '../../scripts/src/lib/repo';
@@ -165,5 +168,58 @@ describe('projection', () => {
     expect(projection.distribution).toEqual([[1, 1]]);
   });
 
-  it.todo('property: propagated mean equals the sampled mean of 20k seeded runs within 4 standard errors, over random legal missions and parties');
+});
+
+// T6.5.
+describe('projection property', () => {
+  const CASES = 200;
+  const N = 5000;
+
+  it(`propagated mean equals the sampled mean of ${N} seeded runs within 4 standard errors, over ${CASES} random legal missions and parties`, () => {
+    const failures: string[] = [];
+    let gated = 0;
+    let withAdvantage = 0;
+    let withDnf = 0;
+    for (let c = 0; c < CASES; c++) {
+      const gen = rngFor('projection-property', 'case:' + c);
+      const mission = randomMission(gen, `prop-${c}`);
+      const party = randomParty(gen);
+      const projection = projectMission(party, mission, baseOf, crModel);
+
+      // Internal consistency.
+      const ends = mission.nodes.filter((n) => n.kind === 'end').reduce((sum, n) => sum + (projection.reach[n.id] ?? 0), 0);
+      const fromDistribution = projection.distribution.reduce((sum, [score, p]) => sum + score * p, 0);
+      if (Math.abs(ends + projection.pDnf - 1) > 1e-9) failures.push(`case ${c}: end reach + pDnf = ${ends + projection.pDnf}`);
+      if (Math.abs(total(projection) - 1) > 1e-9) failures.push(`case ${c}: distribution sums to ${total(projection)}`);
+      if (Math.abs(fromDistribution - projection.expectedScore) > 1e-9) failures.push(`case ${c}: distribution mean ${fromDistribution}`);
+
+      // Sampled mean vs the exact mean, with the standard error from the exact distribution.
+      let sum = 0;
+      let dnfs = 0;
+      for (let k = 0; k < N; k++) {
+        const run = runMission(party, mission, (id) => rngFor(`prop-${c}-${k}`, 'roll:' + id), baseOf, crModel);
+        sum += run.score;
+        if (run.dnf) dnfs++;
+      }
+      const mean = sum / N;
+      const variance = projection.distribution.reduce((v, [score, p]) => v + p * (score - projection.expectedScore) ** 2, 0);
+      const se = Math.sqrt(variance / N);
+      if (Math.abs(mean - projection.expectedScore) > 4 * se + 1e-12) {
+        failures.push(`case ${c}: sampled ${mean} vs projected ${projection.expectedScore} (4 SE = ${4 * se})`);
+      }
+      const dnfSe = Math.sqrt((projection.pDnf * (1 - projection.pDnf)) / N);
+      if (Math.abs(dnfs / N - projection.pDnf) > 4 * dnfSe + 1e-12) {
+        failures.push(`case ${c}: sampled DNF ${dnfs / N} vs projected ${projection.pDnf} (4 SE = ${4 * dnfSe})`);
+      }
+
+      if (mission.nodes.some((n) => n.kind === 'check' && n.check.requires !== undefined)) gated++;
+      if (mission.nodes.some((n) => n.kind === 'check' && checkOdds(party, n.check).advantage)) withAdvantage++;
+      if (projection.pDnf > 0) withDnf++;
+    }
+    expect(failures).toEqual([]);
+    // The generator covers the interesting cases.
+    expect(gated).toBeGreaterThan(CASES / 10);
+    expect(withAdvantage).toBeGreaterThan(CASES / 10);
+    expect(withDnf).toBeGreaterThan(CASES / 4);
+  });
 });
