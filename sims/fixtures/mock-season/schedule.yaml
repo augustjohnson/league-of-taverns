@@ -1,20 +1,34 @@
 # Mock season schedule: one environment per week, so each mission in
 # missions/ maps to exactly one week by its environment.
+#
+# Sponsors: three weeks for six taverns, so only three taverns get a home
+# week (a real season has one week per tavern, D-48). Keep that in mind when
+# comparing bots: the home taverns are a random, a cr-greedy and a value seat.
 
 season: mock-season
+sponsors:
+  - id: the-thorn-mother
+    tavern: the-rusty-tankard
+  - id: the-drowned-lord
+    tavern: the-gilded-flagon
+  - id: the-storm-crow
+    tavern: the-sleeping-giant
 weeks:
   - week: 1
     title: The Thornwood Trail
     environment: forest
     theme: A bandit camp in the briars, and the road it has been taxing.
     commitment: null
+    sponsor: the-thorn-mother
   - week: 2
     title: The Saltmarsh Wreck
     environment: coast
     theme: False lights on the rocks, and what guards the hold.
     commitment: null
+    sponsor: the-drowned-lord
   - week: 3
     title: The Eyrie Pass
     environment: mountain
     theme: A storm on the pass and a gap only wings can cross.
     commitment: null
+    sponsor: the-storm-crow

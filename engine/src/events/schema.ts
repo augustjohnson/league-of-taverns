@@ -115,6 +115,7 @@ export const seasonConfigSchema = z.strictObject({
   }),
   scoring: z.strictObject({
     pointsScale: z.number().positive(),
+    homeBonus: z.number().positive(),
   }),
   waivers: z.strictObject({ priority: z.literal('rolling'), initialOrder: z.literal('reverse_draft') }),
   trades: z.strictObject({
@@ -160,8 +161,10 @@ export const payloadSchemas = {
         environment: text,
         theme: z.string(),
         commitment: sha256HexSchema.nullable(),
+        sponsor: kebabIdSchema.nullable(),
       }),
     ),
+    sponsors: z.array(z.strictObject({ id: kebabIdSchema, tavern: kebabIdSchema })),
   }),
   'character.pooled': z.strictObject({
     character: kebabIdSchema,

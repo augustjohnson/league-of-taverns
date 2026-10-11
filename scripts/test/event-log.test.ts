@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { InvalidEventError, LogParseError, ReplayError, lineHash, replayLog } from '@league-of-taverns/engine';
 import type { Actor, EventOf, EventType, LeagueEvent } from '@league-of-taverns/engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AT, COMMISSIONER, POOL, SEASON, miniConfig, schedule } from '../../engine/test/support/league-log';
+import { AT, COMMISSIONER, POOL, SEASON, miniConfig, schedule, sponsors } from '../../engine/test/support/league-log';
 import { ValidationFailure } from '../src/lib/main';
 import { appendEvent, eventLogPath, readEventLog, type EventDraft } from '../src/lib/repo';
 
@@ -24,7 +24,7 @@ function draft<T extends EventType>(type: T, payload: EventOf<T>['payload'], act
   return { v: 1, type, season: SEASON, at: AT, actor, payload } as EventDraft;
 }
 
-const created = draft('season.created', { config: miniConfig(), configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule() });
+const created = draft('season.created', { config: miniConfig(), configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors() });
 const pooled = (i: number) => draft('character.pooled', { character: POOL[i]!.id, base: 'ogre', cr: POOL[i]!.cr, modifiers: [] });
 const joined = (tavern: string, githubId: number) => draft('tavern.joined', { tavern, name: tavern, manager: { githubId, login: `m${githubId}` } });
 

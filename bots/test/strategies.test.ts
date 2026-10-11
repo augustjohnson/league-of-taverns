@@ -51,7 +51,7 @@ function configWith(partyCr: number, size = 7, weeks = 6): SeasonConfig {
     budget: { partyCr: partyCr as CrEighths, modifierPointsPerCharacter: 3 },
     roster: { size, starters: 4, ownership: 'exclusive' },
     draft: { format: 'snake', rounds: size, order: { mode: 'seeded' }, pickWindowHours: 24, onTimeout: 'autopick' },
-    scoring: { pointsScale: 100 },
+    scoring: { pointsScale: 100, homeBonus: 1.25 },
     waivers: { priority: 'rolling', initialOrder: 'reverse_draft' },
     trades: { vetoWindowHours: 24, vetoBy: 'commissioner', deadlineWeek: 4 },
     missedLineup: 'carry_over',

@@ -2,7 +2,7 @@
  * Selectors: derived views over `LeagueState`. Pure, never stored
  * (docs/schema.md § Reducers, "Derived views").
  */
-import { standings, type StandingRow, type WeekResult } from '../league';
+import { sponsoredTavern, standings, type StandingRow, type WeekResult } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
 import type { LeagueState } from './state';
@@ -37,6 +37,11 @@ export function onTheClock(state: LeagueState): string | null {
     }
   }
   return snakePickOwner(order, state.draft.picks);
+}
+
+/** The home tavern for `week`: the one whose sponsor set its mission, or null (no sponsor, or no season). */
+export function homeTavern(state: LeagueState, week: number): string | null {
+  return sponsoredTavern(state.sponsors, state.schedule, week);
 }
 
 /**

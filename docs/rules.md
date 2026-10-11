@@ -101,8 +101,9 @@
 - **Home bonus:** on its sponsor's mission, a tavern's loot × 1.25 **[D-47]**.
 - In the engine, score = loot ÷ haul and points = round(score ×
   `pointsScale`). With the haul and `pointsScale` both 100, points equal loot.
-- *The home bonus is not in the engine yet:* it needs a sponsor for each
-  tavern and week in the season config.
+- **Sponsors come from the GM's season package:** `schedule.yaml` names
+  each god, the tavern it backs and the week it sets; `config.yaml` sets the
+  bonus (`scoring.homeBonus`). Projected points include the bonus too.
 - Each week runs **once**, as a single real random roll per check and battle
   **[D-13, details to come]**. The rolls are recorded in the event log, so the
   result is final and auditable, though not re-derivable from a seed.

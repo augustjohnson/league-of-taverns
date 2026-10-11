@@ -14,7 +14,7 @@ import type { Mission, Open5eMonster } from '@league-of-taverns/engine';
 import { seasonInput, type SeasonInput, type SeasonParts } from '../season-runner';
 
 /** Bumped when the shape changes. */
-export const PLAYGROUND_DATA_VERSION = 1;
+export const PLAYGROUND_DATA_VERSION = 2;
 
 /** Everything the page needs, JSON-safe. A `SeasonParts` with the snapshot trimmed to the records it uses. */
 export interface PlaygroundData extends SeasonParts {
@@ -53,6 +53,7 @@ export function serializeSeason(parts: SeasonParts, source: string): PlaygroundD
     configSha256: parts.configSha256,
     engineVersion: parts.engineVersion,
     schedule: parts.schedule,
+    sponsors: parts.sponsors,
     pool: parts.pool,
     taverns: parts.taverns,
     commissioner: parts.commissioner,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { standings, type SeasonConfig, type WeekResult } from '../src/league';
+import { projectedPoints, runPoints, sponsoredTavern, standings, validateSponsors, type SeasonConfig, type WeekResult } from '../src/league';
 import { draftOrder, snakePickOwner } from '../src/roster';
 import type { Rng } from '../src/rng';
 import type { CrEighths } from '../src/vocabulary';
@@ -26,7 +26,7 @@ function makeConfig(overrides: { order?: SeasonConfig['draft']['order'] } = {}):
     budget: { partyCr: (12 * 8) as CrEighths, modifierPointsPerCharacter: 3 },
     roster: { size: 7, starters: 4, ownership: 'exclusive' },
     draft: { format: 'snake', rounds: 7, order: overrides.order ?? { mode: 'seeded' }, pickWindowHours: 24, onTimeout: 'autopick' },
-    scoring: { pointsScale: 100 },
+    scoring: { pointsScale: 100, homeBonus: 1.25 },
     waivers: { priority: 'rolling', initialOrder: 'reverse_draft' },
     trades: { vetoWindowHours: 24, vetoBy: 'commissioner', deadlineWeek: 4 },
     missedLineup: 'carry_over',
@@ -152,5 +152,44 @@ describe('standings', () => {
 
   it('rejects duplicate results for one tavern-week', () => {
     expect(() => standings(['h'], [result(1, 'h', 1), result(1, 'h', 2)])).toThrow(/duplicate/);
+  });
+});
+
+describe('sponsors and the home bonus', () => {
+  const gods = [
+    { id: 'the-sea', tavern: 'a' },
+    { id: 'the-sky', tavern: 'b' },
+  ];
+  const weeks = [
+    { week: 1, sponsor: 'the-sea' },
+    { week: 2, sponsor: null },
+    { week: 3, sponsor: 'the-sky' },
+  ];
+
+  it('finds each week\'s home tavern; unsponsored or unknown weeks have none', () => {
+    expect([1, 2, 3, 4].map((w) => sponsoredTavern(gods, weeks, w))).toEqual(['a', null, 'b', null]);
+  });
+
+  it('accepts a valid package, including unsponsored weeks and sponsors without a week', () => {
+    expect(validateSponsors(gods, weeks)).toEqual([]);
+    expect(validateSponsors([...gods, { id: 'the-earth', tavern: 'c' }], weeks)).toEqual([]);
+    expect(validateSponsors([], [{ week: 1, sponsor: null }])).toEqual([]);
+  });
+
+  it('flags duplicate gods, two gods on one tavern, unknown sponsors and a god on two weeks', () => {
+    const codes = (s: Parameters<typeof validateSponsors>[0], w: Parameters<typeof validateSponsors>[1]) => validateSponsors(s, w).map((i) => i.code);
+    expect(codes([...gods, { id: 'the-sea', tavern: 'c' }], weeks)).toEqual(['duplicate_sponsor']);
+    expect(codes([...gods, { id: 'the-earth', tavern: 'a' }], weeks)).toEqual(['duplicate_tavern']);
+    expect(codes(gods, [...weeks, { week: 4, sponsor: 'the-moon' }])).toEqual(['unknown_sponsor']);
+    expect(codes(gods, [...weeks, { week: 4, sponsor: 'the-sea' }])).toEqual(['sponsor_reused']);
+  });
+
+  it('scales points by homeBonus at home only; homeBonus 1 turns it off', () => {
+    const scoring = { pointsScale: 100, homeBonus: 1.25 };
+    expect(runPoints(0.7, scoring, false)).toBe(70);
+    expect(runPoints(0.7, scoring, true)).toBe(88); // 87.5 rounds half up
+    expect(runPoints(0.7, { ...scoring, homeBonus: 1 }, true)).toBe(70);
+    expect(projectedPoints(0.5, scoring, true)).toBe(62.5);
+    expect(projectedPoints(0.5, scoring, false)).toBe(50);
   });
 });

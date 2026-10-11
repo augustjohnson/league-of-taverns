@@ -17,13 +17,14 @@
  */
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
+import { runPoints, sponsoredTavern } from '../league';
 import { missionHaul, type Mission, type MissionNode } from '../missions';
 import { formatIssuePath } from '../missions/schema';
 import { lootScore, missionGraph } from '../resolution';
 import { InvalidEventError, applyEvent, initialState } from './reducers';
 import { eventSchema } from './schema';
 import type { LeagueState } from './state';
-import type { LeagueEvent } from './types';
+import type { LeagueEvent, PayloadByType } from './types';
 
 /** A log line that is not valid JSON or does not match the event schema. */
 export class LogParseError extends Error {
@@ -207,7 +208,9 @@ export interface ResolutionMismatch {
  * - `dnf`, `checksPassed`, `checksAttempted`, `loot` (the `loot` of each
  *   passed check) and `score` (`lootScore(loot, missionHaul(mission))`, DNF
  *   or not) match the walk.
- * - `points` = round(score × `scoring.pointsScale`) from `season.created`.
+ * - `points` = `runPoints(score, scoring, home)` from `season.created`'s
+ *   scoring, where home means the tavern's sponsor set this week's mission
+ *   (D-47).
  *
  * Returns one entry per mismatch, in log order. If the walk itself breaks (a
  * record for the wrong node, or an outcome with no edge), that is reported
@@ -216,9 +219,9 @@ export interface ResolutionMismatch {
 export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyArray<ResolutionMismatch> {
   const mismatches: ResolutionMismatch[] = [];
   const revealed = new Map<number, Mission>();
-  let pointsScale: number | null = null;
+  let season: PayloadByType['season.created'] | null = null;
   for (const event of events) {
-    if (event.type === 'season.created') pointsScale = event.payload.config.scoring.pointsScale;
+    if (event.type === 'season.created') season = event.payload;
     if (event.type === 'mission.revealed') revealed.set(event.payload.week, event.payload.mission);
     if (event.type !== 'mission.resolved') continue;
     const { week, tavern, run, lineup } = event.payload;
@@ -226,9 +229,14 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
       mismatches.push({ seq: event.seq, week, tavern, field, message });
     };
 
-    if (pointsScale !== null) {
-      const points = Math.round(run.score * pointsScale);
-      if (event.payload.points !== points) report('points', `points ${event.payload.points} should be round(${run.score} × ${pointsScale}) = ${points}`);
+    if (season !== null) {
+      const { scoring } = season.config;
+      const home = sponsoredTavern(season.sponsors, season.schedule, week) === tavern;
+      const points = runPoints(run.score, scoring, home);
+      if (event.payload.points !== points) {
+        const factors = `${run.score} × ${scoring.pointsScale}${home ? ` × ${scoring.homeBonus} (home)` : ''}`;
+        report('points', `points ${event.payload.points} should be round(${factors}) = ${points}`);
+      }
     }
     const mission = revealed.get(week);
     if (mission === undefined) {

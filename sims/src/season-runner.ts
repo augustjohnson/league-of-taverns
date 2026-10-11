@@ -34,14 +34,17 @@ import {
   cyrb128,
   effectiveStats,
   freeAgents,
+  homeTavern,
   initialState,
   lineHash,
   onTheClock,
   projectMission,
+  projectedPoints,
   replayLog,
   resolveWaivers,
   rngFor,
   runMission,
+  runPoints,
   seasonStandings,
   standings,
   serializeEvent,
@@ -75,6 +78,7 @@ import { deepEqual } from './deep-equal';
 // ── input ──────────────────────────────────────────────────────────────────
 
 export type ScheduleEntry = PayloadByType['season.created']['schedule'][number];
+export type SponsorEntry = PayloadByType['season.created']['sponsors'][number];
 
 export interface SeasonInput {
   readonly config: SeasonConfig;
@@ -84,6 +88,8 @@ export interface SeasonInput {
   readonly engineVersion: string;
   /** The public schedule, with every `commitment` null (missions are open, D-08). */
   readonly schedule: ReadonlyArray<ScheduleEntry>;
+  /** The GM's sponsors: which god backs which tavern (D-44). */
+  readonly sponsors: ReadonlyArray<SponsorEntry>;
   /** In pool-file order: the order `character.pooled` events are written. */
   readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
   /** In managers-file order: the join order. */
@@ -117,7 +123,7 @@ export interface SeasonSource {
       readonly manager: { readonly bot: BotId } | { readonly login: string; readonly githubId: number | null };
     }>;
   };
-  readonly schedule: { readonly weeks: ReadonlyArray<ScheduleEntry> };
+  readonly schedule: { readonly sponsors: ReadonlyArray<SponsorEntry>; readonly weeks: ReadonlyArray<ScheduleEntry> };
 }
 
 /**
@@ -132,6 +138,8 @@ export interface SeasonParts {
   readonly engineVersion: string;
   /** The public schedule, with every `commitment` null (missions are open, D-08). */
   readonly schedule: ReadonlyArray<ScheduleEntry>;
+  /** The GM's sponsors: which god backs which tavern (D-44). */
+  readonly sponsors: ReadonlyArray<SponsorEntry>;
   /** In pool-file order. */
   readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
   /** In managers-file order. */
@@ -184,6 +192,7 @@ export function seasonParts(
     configSha256: lineHash(configText),
     engineVersion,
     schedule: loaded.schedule.weeks.map((week) => ({ ...week, commitment: null })),
+    sponsors: loaded.schedule.sponsors,
     pool,
     taverns,
     commissioner: githubId === null ? null : { githubId, login },
@@ -226,6 +235,7 @@ export function seasonInput(parts: SeasonParts): SeasonInput {
     configSha256: parts.configSha256,
     engineVersion: parts.engineVersion,
     schedule: parts.schedule,
+    sponsors: parts.sponsors,
     pool: parts.pool,
     taverns: parts.taverns,
     commissioner: parts.commissioner,
@@ -297,11 +307,15 @@ export interface TavernResult {
   readonly dnf: boolean | null;
   /** This week's rank by points, 1-based; equal points share a rank. */
   readonly rank: number;
+  /** True on this tavern's sponsor's week: its points include the home bonus. */
+  readonly home: boolean;
 }
 
 export interface WeekSummary {
   readonly week: number;
   readonly mission: string;
+  /** The tavern whose sponsor set this week's mission, or null. */
+  readonly home: string | null;
   readonly results: ReadonlyArray<TavernResult>;
   /** Claims made after this week's run and how they resolved. Empty after the last week. */
   readonly waivers: ReadonlyArray<{
@@ -599,6 +613,7 @@ export class SeasonSession {
     const run = base + 18 * HOUR + 15 * MINUTE;
     let r = 0;
     const { mission, sha256 } = scheduled;
+    const home = homeTavern(this.log.state, week);
     this.append('mission.revealed', { week, mission, sha256, salt: null }, system('weekly-run'), run + r++ * SECOND);
     for (const { tavern, lineup } of lineups) {
       if (lineup === null) continue;
@@ -618,9 +633,9 @@ export class SeasonSession {
           lineup,
           run: result,
           projected: { expectedScore: projection.expectedScore, pDnf: projection.pDnf },
-          points: Math.round(result.score * config.scoring.pointsScale),
+          points: runPoints(result.score, config.scoring, tavern === home),
           // Exact expected points (docs/rules.md §7), unrounded like the projection itself.
-          projectedPoints: projection.expectedScore * config.scoring.pointsScale,
+          projectedPoints: projectedPoints(projection.expectedScore, config.scoring, tavern === home),
         },
         system('weekly-run'),
         run + r++ * SECOND,
@@ -697,7 +712,7 @@ export class SeasonSession {
     let k = 0;
     this.append(
       'season.created',
-      { config: input.config, configSha256: input.configSha256, engineVersion: input.engineVersion, schedule: input.schedule },
+      { config: input.config, configSha256: input.configSha256, engineVersion: input.engineVersion, schedule: input.schedule, sponsors: input.sponsors },
       setupActor,
       preseason + k++ * SECOND,
     );
@@ -824,9 +839,11 @@ function summarize(
     const locked = state.lockedLineups.get(week) ?? [];
     const resolved = state.results.get(week);
     const rankOf = new Map(standings([], weekResults(state, week)).map((r) => [r.tavern, r.rank]));
+    const home = homeTavern(state, week);
     weeks.push({
       week,
       mission: state.revealed.get(week)?.id ?? '',
+      home,
       results: locked.map(({ tavern, lineup, source }) => {
         const r = resolved?.get(tavern);
         return {
@@ -840,6 +857,7 @@ function summarize(
           checksAttempted: r?.run.checksAttempted ?? 0,
           dnf: r === undefined ? null : r.run.dnf,
           rank: rankOf.get(tavern) ?? 1,
+          home: tavern === home,
         };
       }),
       waivers: waivers.get(week) ?? [],

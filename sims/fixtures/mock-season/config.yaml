@@ -31,6 +31,7 @@ draft:
 
 scoring:
   pointsScale: 100
+  homeBonus: 1.25
 
 waivers:
   priority: rolling

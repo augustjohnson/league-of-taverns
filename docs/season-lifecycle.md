@@ -27,8 +27,10 @@ offseason ─▶ candidates ─▶ validate + report ─▶ select ─▶ chrome
    keepers, the commissioner confirms, and kept characters must be in the new
    pool. Modifier changes on a keeper are capped (`carryover.maxModifierChangePoints`).
 5. **Config, managers, schedule.** Write `config.yaml`, `managers.yaml`
-   (GitHub ids), and `schedule.yaml`: week → title, environment, theme. **The
-   schedule is public the moment it merges.**
+   (GitHub ids), and `schedule.yaml`: week → title, environment, theme,
+   sponsor, plus the `sponsors` list (god → tavern, D-44/D-48). Set the home
+   bonus in `config.yaml` (`scoring.homeBonus`, D-47). **The schedule is
+   public the moment it merges.**
 
 ## 1. Mission candidates
 

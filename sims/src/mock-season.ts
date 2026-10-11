@@ -72,9 +72,15 @@ function print(season: string, seed: string, totals: Aggregate, summaries: Reado
     const only = summaries[0]!;
     console.log(`champion: ${only.champions.map((c) => `${c.tavern} (${c.bot})`).join(' and ')}`);
     for (const row of only.standings) {
-      const weekly = only.weeks.map((w) => w.results.find((r) => r.tavern === row.tavern)?.points ?? 0).join('/');
+      const weekly = only.weeks
+        .map((w) => {
+          const r = w.results.find((x) => x.tavern === row.tavern);
+          return `${r?.points ?? 0}${r?.home ? '*' : ''}`;
+        })
+        .join('/');
       console.log(`  ${row.rank}. ${row.tavern.padEnd(20)} ${row.bot.padEnd(15)} ${String(row.points).padStart(4)} pts (${weekly})`);
     }
+    console.log('  (* = home week: loot × scoring.homeBonus)');
   }
   const header = ['bot', 'seats', 'titles', 'titles/seat', 'week top%', 'mean pts', 'mean proj', 'DNF%'];
   const rows = Object.entries(totals.byBot).map(([bot, a]) => [

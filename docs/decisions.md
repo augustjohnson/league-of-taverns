@@ -130,8 +130,8 @@ problem.
 
 ### Story and scoring (2026-10-11)
 
-The story behind these is in [lore.md](lore.md). D-45 and D-46 are in the
-engine. D-47 and D-48 are not yet.
+The story behind these is in [lore.md](lore.md). D-45 to D-48 are in the
+engine.
 
 **D-44 Story frame: DECIDED (2026-10-11).**
 - Managers play barkeeps, each pushed around by a different god.
@@ -186,7 +186,11 @@ tavern's loot is multiplied by 1.25.
   ×1.5 50.5%; ×2 66.8%. Under the table a weekly top earns nothing by
   itself: the bonus is 25% of one week's loot, and every tavern gets one
   home week (D-48), so it evens out over a season.
-- *Needs:* a sponsor per tavern and per week in the season config.
+- *Built (2026-10-11):* the GM's season package sets it. `schedule.yaml`
+  lists `sponsors` (god id → tavern) and each week's `sponsor`, and
+  `config.yaml` sets `scoring.homeBonus` (1 turns it off). The engine only
+  applies it: `runPoints` and `projectedPoints` multiply at home, and
+  `verifyResolutions` audits it.
 
 **D-48 One mission per sponsor: DECIDED (2026-10-11).** The season has as many
 weeks as taverns, and each week is one sponsor's mission.
@@ -194,6 +198,12 @@ weeks as taverns, and each week is one sponsor's mission.
   missions are sealed. That means before the draft.
 - D-01 caps a 64-character pool at 9 taverns.
 - A mystery mission set by the GM is parked as an idea.
+- *Built (2026-10-11):* `validateSponsors` enforces one week per sponsor
+  and one sponsor per tavern, at load and at `season.created`. The first
+  `draft.pick` requires every sponsored tavern to have joined. A week with
+  `sponsor: null` is allowed (room for the mystery mission). That every
+  tavern gets exactly one week is not enforced yet; lock-check (T8.4) is
+  the place for it.
 
 ### Missions and secrecy
 

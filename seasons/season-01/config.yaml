@@ -29,7 +29,8 @@ draft:
   onTimeout: autopick               # OPEN D-26: autopick (bot strategy "value") | skip | wait
 
 scoring:
-  pointsScale: 100                  # points = round(score × 100); OPEN D-14
+  pointsScale: 100                  # points = round(score × 100 × home multiplier)
+  homeBonus: 1.25                   # D-47: loot × this on a tavern's sponsor's week (1 = off). Sponsors: schedule.yaml
 
 waivers:
   priority: rolling                 # OPEN D-05: successful claim moves you to the back

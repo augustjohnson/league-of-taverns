@@ -5,6 +5,9 @@
  * - Define `SeasonConfig`, the parsed and normalized form of
  *   seasons/<id>/config.yaml. The YAML loader lives in scripts/; this is the
  *   shape the engine receives (CR values already in eighths).
+ * - Sponsors and the home bonus (D-47, D-48): which tavern is home in a
+ *   week, and the points a run earns there. The GM's season package says
+ *   who sponsors whom and the bonus size. The engine only applies it.
  * - Rank taverns by total loot from finalized weeks (a league table, D-04).
  *
  * Standings are always derived from events and never stored.
@@ -35,8 +38,10 @@ export interface SeasonConfig {
     readonly onTimeout: 'autopick' | 'skip' | 'wait';
   };
   readonly scoring: {
-    /** Points = round(score × pointsScale). */
+    /** Points = round(score × pointsScale × homeBonus at home, else × 1). */
     readonly pointsScale: number;
+    /** Loot multiplier for a tavern on its sponsor's mission (D-47). 1 turns the bonus off. */
+    readonly homeBonus: number;
   };
   readonly waivers: { readonly priority: 'rolling'; readonly initialOrder: 'reverse_draft' };
   readonly trades: {
@@ -59,6 +64,77 @@ export interface SeasonConfig {
     readonly championBonusKeepers: number;
     readonly maxModifierChangePoints: number;
   };
+}
+
+/** A god from the GM's season package and the tavern it sponsors (D-44). Names and voice are chrome. */
+export interface Sponsor {
+  readonly id: string;
+  readonly tavern: string;
+}
+
+/** The part of a schedule entry sponsors care about. */
+export interface SponsoredWeek {
+  readonly week: number;
+  /** The sponsor whose mission this week is, or null for an unsponsored week. */
+  readonly sponsor: string | null;
+}
+
+export interface SponsorIssue {
+  readonly code: 'duplicate_sponsor' | 'duplicate_tavern' | 'unknown_sponsor' | 'sponsor_reused';
+  readonly message: string;
+}
+
+/**
+ * Check the season package's sponsors against its schedule:
+ * - sponsor ids are unique, and so are their taverns (one god per tavern);
+ * - every week's sponsor is a listed sponsor;
+ * - a sponsor sets at most one week's mission (D-48).
+ *
+ * A week with no sponsor, or a sponsor with no week, is allowed. Whether the
+ * taverns exist is checked where taverns are known (managers.yaml, the draft).
+ */
+export function validateSponsors(sponsors: ReadonlyArray<Sponsor>, schedule: ReadonlyArray<SponsoredWeek>): ReadonlyArray<SponsorIssue> {
+  const issues: SponsorIssue[] = [];
+  const ids = new Set<string>();
+  const taverns = new Map<string, string>();
+  for (const { id, tavern } of sponsors) {
+    if (ids.has(id)) issues.push({ code: 'duplicate_sponsor', message: `sponsor "${id}" is listed twice` });
+    ids.add(id);
+    const other = taverns.get(tavern);
+    if (other !== undefined) issues.push({ code: 'duplicate_tavern', message: `"${tavern}" is sponsored by both "${other}" and "${id}"` });
+    else taverns.set(tavern, id);
+  }
+  const weekOf = new Map<string, number>();
+  for (const { week, sponsor } of schedule) {
+    if (sponsor === null) continue;
+    if (!ids.has(sponsor)) issues.push({ code: 'unknown_sponsor', message: `week ${week} names sponsor "${sponsor}", which is not listed` });
+    const first = weekOf.get(sponsor);
+    if (first !== undefined) issues.push({ code: 'sponsor_reused', message: `sponsor "${sponsor}" sets both week ${first} and week ${week}` });
+    else weekOf.set(sponsor, week);
+  }
+  return issues;
+}
+
+/** The home tavern for `week`: the tavern its sponsor backs, or null for an unsponsored week. */
+export function sponsoredTavern(sponsors: ReadonlyArray<Sponsor>, schedule: ReadonlyArray<SponsoredWeek>, week: number): string | null {
+  const sponsor = schedule.find((w) => w.week === week)?.sponsor ?? null;
+  if (sponsor === null) return null;
+  return sponsors.find((s) => s.id === sponsor)?.tavern ?? null;
+}
+
+/** The points multiplier a tavern gets: `homeBonus` at home, else 1. */
+export function pointsMultiplier(scoring: SeasonConfig['scoring'], home: boolean): number {
+  return home ? scoring.homeBonus : 1;
+}
+
+/** A run's points: round(score × pointsScale × the home multiplier). */
+export function runPoints(score: number, scoring: SeasonConfig['scoring'], home: boolean): number {
+  return Math.round(score * scoring.pointsScale * pointsMultiplier(scoring, home));
+}
+
+/** Exact expected points, unrounded like the projection itself: expectedScore × pointsScale × the home multiplier. */
+export function projectedPoints(expectedScore: number, scoring: SeasonConfig['scoring'], home: boolean): number {
+  return expectedScore * scoring.pointsScale * pointsMultiplier(scoring, home);
 }
 
 /** One finalized week for one tavern, as read from `week.finalized`. */

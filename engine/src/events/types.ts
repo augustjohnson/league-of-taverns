@@ -1,5 +1,5 @@
 import type { Modifier } from '../characters';
-import type { SeasonConfig } from '../league';
+import type { SeasonConfig, Sponsor } from '../league';
 import type { Mission } from '../missions';
 import type { RunResult } from '../resolution';
 import type { Lineup } from '../roster';
@@ -46,8 +46,17 @@ export interface PayloadByType {
     /** sha256 of config.yaml at creation, so later edits are detectable. */
     readonly configSha256: string;
     readonly engineVersion: string;
-    /** Public schedule plus each week's sealed-mission commitment (docs/decisions.md D-08). */
-    readonly schedule: ReadonlyArray<{ readonly week: number; readonly title: string; readonly environment: string; readonly theme: string; readonly commitment: string | null }>;
+    /** Public schedule plus each week's sealed-mission commitment (docs/decisions.md D-08) and sponsor (D-48). */
+    readonly schedule: ReadonlyArray<{
+      readonly week: number;
+      readonly title: string;
+      readonly environment: string;
+      readonly theme: string;
+      readonly commitment: string | null;
+      readonly sponsor: string | null;
+    }>;
+    /** The gods of the GM's season package and the tavern each sponsors (D-44). */
+    readonly sponsors: ReadonlyArray<Sponsor>;
   };
   'character.pooled': {
     readonly character: string;

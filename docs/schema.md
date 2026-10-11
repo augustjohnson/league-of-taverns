@@ -235,7 +235,7 @@ The annotated example in the file is the reference. Key groups:
 | `budget` | `partyCr` (B), `modifierPointsPerCharacter` |
 | `roster` | `size`, `starters` (4), `ownership` |
 | `draft` | `format`, `rounds`, `order`, `pickWindowHours`, `onTimeout` |
-| `scoring` | `pointsScale` |
+| `scoring` | `pointsScale`, `homeBonus` (D-47; 1 = off) |
 | `waivers` | `priority`, `initialOrder` |
 | `trades` | `vetoWindowHours`, `vetoBy`, `deadlineWeek` |
 | `missedLineup` | `carry_over` |
@@ -249,7 +249,10 @@ governs, and CI flags later edits to the file.
 
 `managers.yaml`: `commissioner`, `gm`, and `taverns: [{ id, name, manager: { login, githubId } | { bot } }]`.
 
-`schedule.yaml`: `season`, `weeks: [{ week, title, environment, theme, commitment }]`.
+`schedule.yaml`: `season`, `sponsors: [{ id, tavern }]`, `weeks: [{ week, title, environment, theme, commitment, sponsor }]`.
+`sponsor` is a sponsor id or null. Each sponsor backs one tavern (in
+`managers.yaml`) and sets at most one week (D-48). On that week the tavern's
+points are × `scoring.homeBonus` (D-47). A god's name and voice are chrome.
 
 ---
 
@@ -280,7 +283,7 @@ governs, and CI flags later edits to the file.
 
 | Type | Actor | Payload | Preconditions (reducer rejects otherwise) |
 |---|---|---|---|
-| `season.created` | commissioner | `config`, `configSha256`, `engineVersion`, `schedule[{week,title,environment,theme,commitment}]` | first event, and only once |
+| `season.created` | commissioner | `config`, `configSha256`, `engineVersion`, `schedule[{week,title,environment,theme,commitment,sponsor}]`, `sponsors[{id,tavern}]` | first event, and only once; sponsors pass `validateSponsors` |
 | `character.pooled` | commissioner | `character`, `base`, `cr`, `modifiers` | phase `preseason`, id not already pooled, modifiers within budget |
 | `tavern.joined` | commissioner | `tavern`, `name`, `manager` | phase `preseason`, tavern id unique, manager not already in a tavern |
 | `character.retained` | commissioner | `tavern`, `character`, `fromSeason`, `basis`, `costRound` | before the first pick, character pooled and unowned, tavern within its keeper limit |
@@ -330,7 +333,7 @@ State shape: `LeagueState` in `engine/src/events/state.ts`.
 
 | Event | State change |
 |---|---|
-| `season.created` | set `config` and phase `preseason` |
+| `season.created` | set `config`, `schedule`, `sponsors` and phase `preseason` |
 | `character.pooled` | add to `pool` |
 | `tavern.joined` | add to `taverns` with an empty roster |
 | `character.retained` | `owner[character] = tavern`, append to the roster, record the forfeited round |

@@ -53,7 +53,7 @@ describe('playground data', () => {
   });
 
   it('rejects data of another version', () => {
-    expect(() => seasonInputFromData({ ...data, version: 2 } as unknown as PlaygroundData)).toThrow(/version/);
+    expect(() => seasonInputFromData({ ...data, version: 99 } as unknown as PlaygroundData)).toThrow(/version/);
   });
 });
 

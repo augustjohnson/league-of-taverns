@@ -14,6 +14,7 @@ import {
   checkOdds,
   evTtkBreakdown,
   freeAgents,
+  homeTavern,
   lineHash,
   projectMission,
   rngFor,
@@ -404,7 +405,7 @@ function renderStandings(r: Run): string {
         .map((x) => {
           const checks = results.get(x.tavern)?.checksPassed ?? 0;
           return (
-            `<tr><td class="n">${x.rank}</td><td><span class="${x.rank === 1 ? 'win' : ''}">${esc(tavernName(x.tavern))}</span></td>` +
+            `<tr><td class="n">${x.rank}</td><td><span class="${x.rank === 1 ? 'win' : ''}">${esc(tavernName(x.tavern))}</span>${x.home ? ` <span class="tag brass" title="sponsor's week: loot × ${config.scoring.homeBonus}">home</span>` : ''}</td>` +
             `<td class="n">${x.points}</td><td class="n muted">${x.projectedPoints.toFixed(1)}${x.projectedPoints === top ? ' <span class="tag brass">best</span>' : ''}</td><td class="n muted">${checks}</td></tr>`
           );
         })
@@ -1210,7 +1211,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
         : `<span class="fail">Changed since you submitted</span> <span class="muted">(submitted: C ${esc(pending.captain)}, ${pending.allies.map(esc).join(', ')})</span>`;
 
   const lineupCardHtml =
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · against the whole league</span></div>` +
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · ${homeLine(s, week)}</span></div>` +
     `<div class="scroll"><table><thead><tr>${CHAR_HEAD}<th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` +
     `<p class="small">Starting ${play.picks.length} of ${config.roster.starters} · CR ${num(formatCr(total))} of ${num(formatCr(BUDGET))}</p>${crMeter(total)}` +
     (lineup === null
@@ -1258,6 +1259,14 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     `<section class="card"><div class="row" style="justify-content:space-between"><span class="muted small">The bots set their lineups and claims when you play the week.</span>` +
     `<button type="button" class="primary" data-action="play-week">Play week ${week}</button></div></section>`
   );
+}
+
+/** Whose home week it is, from the sponsors in the season package. */
+function homeLine(s: SeasonSession, week: number): string {
+  const home = homeTavern(s.state, week);
+  if (home === null) return 'no sponsor this week';
+  if (home === s.human!.tavern) return `<b>your home week</b>: loot × ${config.scoring.homeBonus}`;
+  return `home week for <b>${esc(tavernName(home))}</b> (× ${config.scoring.homeBonus})`;
 }
 
 function renderPlayResult(s: SeasonSession, week: number): string {
