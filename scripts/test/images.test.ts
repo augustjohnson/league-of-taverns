@@ -246,7 +246,7 @@ describe('style and graph', () => {
   });
 
   it("uses a size's own framing where it has one", () => {
-    expect(positivePrompt(style, 'portrait', 'a stirge', 'tiny')).toContain('beer mug');
+    expect(positivePrompt(style, 'portrait', 'a stirge', 'tiny')).toContain('wooden flagon');
     expect(positivePrompt(style, 'portrait', 'a t-rex', 'huge')).toContain('from the top left');
     expect(positivePrompt(style, 'cover', 'a bog')).toContain('a bog');
   });

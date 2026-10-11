@@ -37,12 +37,14 @@ portrait:
     tiny:
       width: 80
       height: 104
-      # Tiny creatures mostly fly; a mug on the bar grounds them. Its base is
-      # narrower than the creature, hence the lower minFooting.
+      # Tiny creatures perch on a flagon that stands ON the bar, so nothing of
+      # theirs is hidden (counter 0): the flagon's base is the card's bottom
+      # edge. The base is narrower than the creature, hence the lower minFooting.
+      counter: 0
       minFooting: 0.25
       framing: >-
-        (perched on the rim of a large wooden beer mug:1.3), (whole creature
-        visible, centered:1.2), the mug continuing past the bottom edge
+        (perched on the rim of a large wooden flagon:1.3), (the whole flagon
+        visible down to its base:1.2), (whole creature visible, centered:1.2)
     small:      { width: 96,  height: 120 }
     medium:     { width: 112, height: 144 }
     large:      { width: 128, height: 160 }
@@ -70,14 +72,22 @@ portrait:
   minFooting: 0.5
   tolerance: 2
   framing: >-
-    (upper body portrait:1.3), (centered, with empty space above the head and
-    on both sides:1.2), shoulders and chest continuing past the bottom edge
+    (waist-up view:1.3), (realistic adult proportions, small head, broad
+    shoulders:1.2), (centered, with empty space above the head and on both
+    sides:1.2), torso continuing past the bottom edge
   cutout: true
+  # One fixed light for every portrait. Tavern lighting is applied per scene
+  # when the cards are composed (docs/images.md § Lighting), never baked in.
   positive: >-
-    pixel art, {{framing}}, {{subject}}, three-quarter view, looking at viewer,
-    (thick dark outline around the character:1.3), plain white background
+    pixel art, medieval fantasy tavern patron, {{framing}}, {{subject}},
+    three-quarter view, looking at viewer, (soft even light from the upper
+    left:1.1), (thick dark outline around the character:1.3), plain white
+    background
   negative: >-
     (cropped:1.3), (out of frame:1.3), cut off, floating head, disembodied head,
+    (oversized head, big head, chibi, bobblehead, caricature:1.4),
+    (modern clothing, jacket, hoodie, jeans, zipper, coffee cup, paper
+    cup:1.3), colored lighting, dramatic shadows,
     (suit, necktie, blazer, business attire:1.3), close-up, (full body:1.3),
     legs, feet, floor, shadow, text, letters,
     watermark, frame, border, blurry, photo, 3d render

@@ -42,13 +42,34 @@ Portraits are made to stand side by side behind the bar in a tavern scene:
   the frame); put those at the left end of a lineup.
 - **No floating.** At the counter line the figure must be solid across half
   its width (`minFooting`), so a head on a thin neck fails. Tiny creatures
-  perch on a beer mug standing on the bar, with a lower threshold.
+  perch on a flagon that stands **on** the bar: their cards have no hidden
+  rows (`counter: 0`) and sit on the bar's top edge, with a lower threshold
+  because the flagon's base is narrow.
 
 `draft-images` checks every candidate (`scripts/src/lib/images/framing.ts`),
 the review page marks failures and draws the bar over each card, `accept`
 refuses failures without `--force`, and `validate` checks committed
 portraits. Proportions, such as a big head on a small body, are left to the
 GM's eye. Expect 2 or 3 of 4 candidates to pass for most sizes, fewer for Huge.
+
+## Lighting
+
+Portraits are shared by every tavern a character plays for, so tavern
+lighting is never baked in. Every portrait renders with the same soft, even
+light from the upper left; the negative prompt pushes away from coloured
+light and dramatic shadows. Each tavern's mood is applied when a lineup is
+composed: a palette remap that darkens by the tavern's ambient level and
+pulls colours toward its light colour, then snaps back to the palette, so
+sprites stay crisp. A candlelit winery, a dusk beer garden and a torchlit
+dungeon are three settings of the same remap.
+
+## Proportions
+
+The prompt asks for waist-up framing, realistic adult proportions and broad
+shoulders, and the negative prompt rejects oversized heads, chibi and
+bobblehead styles. That made big heads rare in testing (none in 8 seeds of
+the worst case), but no automatic check catches them reliably: silhouettes
+can't tell a big head from narrow clothing. The GM's review is the guarantee.
 
 ## How an image is made
 

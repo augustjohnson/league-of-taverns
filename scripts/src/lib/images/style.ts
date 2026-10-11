@@ -41,6 +41,7 @@ const prompts = {
 const portraitSize = size.extend({
   bleed: z.array(z.enum(EDGES)).exactOptional(),
   minFooting: z.number().min(0).max(1).exactOptional(),
+  counter: z.number().int().nonnegative().exactOptional(),
   framing: text.exactOptional(),
 });
 
@@ -118,7 +119,7 @@ export function framingRules(style: ImageStyle, size: CreatureSize): FramingRule
   const entry = style.portrait.sizes[size];
   return {
     bleed: entry.bleed ?? [],
-    counter: style.portrait.counter,
+    counter: entry.counter ?? style.portrait.counter,
     minFooting: entry.minFooting ?? style.portrait.minFooting,
     tolerance: style.portrait.tolerance,
   };

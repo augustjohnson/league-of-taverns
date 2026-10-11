@@ -21,7 +21,7 @@ characters:
     name: Vix Dunmore
     epithet: the Landlord
     hook: Has declared ownership of eleven caves. Collects rent from the bats.
-    look: small rust-red kobold with a chipped left horn and a brass ring through one nostril, wearing a bowler hat, a ledger under one arm, (flat businesslike stare:1.3)
+    look: small rust-red kobold with a chipped left horn and a brass ring through one nostril, wearing a battered felt hat, a ledger under one arm, (flat businesslike stare:1.3)
     bodyPlan: humanoid
 
   - id: mott
@@ -48,7 +48,7 @@ characters:
     name: Deborah
     epithet: Chief Steward
     hook: Has refused every order she has ever been given, in writing.
-    look: grey mule with a white blaze, a notch cut in her right ear and a red armband on one foreleg, (deeply unimpressed stare:1.3)
+    look: grey mule with a white blaze, a notch cut in her right ear and a red cloth band tied around one foreleg, (deeply unimpressed stare:1.3)
     bodyPlan: beast
 
   - id: carmichael
@@ -57,7 +57,7 @@ characters:
     name: Carmichael
     epithet: Sideways
     hook: Has never moved forward. Describes this as a strategy, when asked and when not.
-    look: big orange crab with one oversized barnacle-crusted claw, a cracked shell plate and a white sweatband, (blank beady stare:1.3)
+    look: big orange crab with one oversized barnacle-crusted claw, a cracked shell plate and a knotted cloth headband, (blank beady stare:1.3)
     bodyPlan: beast
 
   - id: gus-tallow
@@ -102,7 +102,7 @@ characters:
     name: Gary Pell
     epithet: from Accounting
     hook: Died at his desk in 1102. Has not missed a day since.
-    look: grey-green zombie man in a stained grey wool cardigan, missing his left ear, ink-stained fingers holding a chipped coffee mug, (dead-eyed polite smile:1.3)
+    look: grey-green zombie man in a stained grey wool tunic, missing his left ear, ink-stained fingers holding a dented pewter tankard, (dead-eyed polite smile:1.3)
     bodyPlan: humanoid
 
   - id: nell-malone
@@ -120,7 +120,7 @@ characters:
     name: Doug
     epithet: Fully Grown
     hook: The size of a loaf of bread. Does not want to discuss loaves.
-    look: tiny red pseudodragon with a torn left wing, a scar across his snout and a small black leather jacket, (tough-guy scowl:1.3)
+    look: tiny red pseudodragon with a torn left wing, a scar across his snout and a tiny studded leather jerkin, (tough-guy scowl:1.3)
     bodyPlan: winged
 
   - id: wren-ashby
@@ -129,7 +129,7 @@ characters:
     name: Wren Ashby
     epithet: the Lifter
     hook: Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.
-    look: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and dragonfly wings, in a sweat-stained tank top, (intense focused stare:1.3)
+    look: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and dragonfly wings, in a sweat-stained sleeveless linen tunic, (intense focused stare:1.3)
     bodyPlan: winged
 
   - id: mike
@@ -138,7 +138,7 @@ characters:
     name: Mike
     epithet: the Life of the Party
     hook: Nobody remembers anything after he arrives. Everyone wakes up purple.
-    look: chunky violet mushroom with white spots, drooping tendrils and small round pink sunglasses, (blissed-out lazy smile:1.3)
+    look: chunky violet mushroom with white spots, drooping tendrils and small round smoked-glass spectacles, (blissed-out lazy smile:1.3)
     bodyPlan: plant
 
   - id: lenore
@@ -156,7 +156,7 @@ characters:
     name: "Ghh'ŭrzh"
     epithet: the Intern
     hook: Fired from the Abyss for incompetence, which is difficult to arrange.
-    look: pot-bellied grey demon with one snapped-off horn and a crooked paper name tag pinned to his chest, (nervous sweaty grin:1.3)
+    look: pot-bellied grey demon with one snapped-off horn and a crooked parchment name tag pinned to his chest, (nervous sweaty grin:1.3)
     bodyPlan: humanoid
 
   # ── CR 1/2 ──────────────────────────────────────────────────────────────
@@ -166,7 +166,7 @@ characters:
     name: Gloria
     epithet: Aisle Four
     hook: Has been mopped up eleven times. Comes back a little angrier each time.
-    look: glossy grey puddle of ooze with two eyes, an old mop head stuck in it and a yellow wet floor sign beside it, (smug smirk:1.3)
+    look: glossy grey puddle of ooze with two eyes, an old mop head stuck in it and an overturned wooden bucket beside it, (smug smirk:1.3)
     bodyPlan: blob
 
   - id: prudence
@@ -211,7 +211,7 @@ characters:
     name: Barb
     epithet: the Duchess
     hook: Controls every tavern bin within forty miles. Accepts tribute in pie crusts.
-    look: black bear with a white chest blaze, a crushed pizza box worn as a crown and crumbs in her fur, (regal calm stare:1.3)
+    look: black bear with a white chest blaze, a crushed wicker bread basket worn as a crown and crumbs in her fur, (regal calm stare:1.3)
     bodyPlan: beast
 
   - id: professor-albright
@@ -238,7 +238,7 @@ characters:
     name: Randall Pike
     epithet: Wedding Guest
     hook: Has attended four hundred weddings. Was invited to none.
-    look: curly-haired satyr with one curled horn and one broken stub, a crooked paper party hat and a party blower in his mouth, (cheeky wink:1.3)
+    look: curly-haired satyr with one curled horn and one broken stub, a wreath of wilted flowers and a tin whistle in his mouth, (cheeky wink:1.3)
     bodyPlan: humanoid
 
   # ── CR 1 ────────────────────────────────────────────────────────────────
@@ -266,7 +266,7 @@ characters:
     name: Lou Varga
     epithet: Banned
     hook: Banned from every all-you-can-eat in the realm for taking the phrase literally.
-    look: gaunt pale-grey ghoul with long yellow nails, a plastic lobster bib and sauce on his chin, (ravenous drooling grin:1.3)
+    look: gaunt pale-grey ghoul with long yellow nails, a stained linen bib and gravy on his chin, (ravenous drooling grin:1.3)
     bodyPlan: humanoid
 
   - id: hoss
@@ -284,7 +284,7 @@ characters:
     name: Vera Shrike
     epithet: Karaoke
     hook: Has won every singing contest she has entered. The judges left early each time.
-    look: bird-woman harpy with wild teal feathered hair and a chipped beak, holding a tin microphone, (mid-song open mouth:1.3)
+    look: bird-woman harpy with wild teal feathered hair and a chipped beak, holding a battered brass speaking trumpet, (mid-song open mouth:1.3)
     bodyPlan: winged
 
   - id: mortimer
@@ -293,7 +293,7 @@ characters:
     name: Mortimer
     epithet: Notary
     hook: Requires a signed form before he will pass the salt.
-    look: small red imp with bat wings and one horn capped in brass, holding a quill and a rubber stamp, (fussy glare:1.3)
+    look: small red imp with bat wings and one horn capped in brass, holding a quill and a wax seal stamp, (fussy glare:1.3)
     bodyPlan: winged
 
   - id: patsy
@@ -411,7 +411,7 @@ characters:
     name: Herb
     epithet: the Speed Bump
     hook: Cannot stop or turn. Has not been asked to do either.
-    look: grey rhinoceros with a chipped horn wearing an orange traffic cone, (determined charging glare:1.3)
+    look: grey rhinoceros with a chipped horn with a dented iron cooking pot stuck on his horn, (determined charging glare:1.3)
     bodyPlan: beast
 
   - id: jenkins
@@ -448,7 +448,7 @@ characters:
     name: Stanley
     epithet: Undefeated
     hook: Has never lost a staring contest. His opponents are now garden ornaments.
-    look: green eight-legged lizard with a scar along its jaw and sunglasses pushed up on its head, (unblinking intense stare:1.3)
+    look: green eight-legged lizard with a scar along its jaw and smoked-glass spectacles pushed up on its head, (unblinking intense stare:1.3)
     bodyPlan: beast
 
   - id: nobody-special
@@ -484,7 +484,7 @@ characters:
     name: Kevin
     epithet: Weekends Only
     hook: Only turns when the full moon falls on a Saturday. Plans his whole life around it.
-    look: shaggy grey werewolf with reading glasses, in a fluffy blue bathrobe, holding a mug, (tired resigned expression:1.3)
+    look: shaggy grey werewolf with reading glasses, in a patched wool nightshirt and nightcap, holding a clay mug of mead, (tired resigned expression:1.3)
     bodyPlan: humanoid
 
   - id: auntie-grizelda
@@ -493,7 +493,7 @@ characters:
     name: Auntie Grizelda
     epithet: Your Aunt
     hook: Attends every family event uninvited, with a casserole nobody should eat.
-    look: green-skinned warty hag with a single long tooth, pink hair curlers and a smoking clay pipe, (gossipy knowing smirk:1.3)
+    look: green-skinned warty hag with a single long tooth, rag curls tied in her grey hair and a smoking clay pipe, (gossipy knowing smirk:1.3)
     bodyPlan: humanoid
 
   # ── CR 4 ────────────────────────────────────────────────────────────────
@@ -530,7 +530,7 @@ characters:
     name: Peanut
     epithet: Remembers Everything
     hook: Keeps a written list of everyone who has ever wronged her. The list has a second volume.
-    look: grey elephant with one broken tusk and a tiny notebook tucked behind her ear, (narrow-eyed grudge-holding glare:1.3)
+    look: grey elephant with one broken tusk and a tiny leather-bound journal tucked behind her ear, (narrow-eyed grudge-holding glare:1.3)
     bodyPlan: beast
 
   # ── CR 5 ────────────────────────────────────────────────────────────────
@@ -567,7 +567,7 @@ characters:
     name: "Ö'tʰǧh"
     epithet: Sanitation
     hook: Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.
-    look: lumpy brown three-legged otyugh with a single eyestalk and a banana peel draped on its head, (proud gap-toothed grin:1.3)
+    look: lumpy brown three-legged otyugh with a single eyestalk and a rotten cabbage leaf draped on its head, (proud gap-toothed grin:1.3)
     bodyPlan: blob
 
   # ── CR 6–8 ──────────────────────────────────────────────────────────────
@@ -586,7 +586,7 @@ characters:
     name: Mavis
     epithet: Salon Owner
     hook: Gives the worst haircuts in the realm. No client has complained, or moved, since.
-    look: green-skinned medusa with hissing snakes for hair in pink curlers and large dark sunglasses, (bored gum-chewing smirk:1.3)
+    look: green-skinned medusa with hissing snakes for hair tied up with ribbons and round smoked-glass spectacles, (bored gum-chewing smirk:1.3)
     bodyPlan: humanoid
 
   - id: tony
@@ -595,5 +595,5 @@ characters:
     name: Tony
     epithet: Can't Clap
     hook: The most dangerous thing in the league. Defeated daily by doorknobs, high-fives and shirts.
-    look: huge green tyrannosaurus with a scarred snout and tiny arms straining toward a beer mug balanced on its own head, (frustrated toothy grimace:1.3)
+    look: huge green tyrannosaurus with a scarred snout and tiny arms straining toward a wooden tankard balanced on its own head, (frustrated toothy grimace:1.3)
     bodyPlan: beast

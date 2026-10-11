@@ -19,7 +19,7 @@ export type Edge = (typeof EDGES)[number];
 export interface FramingRules {
   /** Edges this canvas may be cut by, besides the bottom. */
   readonly bleed: ReadonlyArray<Edge>;
-  /** Rows at the bottom of every card hidden behind the bar. */
+  /** Rows at the bottom of the card hidden behind the bar; 0 for a card standing on top of the bar. */
   readonly counter: number;
   /** Least share of the figure's width that must be solid at the counter line. */
   readonly minFooting: number;

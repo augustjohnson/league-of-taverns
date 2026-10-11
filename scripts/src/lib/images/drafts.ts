@@ -139,14 +139,23 @@ export function candidateProblems(target: DraftTarget, sprite: Uint8Array, style
   return target.kind === 'portrait' && target.size !== undefined ? framingProblems(decodePng(sprite), framingRules(style, target.size)) : [];
 }
 
+/** What the review page needs about a staged candidate. */
+interface StagedFraming {
+  readonly problems: ReadonlyArray<string>;
+  /** Rows the bar hides; 0 means the card stands on top of the bar. Absent for covers. */
+  readonly counter?: number;
+}
+
 /** Stage a candidate with its framing problems, for the review page. Returns the problems. */
 export function stage(target: DraftTarget, seed: number, render: Uint8Array, sprite: Uint8Array, style: ImageStyle, root: RepoRoot = REPO_ROOT): string[] {
   const paths = stagedPaths(target, seed, root);
   const problems = candidateProblems(target, sprite, style);
+  const framing: StagedFraming =
+    target.kind === 'portrait' && target.size !== undefined ? { problems, counter: framingRules(style, target.size).counter } : { problems };
   mkdirSync(dirname(paths.sprite), { recursive: true });
   writeFileSync(paths.render, render);
   writeFileSync(paths.sprite, sprite);
-  writeFileSync(paths.framing, `${JSON.stringify(problems)}\n`);
+  writeFileSync(paths.framing, `${JSON.stringify(framing)}\n`);
   return problems;
 }
 
@@ -210,12 +219,19 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
       const src = `${segments.join('/')}/s${seed}`;
       // Portraits differ in size by creature size; show each at its own size so they compare as they'll appear.
       const { width, height } = pngSize(readFileSync(join(base, `${src}.png`)));
-      // Portraits show the bar the scene puts in front of them.
-      const bar = target.kind === 'portrait' ? `<div class="bar" style="height:${style.portrait.counter * scale}px"></div>` : '';
+      // Portraits show the bar as the scene will: in front of the card, or under a card standing on it.
+      const framing = readFraming(join(base, `${src}.framing.json`));
+      const counter = framing?.counter;
+      const bar =
+        counter === undefined
+          ? ''
+          : counter > 0
+            ? `<div class="bar" style="height:${counter * scale}px"></div>`
+            : `<div class="bar under" style="height:${style.portrait.counter * scale}px"></div>`;
       return `<figure>
   <div class="card"><img class="sprite" src="${src}.png" width="${width * scale}" height="${height * scale}" alt="${target.kind} ${target.id} seed ${seed}">${bar}</div>
   <img class="render" src="${src}.render.png" alt="raw render">
-  ${framingNote(join(base, `${src}.framing.json`))}
+  ${framingNote(framing)}
   <figcaption>seed ${seed}<code>pnpm draft-images accept ${which} --seed ${seed}</code></figcaption>
 </figure>`;
     });
@@ -234,6 +250,7 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
   .sprite { image-rendering: pixelated; background: var(--tavern); display: block; }
   .card { position: relative; }
   .bar { position: absolute; left: 0; right: 0; bottom: 0; background: #5a3a22; border-top: 3px solid #8a5a32; }
+  .bar.under { position: static; }
   .render { width: 120px; opacity: 0.8; }
   .ok { color: #8c8; } .bad { color: #e88; max-width: 360px; }
   code { display: block; font-size: 11px; color: #9ab; user-select: all; max-width: 360px; overflow-wrap: anywhere; }
@@ -248,8 +265,12 @@ ${sections.join('\n') || '<p>No drafts staged.</p>'}
   return file;
 }
 
-function framingNote(file: string): string {
-  if (!existsSync(file)) return '';
-  const problems = JSON.parse(readFileSync(file, 'utf8')) as string[];
+function readFraming(file: string): StagedFraming | undefined {
+  return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as StagedFraming) : undefined;
+}
+
+function framingNote(framing: StagedFraming | undefined): string {
+  if (framing === undefined) return '';
+  const { problems } = framing;
   return problems.length === 0 ? '<span class="ok">layers cleanly</span>' : `<span class="bad">${problems.map((p) => `✗ ${p}`).join('<br>')}</span>`;
 }
