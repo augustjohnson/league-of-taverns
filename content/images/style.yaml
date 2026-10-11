@@ -71,6 +71,14 @@ portrait:
   # bottom edge, plus a size's bleed edges, may cut it. Proportions (a big
   # head on a small body) are left to the GM, who sees the bar on the review page.
   counter: 20
+  # Translucent characters (chrome.portrait.translucent): see-through parts of
+  # the figure (close to the render's background colour, or pale and washed
+  # out) become glass at this opacity, so the tavern shows through.
+  glass:
+    alpha: 112
+    maxDistance: 0.1
+    minLightness: 0.78
+    maxChroma: 0.07
   minFooting: 0.5
   tolerance: 2
   # Body plans (chrome.portrait.bodyPlan, default humanoid). `anchor` opens
@@ -86,7 +94,7 @@ portrait:
         shoulders:1.2), (centered, with empty space above the head and on both
         sides:1.2), torso continuing past the bottom edge
     beast:
-      anchor: (fantasy animal with true animal anatomy:1.3)
+      anchor: (animal with true animal anatomy:1.2)
       framing: >-
         (head, neck and front shoulders of the animal:1.3), (centered, with
         empty space above the head and on both sides:1.2), the animal's body

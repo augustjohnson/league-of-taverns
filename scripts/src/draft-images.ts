@@ -121,7 +121,7 @@ async function draft(args: Args): Promise<void> {
   const clean = new Map<string, number>();
   jobs.forEach(({ target, seed }, i) => {
     const render = renders[i]!;
-    const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind)));
+    const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind, target.translucent)));
     const problems = stage(target, seed, render, sprite, style);
     clean.set(target.id, (clean.get(target.id) ?? 0) + (problems.length === 0 ? 1 : 0));
   });

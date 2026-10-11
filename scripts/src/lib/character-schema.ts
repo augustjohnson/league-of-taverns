@@ -32,6 +32,8 @@ export interface CharacterChrome {
     readonly seed?: number;
     /** What shape the character is, for framing (docs/images.md). Default humanoid. */
     readonly bodyPlan?: BodyPlan;
+    /** See-through body (an ice-clear gelatinous cube): pale parts become glass. */
+    readonly translucent?: boolean;
   };
   readonly history?: ReadonlyArray<string>;
 }
@@ -63,6 +65,7 @@ const chromeSchema = z.strictObject({
       path: text.exactOptional(),
       seed: z.number().int().nonnegative().exactOptional(),
       bodyPlan: z.enum(BODY_PLANS).exactOptional(),
+      translucent: z.boolean().exactOptional(),
     })
     .exactOptional(),
   history: z.array(z.string()).exactOptional(),

@@ -52,6 +52,17 @@ refuses failures without `--force`, and `validate` checks committed
 portraits. Proportions, such as a big head on a small body, are left to the
 GM's eye. Expect 2 or 3 of 4 candidates to pass for most sizes, fewer for Huge.
 
+## Translucency
+
+A character with `chrome.portrait.translucent: true` (Wendell, a gelatinous
+cube clear as ice) gets glass: inside the cutout, cells close to the render's
+own background colour, or pale and washed out, are the background showing
+through. They keep their palette colour at the style's `glass.alpha` opacity
+(112 of 255), so the tavern shows through the cube while its outline and
+whatever is frozen inside stay solid. `validate` allows that one opacity, and
+only on translucent characters. Translucent creatures still stand behind the
+bar like everyone else; their base is hidden by the counter.
+
 ## Lighting
 
 Portraits are shared by every tavern a character plays for, so tavern
@@ -139,6 +150,9 @@ prompt: >-
   them, and "man" alone drifts into office wear.
 - Name the skin or body colour. "Ogre" alone came out human-skinned in 3 of 4.
 - Weight the expression, as in `(… grin:1.3)`. The model scowls by default.
+- Weight the species, not just the creature: the beast plan's generic
+  "animal" turned "huge bear" into a lynx, a dog and a red panda until it
+  read "(huge brown grizzly bear:1.4)".
 - Use creature words SDXL knows, and weight the creature itself:
   "pseudodragon" came out as a man, then as a white bird;
   "(tiny red dragon with scales:1.4)" is a dragon.

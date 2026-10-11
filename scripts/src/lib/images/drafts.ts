@@ -21,7 +21,7 @@ import { seasonDir } from '../season';
 import { framingProblems } from './framing';
 import { checkSprite } from './pixelate';
 import { decodePng, pngSize } from './png';
-import { creatureSize, framingRules, outputSize, paletteOf } from './style';
+import { creatureSize, framingRules, glassAlpha, outputSize, paletteOf } from './style';
 import type { BodyPlan } from './body-plans';
 import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
@@ -35,6 +35,8 @@ export interface DraftTarget {
   readonly size?: CreatureSize;
   /** Portraits only: the character's body plan. */
   readonly bodyPlan?: BodyPlan;
+  /** Portraits only: see-through parts become glass. */
+  readonly translucent?: boolean;
   readonly subject: string;
   /** Where an accepted image goes, absolute. */
   readonly destination: string;
@@ -82,7 +84,13 @@ export function portraitTargets(
     const { base } = loadCharacterRef(id, root);
     const size = sizeOf(base);
     if (size === undefined) throw new ValidationFailure(`characters/${id}/character.yaml: base ${JSON.stringify(base)} is not in the snapshot, so its size is unknown`);
-    targets.push({ kind: 'portrait', id, size, bodyPlan: portrait.bodyPlan ?? 'humanoid', subject: portrait.prompt, destination: join(charactersDir, id, 'portrait.png') });
+    targets.push({
+      kind: 'portrait',
+      id,
+      size,
+      bodyPlan: portrait.bodyPlan ?? 'humanoid',
+      translucent: portrait.translucent === true,
+      subject: portrait.prompt, destination: join(charactersDir, id, 'portrait.png') });
   }
   return targets;
 }
@@ -174,7 +182,12 @@ export function accept(target: DraftTarget, seed: number, style: ImageStyle, roo
   if (!existsSync(staged)) {
     throw new ValidationFailure(`no staged ${target.kind} for ${target.id} with seed ${seed} (looked for ${relative(rootDir(root), staged)})`);
   }
-  const problems = checkSprite(decodePng(readFileSync(staged)), outputSize(style, target.kind, target.size), paletteOf(style));
+  const problems = checkSprite(
+    decodePng(readFileSync(staged)),
+    outputSize(style, target.kind, target.size),
+    paletteOf(style),
+    glassAlpha(style, target.kind, target.translucent),
+  );
   if (problems.length > 0) throw new ValidationFailure(`${relative(rootDir(root), staged)} ${problems.join('; ')}`);
   const framing = candidateProblems(target, readFileSync(staged), style);
   if (framing.length > 0 && !force) {

@@ -170,6 +170,27 @@ describe('pixelate', () => {
     expect(() => pixelate({ width: 9, height: 8, data: new Uint8Array(9 * 8 * 4) }, options())).toThrow(/8-pixel grid/);
   });
 
+  it('turns see-through parts of a translucent figure into glass, keeping the rest solid', () => {
+    const [ice, ink] = [PALETTE[8]!, PALETTE[0]!]; // pale #c7dcd0, dark #2e222f
+    // A 3×3 figure on a white background: dark outline, a pale interior cell.
+    const render = blockRender([
+      [null, null, null, null, null],
+      [null, ink, ink, ink, null],
+      [null, ink, ice, ink, null],
+      [null, ink, ink, ink, null],
+    ]);
+    const glass = { alpha: 112, maxDistance: 0.1, minLightness: 0.78, maxChroma: 0.07 };
+    const sprite = decodePng(encodeIndexedPng(pixelate(render, options({ cutout: true, glass }))));
+    expect(pixel(sprite, 2, 2)).toEqual([...ice, 112]);
+    expect(pixel(sprite, 1, 1)).toEqual([...ink, 255]);
+    expect(pixel(sprite, 0, 0)[3]).toBe(0);
+    expect(checkSprite(sprite, { width: 5, height: 4 }, PALETTE)).toEqual([
+      'has 1 semi-transparent pixel; pixels must be fully opaque or fully transparent',
+    ]);
+    expect(checkSprite(sprite, { width: 5, height: 4 }, PALETTE, 112)).toEqual([]);
+    expect(() => pixelate(render, options({ glass }))).toThrow(/glass needs a cutout/);
+  });
+
   it('is deterministic', () => {
     const render = blockRender([
       [ink, moss, [120, 90, 60]],

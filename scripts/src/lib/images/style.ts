@@ -70,6 +70,12 @@ const styleSchema = z.strictObject({
   portrait: z.strictObject({
     sizes: z.strictObject(Object.fromEntries(CREATURE_SIZES.map((s) => [s, portraitSize])) as Record<CreatureSize, typeof portraitSize>),
     counter: z.number().int().nonnegative(),
+    glass: z.strictObject({
+      alpha: z.number().int().min(1).max(254),
+      maxDistance: z.number().nonnegative(),
+      minLightness: z.number().min(0).max(1),
+      maxChroma: z.number().nonnegative(),
+    }),
     minFooting: z.number().min(0).max(1),
     tolerance: z.number().int().nonnegative(),
     bodyPlans: z.strictObject(
@@ -161,11 +167,17 @@ export function negativePrompt(style: ImageStyle, kind: ImageKind, plan: BodyPla
   return extra === undefined ? style[kind].negative : `${style[kind].negative}, ${extra.trim()}`;
 }
 
-export function pixelateOptions(style: ImageStyle, kind: ImageKind): PixelateOptions {
+export function pixelateOptions(style: ImageStyle, kind: ImageKind, translucent = false): PixelateOptions {
   return {
     ...style.pixelate,
     palette: paletteOf(style),
     cutout: style[kind].cutout,
     anchorBottom: kind === 'portrait',
+    ...(kind === 'portrait' && translucent ? { glass: style.portrait.glass } : {}),
   };
+}
+
+/** The one partial opacity a translucent portrait may use. */
+export function glassAlpha(style: ImageStyle, kind: ImageKind, translucent = false): number | undefined {
+  return kind === 'portrait' && translucent ? style.portrait.glass.alpha : undefined;
 }

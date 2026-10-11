@@ -14,6 +14,10 @@
  *    between two palette entries.
  * 4. Despeckle: a pixel whose four neighbours all agree on another colour
  *    takes that colour.
+ * 4b. Glass (translucent characters only): inside the cutout, cells close to
+ *    the render's own background colour, or pale and washed out, are the
+ *    background showing through a clear body. They keep their palette colour
+ *    at `glass.alpha` opacity; outlines and anything inside stay solid.
  * 5. Frame: portraits are dropped onto the bottom edge, where the bar hides
  *    how they end (./framing.ts), and centred unless they touch a side edge.
  *
@@ -33,7 +37,24 @@ export interface PixelateOptions {
   readonly cutout: boolean;
   /** Re-anchor the opaque area bottom-centre (portraits). */
   readonly anchorBottom: boolean;
+  /** Turn see-through parts of the figure into glass (needs `cutout`). */
+  readonly glass?: GlassOptions;
 }
+
+export interface GlassOptions {
+  /** Opacity of glass pixels, 1–254. */
+  readonly alpha: number;
+  /** OKLab distance to the render's background colour within which a cell is glass. */
+  readonly maxDistance: number;
+  /** A cell at least this light (OKLab L) and at most `maxChroma` saturated is glass too: a pale, clear body. */
+  readonly minLightness: number;
+  readonly maxChroma: number;
+}
+
+/** Cell states: transparent, solid, or glass (partly transparent). */
+const CLEAR = 0;
+const SOLID = 1;
+const GLASS = 2;
 
 export class PixelateError extends Error {
   override name = 'PixelateError';
@@ -52,10 +73,33 @@ export function pixelate(render: RgbaImage, options: PixelateOptions): IndexedIm
     throw new PixelateError('cutout requested, but the render has no transparent area; was it rendered without background removal?');
   }
 
+  if (options.glass !== undefined) {
+    if (!options.cutout) throw new PixelateError('glass needs a cutout: the background colour comes from the area the cutout removed');
+    markGlass(render, colors, opaque, options.glass);
+  }
+
   const paletteIndex = quantize(colors, opaque, options);
   despeckle(paletteIndex, opaque, width, height);
   const framed = options.anchorBottom ? anchorBottom(paletteIndex, opaque, width, height) : { paletteIndex, opaque };
-  return toIndexed(framed.paletteIndex, framed.opaque, width, height, options.palette);
+  return toIndexed(framed.paletteIndex, framed.opaque, width, height, options.palette, options.glass?.alpha ?? 255);
+}
+
+/** Mark see-through solid cells as glass, judged against the median colour of the render's removed background. */
+function markGlass(render: RgbaImage, colors: ReadonlyArray<Rgb>, opaque: Uint8Array, glass: GlassOptions): void {
+  const channels: [number[], number[], number[]] = [[], [], []];
+  for (let i = 0; i < render.data.length; i += 4 * 7) {
+    if (render.data[i + 3]! > 127) continue;
+    for (let c = 0; c < 3; c++) channels[c]!.push(render.data[i + c]!);
+  }
+  const median = (values: number[]): number => values.sort((a, b) => a - b)[values.length >> 1] ?? 255;
+  const background = oklab([median(channels[0]), median(channels[1]), median(channels[2])]);
+  colors.forEach((rgb, i) => {
+    if (opaque[i] !== SOLID) return;
+    const [l, a, b] = oklab(rgb);
+    const distance = Math.hypot(l - background[0], a - background[1], b - background[2]);
+    const pale = l >= glass.minLightness && Math.hypot(a, b) <= glass.maxChroma;
+    if (distance <= glass.maxDistance || pale) opaque[i] = GLASS;
+  });
 }
 
 /** Most common colour per cell, on 5-bit-per-channel bins, averaged within the winning bin. */
@@ -107,7 +151,7 @@ function quantize(colors: ReadonlyArray<Rgb>, opaque: Uint8Array, options: Pixel
   const points: Lab[] = [];
   const at: number[] = [];
   colors.forEach((rgb, i) => {
-    if (opaque[i] === 1) {
+    if (opaque[i] !== CLEAR) {
       points.push(oklab(rgb));
       at.push(i);
     }
@@ -153,9 +197,9 @@ function despeckle(index: Uint8Array, opaque: Uint8Array, width: number, height:
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
-      if (opaque[i] !== 1) continue;
+      if (opaque[i] === CLEAR) continue;
       const around = [i - width, i + width, i - 1, i + 1];
-      if (!around.every((n) => opaque[n] === 1)) continue;
+      if (!around.every((n) => opaque[n] === opaque[i])) continue;
       const first = source[around[0]!]!;
       if (first !== source[i] && around.every((n) => source[n] === first)) index[i] = first;
     }
@@ -172,7 +216,7 @@ function anchorBottom(
   let [left, right, top, bottom] = [width, -1, height, -1];
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (opaque[y * width + x] !== 1) continue;
+      if (opaque[y * width + x] === CLEAR) continue;
       left = Math.min(left, x);
       right = Math.max(right, x);
       top = Math.min(top, y);
@@ -196,22 +240,41 @@ function anchorBottom(
   return { paletteIndex: movedIndex, opaque: movedOpaque };
 }
 
-/** Compact palette: only the colours used, plus one transparent entry first when anything is transparent. */
-function toIndexed(paletteIndex: Uint8Array, opaque: Uint8Array, width: number, height: number, palette: ReadonlyArray<Rgb>): IndexedImage {
-  const transparent = opaque.includes(0);
-  const used = [...new Set(paletteIndex.filter((_, i) => opaque[i] === 1))].sort((a, b) => a - b);
-  const slot = new Map(used.map((p, i) => [p, i + (transparent ? 1 : 0)]));
+/**
+ * Compact palette: only the (colour, solid or glass) pairs used, plus one
+ * transparent entry first when anything is transparent.
+ */
+function toIndexed(
+  paletteIndex: Uint8Array,
+  opaque: Uint8Array,
+  width: number,
+  height: number,
+  palette: ReadonlyArray<Rgb>,
+  glassAlpha: number,
+): IndexedImage {
+  const transparent = opaque.includes(CLEAR);
+  const key = (i: number): number => paletteIndex[i]! * 4 + opaque[i]!;
+  const used = [...new Set(Array.from(opaque.keys()).filter((i) => opaque[i] !== CLEAR).map(key))].sort((a, b) => a - b);
+  const slot = new Map(used.map((k, i) => [k, i + (transparent ? 1 : 0)]));
   const entries: Array<readonly [number, number, number, number]> = [
     ...(transparent ? [[0, 0, 0, 0] as const] : []),
-    ...used.map((p) => [...palette[p]!, 255] as const),
+    ...used.map((k) => [...palette[k >> 2]!, (k & 3) === GLASS ? glassAlpha : 255] as const),
   ];
   const indices = new Uint8Array(width * height);
-  for (let i = 0; i < indices.length; i++) indices[i] = opaque[i] === 1 ? slot.get(paletteIndex[i]!)! : 0;
+  for (let i = 0; i < indices.length; i++) indices[i] = opaque[i] === CLEAR ? 0 : slot.get(key(i))!;
   return { width, height, indices, palette: entries };
 }
 
-/** Problems that would make a committed image not a league sprite: wrong size, partial alpha, off-palette colours. */
-export function checkSprite(image: RgbaImage, expected: { readonly width: number; readonly height: number }, palette: ReadonlyArray<Rgb>): string[] {
+/**
+ * Problems that would make a committed image not a league sprite: wrong size,
+ * partial alpha (other than `glassAlpha`, for a translucent character), off-palette colours.
+ */
+export function checkSprite(
+  image: RgbaImage,
+  expected: { readonly width: number; readonly height: number },
+  palette: ReadonlyArray<Rgb>,
+  glassAlpha?: number,
+): string[] {
   const problems: string[] = [];
   if (image.width !== expected.width || image.height !== expected.height) {
     problems.push(`is ${image.width}×${image.height}, expected ${expected.width}×${expected.height}`);
@@ -222,7 +285,7 @@ export function checkSprite(image: RgbaImage, expected: { readonly width: number
   for (let i = 0; i < image.data.length; i += 4) {
     const a = image.data[i + 3]!;
     if (a === 0) continue;
-    if (a !== 255) partial++;
+    if (a !== 255 && a !== glassAlpha) partial++;
     const rgb = (image.data[i]! << 16) | (image.data[i + 1]! << 8) | image.data[i + 2]!;
     if (!allowed.has(rgb)) off.add(`#${rgb.toString(16).padStart(6, '0')}`);
   }
