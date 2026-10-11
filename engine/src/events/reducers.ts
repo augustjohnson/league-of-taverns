@@ -114,8 +114,9 @@
  *   schedule's environment. The reducer has no creature snapshot, so the
  *   snapshot-dependent checks (`encounter.ref`, `encounter.budget`) are the
  *   reveal script's.
- * - `mission.resolved`: the counts are recomputed from the recorded nodes,
- *   and the score must equal `runScore` of them (0 on a DNF), to within
+ * - `mission.resolved`: the counts and the loot (the `loot` of each passed
+ *   check node) are recomputed from the recorded nodes, and the score must
+ *   equal `lootScore(loot, missionHaul(mission))`, DNF or not, to within
  *   1e-9. Everything else (path, d20s, points) is audited by
  *   `verifyResolutions`, which reports instead of throwing.
  * - `week.finalized` needs a result for every tavern whose locked lineup is
@@ -124,8 +125,8 @@
  */
 import { REGISTRY_VERSION, TRAITS, validateModifiers } from '../characters';
 import type { SeasonConfig } from '../league';
-import { validateMission } from '../missions';
-import { runScore } from '../resolution';
+import { missionHaul, validateMission, type Mission } from '../missions';
+import { lootScore } from '../resolution';
 import { draftOrderSeed, rngFor } from '../rng';
 import {
   draftOrder,
@@ -518,7 +519,9 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
         `nodes record ${passed}/${checks.length} checks, run says ${run.checksPassed}/${run.checksAttempted}`,
       );
     }
-    const expected = run.dnf ? 0 : runScore(passed, checks.length);
+    const loot = lootOf(mission, checks);
+    if (loot !== run.loot) fail(event, 'resolve.score_mismatch', `nodes bank ${loot} loot, run says ${run.loot}`);
+    const expected = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - expected) > 1e-9) fail(event, 'resolve.score_mismatch', `score ${run.score} should be ${expected}`);
     const byTavern = state.results.get(week) ?? new Map<string, typeof result>();
     return { ...state, results: mapSet(state.results, week, mapSet(byTavern, tavern, result)) };
@@ -688,6 +691,17 @@ function release(state: Pick<LeagueState, 'owner' | 'taverns'>, tavern: string, 
     owner: mapDelete(state.owner, character),
     taverns: mapSet(state.taverns, tavern, { ...t, roster: t.roster.filter((c) => c !== character) }),
   };
+}
+
+/** Loot banked by the passed checks among `records`: each one's node `loot` in `mission`. */
+function lootOf(mission: Mission, records: ReadonlyArray<{ readonly node: string; readonly outcome: string }>): number {
+  let loot = 0;
+  for (const record of records) {
+    if (record.outcome !== 'pass') continue;
+    const node = mission.nodes.find((n) => n.id === record.node);
+    if (node?.kind === 'check') loot += node.loot;
+  }
+  return loot;
 }
 
 function mapSet<K, V>(map: ReadonlyMap<K, V>, key: K, value: V): ReadonlyMap<K, V> {

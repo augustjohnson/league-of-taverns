@@ -66,6 +66,7 @@ missions:
   maxRank: 8
   battlesPerPath: { min: 0, max: 3 }
   encounterCrRatio: 1.0
+  haul: 100                         # fixed haul: loot on every mission's best path (D-45)
   battleModel: ev-ttk-v0
 
 carryover:

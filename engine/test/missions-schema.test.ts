@@ -16,7 +16,7 @@ function validMission(): Record<string, unknown> {
     environment: 'swamp',
     nodes: [
       { id: 'start', rank: 0, kind: 'start' },
-      { id: 'look', rank: 1, kind: 'check', check: { type: 'skill', skill: 'perception', dc: 12 } },
+      { id: 'look', rank: 1, kind: 'check', check: { type: 'skill', skill: 'perception', dc: 12 }, loot: 100 },
       { id: 'fight', rank: 2, kind: 'battle', encounter: { creatures: [{ ref: 'crocodile', count: 2 }] } },
       { id: 'done', rank: 3, kind: 'end' },
     ],
@@ -50,12 +50,12 @@ describe('mission schema', () => {
     expect(mission.nodes).toHaveLength(10);
     expect(mission.edges).toHaveLength(11);
     const wade = mission.nodes.find((node) => node.id === 'wade-across');
-    expect(wade).toEqual({ id: 'wade-across', rank: 4, kind: 'check', check: { type: 'save', ability: 'con', dc: 12 } });
+    expect(wade).toEqual({ id: 'wade-across', rank: 4, kind: 'check', check: { type: 'save', ability: 'con', dc: 12 }, loot: 10 });
   });
 
   it('accepts a check with a requires gate', () => {
     const mission = validMission();
-    nodes(mission)[1] = { id: 'look', rank: 1, kind: 'check', check: { type: 'ability', ability: 'str', dc: 10, requires: { speed: 'fly' } } };
+    nodes(mission)[1] = { id: 'look', rank: 1, kind: 'check', check: { type: 'ability', ability: 'str', dc: 10, requires: { speed: 'fly' } }, loot: 5 };
     expect(parseMission(mission).ok).toBe(true);
   });
 
@@ -67,7 +67,7 @@ describe('mission schema', () => {
 
   it('reports a skill check missing `skill` at its path', () => {
     const mission = validMission();
-    nodes(mission)[1] = { id: 'look', rank: 1, kind: 'check', check: { type: 'skill', dc: 12 } };
+    nodes(mission)[1] = { id: 'look', rank: 1, kind: 'check', check: { type: 'skill', dc: 12 }, loot: 5 };
     expect(paths(mission)).toEqual(['nodes[1].check.skill']);
   });
 
@@ -81,9 +81,20 @@ describe('mission schema', () => {
 
   it('rejects vocabulary outside the closed lists and unknown keys', () => {
     const mission = validMission();
-    nodes(mission)[1] = { id: 'look', rank: 1, kind: 'check', check: { type: 'skill', skill: 'juggling', dc: 12, requires: { sense: 'smell' } } };
+    nodes(mission)[1] = { id: 'look', rank: 1, kind: 'check', check: { type: 'skill', skill: 'juggling', dc: 12, requires: { sense: 'smell' } }, loot: 5 };
     nodes(mission)[3] = { id: 'done', rank: 3, kind: 'end', title: 'prose belongs in chrome' };
     expect(paths(mission)).toEqual(['nodes[1].check.skill', 'nodes[1].check.requires', 'nodes[3]']);
+  });
+
+  it('requires a whole, non-negative loot on every check (D-45)', () => {
+    const mission = validMission();
+    const { loot: _loot, ...noLoot } = nodes(mission)[1]!;
+    nodes(mission)[1] = noLoot;
+    expect(paths(mission)).toEqual(['nodes[1].loot']);
+    nodes(mission)[1] = { ...noLoot, loot: -5 };
+    expect(paths(mission)).toEqual(['nodes[1].loot']);
+    nodes(mission)[1] = { ...noLoot, loot: 2.5 };
+    expect(paths(mission)).toEqual(['nodes[1].loot']);
   });
 
   it('reports every malformed field, not just the first', () => {

@@ -39,11 +39,12 @@ describe('projection', () => {
     ]);
   });
 
-  it('expected score is E[passed / attempted], not E[passed] / E[attempted]', () => {
-    // start → a ─pass→ done
-    //           └fail→ b → c → done      every check at p = 0.5 (+0 vs DC 11)
+  it('expected score is E[loot] / haul, and a failed check banks nothing', () => {
+    // start → a (2) ─pass→ done
+    //               └fail→ b (1) → c (1) → done      every check at p = 0.5 (+0 vs DC 11)
+    // Both routes can bank 2, so the haul is 2.
     const mission = missionOf(
-      [start(), skillCheck('a', 1, 'stealth', 11), skillCheck('b', 2, 'stealth', 11), skillCheck('c', 3, 'stealth', 11), end('done', 4)],
+      [start(), skillCheck('a', 1, 'stealth', 11, 2), skillCheck('b', 2, 'stealth', 11), skillCheck('c', 3, 'stealth', 11), end('done', 4)],
       [
         edge('start', 'a', 'always'),
         edge('a', 'done', 'pass'),
@@ -54,33 +55,29 @@ describe('projection', () => {
       ],
     );
     const projection = projectMission(zero, mission, baseOf, constantModel(1));
-    // Pass a: 1/1 at 0.5. Fail a: 3 attempted, b + c ~ Bin(2, 0.5) passed.
-    // E = 0.5 × 1 + 0.5 × (1/3) = 2/3, while E[passed] / E[attempted] = 1 / 2.
-    expect(projection.expectedScore).toBeCloseTo(2 / 3, 12);
-    const ePassed = 0.5 * 1 + 0.5 * 1;
-    const eAttempted = 0.5 * 1 + 0.5 * 3;
-    expect(ePassed / eAttempted).toBe(0.5);
+    // Pass a: 2 of 2 at 0.5. Fail a: b + c ~ Bin(2, 0.5) loot.
+    // E = 0.5 × 1 + 0.5 × (0.25 × 0 + 0.5 × 1/2 + 0.25 × 1) = 3/4.
+    expect(projection.expectedScore).toBeCloseTo(3 / 4, 12);
     expect(projection.reach).toEqual({ start: 1, a: 1, b: 0.5, c: 0.5, done: 1 });
     expectDistribution(projection, [
       [0, 0.125],
-      [1 / 3, 0.25],
-      [2 / 3, 0.125],
-      [1, 0.5],
+      [0.5, 0.25],
+      [1, 0.625],
     ]);
   });
 
-  it('any lost battle contributes 0 to the expectation', () => {
-    // A certain check, then a battle at p(win) = 0.3.
+  it('a lost battle keeps the loot banked before it (D-46)', () => {
+    // A certain check (1), a battle at p(win) = 0.3, then a certain check (3). Haul 4.
     const mission = missionOf(
-      [start(), skillCheck('c', 1, 'stealth', 1), battle('fight', 2), end('done', 3)],
-      [edge('start', 'c', 'always'), edge('c', 'fight', 'pass'), edge('c', 'fight', 'fail'), edge('fight', 'done', 'win')],
+      [start(), skillCheck('c', 1, 'stealth', 1), battle('fight', 2), skillCheck('d', 3, 'stealth', 1, 3), end('done', 4)],
+      [edge('start', 'c', 'always'), edge('c', 'fight', 'always'), edge('fight', 'd', 'win'), edge('d', 'done', 'always')],
     );
     const projection = projectMission(zero, mission, baseOf, constantModel(0.3));
-    expect(projection.expectedScore).toBeCloseTo(0.3, 12);
+    expect(projection.expectedScore).toBeCloseTo(0.7 * 0.25 + 0.3 * 1, 12);
     expect(projection.pDnf).toBeCloseTo(0.7, 12);
-    expect(projection.reach).toEqual({ start: 1, c: 1, fight: 1, done: 0.3 });
+    expect(projection.reach).toEqual({ start: 1, c: 1, fight: 1, d: 0.3, done: 0.3 });
     expectDistribution(projection, [
-      [0, 0.7],
+      [0.25, 0.7],
       [1, 0.3],
     ]);
   });
@@ -89,11 +86,13 @@ describe('projection', () => {
     // All modifiers 0: survival DC 12 → 0.45, stealth DC 14 → 0.35,
     // athletics DC 13 → 0.4, Con save DC 12 → 0.45. Every battle at 0.5.
     const projection = projectMission(zero, loadMission(EXAMPLE_MISSION), baseOf, constantModel(0.5));
-    // Find the path (0.45): slip past (0.35) then haul the chain, or fail into the toll fight.
-    const viaPath = 0.35 * (0.4 * 1 + 0.6 * (0.45 * (3 / 4) + 0.55 * (2 / 4))) + 0.65 * 0.5 * (1 / 2);
-    // Miss it (0.55): the bog ambush (0.5), then haul the chain (1/2), or wade with 0 of 2 so far.
-    const viaBog = 0.5 * (0.4 * (1 / 2) + 0.6 * (0.45 * (1 / 3) + 0.55 * 0));
-    expect(projection.expectedScore).toBeCloseTo(0.45 * viaPath + 0.55 * viaBog, 12);
+    // Loot: find-path 20, slip-past 30, haul-chain 50, wade-across 10; haul 100.
+    // Find the path (0.45, +20): slip past (0.35, +30) then haul the chain (+50) or
+    // wade (+10), or fail into the toll fight, which keeps the 20 win or lose.
+    const viaPath = 20 + 0.35 * (30 + 0.4 * 50 + 0.6 * 0.45 * 10);
+    // Miss it (0.55): lose the bog ambush with nothing (0.5), or haul the chain or wade.
+    const viaBog = 0.5 * (0.4 * 50 + 0.6 * 0.45 * 10);
+    expect(projection.expectedScore).toBeCloseTo((0.45 * viaPath + 0.55 * viaBog) / 100, 12);
     expect(projection.pDnf).toBeCloseTo(0.45 * 0.65 * 0.5 + 0.55 * 0.5, 12);
     expect(projection.reach['toll-seized']).toBeCloseTo(0.45 * 0.65 * 0.5, 12);
     expect(projection.reach['haul-chain']).toBeCloseTo(0.45 * 0.35 + 0.55 * 0.5, 12);
@@ -111,9 +110,9 @@ describe('projection', () => {
     }
   });
 
-  it('merges equal scores by reduced fraction and sorts by score', () => {
-    // a ─pass→ b → done: 1/2 or 2/2.   a ─fail→ c → d → e → done: k/4.
-    // 1 of 2 and 2 of 4 are the same score, so they share one entry.
+  it('merges runs that bank the same loot and sorts by score', () => {
+    // a ─pass→ b → done: 1 or 2 loot.   a ─fail→ c → d → e → done: 0 to 3. Haul 3.
+    // Both routes can bank 1 or 2, so those share entries.
     const mission = missionOf(
       [
         start(),
@@ -135,20 +134,19 @@ describe('projection', () => {
       ],
     );
     const projection = projectMission(zero, mission, baseOf, constantModel(1));
-    // Fail a (0.5), then c, d, e ~ Bin(3, 0.5) of 4: 0, 1/4, 2/4, 3/4 at 1/8, 3/8, 3/8, 1/8.
-    // Pass a (0.5), then b: 1/2 or 1 at 1/2 each.
+    // Fail a (0.5), then c, d, e ~ Bin(3, 0.5): 0, 1, 2, 3 at 1/8, 3/8, 3/8, 1/8.
+    // Pass a (0.5), then b: 1 or 2 at 1/2 each.
     expectDistribution(projection, [
       [0, 0.0625],
-      [0.25, 0.1875],
-      [0.5, 0.1875 + 0.25],
-      [0.75, 0.0625],
-      [1, 0.25],
+      [1 / 3, 0.1875 + 0.25],
+      [2 / 3, 0.1875 + 0.25],
+      [1, 0.0625],
     ]);
   });
 
   it('projects a gated check nobody qualifies for as a certain fail', () => {
     const mission = missionOf(
-      [start(), check('c', 1, { type: 'skill', skill: 'stealth', dc: 2, requires: { sense: 'truesight' } }), skillCheck('x', 2, 'stealth', 1), end('done', 3)],
+      [start(), check('c', 1, { type: 'skill', skill: 'stealth', dc: 2, requires: { sense: 'truesight' } }, 2), skillCheck('x', 2, 'stealth', 1), end('done', 3)],
       [edge('start', 'c', 'always'), edge('c', 'done', 'pass'), edge('c', 'x', 'fail'), edge('x', 'done', 'always')],
     );
     const projection = projectMission(zero, mission, baseOf, constantModel(1));
@@ -221,5 +219,5 @@ describe('projection property', () => {
     expect(gated).toBeGreaterThan(CASES / 10);
     expect(withAdvantage).toBeGreaterThan(CASES / 10);
     expect(withDnf).toBeGreaterThan(CASES / 4);
-  });
+  }, 30_000); // about 3 s alone; the 5 s default is too tight when the whole suite runs in parallel
 });

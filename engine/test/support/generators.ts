@@ -82,7 +82,7 @@ function candidate(rng: Rng, id: string): Mission {
       const nodeId = `n${serial++}`;
       const roll = rng();
       if (rank > 1 && roll < 0.08) layer.push({ id: nodeId, rank, kind: 'end' });
-      else if (roll < 0.68) layer.push({ id: nodeId, rank, kind: 'check', check: randomCheck(rng) });
+      else if (roll < 0.68) layer.push({ id: nodeId, rank, kind: 'check', check: randomCheck(rng), loot: int(rng, 0, 5) });
       else layer.push({ id: nodeId, rank, kind: 'battle', encounter: { creatures: randomEncounter(rng) } });
     }
     byRank.push(layer);

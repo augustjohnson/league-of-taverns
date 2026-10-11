@@ -99,8 +99,10 @@
 - **Fixed haul:** every mission's best path pays the same total loot, so every
   week counts equally **[D-45]**.
 - **Home bonus:** on its sponsor's mission, a tavern's loot × 1.25 **[D-47]**.
-- *Not yet in the engine,* which still scores checks passed ÷ checks attempted,
-  ×100, with 0 for a DNF.
+- In the engine, score = loot ÷ haul and points = round(score ×
+  `pointsScale`). With the haul and `pointsScale` both 100, points equal loot.
+- *The home bonus is not in the engine yet:* it needs a sponsor for each
+  tavern and week in the season config.
 - Each week runs **once**, as a single real random roll per check and battle
   **[D-13, details to come]**. The rolls are recorded in the event log, so the
   result is final and auditable, though not re-derivable from a seed.

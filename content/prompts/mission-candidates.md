@@ -24,9 +24,11 @@ separately.
 - A **check** is one d20 roll plus the best modifier in the party against a DC.
   Pass chance = clamp((21 − (DC − modifier)) / 20, 0, 1). The party member with
   the highest modifier always makes the roll.
+- Each check carries **loot**, banked when it passes. A failed check banks
+  nothing.
 - A **battle** is resolved from party strength vs encounter strength. Losing
-  any battle ends the mission with score 0.
-- Otherwise score = checks passed / checks attempted on the path taken.
+  a battle ends the mission, and the party keeps the loot banked so far.
+- Score = loot banked ÷ the haul (the most loot any path can bank).
 - Failed checks should usually route into a battle or a harder detour. That
   coupling is the core tension.
 
@@ -46,6 +48,8 @@ Party CR budget B = {{party_cr}}. Archetype summary of the draftable pool:
   Each battle node has exactly one `win` edge. There are no `lose` edges.
 - Every path from start to an end attempts at least one check.
 - DC between {{dc_min}} and {{dc_max}}.
+- Every check has a whole-number `loot` ≥ 0, and the best path banks exactly
+  {{haul}} (the fixed haul).
 - Encounter creatures must be slugs from this list, and total encounter CR must
   be ≤ {{encounter_cr_ratio}} × B:
   {{allowed_encounter_slugs}}
@@ -60,6 +64,8 @@ Party CR budget B = {{party_cr}}. Archetype summary of the draftable pool:
 - Spread DCs. Include at least one check most parties pass and one that only a
   specialist passes reliably.
 - Two or three distinct paths. A branch nobody can reach is wasted.
+- Put more loot on later checks, and the hardest battle late in the mission,
+  so a late loss costs about half the haul.
 
 ## Output
 

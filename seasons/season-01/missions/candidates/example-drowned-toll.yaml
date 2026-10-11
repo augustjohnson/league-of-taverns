@@ -23,10 +23,12 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: survival, dc: 12 }
+    loot: 20
   - id: slip-past
     rank: 2
     kind: check
     check: { type: skill, skill: stealth, dc: 14 }
+    loot: 30
   - id: bog-ambush
     rank: 2
     kind: battle
@@ -38,6 +40,7 @@ nodes:
     rank: 3
     kind: check
     check: { type: skill, skill: athletics, dc: 13 }
+    loot: 50
   - id: toll-fight
     rank: 3
     kind: battle
@@ -49,6 +52,7 @@ nodes:
     rank: 4
     kind: check
     check: { type: save, ability: con, dc: 12 }
+    loot: 10
   - { id: crossed-dry, rank: 5, kind: end }
   - { id: crossed-wet, rank: 5, kind: end }
   - { id: toll-seized, rank: 5, kind: end }

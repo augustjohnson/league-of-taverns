@@ -332,7 +332,7 @@ describe('validateSeason', () => {
       environment: 'tower',
       nodes: [
         { id: 'start', rank: 0, kind: 'start' },
-        { id: 'climb', rank: 1, kind: 'check', check: { type: 'skill', skill: 'athletics', dc: 25 } },
+        { id: 'climb', rank: 1, kind: 'check', check: { type: 'skill', skill: 'athletics', dc: 25 }, loot: 100 },
         { id: 'duel', rank: 2, kind: 'battle', encounter: { creatures: [{ ref: 'mage', count: 1 }] } },
         { id: 'done', rank: 3, kind: 'end' },
       ],

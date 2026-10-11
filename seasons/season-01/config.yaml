@@ -65,6 +65,7 @@ missions:
   maxRank: 8
   battlesPerPath: { min: 0, max: 3 }
   encounterCrRatio: 1.0             # total encounter CR ≤ ratio × B
+  haul: 100                         # fixed haul: loot on every mission's best path (D-45)
   battleModel: ev-ttk-v0            # engine/src/resolution BattleModel id (T6.2)
 
 carryover:                          # OPEN D-11. Applies when season-02 is created.

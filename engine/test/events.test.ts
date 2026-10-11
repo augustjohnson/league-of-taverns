@@ -37,6 +37,7 @@ const config: SeasonConfig = {
     maxRank: 8,
     battlesPerPath: { min: 0, max: 3 },
     encounterCrRatio: 1,
+    haul: 100,
     battleModel: 'ev-ttk-v0',
   },
   carryover: {
@@ -55,7 +56,7 @@ const mission: Mission = {
   environment: 'swamp',
   nodes: [
     { id: 'start', rank: 0, kind: 'start' },
-    { id: 'find-path', rank: 1, kind: 'check', check: { type: 'skill', skill: 'survival', dc: 12, requires: { sense: 'darkvision' } } },
+    { id: 'find-path', rank: 1, kind: 'check', check: { type: 'skill', skill: 'survival', dc: 12, requires: { sense: 'darkvision' } }, loot: 100 },
     { id: 'bog-ambush', rank: 2, kind: 'battle', encounter: { creatures: [{ ref: 'crocodile', count: 3 }] } },
     { id: 'crossed', rank: 3, kind: 'end' },
   ],
@@ -172,6 +173,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
       dnf: false,
       checksPassed: 0,
       checksAttempted: 1,
+      loot: 0,
       score: 0,
     },
     projected: { expectedScore: 0.55, pDnf: 0.2 },
@@ -302,6 +304,7 @@ describe('replay and verification', () => {
       dnf: lost,
       checksPassed: 0,
       checksAttempted: 1,
+      loot: 0,
       score: 0,
     };
   }
@@ -389,6 +392,7 @@ describe('replay and verification', () => {
     expect(fields({ run: { ...won, dnf: true }, points: 0 })).toEqual(['run.dnf']);
     expect(fields({ run: { ...won, checksPassed: 1, score: 1 }, points: 100 })).toEqual(['run.checksPassed', 'run.score']);
     expect(fields({ run: won, points: 7 })).toEqual(['points']);
+    expect(fields({ run: { ...won, loot: 5 }, points: 0 })).toEqual(['run.loot']);
     expect(fields({ run: { ...won, nodes: won.nodes.slice(0, 1) }, points: 0 })).toEqual(['run.nodes[1]']);
     expect(fields({ run: { ...won, nodes: [{ ...won.nodes[0]!, actor: 'stranger' } as (typeof won.nodes)[0], won.nodes[1]!] }, points: 0 })).toEqual(['run.nodes[0].actor']);
     expect(fields({ mission: 'another-mission' })).toEqual(['mission']);

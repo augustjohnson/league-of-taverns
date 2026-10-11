@@ -32,6 +32,8 @@ export interface StartNode extends NodeBase {
 export interface CheckNode extends NodeBase {
   readonly kind: 'check';
   readonly check: CheckSpec;
+  /** Loot banked when the check passes (docs/decisions.md D-45). Nothing is banked on a fail. */
+  readonly loot: number;
 }
 
 export type CheckSpec = CheckTarget & {

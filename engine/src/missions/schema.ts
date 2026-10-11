@@ -59,7 +59,7 @@ const encounterSchema = z.strictObject({
 
 const missionNodeSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...nodeFields, kind: z.literal('start') }),
-  z.strictObject({ ...nodeFields, kind: z.literal('check'), check: checkSpecSchema }),
+  z.strictObject({ ...nodeFields, kind: z.literal('check'), check: checkSpecSchema, loot: z.number().int().nonnegative() }),
   z.strictObject({ ...nodeFields, kind: z.literal('battle'), encounter: encounterSchema }),
   z.strictObject({ ...nodeFields, kind: z.literal('end') }),
 ]);

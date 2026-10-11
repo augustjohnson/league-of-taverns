@@ -27,6 +27,7 @@ function seasonConfig(opts: { size?: number; deadlineWeek?: number | null } = {}
       maxRank: 8,
       battlesPerPath: { min: 0, max: 3 },
       encounterCrRatio: 1,
+      haul: 100,
       battleModel: 'ev-ttk-v0',
     },
     carryover: { mode: 'none', keepersPerTavern: 0, keeperCost: 'none', championBonusKeepers: 0, maxModifierChangePoints: 0 },

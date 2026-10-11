@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { topologicalOrder, validateMission } from '../src/missions';
+import { missionHaul, topologicalOrder, validateMission } from '../src/missions';
 import type { BattleNode, CheckNode, Mission, MissionEdge, MissionIssue, MissionNode, MissionRules } from '../src/missions';
 import type { CrEighths } from '../src/vocabulary';
 // The engine has no YAML parser (it does no I/O), so the example file is read
@@ -31,11 +31,12 @@ const RULES: MissionRules = {
 
 const start = (id = 'start', rank = 0): MissionNode => ({ id, rank, kind: 'start' });
 const end = (id: string, rank: number): MissionNode => ({ id, rank, kind: 'end' });
-const check = (id: string, rank: number, dc = 12, extra: Partial<CheckNode['check']> = {}): CheckNode => ({
+const check = (id: string, rank: number, dc = 12, extra: Partial<CheckNode['check']> = {}, loot = 1): CheckNode => ({
   id,
   rank,
   kind: 'check',
   check: { type: 'skill', skill: 'perception', dc, ...extra } as CheckNode['check'],
+  loot,
 });
 const battle = (id: string, rank: number, creatures: BattleNode['encounter']['creatures'] = [{ ref: 'goblin', count: 2 }]): BattleNode => ({
   id,
@@ -209,6 +210,32 @@ describe('mission validator', () => {
       ],
     });
     expect(validate(mission)).toEqual([]);
+  });
+
+  it('checks the fixed haul only when the rules set one (haul)', () => {
+    // start → a (30) ─pass→ b (70) → done      best path banks 100
+    //                └fail→ c (90) → done      a fail banks nothing, so 90
+    const mission = tiny({
+      nodes: [start(), check('a', 1, 12, {}, 30), check('b', 2, 12, {}, 70), check('c', 2, 12, {}, 90), end('done', 3)],
+      edges: [
+        edge('start', 'a', 'always'),
+        edge('a', 'b', 'pass'),
+        edge('a', 'c', 'fail'),
+        edge('b', 'done', 'always'),
+        edge('c', 'done', 'always'),
+      ],
+    });
+    expect(missionHaul(mission)).toBe(100);
+    expect(validate(mission)).toEqual([]);
+    expect(validate(mission, { ...RULES, haul: 100 })).toEqual([]);
+    const issues = validate(mission, { ...RULES, haul: 120 });
+    expect(codes(issues)).toEqual(['haul@done']);
+    expect(issues[0]?.message).toContain('start → a → b → done banks 100');
+    expect(issues[0]?.message).toContain('fixed haul of 120');
+  });
+
+  it('accepts the example mission under the season-01 fixed haul of 100 (haul)', () => {
+    expect(validate(loadMission(EXAMPLE), { ...RULES, haul: 100 })).toEqual([]);
   });
 
   it('rejects a DC outside the season band (dc)', () => {
