@@ -13,6 +13,12 @@ league doesn't use.
   an optional human seat (player vs bots); `runMockSeason` is a session with
   no human, driven straight through. Tests call it directly. It imports nothing from Node, so
   the browser playground bundles it.
+- `src/reports.ts` is the playground's season reports (drafts): `luckReport`
+  (loot above projection, score percentile, checks and battles won above
+  their chances, rank vs projected rank), `titleOdds` (Monte Carlo of the
+  rest of the season after the draft and each week) and `benchReport` (loot
+  left on the bench, by projection and with the same dice), over a shared
+  `ReportContext`; `luckSeason` and `aggregateLuck` roll luck up over a batch.
 - `src/load.ts` reads a season folder through the scripts loaders
   (`@league-of-taverns/scripts/lib/*`, a workspace dependency).
 - `src/balance-report.ts` aggregates the output (T9.3).
@@ -77,6 +83,21 @@ open. The tabs:
 - **Standings:** total loot, weekly loot, each tavern's bot and the
   champion; each week's table with actual and projected points and checks
   passed; waiver outcomes.
+- **Reports** (drafts, `src/reports.ts`), for the seeded run or your finished
+  season: **title odds** after the draft and after each week (2,000 simulated
+  finishes; played weeks count as played, each tavern fields its own
+  strategy's lineup from its current roster and draws loot from that lineup's
+  exact distribution, home bonus included; future waivers aren't modeled), as
+  a chart and a table; a **luck index** per tavern (loot minus projection, the
+  mean percentile of each week's loot in its own distribution, checks and
+  battles won minus their chances, and the rank it would hold had everyone
+  banked exactly their projection); and **loot on the bench** per
+  tavern-week. A benched character never rolled, so the bench has two lenses:
+  *projected* (the best lineup by exact expected loot: the call you could have
+  made) and *same dice* (rerun with the week's seed, where every mission node
+  has its own fixed roll: hindsight with the luck held fixed). It shows the
+  best one-for-one swap, the best lineups by each lens, and the week and
+  season rank the best same-dice lineups would have reached.
 - **Weeks:** a week's mission as a layered graph; a tavern's locked lineup,
   its path taken and each node's projected reach; the node-by-node roll log.
 - **Lineup lab:** any four characters from the pool or a roster, any captain,
@@ -84,8 +105,13 @@ open. The tabs:
   and the `evTtkBreakdown` per battle, the projection and its score
   distribution; Roll once, and Roll 1,000 against the projection.
 - **Draft board, Pool, Event log** (filterable, pretty JSON, copy the NDJSON
-  to the clipboard) and **Batch** (the CLI's aggregate table for 10–200
-  seasons).
+  to the clipboard) and **Batch**: the CLI's aggregate table for 10–200
+  seasons, plus luck over the batch. A season's total loot is exactly its
+  projected loot (strength) plus its loot above projection (luck), so it
+  shows each one's share of the spread of totals within a season, the share
+  of titles won by each luck rank and each strength rank against par, the
+  champion's mean luck, and each bot's mean luck (it should wash out to about
+  0 and 50%; a bot that stays lucky points to a projection bias).
 
 How it is built: `src/build-playground.ts` loads the season with the scripts
 loaders (`loadMockSeasonParts`), serializes it with `serializeSeason`
