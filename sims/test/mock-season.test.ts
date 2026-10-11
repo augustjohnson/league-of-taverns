@@ -17,8 +17,8 @@ describe('one seeded mock season', () => {
     expect(state.phase).toBe('complete');
     expect(events[0]!.type).toBe('season.created');
     expect(events.at(-1)!.type).toBe('week.finalized');
-    expect(state.finalizedWeeks).toEqual(new Set([1, 2, 3]));
-    expect(state.waivers.resolvedWeeks).toEqual(new Set([1, 2]));
+    expect(state.finalizedWeeks).toEqual(new Set([1, 2, 3, 4, 5, 6]));
+    expect(state.waivers.resolvedWeeks).toEqual(new Set([1, 2, 3, 4, 5]));
   });
 
   it('writes the events in lifecycle order', () => {
@@ -29,8 +29,8 @@ describe('one seeded mock season', () => {
     expect(firstOf('tavern.joined')).toBeGreaterThan(types.lastIndexOf('character.pooled'));
     expect(firstOf('draft.pick')).toBeGreaterThan(types.lastIndexOf('tavern.joined'));
     expect(firstOf('lineup.set')).toBeGreaterThan(types.lastIndexOf('draft.pick'));
-    expect(types.filter((t) => t === 'week.finalized')).toHaveLength(3);
-    expect(types.filter((t) => t === 'waiver.resolved')).toHaveLength(2);
+    expect(types.filter((t) => t === 'week.finalized')).toHaveLength(6);
+    expect(types.filter((t) => t === 'waiver.resolved')).toHaveLength(5);
   });
 
   it('stamps proper envelopes: contiguous seq, a prev chain, ordered timestamps, system/commissioner/bot actors', () => {
@@ -75,7 +75,7 @@ describe('one seeded mock season', () => {
   });
 
   it('pins the sim-1 champion', () => {
-    expect(sim1.summary.champion).toEqual({ tavern: 'the-gilded-flagon', bot: 'cr-greedy' });
+    expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'cr-greedy' }]);
     expect(sim1.summary.standings[0]!.tavern).toBe('the-gilded-flagon');
   });
 });
@@ -99,9 +99,9 @@ describe('many seasons', () => {
     const summaries = Array.from({ length: 20 }, (_, i) => runMockSeason(input, { seed: runSeed('batch', i + 1) }).summary);
     const totals = aggregate(summaries);
     expect(totals.runs).toBe(20);
-    expect(Object.values(totals.byBot).reduce((n, b) => n + b.titles, 0)).toBe(20);
+    expect(Object.values(totals.byBot).reduce((n, b) => n + b.titles, 0)).toBeCloseTo(20);
     expect(Object.values(totals.byBot).reduce((n, b) => n + b.seats, 0)).toBe(120);
-    expect(totals.higherProjectedWins.share).toBeGreaterThan(0);
+    expect(totals.bestProjectedTops.share).toBeGreaterThan(0);
     expect(totals.dnfRate).toBeGreaterThanOrEqual(0);
     expect(totals.dnfRate).toBeLessThan(1);
   });

@@ -1,6 +1,6 @@
 /**
  * Pure view-model helpers for the playground: mission graph layout, score
- * histograms, Monte Carlo sampling, matchup tiebreaks, the draft board, and
+ * histograms, Monte Carlo sampling, the draft board, and
  * the small formatters the page uses. No DOM, so tests run them in Node.
  */
 import { SKILLS, replay, runMission, rngFor } from '@league-of-taverns/engine';
@@ -15,9 +15,7 @@ import type {
   MissionNode,
   Modifier,
   Party,
-  SeasonConfig,
   Skill,
-  WeekResult,
 } from '@league-of-taverns/engine';
 import type { Aggregate } from '../season-runner';
 
@@ -205,25 +203,6 @@ export function partyFrom(captain: string, allies: ReadonlyArray<string>, statsO
   return { captain, members: [captain, ...allies].map(statsOf) };
 }
 
-// ── matchups ───────────────────────────────────────────────────────────────
-
-export type DecidedBy = 'points' | SeasonConfig['scoring']['tiebreakers'][number] | 'tie';
-
-/**
- * What separated a matchup, following `matchupWinner`'s order: points, then
- * each tiebreaker. `seeded_coin` always separates, so it is named whenever
- * everything before it is level (the winner itself comes from the summary).
- */
-export function decidedBy(home: WeekResult, away: WeekResult, tiebreakers: SeasonConfig['scoring']['tiebreakers']): DecidedBy {
-  if (home.points !== away.points) return 'points';
-  for (const tb of tiebreakers) {
-    if (tb === 'seeded_coin') return tb;
-    const [h, a] = tb === 'projected' ? [home.projected, away.projected] : [home.checksPassed, away.checksPassed];
-    if (h !== a) return tb;
-  }
-  return 'tie';
-}
-
 // ── draft board ────────────────────────────────────────────────────────────
 
 export interface DraftCell {
@@ -371,13 +350,13 @@ export function eventSummary(event: LeagueEvent): string {
 
 /** The CLI's aggregate table (mock-season.ts `print`), as rows of cells. */
 export function aggregateRows(totals: Aggregate): { readonly header: ReadonlyArray<string>; readonly rows: ReadonlyArray<ReadonlyArray<string>> } {
-  const header = ['bot', 'seats', 'titles', 'titles/seat', 'win%', 'mean pts', 'mean proj', 'DNF%'];
+  const header = ['bot', 'seats', 'titles', 'titles/seat', 'week top%', 'mean pts', 'mean proj', 'DNF%'];
   const rows = Object.entries(totals.byBot).map(([bot, a]) => [
     bot,
     String(a.seats),
-    String(a.titles),
+    Number.isInteger(a.titles) ? String(a.titles) : a.titles.toFixed(1),
     a.titlesPerSeat.toFixed(3),
-    pct(a.winRate),
+    pct(a.weekTopRate),
     a.meanPoints.toFixed(1),
     a.meanProjected.toFixed(1),
     pct(a.dnfRate),

@@ -25,6 +25,7 @@ import {
   seasonConfigSchema,
   toSchemaIssues,
   validateModifiers,
+  validateSponsors,
 } from '@league-of-taverns/engine';
 import type {
   CrEighths,
@@ -32,6 +33,7 @@ import type {
   PooledCharacter,
   SchemaIssue,
   SeasonConfig,
+  Sponsor,
 } from '@league-of-taverns/engine';
 import { z } from 'zod';
 import { ValidationFailure } from './main';
@@ -404,16 +406,22 @@ export type ScheduleWeek = z.infer<typeof scheduleWeekSchema>;
 
 export interface SeasonSchedule {
   readonly season: string;
+  /** The GM's gods and the tavern each sponsors (D-44). Names and voice live in chrome. */
+  readonly sponsors: ReadonlyArray<Sponsor>;
   readonly weeks: ReadonlyArray<ScheduleWeek>;
 }
 
 const scheduleWeekSchema = payloadSchemas['season.created'].shape.schedule.element;
+const sponsorSchema = payloadSchemas['season.created'].shape.sponsors.element;
 
-const scheduleFileSchema = z.strictObject({ season: kebabIdSchema, weeks: z.array(scheduleWeekSchema) });
+const scheduleFileSchema = z.strictObject({ season: kebabIdSchema, sponsors: z.array(sponsorSchema), weeks: z.array(scheduleWeekSchema) });
 
 /**
- * Load schedule.yaml. `season` matches config.yaml, and the weeks are
- * numbered 1..N in order with N equal to config.yaml `weeks`.
+ * Load schedule.yaml, the GM's public plan for the season. `season` matches
+ * config.yaml, the weeks are numbered 1..N in order with N equal to
+ * config.yaml `weeks`, and `sponsors` passes `validateSponsors` (each week's
+ * `sponsor` is listed, one week per sponsor, one sponsor per tavern).
+ * `loadSeason` also checks every sponsored tavern is in managers.yaml.
  */
 export function loadSchedule(season: SeasonSource, root: RepoRoot = REPO_ROOT): SeasonSchedule {
   const ctx = seasonContext(season, root);
@@ -434,6 +442,7 @@ function readSchedule(ctx: SeasonContext, loaded: LoadedSeasonConfig): SeasonSch
   if (schedule.weeks.length !== config.weeks) {
     issues.add('weeks', `has ${schedule.weeks.length} entries, but config.yaml weeks is ${config.weeks}`);
   }
+  for (const issue of validateSponsors(schedule.sponsors, schedule.weeks)) issues.add('sponsors', issue.message);
   issues.throwIfAny();
   return schedule;
 }
@@ -508,6 +517,15 @@ export function loadSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT): Lo
   const pool = attempt(() => readPool(ctx, loaded, snapshot));
   const managers = attempt(() => readManagers(ctx, loaded));
   const schedule = attempt(() => readSchedule(ctx, loaded));
-  if (pool === undefined || managers === undefined || schedule === undefined) throw new ValidationFailure(failures.join('\n'));
+  if (managers !== undefined && schedule !== undefined) {
+    const label = seasonFile(ctx, loaded.files.schedule).label;
+    const taverns = new Set(managers.taverns.map((t) => t.id));
+    schedule.sponsors.forEach((sponsor, i) => {
+      if (!taverns.has(sponsor.tavern)) {
+        failures.push(`${label}: sponsors[${i}].tavern: ${JSON.stringify(sponsor.tavern)} is not a tavern in ${loaded.files.managers}`);
+      }
+    });
+  }
+  if (pool === undefined || managers === undefined || schedule === undefined || failures.length > 0) throw new ValidationFailure(failures.join('\n'));
   return { ...loaded, dir: ctx.dir, snapshot, pool, managers, schedule };
 }

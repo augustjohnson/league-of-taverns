@@ -70,19 +70,25 @@ function print(season: string, seed: string, totals: Aggregate, summaries: Reado
   );
   if (runs === 1) {
     const only = summaries[0]!;
-    console.log(`champion: ${only.champion.tavern} (${only.champion.bot})`);
+    console.log(`champion: ${only.champions.map((c) => `${c.tavern} (${c.bot})`).join(' and ')}`);
     for (const row of only.standings) {
-      const weekly = only.weeks.map((w) => w.results.find((r) => r.tavern === row.tavern)?.points ?? 0).join('/');
-      console.log(`  ${row.rank}. ${row.tavern.padEnd(20)} ${row.bot.padEnd(15)} ${row.wins}-${row.losses}-${row.ties}  ${String(row.pointsFor).padStart(4)} pts (${weekly})`);
+      const weekly = only.weeks
+        .map((w) => {
+          const r = w.results.find((x) => x.tavern === row.tavern);
+          return `${r?.points ?? 0}${r?.home ? '*' : ''}`;
+        })
+        .join('/');
+      console.log(`  ${row.rank}. ${row.tavern.padEnd(20)} ${row.bot.padEnd(15)} ${String(row.points).padStart(4)} pts (${weekly})`);
     }
+    console.log('  (* = home week: loot × scoring.homeBonus)');
   }
-  const header = ['bot', 'seats', 'titles', 'titles/seat', 'win%', 'mean pts', 'mean proj', 'DNF%'];
+  const header = ['bot', 'seats', 'titles', 'titles/seat', 'week top%', 'mean pts', 'mean proj', 'DNF%'];
   const rows = Object.entries(totals.byBot).map(([bot, a]) => [
     bot,
     String(a.seats),
-    String(a.titles),
+    fmtTitles(a.titles),
     a.titlesPerSeat.toFixed(3),
-    pct(a.winRate),
+    pct(a.weekTopRate),
     a.meanPoints.toFixed(1),
     a.meanProjected.toFixed(1),
     pct(a.dnfRate),
@@ -91,13 +97,18 @@ function print(season: string, seed: string, totals: Aggregate, summaries: Reado
   const line = (cells: ReadonlyArray<string>): string => cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]!) : c.padStart(widths[i]!))).join('  ');
   console.log(line(header));
   for (const r of rows) console.log(line(r));
-  const hp = totals.higherProjectedWins;
-  console.log(`higher-projected tavern won ${hp.wins}/${hp.matchups} matchups (${pct(hp.share)})`);
+  const bp = totals.bestProjectedTops;
+  console.log(`best-projected tavern topped its week ${bp.tops}/${bp.weeks} times (${pct(bp.share)})`);
   console.log(`DNF rate: ${pct(totals.dnfRate)} of mission runs; tavern-weeks with no lineup: ${totals.noLineupWeeks}`);
   if (runs > 1) {
     const seats = Object.entries(totals.titlesByTavern)
-      .map(([tavern, titles]) => `${tavern} ${titles}`)
+      .map(([tavern, titles]) => `${tavern} ${fmtTitles(titles)}`)
       .join(', ');
     console.log(`titles by seat: ${seats}`);
   }
+}
+
+/** Whole titles as integers, split titles to one decimal. */
+function fmtTitles(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }

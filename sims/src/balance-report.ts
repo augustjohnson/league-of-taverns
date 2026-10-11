@@ -4,7 +4,7 @@
  * Answers:
  * - Does one strategy dominate? Win rate and title rate per bot strategy,
  *   with confidence intervals and the random-bot baseline.
- * - How often does the best-projected tavern win? Per week (H2H) and per season.
+ * - How often does the best-projected tavern win? Per week (tops the table) and per season.
  *   Too often means luck is irrelevant, too rarely means skill is.
  * - Which characters are auto-picks (high ADP, near-100% rostered) and which
  *   are never picked? Pick rate, mean draft position, lineup share, and points

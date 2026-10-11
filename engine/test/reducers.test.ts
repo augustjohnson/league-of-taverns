@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { InvalidEventError, applyEvent, initialState } from '../src/events/reducers';
 import { lineHash, replay, replayLog } from '../src/events/replay';
-import { freeAgents, onTheClock, seasonStandings, weekResults } from '../src/events/selectors';
+import { freeAgents, homeTavern, onTheClock, seasonStandings, weekResults } from '../src/events/selectors';
 import type { LeagueState } from '../src/events/state';
 import type { LeagueEvent, PayloadByType } from '../src/events/types';
-import { headToHeadSchedule, standings, type SeasonConfig } from '../src/league';
+import { standings, type SeasonConfig } from '../src/league';
 import { draftOrderSeed, rngFor } from '../src/rng';
 import { draftOrder, snakePickOwner, type Lineup } from '../src/roster';
 import type { CrEighths } from '../src/vocabulary';
@@ -21,6 +21,7 @@ import {
   missionFor,
   resolution,
   schedule,
+  sponsors,
   waiverResolution,
 } from './support/league-log';
 
@@ -55,7 +56,7 @@ function rejection(state: LeagueState, event: LeagueEvent): InvalidEventError {
 
 function created(patch: Partial<SeasonConfig>): LeagueState {
   const cfg = miniConfig(patch);
-  return applyEvent(initialState(), candidate(initialState(), 'season.created', { config: cfg, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule().filter((w) => w.week <= cfg.weeks) }, COMMISSIONER));
+  return applyEvent(initialState(), candidate(initialState(), 'season.created', { config: cfg, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule().filter((w) => w.week <= cfg.weeks), sponsors: sponsors() }, COMMISSIONER));
 }
 
 function joined(state: LeagueState, taverns: ReadonlyArray<string>, pool = POOL.slice(0, 8)): LeagueState {
@@ -185,20 +186,27 @@ describe('mini-season replay', () => {
     expect(weekResults(at.final, 3)).toEqual([]);
   });
 
-  it('seasonStandings: head to head over finalized weeks', () => {
-    const rows = seasonStandings(at.final);
-    const matchups = headToHeadSchedule([...TAVERNS], 2);
-    const results = [...weekResults(at.final, 1), ...weekResults(at.final, 2)];
-    expect(rows).toEqual(standings(matchups, results, config, rngFor(`${SEASON}/standings`, 'coin')));
-    expect(rows).toHaveLength(4);
-    // Coin flips are in the tiebreak list, so no game ends tied: 4 games, 4 wins.
-    expect(rows.reduce((n, r) => n + r.wins, 0)).toBe(4);
-    expect(rows.reduce((n, r) => n + r.losses, 0)).toBe(4);
-    for (const row of rows) {
-      expect(row.wins + row.losses + row.ties).toBe(2);
-      expect(row.pointsFor).toBe(results.filter((r) => r.tavern === row.tavern).reduce((n, r) => n + r.points, 0));
+  it('homeTavern: each week\'s sponsor\'s tavern, whose points carry the home bonus', () => {
+    expect(homeTavern(at.final, 1)).toBe(A);
+    expect(homeTavern(at.final, 2)).toBe(B);
+    expect(homeTavern(at.final, 3)).toBeNull();
+    expect(homeTavern(initialState(), 1)).toBeNull();
+    for (const week of [1, 2]) {
+      for (const [tavern, r] of at.final.results.get(week)!) {
+        const factor = tavern === homeTavern(at.final, week) ? 1.25 : 1;
+        expect(r.points).toBe(Math.round(r.run.score * 100 * factor));
+        expect(r.projectedPoints).toBeCloseTo(r.projected.expectedScore * 100 * factor, 9);
+      }
     }
-    expect(seasonStandings(at.w1Resolved).every((r) => r.wins + r.losses === 0)).toBe(true);
+  });
+
+  it('seasonStandings: total points over finalized weeks', () => {
+    const rows = seasonStandings(at.final);
+    const results = [...weekResults(at.final, 1), ...weekResults(at.final, 2)];
+    expect(rows).toEqual(standings([...TAVERNS], results));
+    expect(rows).toHaveLength(4);
+    for (const row of rows) expect(row.points).toBe(results.filter((r) => r.tavern === row.tavern).reduce((n, r) => n + r.points, 0));
+    expect(seasonStandings(at.w1Resolved).every((r) => r.points === 0 && r.rank === 1)).toBe(true);
     expect(seasonStandings(initialState())).toEqual([]);
   });
 
@@ -298,8 +306,10 @@ const cases: ReadonlyArray<Case> = [
   // season.created
   ['event before season.created', initialState(), candidate(initialState(), 'tavern.joined', { tavern: A, name: 'x', manager: { bot: 'v' } }), 'season.not_created'],
   ['season.created twice', at.created, candidate(at.created, 'season.created', log.events[0]!.payload as PayloadByType['season.created'], COMMISSIONER), 'season.already_created'],
-  ['config id differs from envelope season', initialState(), candidate(initialState(), 'season.created', { config: miniConfig({ id: 'season-02' }), configSha256: lineHash('c'), engineVersion: '0', schedule: [] }), 'season.id_mismatch'],
-  ['schedule lists a week twice', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: [schedule()[0]!, schedule()[0]!] }), 'season.bad_schedule'],
+  ['config id differs from envelope season', initialState(), candidate(initialState(), 'season.created', { config: miniConfig({ id: 'season-02' }), configSha256: lineHash('c'), engineVersion: '0', schedule: [], sponsors: [] }), 'season.id_mismatch'],
+  ['schedule lists a week twice', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: [schedule()[0]!, schedule()[0]!], sponsors: sponsors() }), 'season.bad_schedule'],
+  ['a sponsor sets two weeks', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule().map((w) => ({ ...w, sponsor: 'the-bog-king' })), sponsors: sponsors() }), 'season.bad_sponsors'],
+  ['a week names an unlisted sponsor', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: [] }), 'season.bad_sponsors'],
 
   // character.pooled
   ['pooled after the first pick', at.drafting, candidate(at.drafting, 'character.pooled', { character: 'late', base: 'ogre', cr: 8 as CrEighths, modifiers: [] }), 'pool.wrong_phase'],
@@ -333,6 +343,7 @@ const cases: ReadonlyArray<Case> = [
   ['keeper into a full roster', withConfig(withKeeper, { roster: { ...config.roster, size: 1 } }), candidate(withKeeper, 'character.retained', { ...keeper, character: 'char-23', basis: 'champion_reward' }), 'retain.roster_full'],
 
   // draft.pick
+  ['first pick with a sponsored tavern that never joined', { ...at.preseason, sponsors: [...sponsors(), { id: 'the-lost-god', tavern: 'the-empty-inn' }] }, candidate(at.preseason, 'draft.pick', { pick: 0, tavern: onTheClock(at.preseason)!, character: 'char-01', auto: false }), 'draft.sponsor_not_joined'],
   ['first pick with no taverns', at.created, candidate(at.created, 'draft.pick', { pick: 0, tavern: A, character: 'char-01', auto: false }), 'draft.no_taverns'],
   ['manual order that misses a tavern', withConfig(at.preseason, { draft: { ...config.draft, order: { mode: 'manual', taverns: [A] } } }), candidate(at.preseason, 'draft.pick', { pick: 0, tavern: A, character: 'char-01', auto: false }), 'draft.bad_order'],
   ['pick number is not the count of prior picks', at.drafting, nextPick(at.drafting, { pick: 0 }), 'draft.wrong_pick'],
@@ -461,7 +472,7 @@ describe('preconditions', () => {
 
   it('a log built by hand replays only in order', () => {
     const b = new LogBuilder();
-    b.append('season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule() }, COMMISSIONER);
+    b.append('season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: sponsors() }, COMMISSIONER);
     b.append('tavern.joined', { tavern: A, name: 'A', manager: { bot: 'v' } }, COMMISSIONER);
     const swapped = [b.events[1]!, b.events[0]!];
     expect(() => replay(swapped)).toThrow(InvalidEventError);
@@ -583,8 +594,7 @@ describe('tiny leagues', () => {
     s = applyEvent(s, candidate(s, 'week.finalized', { week: 1 }));
     expect(s.phase).toBe('complete');
     expect(weekResults(s, 1).map((r) => r.points)).toEqual([0, 0]);
-    // 0–0, level on every tiebreak until the seeded coin decides it.
-    expect(seasonStandings(s).map((r) => r.wins + r.losses + r.ties)).toEqual([1, 1]);
-    expect(seasonStandings(s).reduce((n, r) => n + r.wins, 0)).toBe(1);
+    // 0–0 with no tiebreak: both share first.
+    expect(seasonStandings(s).map((r) => r.rank)).toEqual([1, 1]);
   });
 });

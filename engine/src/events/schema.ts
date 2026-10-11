@@ -113,17 +113,9 @@ export const seasonConfigSchema = z.strictObject({
     pickWindowHours: z.number().positive(),
     onTimeout: z.enum(['autopick', 'skip', 'wait']),
   }),
-  matchups: z.strictObject({
-    format: z.literal('head_to_head'),
-    playoffs: z.strictObject({
-      enabled: z.boolean(),
-      teams: z.number().int().nonnegative(),
-      weeks: z.array(week),
-    }),
-  }),
   scoring: z.strictObject({
     pointsScale: z.number().positive(),
-    tiebreakers: z.array(z.enum(['projected', 'checks_passed', 'seeded_coin'])),
+    homeBonus: z.number().positive(),
   }),
   waivers: z.strictObject({ priority: z.literal('rolling'), initialOrder: z.literal('reverse_draft') }),
   trades: z.strictObject({
@@ -169,8 +161,10 @@ export const payloadSchemas = {
         environment: text,
         theme: z.string(),
         commitment: sha256HexSchema.nullable(),
+        sponsor: kebabIdSchema.nullable(),
       }),
     ),
+    sponsors: z.array(z.strictObject({ id: kebabIdSchema, tavern: kebabIdSchema })),
   }),
   'character.pooled': z.strictObject({
     character: kebabIdSchema,

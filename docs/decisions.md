@@ -31,13 +31,14 @@ auction could work) vs linear. *Default:* snake, seeded order.
 With 6 weeks and no injuries, the bench matters only through environment fit
 and the budget. Confirm with sims (T9.3: how often is the bench used?).
 
-**D-04 Matchups and playoffs: OPEN.** Head to head vs total points vs both
-(H2H record with a points tiebreak). Playoffs in a 6-week season would take
-2 of the 6 weeks. *Default:* H2H round-robin, no playoffs, champion = top of
-the standings. *Blocks:* T4.7 (playoffs).
-*Leaning (2026-10-11):* a league table (total loot, or placement points per
-week) rather than H2H. With a home bonus (D-47), H2H makes it matter whom you
-meet in their home week. A league table spreads that evenly. Not yet decided.
+**D-04 Matchups and playoffs: DECIDED (2026-10-11): a league table.** No
+matchups. Standings rank taverns by total loot over the season, and there
+are no playoffs. Head to head (round-robin with a W-L record) was the
+earlier default and is removed from the engine, config and sims.
+- Why: with a home bonus (D-47), H2H made it matter whom you met in their
+  home week. A table treats every tavern the same.
+- Placement points per week (capping one blowout week) were considered and
+  not chosen.
 
 **D-05 Waivers: DEFAULTED.** Rolling priority (winner moves to the back),
 initial order reverse draft. Alternatives: a fixed reverse-standings order, or
@@ -64,10 +65,12 @@ gives it no effect. Options:
 This changes lineup strategy a lot, so decide before T9 balance work.
 *Blocks:* T6.1 final form, T9.3.
 
-**D-14 Points scale and ties: SUPERSEDED in part by D-45 (2026-10-11).**
-Score is now loot, not a ratio. The tiebreak question remains: the
-tiebreakers are projected loot, then a seeded coin. "More checks passed" may
-go. The original text follows. Score is a fraction with small
+**D-14 Points scale and ties: SUPERSEDED by D-45 and D-04 (2026-10-11).**
+Score is now loot, not a ratio, and with no matchups there are no weekly
+ties to break. `scoring.tiebreakers` is removed: equal season totals share a
+rank, and a tie for first gives co-champions. *Still open:* whether to add
+a tiebreak at season end only (for example a seeded coin) so there is always
+one champion. The original text follows. Score is a fraction with small
 denominators (about 3–6 checks), so many taverns land on the same values
 (0, 1/3, 1/2, 2/3, 1), and H2H ties will be common. Options:
 (a) points = round(100 × score) with tiebreakers projected → checks passed →
@@ -127,8 +130,8 @@ problem.
 
 ### Story and scoring (2026-10-11)
 
-The story behind these is in [lore.md](lore.md). D-45 and D-46 are in the
-engine. D-47 and D-48 are not yet.
+The story behind these is in [lore.md](lore.md). D-45 to D-48 are in the
+engine.
 
 **D-44 Story frame: DECIDED (2026-10-11).**
 - Managers play barkeeps, each pushed around by a different god.
@@ -177,7 +180,17 @@ tavern's loot is multiplied by 1.25.
 - Re-measured under D-45 and D-46 on the mock missions: ×1.25 beats a given
   rival 62% of the time and tops the week 39% of the time. (This is a
   post-hoc multiplier on sim results. The engine doesn't apply it yet.)
-- *Needs:* a sponsor per tavern and per week in the season config.
+- Re-measured for the league table (D-04), 300 mock seasons, each tavern
+  taking a turn as home: ×1 tops the week 16.7% (one in six, but only 9.9%
+  alone: ties for the top are common); ×1.25 tops it 38.8% (37.0% alone);
+  ×1.5 50.5%; ×2 66.8%. Under the table a weekly top earns nothing by
+  itself: the bonus is 25% of one week's loot, and every tavern gets one
+  home week (D-48), so it evens out over a season.
+- *Built (2026-10-11):* the GM's season package sets it. `schedule.yaml`
+  lists `sponsors` (god id → tavern) and each week's `sponsor`, and
+  `config.yaml` sets `scoring.homeBonus` (1 turns it off). The engine only
+  applies it: `runPoints` and `projectedPoints` multiply at home, and
+  `verifyResolutions` audits it.
 
 **D-48 One mission per sponsor: DECIDED (2026-10-11).** The season has as many
 weeks as taverns, and each week is one sponsor's mission.
@@ -185,6 +198,12 @@ weeks as taverns, and each week is one sponsor's mission.
   missions are sealed. That means before the draft.
 - D-01 caps a 64-character pool at 9 taverns.
 - A mystery mission set by the GM is parked as an idea.
+- *Built (2026-10-11):* `validateSponsors` enforces one week per sponsor
+  and one sponsor per tavern, at load and at `season.created`. The first
+  `draft.pick` requires every sponsored tavern to have joined. A week with
+  `sponsor: null` is allowed (room for the mystery mission). That every
+  tavern gets exactly one week is not enforced yet; lock-check (T8.4) is
+  the place for it.
 
 ### Missions and secrecy
 
@@ -244,7 +263,7 @@ gap. *Default:* `revealed_with_mission`. Salts are generated at seal time,
 and their hashes are committed in `season.created`.
 *Related alternative:* **shared dice per week** (seed from season + week only,
 no tavern). Every tavern rolls the same d20 at the same node, like duplicate
-bridge, so H2H results reflect lineup choice more than luck. The brief says
+bridge, so weekly results reflect lineup choice more than luck. The brief says
 (season, week, tavern), so that's the default, but sims could compare both
 (T9.3).
 

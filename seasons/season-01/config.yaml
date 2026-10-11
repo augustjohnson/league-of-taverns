@@ -28,13 +28,9 @@ draft:
   pickWindowHours: 24
   onTimeout: autopick               # OPEN D-26: autopick (bot strategy "value") | skip | wait
 
-matchups:
-  format: head_to_head              # OPEN D-04
-  playoffs: { enabled: false, teams: 4, weeks: [] }   # 6 weeks is short; OPEN D-04
-
 scoring:
-  pointsScale: 100                  # points = round(score × 100); OPEN D-14
-  tiebreakers: [projected, checks_passed, seeded_coin]   # OPEN D-14
+  pointsScale: 100                  # points = round(score × 100 × home multiplier)
+  homeBonus: 1.25                   # D-47: loot × this on a tavern's sponsor's week (1 = off). Sponsors: schedule.yaml
 
 waivers:
   priority: rolling                 # OPEN D-05: successful claim moves you to the back

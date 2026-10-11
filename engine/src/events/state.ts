@@ -25,6 +25,8 @@ export interface LeagueState {
   readonly config: SeasonConfig | null;
   /** The public schedule from `season.created`, including each week's commitment. */
   readonly schedule: PayloadByType['season.created']['schedule'];
+  /** The sponsors from `season.created`: which god backs which tavern (D-44, D-47). */
+  readonly sponsors: PayloadByType['season.created']['sponsors'];
   readonly pool: ReadonlyMap<string, { readonly base: string; readonly cr: CrEighths; readonly modifiers: ReadonlyArray<Modifier> }>;
   readonly taverns: ReadonlyMap<string, TavernState>;
   /** characterId → tavernId for every owned character. Absent = free agent. */

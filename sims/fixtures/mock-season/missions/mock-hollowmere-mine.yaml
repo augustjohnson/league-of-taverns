@@ -1,0 +1,61 @@
+# Mock season, week 5 (underground). A dark mine: shore the tunnel or dodge the
+# cave-in, then find the vein. Missing it wakes the crawlers.
+#
+#  rank 0     1              2                3              4             5            6
+#  start ─▶ light-way ─pass─▶ shore-tunnel ─always─▶ deep-vein ─pass─────────────▶ haul-ore ─pass─▶ struck-silver
+#               └─fail─▶ dodge-cave-in ─always─▶ ▲       └─fail─▶ crawlers ─win─▶ ▲      └─fail─▶ dropped-cart
+
+schemaVersion: 1
+id: mock-hollowmere-mine
+season: mock-season
+environment: underground
+
+nodes:
+  - { id: start, rank: 0, kind: start }
+  - id: light-way
+    rank: 1
+    kind: check
+    check: { type: skill, skill: perception, dc: 12 }
+    loot: 15
+  - id: shore-tunnel
+    rank: 2
+    kind: check
+    check: { type: skill, skill: athletics, dc: 13 }
+    loot: 25
+  - id: dodge-cave-in
+    rank: 2
+    kind: check
+    check: { type: save, ability: dex, dc: 12 }
+    loot: 10
+  - id: deep-vein
+    rank: 3
+    kind: check
+    check: { type: skill, skill: investigation, dc: 13 }
+    loot: 30
+  - id: crawlers
+    rank: 4
+    kind: battle
+    encounter:
+      creatures:
+        - { ref: giant-spider, count: 2 }
+        - { ref: giant-centipede, count: 4 }
+        - { ref: swarm-of-bats, count: 2 }
+  - id: haul-ore
+    rank: 5
+    kind: check
+    check: { type: save, ability: str, dc: 12 }
+    loot: 30
+  - { id: struck-silver, rank: 6, kind: end }
+  - { id: dropped-cart, rank: 6, kind: end }
+
+edges:
+  - { from: start,         to: light-way,     on: always }
+  - { from: light-way,     to: shore-tunnel,  on: pass }
+  - { from: light-way,     to: dodge-cave-in, on: fail }
+  - { from: shore-tunnel,  to: deep-vein,     on: always }
+  - { from: dodge-cave-in, to: deep-vein,     on: always }
+  - { from: deep-vein,     to: haul-ore,      on: pass }
+  - { from: deep-vein,     to: crawlers,      on: fail }
+  - { from: crawlers,      to: haul-ore,      on: win }
+  - { from: haul-ore,      to: struck-silver, on: pass }
+  - { from: haul-ore,      to: dropped-cart,  on: fail }

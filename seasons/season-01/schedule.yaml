@@ -1,36 +1,50 @@
-# The PUBLIC schedule: week → title, environment, theme. Managers plan lineups
-# from this. Mission structure stays sealed until each week runs.
+# The PUBLIC schedule: week → title, environment, theme, sponsor. Managers plan
+# lineups from this. Part of the GM's season package, copied into season.created.
 # `commitment` is the sha256 of the sealed mission, filled in by scripts/seal (D-08).
+#
+# Sponsors (D-44, D-47, D-48): each god backs one tavern and sets at most one
+# week's mission. On its sponsor's week a tavern's loot is × scoring.homeBonus
+# (config.yaml). `sponsor: null` is an unsponsored week. A god's name and voice
+# are chrome; only the id and tavern are mechanical.
 
 season: season-01
+sponsors:
+  - id: the-drowned-saint
+    tavern: the-gilded-flagon
 weeks:
   - week: 1
     title: The Drowned Toll
     environment: swamp
     theme: A flooded toll road and a bridge-keeper who wants paying.
     commitment: null
+    sponsor: the-drowned-saint
   - week: 2
     title: Lanterns Under Hollowmere
     environment: underground
     theme: A mine reopened after forty dark years.
     commitment: null
+    sponsor: null
   - week: 3
     title: The Glass Orchard
     environment: forest
     theme: Fruit that rings like bells, and whatever eats it.
     commitment: null
+    sponsor: null
   - week: 4
     title: Ash on the Pass
     environment: mountain
     theme: A caravan stranded below a waking peak.
     commitment: null
+    sponsor: null
   - week: 5
     title: The Saltwind Wreckers
     environment: coast
     theme: False lights on the cliffs and a ship that should not have sunk.
     commitment: null
+    sponsor: null
   - week: 6
     title: Night of the Long Bar
     environment: urban
     theme: Every tavern in the city, one night, one prize.
     commitment: null
+    sponsor: null

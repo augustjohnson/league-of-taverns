@@ -31,11 +31,11 @@
  * | Area | Codes |
  * |---|---|
  * | envelope | `envelope.seq`, `envelope.season` |
- * | `season.created` | `season.not_created` (any other event first), `season.already_created`, `season.id_mismatch`, `season.bad_schedule` |
+ * | `season.created` | `season.not_created` (any other event first), `season.already_created`, `season.id_mismatch`, `season.bad_schedule`, `season.bad_sponsors` |
  * | `character.pooled` | `pool.wrong_phase`, `pool.duplicate`, `pool.registry_version`, `pool.over_budget`, `pool.invalid_modifiers` |
  * | `tavern.joined` | `tavern.wrong_phase`, `tavern.duplicate`, `tavern.manager_taken` |
  * | `character.retained` | `retain.wrong_phase`, `retain.unknown_tavern`, `retain.not_pooled`, `retain.already_owned`, `retain.over_limit`, `retain.roster_full` |
- * | `draft.pick` | `draft.complete`, `draft.no_taverns`, `draft.bad_order`, `draft.wrong_pick`, `draft.not_on_clock`, `draft.not_pooled`, `draft.already_owned`, `draft.roster_full` |
+ * | `draft.pick` | `draft.complete`, `draft.no_taverns`, `draft.sponsor_not_joined`, `draft.bad_order`, `draft.wrong_pick`, `draft.not_on_clock`, `draft.not_pooled`, `draft.already_owned`, `draft.roster_full` |
  * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `duplicate`, `not_owned`, `unknown_character`, `over_budget`) |
  * | `lineup.locked` | `lock.draft_incomplete`, `lock.bad_week`, `lock.already_locked`, `lock.previous_not_finalized`, `lock.unknown_tavern`, `lock.duplicate_tavern`, `lock.missing_tavern`, `lock.source_mismatch`, `lock.illegal_lineup` |
  * | `waiver.claimed` | `waiver.draft_incomplete`, `waiver.unknown_tavern`, `waiver.duplicate_claim`, `waiver.not_pooled`, `waiver.not_free_agent`, `waiver.drop_not_owned` |
@@ -108,6 +108,9 @@
  *   change to its rules must be versioned in the season config, or older
  *   logs stop replaying.
  * - `waiver.resolved` runs once per week (`waiver.already_resolved`).
+ * - `season.created`: sponsors must pass `validateSponsors` (unique gods and
+ *   taverns, every week's sponsor listed, one week per sponsor). Sponsored
+ *   taverns aren't known yet; the first `draft.pick` checks they all joined.
  * - `mission.revealed`: `sha256` must equal the schedule commitment only when
  *   one was made (D-08 made missions open, so commitments are null). The
  *   mission is validated against the season's mission rules and the
@@ -124,7 +127,7 @@
  *   §5; see `weekResults`). Finalizing week `config.weeks` completes the season.
  */
 import { REGISTRY_VERSION, TRAITS, validateModifiers } from '../characters';
-import type { SeasonConfig } from '../league';
+import { validateSponsors, type SeasonConfig } from '../league';
 import { missionHaul, validateMission, type Mission } from '../missions';
 import { lootScore } from '../resolution';
 import { draftOrderSeed, rngFor } from '../rng';
@@ -161,6 +164,7 @@ export function initialState(): LeagueState {
     phase: 'empty',
     config: null,
     schedule: [],
+    sponsors: [],
     pool: new Map(),
     taverns: new Map(),
     owner: new Map(),
@@ -211,7 +215,7 @@ type Handler<T extends EventType> = (state: LeagueState, event: EventOf<T>) => L
 
 const handlers: { readonly [T in EventType]: Handler<T> } = {
   'season.created': (state, event) => {
-    const { config, schedule } = event.payload;
+    const { config, schedule, sponsors } = event.payload;
     if (event.season !== config.id) {
       fail(event, 'season.id_mismatch', `envelope season "${event.season}" differs from config.id "${config.id}"`);
     }
@@ -221,7 +225,9 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       if (weeks.has(entry.week)) fail(event, 'season.bad_schedule', `schedule lists week ${entry.week} twice`);
       weeks.add(entry.week);
     }
-    return { ...state, phase: 'preseason', config, schedule };
+    const issues = validateSponsors(sponsors, schedule);
+    if (issues.length > 0) fail(event, 'season.bad_sponsors', issues.map((i) => i.message).join('; '));
+    return { ...state, phase: 'preseason', config, schedule, sponsors };
   },
 
   'character.pooled': (state, event) => {
@@ -288,6 +294,10 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       // The first pick freezes the tavern list (join order) and the snake order.
       const joined = [...state.taverns.keys()];
       if (joined.length === 0) fail(event, 'draft.no_taverns', 'no taverns have joined');
+      const missing = state.sponsors.filter((s) => !state.taverns.has(s.tavern));
+      if (missing.length > 0) {
+        fail(event, 'draft.sponsor_not_joined', `sponsored taverns have not joined: ${missing.map((s) => `"${s.tavern}" (${s.id})`).join(', ')}`);
+      }
       try {
         order = draftOrder(joined, config, rngFor(draftOrderSeed(config.id), 'order'));
       } catch (error) {

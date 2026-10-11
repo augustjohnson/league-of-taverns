@@ -34,17 +34,19 @@ import {
   cyrb128,
   effectiveStats,
   freeAgents,
-  headToHeadSchedule,
+  homeTavern,
   initialState,
   lineHash,
-  matchupWinner,
   onTheClock,
   projectMission,
+  projectedPoints,
   replayLog,
   resolveWaivers,
   rngFor,
   runMission,
+  runPoints,
   seasonStandings,
+  standings,
   serializeEvent,
   toBaseStats,
   verifyResolutions,
@@ -76,6 +78,7 @@ import { deepEqual } from './deep-equal';
 // ── input ──────────────────────────────────────────────────────────────────
 
 export type ScheduleEntry = PayloadByType['season.created']['schedule'][number];
+export type SponsorEntry = PayloadByType['season.created']['sponsors'][number];
 
 export interface SeasonInput {
   readonly config: SeasonConfig;
@@ -85,6 +88,8 @@ export interface SeasonInput {
   readonly engineVersion: string;
   /** The public schedule, with every `commitment` null (missions are open, D-08). */
   readonly schedule: ReadonlyArray<ScheduleEntry>;
+  /** The GM's sponsors: which god backs which tavern (D-44). */
+  readonly sponsors: ReadonlyArray<SponsorEntry>;
   /** In pool-file order: the order `character.pooled` events are written. */
   readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
   /** In managers-file order: the join order. */
@@ -118,7 +123,7 @@ export interface SeasonSource {
       readonly manager: { readonly bot: BotId } | { readonly login: string; readonly githubId: number | null };
     }>;
   };
-  readonly schedule: { readonly weeks: ReadonlyArray<ScheduleEntry> };
+  readonly schedule: { readonly sponsors: ReadonlyArray<SponsorEntry>; readonly weeks: ReadonlyArray<ScheduleEntry> };
 }
 
 /**
@@ -133,6 +138,8 @@ export interface SeasonParts {
   readonly engineVersion: string;
   /** The public schedule, with every `commitment` null (missions are open, D-08). */
   readonly schedule: ReadonlyArray<ScheduleEntry>;
+  /** The GM's sponsors: which god backs which tavern (D-44). */
+  readonly sponsors: ReadonlyArray<SponsorEntry>;
   /** In pool-file order. */
   readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
   /** In managers-file order. */
@@ -185,6 +192,7 @@ export function seasonParts(
     configSha256: lineHash(configText),
     engineVersion,
     schedule: loaded.schedule.weeks.map((week) => ({ ...week, commitment: null })),
+    sponsors: loaded.schedule.sponsors,
     pool,
     taverns,
     commissioner: githubId === null ? null : { githubId, login },
@@ -227,6 +235,7 @@ export function seasonInput(parts: SeasonParts): SeasonInput {
     configSha256: parts.configSha256,
     engineVersion: parts.engineVersion,
     schedule: parts.schedule,
+    sponsors: parts.sponsors,
     pool: parts.pool,
     taverns: parts.taverns,
     commissioner: parts.commissioner,
@@ -296,22 +305,18 @@ export interface TavernResult {
   readonly checksAttempted: number;
   /** Null when the tavern played nobody. */
   readonly dnf: boolean | null;
-}
-
-export interface MatchupResult {
-  readonly home: string;
-  readonly away: string;
-  /** The winning tavern, or null for a tie. */
-  readonly winner: string | null;
-  /** The tavern with more projected points, or null when level. */
-  readonly higherProjected: string | null;
+  /** This week's rank by points, 1-based; equal points share a rank. */
+  readonly rank: number;
+  /** True on this tavern's sponsor's week: its points include the home bonus. */
+  readonly home: boolean;
 }
 
 export interface WeekSummary {
   readonly week: number;
   readonly mission: string;
+  /** The tavern whose sponsor set this week's mission, or null. */
+  readonly home: string | null;
   readonly results: ReadonlyArray<TavernResult>;
-  readonly matchups: ReadonlyArray<MatchupResult>;
   /** Claims made after this week's run and how they resolved. Empty after the last week. */
   readonly waivers: ReadonlyArray<{
     readonly claim: string;
@@ -327,18 +332,15 @@ export interface RunSummary {
   readonly seed: string;
   readonly season: string;
   readonly events: number;
-  readonly champion: { readonly tavern: string; readonly bot: Seat };
+  /** Every tavern ranked first. More than one only on an exact tie in total points. */
+  readonly champions: ReadonlyArray<{ readonly tavern: string; readonly bot: Seat }>;
   readonly taverns: ReadonlyArray<{ readonly tavern: string; readonly name: string; readonly bot: Seat }>;
   /** Final standings, best first (`seasonStandings`). */
   readonly standings: ReadonlyArray<{
     readonly rank: number;
     readonly tavern: string;
     readonly bot: Seat;
-    readonly wins: number;
-    readonly losses: number;
-    readonly ties: number;
-    readonly pointsFor: number;
-    readonly pointsAgainst: number;
+    readonly points: number;
   }>;
   readonly draft: ReadonlyArray<{ readonly pick: number; readonly tavern: string; readonly bot: Seat; readonly character: string }>;
   readonly weeks: ReadonlyArray<WeekSummary>;
@@ -611,6 +613,7 @@ export class SeasonSession {
     const run = base + 18 * HOUR + 15 * MINUTE;
     let r = 0;
     const { mission, sha256 } = scheduled;
+    const home = homeTavern(this.log.state, week);
     this.append('mission.revealed', { week, mission, sha256, salt: null }, system('weekly-run'), run + r++ * SECOND);
     for (const { tavern, lineup } of lineups) {
       if (lineup === null) continue;
@@ -630,9 +633,9 @@ export class SeasonSession {
           lineup,
           run: result,
           projected: { expectedScore: projection.expectedScore, pDnf: projection.pDnf },
-          points: Math.round(result.score * config.scoring.pointsScale),
+          points: runPoints(result.score, config.scoring, tavern === home),
           // Exact expected points (docs/rules.md §7), unrounded like the projection itself.
-          projectedPoints: projection.expectedScore * config.scoring.pointsScale,
+          projectedPoints: projectedPoints(projection.expectedScore, config.scoring, tavern === home),
         },
         system('weekly-run'),
         run + r++ * SECOND,
@@ -709,7 +712,7 @@ export class SeasonSession {
     let k = 0;
     this.append(
       'season.created',
-      { config: input.config, configSha256: input.configSha256, engineVersion: input.engineVersion, schedule: input.schedule },
+      { config: input.config, configSha256: input.configSha256, engineVersion: input.engineVersion, schedule: input.schedule, sponsors: input.sponsors },
       setupActor,
       preseason + k++ * SECOND,
     );
@@ -813,32 +816,6 @@ function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats): Party
   return { captain: lineup.captain, members: [lineup.captain, ...lineup.allies].map(statsOf) };
 }
 
-/**
- * Every finalized matchup's winner, by week, exactly as `standings` decides
- * them: (week, home, away) order, one shared coin stream. Weeks not yet
- * finalized are left out.
- */
-export function decideMatchups(state: LeagueState): ReadonlyMap<number, ReadonlyArray<MatchupResult>> {
-  const config = state.config;
-  if (config === null) return new Map();
-  const matchups = headToHeadSchedule([...state.taverns.keys()], config.weeks);
-  const results = new Map<string, ReturnType<typeof weekResults>[number]>();
-  for (let week = 1; week <= config.weeks; week++) for (const r of weekResults(state, week)) results.set(`${week}\u0000${r.tavern}`, r);
-  const coin = rngFor(`${config.id}/standings`, 'coin');
-  const decided = new Map<number, MatchupResult[]>();
-  const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-  for (const m of [...matchups].sort((a, b) => a.week - b.week || cmp(a.home, b.home) || cmp(a.away, b.away))) {
-    const home = results.get(`${m.week}\u0000${m.home}`);
-    const away = results.get(`${m.week}\u0000${m.away}`);
-    if (home === undefined || away === undefined) continue;
-    const outcome = matchupWinner(home, away, config.scoring.tiebreakers, coin);
-    const winner = outcome === 'home' ? m.home : outcome === 'away' ? m.away : null;
-    const higherProjected = home.projected > away.projected ? m.home : home.projected < away.projected ? m.away : null;
-    decided.set(m.week, [...(decided.get(m.week) ?? []), { home: m.home, away: m.away, winner, higherProjected }]);
-  }
-  return decided;
-}
-
 // ── summary ────────────────────────────────────────────────────────────────
 
 function summarize(
@@ -853,24 +830,20 @@ function summarize(
   const botId = new Map<string, Seat>(input.taverns.map((t) => [t.id, t.id === human?.tavern ? 'human' : t.bot]));
   const bot = (tavern: string): Seat => botId.get(tavern)!;
 
-  const decided = decideMatchups(state);
-
-  const standings = seasonStandings(state).map((row, i) => ({ rank: i + 1, ...row, bot: bot(row.tavern) }));
-  // Cross-check: the winners above must add up to the standings' records.
-  for (const row of standings) {
-    const wins = [...decided.values()].flat().filter((m) => m.winner === row.tavern).length;
-    if (wins !== row.wins) throw new Error(`summary: ${row.tavern} has ${wins} matchup wins but ${row.wins} in the standings`);
-  }
-  const champion = standings[0];
-  if (champion === undefined) throw new Error('summary: no standings');
+  const table = seasonStandings(state).map((row) => ({ ...row, bot: bot(row.tavern) }));
+  const champions = table.filter((row) => row.rank === 1).map(({ tavern, bot }) => ({ tavern, bot }));
+  if (champions.length === 0) throw new Error('summary: no standings');
 
   const weeks: WeekSummary[] = [];
   for (let week = 1; week <= config.weeks; week++) {
     const locked = state.lockedLineups.get(week) ?? [];
     const resolved = state.results.get(week);
+    const rankOf = new Map(standings([], weekResults(state, week)).map((r) => [r.tavern, r.rank]));
+    const home = homeTavern(state, week);
     weeks.push({
       week,
       mission: state.revealed.get(week)?.id ?? '',
+      home,
       results: locked.map(({ tavern, lineup, source }) => {
         const r = resolved?.get(tavern);
         return {
@@ -883,9 +856,10 @@ function summarize(
           checksPassed: r?.run.checksPassed ?? 0,
           checksAttempted: r?.run.checksAttempted ?? 0,
           dnf: r === undefined ? null : r.run.dnf,
+          rank: rankOf.get(tavern) ?? 1,
+          home: tavern === home,
         };
       }),
-      matchups: decided.get(week) ?? [],
       waivers: waivers.get(week) ?? [],
     });
   }
@@ -898,9 +872,9 @@ function summarize(
     seed,
     season: config.id,
     events: events.length,
-    champion: { tavern: champion.tavern, bot: champion.bot },
+    champions,
     taverns: input.taverns.map((t) => ({ tavern: t.id, name: t.name, bot: bot(t.id) })),
-    standings,
+    standings: table,
     draft,
     weeks,
   };
@@ -916,6 +890,7 @@ export function runSeed(seed: string, n: number): string {
 export interface BotAggregate {
   /** Tavern-seasons this bot managed. */
   readonly seats: number;
+  /** Titles won; co-champions split one title evenly. */
   readonly titles: number;
   /** titles / seats: the chance a given seat with this bot wins the title. 1 / taverns is par. */
   readonly titlesPerSeat: number;
@@ -924,8 +899,8 @@ export interface BotAggregate {
   readonly meanProjected: number;
   /** Share of this bot's runs that ended in a DNF. */
   readonly dnfRate: number;
-  /** Matchup win share (ties count half). */
-  readonly winRate: number;
+  /** Share of tavern-weeks this bot topped the week (a shared top splits evenly). 1 / taverns is par. */
+  readonly weekTopRate: number;
 }
 
 export interface Aggregate {
@@ -933,8 +908,8 @@ export interface Aggregate {
   readonly byBot: Readonly<Record<string, BotAggregate>>;
   /** Titles by tavern seat. Draft slots vary per run (join order is shuffled per seed). */
   readonly titlesByTavern: Readonly<Record<string, number>>;
-  /** Matchups where projected points differed, and how often the higher-projected tavern won. */
-  readonly higherProjectedWins: { readonly matchups: number; readonly wins: number; readonly share: number };
+  /** Weeks with a single highest-projected tavern, and how often it topped the week (alone or shared). */
+  readonly bestProjectedTops: { readonly weeks: number; readonly tops: number; readonly share: number };
   /** Share of all mission runs that ended in a DNF. */
   readonly dnfRate: number;
   /** Tavern-weeks played with no lineup. */
@@ -942,7 +917,7 @@ export interface Aggregate {
 }
 
 export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
-  const blank = (): { seats: number; titles: number; points: number; projected: number; weeks: number; runs: number; dnfs: number; wins: number; games: number } => ({
+  const blank = (): { seats: number; titles: number; points: number; projected: number; weeks: number; runs: number; dnfs: number; tops: number } => ({
     seats: 0,
     titles: 0,
     points: 0,
@@ -950,8 +925,7 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
     weeks: 0,
     runs: 0,
     dnfs: 0,
-    wins: 0,
-    games: 0,
+    tops: 0,
   });
   const tally = new Map<string, ReturnType<typeof blank>>(BOT_IDS.map((id) => [id, blank()]));
   const of = (id: string): ReturnType<typeof blank> => {
@@ -960,8 +934,8 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
     return t;
   };
   const titlesByTavern: Record<string, number> = {};
-  let decided = 0;
-  let projectedWon = 0;
+  let projectedWeeks = 0;
+  let projectedTops = 0;
   let mission = 0;
   let dnfs = 0;
   let noLineup = 0;
@@ -971,9 +945,10 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
       of(t.bot).seats++;
       titlesByTavern[t.tavern] ??= 0;
     }
-    of(run.champion.bot).titles++;
-    titlesByTavern[run.champion.tavern] = (titlesByTavern[run.champion.tavern] ?? 0) + 1;
-    const botOf = new Map(run.taverns.map((t) => [t.tavern, t.bot]));
+    for (const c of run.champions) {
+      of(c.bot).titles += 1 / run.champions.length;
+      titlesByTavern[c.tavern] = (titlesByTavern[c.tavern] ?? 0) + 1 / run.champions.length;
+    }
     for (const week of run.weeks) {
       for (const r of week.results) {
         const t = of(r.bot);
@@ -991,16 +966,13 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
           dnfs++;
         }
       }
-      for (const m of week.matchups) {
-        for (const side of [m.home, m.away]) {
-          const t = of(botOf.get(side)!);
-          t.games++;
-          t.wins += m.winner === side ? 1 : m.winner === null ? 0.5 : 0;
-        }
-        if (m.higherProjected !== null) {
-          decided++;
-          if (m.winner === m.higherProjected) projectedWon++;
-        }
+      const top = week.results.filter((r) => r.rank === 1);
+      for (const r of top) of(r.bot).tops += 1 / top.length;
+      const best = Math.max(...week.results.map((r) => r.projectedPoints));
+      const bestProjected = week.results.filter((r) => r.projectedPoints === best);
+      if (bestProjected.length === 1) {
+        projectedWeeks++;
+        if (bestProjected[0]!.rank === 1) projectedTops++;
       }
     }
   }
@@ -1016,14 +988,14 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
       meanPoints: ratio(t.points, t.weeks),
       meanProjected: ratio(t.projected, t.weeks),
       dnfRate: ratio(t.dnfs, t.runs),
-      winRate: ratio(t.wins, t.games),
+      weekTopRate: ratio(t.tops, t.weeks),
     };
   }
   return {
     runs: runs.length,
     byBot,
     titlesByTavern,
-    higherProjectedWins: { matchups: decided, wins: projectedWon, share: ratio(projectedWon, decided) },
+    bestProjectedTops: { weeks: projectedWeeks, tops: projectedTops, share: ratio(projectedTops, projectedWeeks) },
     dnfRate: ratio(dnfs, mission),
     noLineupWeeks: noLineup,
   };

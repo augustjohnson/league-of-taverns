@@ -4,13 +4,13 @@
  * mini-season (4 taverns, 24 pooled characters, 2 weeks) with state
  * checkpoints for precondition tests.
  */
-import type { SeasonConfig } from '../../src/league';
+import { projectedPoints, runPoints, type SeasonConfig } from '../../src/league';
 import type { Mission } from '../../src/missions';
 import { projectMission } from '../../src/projection';
 import { runMission, type BattleModel } from '../../src/resolution';
 import { applyEvent, initialState } from '../../src/events/reducers';
 import { lineHash, serializeEvent } from '../../src/events/replay';
-import { freeAgents, onTheClock } from '../../src/events/selectors';
+import { freeAgents, homeTavern, onTheClock } from '../../src/events/selectors';
 import type { LeagueState } from '../../src/events/state';
 import type { Actor, EventOf, EventType, LeagueEvent, PayloadByType } from '../../src/events/types';
 import { rngFor, weekSeed } from '../../src/rng';
@@ -36,8 +36,7 @@ export function miniConfig(overrides: Partial<SeasonConfig> = {}): SeasonConfig 
     budget: { partyCr: 40 as CrEighths, modifierPointsPerCharacter: 3 },
     roster: { size: 6, starters: 4, ownership: 'exclusive' },
     draft: { format: 'snake', rounds: 5, order: { mode: 'seeded' }, pickWindowHours: 24, onTimeout: 'autopick' },
-    matchups: { format: 'head_to_head', playoffs: { enabled: false, teams: 0, weeks: [] } },
-    scoring: { pointsScale: 100, tiebreakers: ['projected', 'checks_passed', 'seeded_coin'] },
+    scoring: { pointsScale: 100, homeBonus: 1.25 },
     waivers: { priority: 'rolling', initialOrder: 'reverse_draft' },
     trades: { vetoWindowHours: 24, vetoBy: 'commissioner', deadlineWeek: 2 },
     missedLineup: 'carry_over',
@@ -73,8 +72,16 @@ export const WEEK2_COMMITMENT = lineHash('mission-w2');
 
 export function schedule(): PayloadByType['season.created']['schedule'] {
   return [
-    { week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded road.', commitment: null },
-    { week: 2, title: 'The Sunken Bell', environment: 'swamp', theme: 'A bell under the bog.', commitment: WEEK2_COMMITMENT },
+    { week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded road.', commitment: null, sponsor: 'the-drowned-saint' },
+    { week: 2, title: 'The Sunken Bell', environment: 'swamp', theme: 'A bell under the bog.', commitment: WEEK2_COMMITMENT, sponsor: 'the-bog-king' },
+  ];
+}
+
+/** Two gods: week 1 is the Gilded Flagon's home mission, week 2 the Rusty Nail's. */
+export function sponsors(): PayloadByType['season.created']['sponsors'] {
+  return [
+    { id: 'the-drowned-saint', tavern: 'the-gilded-flagon' },
+    { id: 'the-bog-king', tavern: 'the-rusty-nail' },
   ];
 }
 
@@ -147,6 +154,7 @@ export function resolution(state: LeagueState, week: number, tavern: string, lin
   const seed = weekSeed({ season: SEASON, week, tavern });
   const run = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), baseOf, MODEL);
   const projection = projectMission(party, mission, baseOf, MODEL);
+  const home = homeTavern(state, week) === tavern;
   return {
     week,
     tavern,
@@ -157,8 +165,8 @@ export function resolution(state: LeagueState, week: number, tavern: string, lin
     lineup,
     run,
     projected: { expectedScore: projection.expectedScore, pDnf: projection.pDnf },
-    points: Math.round(run.score * 100),
-    projectedPoints: projection.expectedScore * 100,
+    points: runPoints(run.score, state.config!.scoring, home),
+    projectedPoints: projectedPoints(projection.expectedScore, state.config!.scoring, home),
   };
 }
 
@@ -220,7 +228,7 @@ export function miniSeason(): MiniSeason {
   const config = miniConfig();
   const [a, b, c, d] = TAVERNS;
 
-  log.append('season.created', { config, configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule() }, COMMISSIONER);
+  log.append('season.created', { config, configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors() }, COMMISSIONER);
   const created = log.state;
   for (const [i, { id, cr }] of POOL.entries()) {
     const modifiers = i % 5 === 0 ? [{ kind: 'skill_bonus', skill: 'survival', value: 2 } as const] : [];

@@ -2,7 +2,7 @@
  * Selectors: derived views over `LeagueState`. Pure, never stored
  * (docs/schema.md § Reducers, "Derived views").
  */
-import { headToHeadSchedule, standings, type StandingRow, type WeekResult } from '../league';
+import { sponsoredTavern, standings, type StandingRow, type WeekResult } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
 import type { LeagueState } from './state';
@@ -39,6 +39,11 @@ export function onTheClock(state: LeagueState): string | null {
   return snakePickOwner(order, state.draft.picks);
 }
 
+/** The home tavern for `week`: the one whose sponsor set its mission, or null (no sponsor, or no season). */
+export function homeTavern(state: LeagueState, week: number): string | null {
+  return sponsoredTavern(state.sponsors, state.schedule, week);
+}
+
 /**
  * One finalized week's results, one row per tavern in the locked lineup
  * list (join order): points, projected points and checks passed, read from
@@ -62,16 +67,11 @@ export function weekResults(state: LeagueState, week: number): ReadonlyArray<Wee
 }
 
 /**
- * Season standings over every finalized week. The head-to-head schedule is
- * `headToHeadSchedule(taverns in join order, config.weeks)`, since rules §8
- * publishes it before the draft. The `seeded_coin` tiebreak draws from
- * `rngFor(season + '/standings', 'coin')`. Playoffs are not modelled.
+ * Season standings over every finalized week: total loot, taverns in join
+ * order, equal totals sharing a rank (rules §8). No playoffs.
  */
 export function seasonStandings(state: LeagueState): ReadonlyArray<StandingRow> {
-  const config = state.config;
-  if (config === null) return [];
-  const matchups = headToHeadSchedule([...state.taverns.keys()], config.weeks);
+  if (state.config === null) return [];
   const weeks = [...state.finalizedWeeks].sort((a, b) => a - b);
-  const results = weeks.flatMap((week) => weekResults(state, week));
-  return standings(matchups, results, config, rngFor(`${config.id}/standings`, 'coin'));
+  return standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)));
 }

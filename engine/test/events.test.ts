@@ -23,8 +23,7 @@ const config: SeasonConfig = {
   budget: { partyCr: 96 as CrEighths, modifierPointsPerCharacter: 3 },
   roster: { size: 7, starters: 4, ownership: 'exclusive' },
   draft: { format: 'snake', rounds: 7, order: { mode: 'seeded' }, pickWindowHours: 24, onTimeout: 'autopick' },
-  matchups: { format: 'head_to_head', playoffs: { enabled: false, teams: 4, weeks: [] } },
-  scoring: { pointsScale: 100, tiebreakers: ['projected', 'checks_passed', 'seeded_coin'] },
+  scoring: { pointsScale: 100, homeBonus: 1.25 },
   waivers: { priority: 'rolling', initialOrder: 'reverse_draft' },
   trades: { vetoWindowHours: 24, vetoBy: 'commissioner', deadlineWeek: 4 },
   missedLineup: 'carry_over',
@@ -87,7 +86,8 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
     config,
     configSha256: HASH,
     engineVersion: '0.0.0',
-    schedule: [{ week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded toll road.', commitment: null }],
+    schedule: [{ week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded toll road.', commitment: null, sponsor: 'the-drowned-saint' }],
+    sponsors: [{ id: 'the-drowned-saint', tavern: 'the-gilded-flagon' }],
   }),
   'character.pooled': envelope('character.pooled', 2, commissioner, {
     character: 'bruno-the-bruiser',
@@ -390,7 +390,9 @@ describe('replay and verification', () => {
     expect(fields({ run: { ...won, nodes: [won.nodes[0]!, { ...won.nodes[1]!, roll: 0.9 } as (typeof won.nodes)[1]] }, points: 0 })).toEqual(['run.nodes[1].outcome']);
     expect(fields({ run: { ...won, path: ['start', 'find-path', 'crossed'] }, points: 0 })).toEqual(['run.path']);
     expect(fields({ run: { ...won, dnf: true }, points: 0 })).toEqual(['run.dnf']);
-    expect(fields({ run: { ...won, checksPassed: 1, score: 1 }, points: 100 })).toEqual(['run.checksPassed', 'run.score']);
+    // Week 1 is the-gilded-flagon's home week: points carry the × 1.25 home bonus.
+    expect(fields({ run: { ...won, checksPassed: 1, score: 1 }, points: 125 })).toEqual(['run.checksPassed', 'run.score']);
+    expect(fields({ run: { ...won, checksPassed: 1, score: 1 }, points: 100 })).toEqual(['points', 'run.checksPassed', 'run.score']);
     expect(fields({ run: won, points: 7 })).toEqual(['points']);
     expect(fields({ run: { ...won, loot: 5 }, points: 0 })).toEqual(['run.loot']);
     expect(fields({ run: { ...won, nodes: won.nodes.slice(0, 1) }, points: 0 })).toEqual(['run.nodes[1]']);

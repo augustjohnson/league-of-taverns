@@ -101,8 +101,9 @@
 - **Home bonus:** on its sponsor's mission, a tavern's loot × 1.25 **[D-47]**.
 - In the engine, score = loot ÷ haul and points = round(score ×
   `pointsScale`). With the haul and `pointsScale` both 100, points equal loot.
-- *The home bonus is not in the engine yet:* it needs a sponsor for each
-  tavern and week in the season config.
+- **Sponsors come from the GM's season package:** `schedule.yaml` names
+  each god, the tavern it backs and the week it sets; `config.yaml` sets the
+  bonus (`scoring.homeBonus`). Projected points include the bonus too.
 - Each week runs **once**, as a single real random roll per check and battle
   **[D-13, details to come]**. The rolls are recorded in the event log, so the
   result is final and auditable, though not re-derivable from a seed.
@@ -111,18 +112,15 @@
   Missions are public (§11), so managers can also work them out before the
   lock **[OPEN D-42]**.
 
-## 8. Matchups and standings
+## 8. Standings
 
-- **Head to head** **[OPEN D-04; leaning toward a league table]:** each week, every tavern is paired with an
-  opponent on a round-robin schedule published before the draft. Higher points
-  wins the week.
-- **Ties** **[OPEN D-14]:** broken in order by higher projected points, then
-  more checks passed, then a seeded coin flip. With the coin in the list, no
-  week ends tied.
-- **Standings:** win-loss record, then total points for, then total points
-  against.
-- **Playoffs** are off for a 6-week season **[OPEN D-04]**. The champion is
-  the top of the standings after week 6.
+- **League table** **[D-04]:** no matchups. Every week, every tavern runs the
+  same mission against the whole league. Standings rank taverns by **total
+  loot** over the season.
+- **Ties** **[D-14]:** no tiebreakers. Equal totals share a rank, and a tie
+  for first gives co-champions. A tiebreak at season end only, if one is
+  ever wanted, is still open.
+- **No playoffs.** The champion is the top of the table after the last week.
 
 ## 9. Free agents and waivers
 
@@ -156,7 +154,7 @@
 
 | When | Public |
 |---|---|
-| Season announced | Config, schedule (title, environment, theme per week), H2H pairings, pool with bases and modifiers, character chrome |
+| Season announced | Config, schedule (title, environment, theme per week), pool with bases and modifiers, character chrome |
 | Once selected | Every mission's full structure. The repo is public and missions aren't secret **[D-08]** |
 | During the season | All rosters, transactions and lineup submissions (issues are public) **[D-24]** |
 | Weekly lock | Every tavern's lineup |

@@ -26,9 +26,9 @@ const LOW_CR_CASTERS = [
 ];
 
 describe('mock season config, managers and schedule', () => {
-  it('is a 3-week, 6-tavern season with B = 12, roster 7 and no spellcasters', () => {
+  it('is a 6-week, 6-tavern season with B = 12, roster 7 and no spellcasters', () => {
     expect(config.id).toBe('mock-season');
-    expect(config.weeks).toBe(3);
+    expect(config.weeks).toBe(6);
     expect(config.budget.partyCr).toBe(96);
     expect(config.roster.size).toBe(7);
     expect(spellcasters).toEqual({ maxInPool: 0, maxPerEncounter: 0 });
@@ -42,9 +42,15 @@ describe('mock season config, managers and schedule', () => {
     expect(new Set(bots)).toEqual(new Set(['random', 'cr-greedy', 'skill-coverage', 'value']));
   });
 
-  it('has three weeks with different environments', () => {
-    expect(schedule.weeks.map((w) => w.week)).toEqual([1, 2, 3]);
-    expect(new Set(schedule.weeks.map((w) => w.environment)).size).toBe(3);
+  it('has six weeks with different environments', () => {
+    expect(schedule.weeks.map((w) => w.week)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(new Set(schedule.weeks.map((w) => w.environment)).size).toBe(6);
+  });
+
+  it('gives every tavern exactly one home week (D-48)', () => {
+    const homeOf = new Map(schedule.sponsors.map((s) => [s.id, s.tavern]));
+    const homes = schedule.weeks.map((w) => homeOf.get(w.sponsor!));
+    expect(homes.sort()).toEqual(managers.taverns.map((t) => t.id).sort());
   });
 });
 
@@ -85,7 +91,7 @@ describe('mock season missions', () => {
   it('passes every validate check', () => {
     const report = validateSeason(MOCK_SEASON);
     expect(report.issues).toEqual([]);
-    expect(report.checked.missions).toHaveLength(3);
+    expect(report.checked.missions).toHaveLength(6);
   });
 
   it('has one mission per week, matched by environment, each valid for its week', () => {
@@ -96,11 +102,11 @@ describe('mock season missions', () => {
     }
   });
 
-  it('varies the shape: one single battle, one with two, one with a single gate', () => {
+  it('varies the shape: five with one battle, one with two, one with a single gate', () => {
     const battleCounts = missions.map((m) => battlesOf(m).length).sort();
-    expect(battleCounts).toEqual([1, 1, 2]);
+    expect(battleCounts).toEqual([1, 1, 1, 1, 1, 2]);
     const gated = missions.map((m) => m.nodes.filter((n) => n.kind === 'check' && n.check.requires !== undefined).length);
-    expect(gated.sort()).toEqual([0, 0, 1]);
+    expect(gated.sort()).toEqual([0, 0, 0, 0, 0, 1]);
   });
 
   it('keeps encounters between 0.25 and 0.75 of B, with no spellcasters', () => {

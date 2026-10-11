@@ -64,6 +64,9 @@ interface SeasonFixture {
   readonly characters?: Readonly<Record<string, string>>;
   readonly managers?: Record<string, unknown>;
   readonly weeks?: ReadonlyArray<number>;
+  readonly sponsors?: ReadonlyArray<{ readonly id: string; readonly tavern: string }>;
+  /** Week → sponsor id. Unlisted weeks are unsponsored. */
+  readonly sponsorOf?: Readonly<Record<number, string>>;
 }
 
 /** Write seasons/<id>/ under `root` with season-01's config adjusted by `fixture`. */
@@ -88,8 +91,15 @@ function makeSeason(root: string, id: string, fixture: SeasonFixture = {}): void
       },
     ),
   );
-  const weeks = (fixture.weeks ?? [1, 2]).map((week) => ({ week, title: `Week ${week}`, environment: 'forest', theme: '', commitment: null }));
-  write(join(dir, 'schedule.yaml'), toYaml({ season: id, weeks }));
+  const weeks = (fixture.weeks ?? [1, 2]).map((week) => ({
+    week,
+    title: `Week ${week}`,
+    environment: 'forest',
+    theme: '',
+    commitment: null,
+    sponsor: fixture.sponsorOf?.[week] ?? null,
+  }));
+  write(join(dir, 'schedule.yaml'), toYaml({ season: id, sponsors: fixture.sponsors ?? [], weeks }));
 }
 
 describe('season-01', () => {
@@ -282,6 +292,15 @@ describe('loadManagers and loadSchedule', () => {
       managers: { gm: { login: 'boss', githubId: null }, taverns: [{ id: 'the-inn', name: 'The Inn', manager: { bot: 'genius' } }] },
     });
     makeSeason(root, 'short', { weeks: [1, 2], config: { weeks: 3 } });
+    makeSeason(root, 'gods', {
+      sponsors: [
+        { id: 'the-sea', tavern: 'the-inn' },
+        { id: 'the-sky', tavern: 'the-ghost-inn' },
+      ],
+      sponsorOf: { 1: 'the-sea', 2: 'the-sea' },
+    });
+    makeSeason(root, 'stranger', { sponsorOf: { 1: 'nobody' } });
+    makeSeason(root, 'home', { sponsors: [{ id: 'the-sea', tavern: 'the-inn' }], sponsorOf: { 2: 'the-sea' } });
   });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
@@ -310,6 +329,23 @@ describe('loadManagers and loadSchedule', () => {
     );
     expect(failureOf(() => loadSchedule('short', root))).toBe(
       'seasons/short/schedule.yaml: weeks: has 2 entries, but config.yaml weeks is 3',
+    );
+  });
+
+  it('loads sponsors and each week\'s sponsor', () => {
+    const schedule = loadSchedule('home', root);
+    expect(schedule.sponsors).toEqual([{ id: 'the-sea', tavern: 'the-inn' }]);
+    expect(schedule.weeks.map((w) => w.sponsor)).toEqual([null, 'the-sea']);
+  });
+
+  it('requires listed sponsors, one week each, and sponsored taverns that exist', () => {
+    expect(failureOf(() => loadSchedule('gods', root))).toBe('seasons/gods/schedule.yaml: sponsors: sponsor "the-sea" sets both week 1 and week 2');
+    expect(failureOf(() => loadSchedule('stranger', root))).toBe(
+      'seasons/stranger/schedule.yaml: sponsors: week 1 names sponsor "nobody", which is not listed',
+    );
+    makeSeason(root, 'ghost', { sponsors: [{ id: 'the-sky', tavern: 'the-ghost-inn' }] });
+    expect(failureOf(() => loadSeason('ghost', root))).toBe(
+      'seasons/ghost/schedule.yaml: sponsors[0].tavern: "the-ghost-inn" is not a tavern in managers.yaml',
     );
   });
 
