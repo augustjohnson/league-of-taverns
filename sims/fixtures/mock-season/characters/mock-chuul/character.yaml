@@ -1,0 +1,5 @@
+id: mock-chuul
+base: chuul
+status: active
+chrome:
+  name: Mock Chuul

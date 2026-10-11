@@ -1,0 +1,5 @@
+id: mock-red-dragon-wyrmling
+base: red-dragon-wyrmling
+status: active
+chrome:
+  name: Mock Red Dragon Wyrmling

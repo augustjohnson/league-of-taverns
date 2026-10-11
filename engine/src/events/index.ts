@@ -5,7 +5,8 @@
 export type * from './types';
 export type * from './state';
 export { InvalidEventError, applyEvent, initialState } from './reducers';
-export { LogParseError, lineHash, parseLog, replay, serializeEvent, verifyResolutions } from './replay';
+export { LogParseError, ReplayError, lineHash, parseLog, replay, replayLog, serializeEvent, verifyResolutions } from './replay';
+export { freeAgents, onTheClock, seasonStandings, weekResults } from './selectors';
 export {
   crEighthsSchema,
   eventSchema,

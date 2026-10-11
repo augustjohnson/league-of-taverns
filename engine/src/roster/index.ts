@@ -16,7 +16,6 @@
 import type { SeasonConfig } from '../league';
 import type { Rng } from '../rng';
 import type { CrEighths } from '../vocabulary';
-import { notImplemented } from '../internal/not-implemented';
 
 export interface Lineup {
   readonly captain: string;
@@ -199,24 +198,120 @@ export interface WaiverClaim {
   readonly seq: number;
 }
 
+/**
+ * Why a claim was or wasn't awarded. Failures are checked in this order and
+ * the first that applies is reported:
+ * - `add_unavailable`: `add` is not claimable when the claim is tried (it was
+ *   never a free agent, another claim already took it this run, or it was
+ *   dropped this run).
+ * - `drop_not_owned`: `drop` is not on the claiming tavern's roster at that time.
+ * - `roster_full`: the roster would end up larger than `config.roster.size`.
+ */
+export type WaiverReason = 'awarded' | 'add_unavailable' | 'drop_not_owned' | 'roster_full';
+
 export interface WaiverAward {
   readonly claim: WaiverClaim;
   readonly awarded: boolean;
+  /** One of `WaiverReason`. Typed as string to match the `waiver.resolved` payload. */
   readonly reason: string;
 }
 
 /**
- * Resolve all pending claims at once. Rolling priority: a tavern that wins a
- * claim moves to the back of the order.
+ * Resolve all pending claims at once (docs/rules.md §9, docs/decisions.md D-05).
+ *
+ * - Each tavern's claims are queued by `seq`. Equal seqs keep input order.
+ * - Resolution runs in rounds. A round takes the priority order as it stands
+ *   when the round starts, and each tavern in it with a pending claim has its
+ *   earliest one tried. So a tavern tries at most one claim per round, and a
+ *   failed claim uses up that tavern's turn for the round.
+ * - A claim is awarded when `add` is still claimable, `drop` (if given) is
+ *   still on the tavern's roster, and the resulting roster is at most
+ *   `config.roster.size`. Otherwise it fails with the first `WaiverReason`
+ *   that applies. A `drop` is allowed even when the roster has room.
+ * - A tavern that wins moves to the back of the priority order at once. This
+ *   doesn't change the rest of the round, since each tavern gets one turn per
+ *   round either way.
+ * - An awarded `drop` becomes a free agent immediately but is **not**
+ *   claimable in this run. Rules §9 says dropped characters can be claimed in
+ *   the next window, so the caller adds it to the next run's free agents.
+ * - Rosters change as claims are awarded, and later claims by any tavern see
+ *   the result.
+ *
+ * Returns one award per claim, in the order the claims were decided (round by
+ * round, priority order within a round), plus the final priority order.
+ * Taverns in `priority` without winning claims keep their relative places.
+ *
+ * A tavern missing from `rosters` is treated as having an empty roster.
+ * Throws if `priority` has duplicates or a claim's tavern is not in it.
+ * Pure: inputs are never mutated.
  */
 export function resolveWaivers(
-  _claims: ReadonlyArray<WaiverClaim>,
-  _priority: ReadonlyArray<string>,
-  _rosters: ReadonlyArray<RosterView>,
-  _freeAgents: ReadonlySet<string>,
-  _config: SeasonConfig,
+  claims: ReadonlyArray<WaiverClaim>,
+  priority: ReadonlyArray<string>,
+  rosters: ReadonlyArray<RosterView>,
+  freeAgents: ReadonlySet<string>,
+  config: SeasonConfig,
 ): { readonly awards: ReadonlyArray<WaiverAward>; readonly priority: ReadonlyArray<string> } {
-  return notImplemented('resolveWaivers', 'T4.5');
+  if (new Set(priority).size !== priority.length) throw new Error('resolveWaivers: priority contains duplicates');
+  const known = new Set(priority);
+
+  const queues = new Map<string, WaiverClaim[]>();
+  for (const claim of claims) {
+    if (!known.has(claim.tavern)) throw new Error(`resolveWaivers: claim by "${claim.tavern}", which is not in the priority order`);
+    const queue = queues.get(claim.tavern) ?? [];
+    queue.push(claim);
+    queues.set(claim.tavern, queue);
+  }
+  // Array.prototype.sort is stable, so equal seqs keep input order.
+  for (const queue of queues.values()) queue.sort((a, b) => a.seq - b.seq);
+
+  const owned = new Map<string, Set<string>>();
+  for (const tavern of priority) owned.set(tavern, new Set(findRoster(rosters, tavern)?.characters ?? []));
+
+  // Only characters that were free agents when the run started are claimable in it.
+  const claimable = new Set(freeAgents);
+  const limit = config.roster.size;
+  let order = [...priority];
+  const awards: WaiverAward[] = [];
+  let pending = claims.length;
+
+  while (pending > 0) {
+    for (const tavern of [...order]) {
+      const claim = queues.get(tavern)?.shift();
+      if (claim === undefined) continue;
+      pending--;
+      const roster = owned.get(tavern)!;
+      const reason = waiverFailure(claim, roster, claimable, limit);
+      if (reason !== null) {
+        awards.push({ claim, awarded: false, reason });
+        continue;
+      }
+      claimable.delete(claim.add);
+      if (claim.drop !== null) roster.delete(claim.drop);
+      roster.add(claim.add);
+      order = [...order.filter((t) => t !== tavern), tavern];
+      awards.push({ claim, awarded: true, reason: 'awarded' });
+    }
+  }
+
+  return { awards, priority: order };
+}
+
+function findRoster(rosters: ReadonlyArray<RosterView>, tavern: string): RosterView | undefined {
+  return rosters.find((r) => r.tavern === tavern);
+}
+
+function waiverFailure(
+  claim: WaiverClaim,
+  roster: ReadonlySet<string>,
+  claimable: ReadonlySet<string>,
+  limit: number,
+): Exclude<WaiverReason, 'awarded'> | null {
+  if (!claimable.has(claim.add)) return 'add_unavailable';
+  if (claim.drop !== null && !roster.has(claim.drop)) return 'drop_not_owned';
+  const after = roster.size + 1 - (claim.drop !== null ? 1 : 0);
+  if (after > limit) return 'roster_full';
+  return null;
 }
 
 export interface TradeTerms {
@@ -226,9 +321,94 @@ export interface TradeTerms {
   readonly receive: ReadonlyArray<string>;
 }
 
-/** Violations for a trade against current rosters. Run at proposal and again at acceptance. */
-export function validateTrade(_terms: TradeTerms, _rosters: ReadonlyArray<RosterView>, _config: SeasonConfig): ReadonlyArray<RuleViolation> {
-  return notImplemented('validateTrade', 'T4.5');
+export interface TradeCheckOptions {
+  /**
+   * The first week whose lineups the trade would affect, i.e. the next lineup
+   * to lock. With a week-4 deadline that is 4 before the week-4 lock (allowed)
+   * and 5 after it (past the deadline). Omit to skip the deadline check.
+   */
+  readonly week?: number;
+}
+
+/**
+ * Violations for a trade against current rosters, empty when legal. Run at
+ * proposal and again at completion (docs/rules.md §10). Every violation is
+ * reported, in this order: `same_tavern`, `empty_side`, `duplicate`,
+ * `give_not_owned`, `receive_not_owned`, `roster_size`, `past_deadline`.
+ *
+ * - `same_tavern`: `from` and `to` are the same tavern.
+ * - `empty_side`: `give` or `receive` is empty. One per empty side.
+ * - `duplicate`: a character listed more than once across `give` and
+ *   `receive` together. One per repeated id.
+ * - `give_not_owned`: a `give` piece is not on `from`'s roster. One per id.
+ * - `receive_not_owned`: a `receive` piece is not on `to`'s roster. One per id.
+ * - `roster_size`: one per tavern whose roster would change size and not end
+ *   up between 1 and `config.roster.size`. So N-for-N always passes, and an
+ *   uneven trade passes only when the side taking more pieces has open slots
+ *   and the other side keeps at least one character. Between two full rosters
+ *   an uneven trade always fails, which keeps D-06's default (rosters stay at
+ *   size) for the normal case. Sizes count distinct ids. Skipped for
+ *   `same_tavern`.
+ * - `past_deadline`: `options.week` is given, the season has a deadline, and
+ *   the week is after `config.trades.deadlineWeek`.
+ *
+ * A tavern missing from `rosters` is treated as having an empty roster.
+ * Pure: inputs are never mutated.
+ */
+export function validateTrade(
+  terms: TradeTerms,
+  rosters: ReadonlyArray<RosterView>,
+  config: SeasonConfig,
+  options: TradeCheckOptions = {},
+): ReadonlyArray<RuleViolation> {
+  const violations: RuleViolation[] = [];
+  const { from, to, give, receive } = terms;
+
+  if (from === to) violations.push({ code: 'same_tavern', message: `a tavern cannot trade with itself ("${from}")` });
+
+  if (give.length === 0) violations.push({ code: 'empty_side', message: `${from} gives nothing` });
+  if (receive.length === 0) violations.push({ code: 'empty_side', message: `${to} gives nothing` });
+
+  const pieces = [...give, ...receive];
+  for (const id of new Set(pieces)) {
+    const count = pieces.filter((p) => p === id).length;
+    if (count > 1) violations.push({ code: 'duplicate', message: `"${id}" appears ${count} times in the trade` });
+  }
+
+  const fromRoster = new Set(findRoster(rosters, from)?.characters ?? []);
+  const toRoster = new Set(findRoster(rosters, to)?.characters ?? []);
+  const gives = [...new Set(give)];
+  const receives = [...new Set(receive)];
+  for (const id of gives) {
+    if (!fromRoster.has(id)) violations.push({ code: 'give_not_owned', message: `"${id}" is not on ${from}'s roster` });
+  }
+  for (const id of receives) {
+    if (!toRoster.has(id)) violations.push({ code: 'receive_not_owned', message: `"${id}" is not on ${to}'s roster` });
+  }
+
+  if (from !== to) {
+    const limit = config.roster.size;
+    const sides: ReadonlyArray<readonly [string, number, number]> = [
+      [from, fromRoster.size, receives.length - gives.length],
+      [to, toRoster.size, gives.length - receives.length],
+    ];
+    for (const [tavern, before, delta] of sides) {
+      const after = before + delta;
+      if (after !== before && (after < 1 || after > limit)) {
+        violations.push({
+          code: 'roster_size',
+          message: `${tavern}'s roster would go from ${before} to ${after}; an uneven trade must leave it between 1 and ${limit}`,
+        });
+      }
+    }
+  }
+
+  const deadline = config.trades.deadlineWeek;
+  if (options.week !== undefined && deadline !== null && options.week > deadline) {
+    violations.push({ code: 'past_deadline', message: `week ${options.week} is after the week-${deadline} trade deadline` });
+  }
+
+  return violations;
 }
 
 /**

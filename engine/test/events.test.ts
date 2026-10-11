@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { LogParseError, lineHash, parseLog, serializeEvent } from '../src/events/replay';
+import { InvalidEventError } from '../src/events/reducers';
+import { LogParseError, ReplayError, lineHash, parseLog, replay, replayLog, serializeEvent, verifyResolutions } from '../src/events/replay';
 import type { EventOf, EventType, LeagueEvent } from '../src/events/types';
 import type { SeasonConfig } from '../src/league';
 import type { Mission } from '../src/missions';
 import type { Lineup } from '../src/roster';
 import type { CrEighths } from '../src/vocabulary';
+import { chained, miniSeason } from './support/league-log';
 
 const HASH = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 const system = { kind: 'system', workflow: 'weekly-run' } as const;
@@ -262,9 +264,159 @@ describe('events', () => {
     expect(() => parseLog(fractionalCr)).toThrow(/^events line 1: payload\.cr: /);
   });
 
-  it.todo('replay rejects a gap in seq');
-  it.todo('replay rejects a broken prev hash chain');
-  it.todo('replaying the same log twice yields deeply equal state');
-  it.todo('verifyResolutions reports no mismatch for an honest log and flags an edited d20');
-  it.todo('derived state is invariant to edits in character chrome (chrome never reaches the engine)');
+});
+
+describe('replay and verification', () => {
+  const { log } = miniSeason();
+  const resolvedIndex = log.events.findIndex((e) => e.type === 'mission.resolved');
+  const resolved = log.events[resolvedIndex] as EventOf<'mission.resolved'>;
+  const revealedIndex = log.events.findIndex((e) => e.type === 'mission.revealed');
+  const revealed = log.events[revealedIndex] as EventOf<'mission.revealed'>;
+  const ndjson = (lines: ReadonlyArray<string>): string => `${lines.join('\n')}\n`;
+
+  function replayError(text: string): ReplayError {
+    try {
+      replayLog(text);
+    } catch (error) {
+      if (error instanceof ReplayError) return error;
+      throw error;
+    }
+    throw new Error('expected replayLog to throw');
+  }
+
+  /** The log with the first `mission.resolved` swapped for one with `run` patched. */
+  function withResolution(patch: Partial<EventOf<'mission.resolved'>['payload']>): ReadonlyArray<LeagueEvent> {
+    const edited = { ...resolved, payload: { ...resolved.payload, ...patch } };
+    return log.events.map((e, i) => (i === resolvedIndex ? edited : e));
+  }
+
+  /** start → find-path (fail) → bog → crossed, with a recorded battle. */
+  function battleRun(battle: { roll: number; outcome: 'win' | 'lose' }): EventOf<'mission.resolved'>['payload']['run'] {
+    const lost = battle.outcome === 'lose';
+    return {
+      path: lost ? ['start', 'find-path', 'bog'] : ['start', 'find-path', 'bog', 'crossed'],
+      nodes: [
+        { node: 'find-path', kind: 'check', actor: resolved.payload.lineup.captain, d20: 2, modifier: 1, dc: 11, advantage: false, outcome: 'fail' },
+        { node: 'bog', kind: 'battle', pWin: 0.6, roll: battle.roll, outcome: battle.outcome },
+      ],
+      dnf: lost,
+      checksPassed: 0,
+      checksAttempted: 1,
+      score: 0,
+    };
+  }
+
+  it('replay rejects a gap in seq', () => {
+    const gapped = [...log.events.slice(0, 10), ...log.events.slice(11)];
+    expect(() => replay(gapped)).toThrow(InvalidEventError);
+    expect(() => replay(gapped)).toThrow(/^event 12: .*\[envelope\.seq\]/);
+    // In a log file the missing line first breaks the chain at the line after the gap…
+    const cut = replayError(ndjson([...log.lines.slice(0, 10), ...log.lines.slice(11)]));
+    expect([cut.line, cut.code]).toEqual([11, 'chain.prev_mismatch']);
+    expect(cut.message).toMatch(/^events line 11: /);
+    // …and with the chain rebuilt around the gap, the seq check still names the line.
+    const rechained = replayError(chained(gapped));
+    expect([rechained.line, rechained.code]).toEqual([11, 'envelope.seq']);
+    expect(rechained.cause).toBeInstanceOf(InvalidEventError);
+  });
+
+  it('replay rejects a reordered log', () => {
+    const swap = <T>(xs: ReadonlyArray<T>): T[] => [...xs.slice(0, 4), xs[5]!, xs[4]!, ...xs.slice(6)];
+    const raw = replayError(ndjson(swap(log.lines)));
+    expect([raw.line, raw.code]).toEqual([5, 'chain.prev_mismatch']);
+    const rechained = replayError(chained(swap(log.events)));
+    expect([rechained.line, rechained.code]).toEqual([5, 'envelope.seq']);
+  });
+
+  it('replay rejects a broken prev hash chain', () => {
+    const lines = [...log.lines];
+    lines[0] = serializeEvent({ ...log.events[0]!, prev: lineHash('genesis') });
+    expect(replayError(ndjson(lines))).toMatchObject({ line: 1, code: 'chain.first_prev' });
+
+    for (const prev of [lineHash('elsewhere'), null]) {
+      const broken = [...log.lines];
+      broken[2] = serializeEvent({ ...log.events[2]!, prev });
+      expect(replayError(ndjson(broken))).toMatchObject({ line: 3, code: 'chain.prev_mismatch' });
+    }
+  });
+
+  it('detects an edited line at the line after it, even a whitespace-only edit', () => {
+    const k = log.events.findIndex((e) => e.type === 'tavern.joined');
+    const renamed = [...log.lines];
+    renamed[k] = log.lines[k]!.replace('"name":"the-gilded-flagon"', '"name":"The Gilded Flagon"');
+    expect(renamed[k]).not.toBe(log.lines[k]);
+    expect(replayError(ndjson(renamed))).toMatchObject({ line: k + 2, code: 'chain.prev_mismatch' });
+
+    const padded = [...log.lines];
+    padded[k] = `${log.lines[k]!} `;
+    expect(replayError(ndjson(padded))).toMatchObject({ line: k + 2, code: 'chain.prev_mismatch' });
+  });
+
+  it('names the line of an event the reducers reject', () => {
+    const doubled = [...log.events.slice(0, 3), { ...log.events[2]!, seq: 4 }, ...log.events.slice(3)];
+    const error = replayError(chained(doubled.map((e, i) => ({ ...e, seq: i + 1 }))));
+    expect([error.line, error.code]).toEqual([4, 'pool.duplicate']);
+  });
+
+  it('replaying the same log twice yields deeply equal state', () => {
+    const first = replayLog(log.ndjson);
+    expect(replayLog(log.ndjson)).toEqual(first);
+    expect(replay(parseLog(log.ndjson))).toEqual(first);
+    expect(first.lastHash).toBe(lineHash(log.lines.at(-1)!));
+    expect(replayLog('')).toEqual(replay([]));
+  });
+
+  it('verifyResolutions reports no mismatch for an honest log and flags an edited d20', () => {
+    expect(verifyResolutions(log.events)).toEqual([]);
+    const [first, ...rest] = resolved.payload.run.nodes;
+    if (first?.kind !== 'check') throw new Error('expected the first node to be a check');
+    const events = withResolution({ run: { ...resolved.payload.run, nodes: [{ ...first, d20: first.outcome === 'pass' ? 1 : 20 }, ...rest] } });
+    // The reducers trust the record (D-20), so the edited log still replays…
+    expect(() => replayLog(chained(events))).not.toThrow();
+    // …and the audit catches it.
+    expect(verifyResolutions(events)).toEqual([
+      { seq: resolved.seq, week: 1, tavern: resolved.payload.tavern, field: 'run.nodes[0].outcome', message: expect.stringContaining('d20') },
+    ]);
+  });
+
+  it('verifyResolutions checks battles, the path, the summary and the points', () => {
+    const fields = (patch: Partial<EventOf<'mission.resolved'>['payload']>) => verifyResolutions(withResolution(patch)).map((m) => m.field);
+    const won = battleRun({ roll: 0.3, outcome: 'win' });
+    expect(fields({ run: won, points: 0 })).toEqual([]);
+    expect(fields({ run: battleRun({ roll: 0.9, outcome: 'lose' }), points: 0 })).toEqual([]);
+    expect(fields({ run: { ...won, nodes: [won.nodes[0]!, { ...won.nodes[1]!, roll: 0.9 } as (typeof won.nodes)[1]] }, points: 0 })).toEqual(['run.nodes[1].outcome']);
+    expect(fields({ run: { ...won, path: ['start', 'find-path', 'crossed'] }, points: 0 })).toEqual(['run.path']);
+    expect(fields({ run: { ...won, dnf: true }, points: 0 })).toEqual(['run.dnf']);
+    expect(fields({ run: { ...won, checksPassed: 1, score: 1 }, points: 100 })).toEqual(['run.checksPassed', 'run.score']);
+    expect(fields({ run: won, points: 7 })).toEqual(['points']);
+    expect(fields({ run: { ...won, nodes: won.nodes.slice(0, 1) }, points: 0 })).toEqual(['run.nodes[1]']);
+    expect(fields({ run: { ...won, nodes: [{ ...won.nodes[0]!, actor: 'stranger' } as (typeof won.nodes)[0], won.nodes[1]!] }, points: 0 })).toEqual(['run.nodes[0].actor']);
+    expect(fields({ mission: 'another-mission' })).toEqual(['mission']);
+  });
+
+  it('verifyResolutions lets a gated check fail on a high roll (nobody may have met the gate)', () => {
+    const won = battleRun({ roll: 0.3, outcome: 'win' });
+    const highFail = { ...won, nodes: [{ ...won.nodes[0]!, d20: 20 } as (typeof won.nodes)[0], won.nodes[1]!] };
+    expect(verifyResolutions(withResolution({ run: highFail, points: 0 })).map((m) => m.field)).toEqual(['run.nodes[0].outcome']);
+    const gated = {
+      ...revealed,
+      payload: {
+        ...revealed.payload,
+        mission: {
+          ...revealed.payload.mission,
+          nodes: revealed.payload.mission.nodes.map((n) => (n.kind === 'check' ? { ...n, check: { ...n.check, requires: { sense: 'darkvision' as const } } } : n)),
+        },
+      },
+    };
+    const events = withResolution({ run: highFail, points: 0 }).map((e, i) => (i === revealedIndex ? gated : e));
+    expect(verifyResolutions(events)).toEqual([]);
+  });
+
+  it('chrome never reaches the engine: the log rejects chrome fields, and pooled state holds mechanics only', () => {
+    const pooled = log.events.find((e) => e.type === 'character.pooled')!;
+    for (const chrome of [{ name: 'Bruno' }, { epithet: 'the Bruiser' }, { portrait: 'bruno.png' }]) {
+      expect(() => parseLog(JSON.stringify({ ...pooled, payload: { ...pooled.payload, ...chrome } }))).toThrow(/^events line 1: payload: /);
+    }
+    for (const entry of replay(log.events).pool.values()) expect(Object.keys(entry).sort()).toEqual(['base', 'cr', 'modifiers']);
+  });
 });

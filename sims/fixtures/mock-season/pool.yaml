@@ -1,0 +1,114 @@
+# Mock season pool: 48 non-spellcaster SRD creatures from CR 1/8 to 6.
+# 6 taverns × roster 7 = 42 drafted, leaving 6 for waivers.
+# Schema: docs/schema.md § Pool. Character folders: ./characters/<id>/.
+#
+# Spread (CR: count): 1/8: 4, 1/4: 7, 1/2: 7, 1: 8, 2: 8, 3: 6, 4: 3, 5: 3, 6: 2.
+# 16 of 48 carry modifiers, each within the 3-point budget (registry v1 costs
+# in the trailing comments).
+
+season: mock-season
+registry: 1
+characters:
+  # ── CR 1/8 ──
+  - id: mock-blood-hawk               # beast, fly 60, perception
+  - id: mock-giant-weasel             # beast, stealth + perception
+    modifiers:
+      - { kind: trait, trait: keen-nose }                       # 2
+  - id: mock-merfolk                  # humanoid, swim 40
+    modifiers:
+      - { kind: skill_bonus, skill: persuasion, value: 2 }      # 2
+  - id: mock-noble                    # humanoid, deception / insight / persuasion
+
+  # ── CR 1/4 ──
+  - id: mock-giant-owl                # beast, fly 60, perception + stealth, darkvision 120
+  - id: mock-giant-wolf-spider        # beast, climb 40, stealth 7
+  - id: mock-goblin                   # humanoid, stealth 6
+    modifiers:
+      - { kind: skill_bonus, skill: stealth, value: 1 }         # 1
+  - id: mock-sprite                   # fey, fly 40, stealth 8
+  - id: mock-panther                  # beast, climb 40, stealth + perception
+  - id: mock-wolf                     # beast, perception + stealth
+    modifiers:
+      - { kind: grant_sense, sense: darkvision, feet: 60 }      # 1
+  - id: mock-giant-frog               # beast, swim 30
+
+  # ── CR 1/2 ──
+  - id: mock-ape                      # beast, climb 30, athletics 5
+    modifiers:
+      - { kind: skill_bonus, skill: athletics, value: 2 }       # 2
+      - { kind: trait, trait: thick-skull }                     # 1
+  - id: mock-lizardfolk               # humanoid, swim 30, survival 5
+    modifiers:
+      - { kind: skill_bonus, skill: stealth, value: 2 }         # 2
+  - id: mock-scout                    # humanoid, perception / stealth / survival / nature
+  - id: mock-sahuagin                 # humanoid, swim 40, perception 5
+    modifiers:
+      - { kind: skill_bonus, skill: athletics, value: 1 }       # 1
+      - { kind: save_bonus, ability: wis, value: 1 }            # 1
+  - id: mock-satyr                    # fey, performance 6, stealth 5
+  - id: mock-worg                     # monstrosity, perception 4
+  - id: mock-reef-shark               # beast, swim 40
+
+  # ── CR 1 ──
+  - id: mock-brown-bear               # beast, climb 30, strong
+    modifiers:
+      - { kind: trait, trait: thick-skull }                     # 1
+      - { kind: skill_bonus, skill: athletics, value: 2 }       # 2
+  - id: mock-bugbear                  # humanoid, stealth 6
+    modifiers:
+      - { kind: battle_bonus, value: 1 }                        # 2
+  - id: mock-death-dog                # monstrosity, perception 5
+  - id: mock-giant-eagle              # beast, fly 80, perception 4
+  - id: mock-giant-octopus            # beast, swim 60, stealth 5
+  - id: mock-spy                      # humanoid, the skill monkey
+    modifiers:
+      - { kind: advantage, on: { type: skill, skill: stealth } } # 2
+  - id: mock-hippogriff               # monstrosity, fly 60, perception 5
+  - id: mock-imp                      # fiend, fly 40, deception / stealth
+
+  # ── CR 2 ──
+  - id: mock-ogre                     # giant, strong
+    modifiers:
+      - { kind: skill_bonus, skill: intimidation, value: 2 }    # 2
+      - { kind: trait, trait: thick-skull }                     # 1
+  - id: mock-centaur                  # monstrosity, athletics 6, survival 3
+    modifiers:
+      - { kind: skill_bonus, skill: survival, value: 2 }        # 2
+  - id: mock-ettercap                 # monstrosity, climb 30, stealth / survival
+  - id: mock-griffon                  # monstrosity, fly 80, perception 5
+  - id: mock-pegasus                  # celestial, fly 90, perception 6
+  - id: mock-plesiosaurus             # beast, swim 40
+  - id: mock-saber-toothed-tiger      # beast, stealth 6
+  - id: mock-gargoyle                 # elemental, fly 60
+
+  # ── CR 3 ──
+  - id: mock-minotaur                 # monstrosity, perception 7
+    modifiers:
+      - { kind: skill_bonus, skill: survival, value: 1 }        # 1
+      - { kind: trait, trait: thick-skull }                     # 1
+  - id: mock-wight                    # undead, stealth + perception
+  - id: mock-owlbear                  # monstrosity, strong
+    modifiers:
+      - { kind: trait, trait: keen-nose }                       # 2
+      - { kind: trait, trait: thick-skull }                     # 1
+  - id: mock-phase-spider             # monstrosity, climb 30, stealth 6
+  - id: mock-winter-wolf              # monstrosity, perception 5
+  - id: mock-killer-whale             # beast, swim 60
+
+  # ── CR 4 ──
+  - id: mock-ettin                    # giant, perception 4
+  - id: mock-chuul                    # aberration, swim 30
+  - id: mock-red-dragon-wyrmling      # dragon, fly 60, climb 30
+
+  # ── CR 5 ──
+  - id: mock-gladiator                # humanoid, athletics 10
+    modifiers:
+      - { kind: save_bonus, ability: dex, value: 2 }            # 2
+  - id: mock-troll                    # giant, strong
+    modifiers:
+      - { kind: trait, trait: amphibious }                      # 2
+  - id: mock-giant-crocodile          # beast, swim 50, stealth 5
+
+  # ── CR 6 ──
+  - id: mock-wyvern                   # dragon, fly 80
+  - id: mock-chimera                  # monstrosity, fly 60, perception 8

@@ -1,0 +1,5 @@
+id: mock-spy
+base: spy
+status: active
+chrome:
+  name: Mock Spy

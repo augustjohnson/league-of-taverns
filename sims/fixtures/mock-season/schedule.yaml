@@ -1,0 +1,20 @@
+# Mock season schedule: one environment per week, so each mission in
+# missions/ maps to exactly one week by its environment.
+
+season: mock-season
+weeks:
+  - week: 1
+    title: The Thornwood Trail
+    environment: forest
+    theme: A bandit camp in the briars, and the road it has been taxing.
+    commitment: null
+  - week: 2
+    title: The Saltmarsh Wreck
+    environment: coast
+    theme: False lights on the rocks, and what guards the hold.
+    commitment: null
+  - week: 3
+    title: The Eyrie Pass
+    environment: mountain
+    theme: A storm on the pass and a gap only wings can cross.
+    commitment: null
