@@ -46,6 +46,12 @@ Portraits are made to stand side by side behind the bar in a tavern scene:
   rows (`counter: 0`) and sit on the bar's top edge, with a lower threshold
   because the flagon's base is narrow.
 
+The same pass rejects three ways a candidate goes wrong: a sprite sheet of
+copies (the largest shape holds under 80% of the sprite), greyscale ink
+drawings (mean chroma under 0.025; grey-skinned characters with coloured
+accents measure 0.03 and up), and, for humanoids, full-body poses (the
+figure fills under 35% of the card above the bar).
+
 `draft-images` checks every candidate (`scripts/src/lib/images/framing.ts`),
 the review page marks failures and draws the bar over each card, `accept`
 refuses failures without `--force`, and `validate` checks committed

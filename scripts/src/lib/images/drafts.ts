@@ -147,7 +147,7 @@ export function stagedPaths(target: TargetKey, seed: number, root: RepoRoot = RE
 
 /** Problems that would stop a staged candidate from being layered cleanly (none for covers). */
 export function candidateProblems(target: DraftTarget, sprite: Uint8Array, style: ImageStyle): string[] {
-  return target.kind === 'portrait' && target.size !== undefined ? framingProblems(decodePng(sprite), framingRules(style, target.size)) : [];
+  return target.kind === 'portrait' && target.size !== undefined ? framingProblems(decodePng(sprite), framingRules(style, target.size, target.bodyPlan)) : [];
 }
 
 /** What the review page needs about a staged candidate. */
@@ -162,7 +162,7 @@ export function stage(target: DraftTarget, seed: number, render: Uint8Array, spr
   const paths = stagedPaths(target, seed, root);
   const problems = candidateProblems(target, sprite, style);
   const framing: StagedFraming =
-    target.kind === 'portrait' && target.size !== undefined ? { problems, counter: framingRules(style, target.size).counter } : { problems };
+    target.kind === 'portrait' && target.size !== undefined ? { problems, counter: framingRules(style, target.size, target.bodyPlan).counter } : { problems };
   mkdirSync(dirname(paths.sprite), { recursive: true });
   writeFileSync(paths.render, render);
   writeFileSync(paths.sprite, sprite);

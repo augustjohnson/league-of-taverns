@@ -20,6 +20,7 @@ import { framingProblems } from './framing';
 import { checkSprite } from './pixelate';
 import { PngError, decodePng } from './png';
 import { framingRules, glassAlpha, loadImageStyle, outputSize, paletteOf } from './style';
+import type { BodyPlan } from './body-plans';
 import type { CreatureSize, ImageKind, ImageStyle } from './style';
 
 /** A palette sprite at league sizes is a few KB; anything near this is not one. */
@@ -33,7 +34,7 @@ export interface PooledPortrait {
 
 export function checkSeasonImages(season: SeasonSource, characters: ReadonlyArray<PooledPortrait>, root: RepoRoot = REPO_ROOT): string[] {
   const issues: string[] = [];
-  const images: Array<{ readonly file: string; readonly kind: ImageKind; readonly size?: CreatureSize; readonly translucent?: boolean }> = [];
+  const images: Array<{ readonly file: string; readonly kind: ImageKind; readonly size?: CreatureSize; readonly translucent?: boolean; readonly plan?: BodyPlan }> = [];
   const label = (file: string): string => relative(rootDir(root), file);
 
   const charactersRoot = charactersRootDir(season, root);
@@ -52,7 +53,7 @@ export function checkSeasonImages(season: SeasonSource, characters: ReadonlyArra
     }
     // An unknown base is already reported by the pool check; its size can't be checked.
     if (portrait.path !== undefined && size !== undefined) {
-      images.push({ file: join(charactersRoot, 'characters', id, portrait.path), kind: 'portrait', size, translucent: portrait.translucent === true });
+      images.push({ file: join(charactersRoot, 'characters', id, portrait.path), kind: 'portrait', size, translucent: portrait.translucent === true, plan: portrait.bodyPlan ?? 'humanoid' });
     }
   }
 
@@ -76,8 +77,8 @@ export function checkSeasonImages(season: SeasonSource, characters: ReadonlyArra
     if (!(error instanceof ValidationFailure)) throw error;
     return [...issues, ...error.message.split('\n')];
   }
-  for (const { file, kind, size, translucent } of images) {
-    issues.push(...checkImageFile(file, outputSize(style, kind, size), kind, size, glassAlpha(style, kind, translucent), style, label));
+  for (const { file, kind, size, translucent, plan } of images) {
+    issues.push(...checkImageFile(file, outputSize(style, kind, size), kind, size, plan, glassAlpha(style, kind, translucent), style, label));
   }
   return issues;
 }
@@ -87,6 +88,7 @@ function checkImageFile(
   expected: { readonly width: number; readonly height: number },
   kind: ImageKind,
   size: CreatureSize | undefined,
+  plan: BodyPlan | undefined,
   glass: number | undefined,
   style: ImageStyle,
   label: (file: string) => string,
@@ -99,7 +101,7 @@ function checkImageFile(
   try {
     const image = decodePng(readFileSync(file));
     const problems = checkSprite(image, expected, paletteOf(style), glass);
-    if (size !== undefined && problems.length === 0) problems.push(...framingProblems(image, framingRules(style, size)));
+    if (size !== undefined && problems.length === 0) problems.push(...framingProblems(image, framingRules(style, size, plan)));
     return problems.map((p) => `${label(file)}: ${p}`);
   } catch (error) {
     if (error instanceof PngError) return [`${label(file)}: ${error.message}`];

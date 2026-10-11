@@ -81,6 +81,12 @@ portrait:
     maxChroma: 0.07
   minFooting: 0.5
   tolerance: 2
+  # Quality checks on the same candidates: one figure, not a sprite sheet of
+  # copies (the largest shape holds minMainShare of the sprite), and colour,
+  # not an ink drawing (mean chroma at least minChroma; grey-skinned
+  # characters with coloured accents measure 0.03 and up).
+  minMainShare: 0.8
+  minChroma: 0.025
   # Body plans (chrome.portrait.bodyPlan, default humanoid). `anchor` opens
   # the prompt and says what kind of thing this is; `framing` is used unless
   # the size has its own; `negative` is added to the negative prompt. Every
@@ -89,10 +95,11 @@ portrait:
   bodyPlans:
     humanoid:
       anchor: medieval fantasy tavern patron
+      minFill: 0.35          # smaller is a full-body pose (scripts/src/lib/images/framing.ts)
       framing: >-
         (waist-up view:1.3), (realistic adult proportions, small head, broad
         shoulders:1.2), (centered, with empty space above the head and on both
-        sides:1.2), torso continuing past the bottom edge
+        sides:1.3), torso continuing past the bottom edge
     beast:
       anchor: (animal with true animal anatomy:1.2)
       framing: >-
@@ -136,12 +143,14 @@ portrait:
         bottom edge
       negative: *not-a-person
     multihead:
-      anchor: (fantasy monster with several heads on one body:1.3)
+      anchor: (a single fantasy monster, one body with two or three heads:1.3)
       framing: >-
         (all heads and the shoulders they share:1.3), (centered, with empty
         space above the heads and on both sides:1.2), body continuing past
         the bottom edge
-      negative: *not-a-person
+      negative: >-
+        (human, person, man, woman, humanoid body, knight, armor:1.4),
+        (crowd, group, horde, many creatures, several monsters:1.4)
   cutout: true
   # Colour grade before snapping to the palette: contrast stretches lightness
   # around the middle, saturation scales chroma. Portraits only, so the cast
@@ -152,15 +161,18 @@ portrait:
   # Every portrait shares one camera: eye level, straight on, matching the bar.
   # A view from above made a cube look like it floated behind the counter.
   positive: >-
-    pixel art, {{anchor}}, {{framing}}, {{subject}}, (eye-level front
-    view:1.2), three-quarter view, looking at viewer, (dynamic pose, bold
-    expressive features:1.2), (high contrast, bold shading:1.2), (soft even
-    light from the upper left:1.1), (thick dark outline around the
-    character:1.3), plain white background
+    pixel art, (vibrant full color:1.3), {{anchor}}, {{framing}}, {{subject}},
+    (eye-level front view:1.2), three-quarter view, looking at viewer, (bold
+    expressive face:1.2), (soft even light from the upper left:1.1), (thick
+    dark outline around the character:1.3), plain white background
   negative: >-
     (cropped:1.3), (out of frame:1.3), cut off, floating head, disembodied head,
     (isometric, top-down view, view from above, bird's eye view:1.3),
     washed out, flat colors, low contrast,
+    (monochrome, grayscale, black and white, desaturated, sketch, line art,
+    ink drawing:1.4),
+    (sprite sheet, character sheet, multiple characters, multiple views,
+    grid, collection, many copies:1.4),
     (oversized head, big head, chibi, bobblehead, caricature:1.4),
     (modern clothing, jacket, hoodie, jeans, zipper, coffee cup, paper
     cup:1.3), colored lighting, dramatic shadows,

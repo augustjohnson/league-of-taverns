@@ -505,7 +505,7 @@ characters:
     name: Hrök and Hrøk
     epithet: the Coworkers
     hook: Two heads, one body, and a twenty-year argument about whose turn it is to scratch.
-    look: two-headed grey-skinned ettin, one bald head with an eyepatch and one with a ginger beard, turned toward each other mid-argument, (both heads yelling:1.3)
+    look: (one giant with exactly two heads on one body:1.4), grey-skinned ettin, one bald head with an eyepatch and one with a ginger beard, turned toward each other mid-argument, (both heads yelling:1.3)
     bodyPlan: multihead
 
   - id: pudding

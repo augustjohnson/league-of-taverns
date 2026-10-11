@@ -14,6 +14,7 @@ seasons/*/reports/
 
 # Image candidates from draft-images; only accepted images are committed.
 .image-drafts/
+.image-drafts-*/
 
 # Agent worktrees created by Claude Code sessions.
 .claude/worktrees/

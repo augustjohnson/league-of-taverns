@@ -17,6 +17,7 @@ import type { RgbaImage } from '../src/lib/images/png';
 import {
   CREATURE_SIZES,
   creatureSize,
+  framingRules,
   loadImageStyle,
   outputSize,
   pixelateOptions,
@@ -210,7 +211,7 @@ describe('pixelate', () => {
 
 describe('framing', () => {
   // 20×20 cards with a 4-row bar: the counter line is row 15.
-  const rules = { bleed: [] as Edge[], counter: 4, minFooting: 0.5, tolerance: 2 };
+  const rules = { bleed: [] as Edge[], counter: 4, minFooting: 0.5, tolerance: 2, minMainShare: 0, minChroma: 0, minFill: 0 };
   /** Opaque where `cell(x, y)` is true. */
   const shape = (width: number, height: number, cell: (x: number, y: number) => boolean): RgbaImage => ({
     width,
@@ -239,6 +240,38 @@ describe('framing', () => {
     ]);
     const neck = shape(20, 20, (x, y) => (x >= 4 && x <= 15 && y >= 4 && y <= 12) || (x >= 9 && x <= 10 && y > 12));
     expect(framingProblems(neck, rules)).toEqual(['floats: only 17% of its width is solid at the counter line (needs 50%)']);
+  });
+
+  it('flags a sprite sheet of copies and a greyscale sprite', () => {
+    const coloured = (width: number, height: number, cell: (x: number, y: number) => boolean, rgb: number[]): RgbaImage => ({
+      width,
+      height,
+      data: Uint8Array.from({ length: width * height * 4 }, (_, i) => {
+        const p = i >> 2;
+        const on = cell(p % width, Math.floor(p / width));
+        return i % 4 === 3 ? (on ? 255 : 0) : on ? rgb[i % 4]! : 0;
+      }),
+    });
+    const strict = { ...rules, minMainShare: 0.8, minChroma: 0.025 };
+    const green = [60, 180, 80];
+    const one = coloured(20, 20, (x, y) => x >= 3 && x <= 16 && y >= 4, green);
+    expect(framingProblems(one, strict)).toEqual([]);
+    // Two equal figures side by side.
+    const two = coloured(20, 20, (x, y) => y >= 4 && ((x >= 2 && x <= 8) || (x >= 11 && x <= 17)), green);
+    expect(framingProblems(two, strict)).toContain('shows more than one figure (the largest shape is only 50% of the sprite; needs 80%)');
+    const grey = coloured(20, 20, (x, y) => x >= 3 && x <= 16 && y >= 4, [140, 140, 140]);
+    expect(framingProblems(grey, strict)).toEqual(['is nearly greyscale (mean chroma 0.000, needs 0.025)']);
+  });
+
+  it('flags a person too small in the frame (a full-body pose)', () => {
+    // A thin standing figure: 4 wide, 14 tall, in a 20×20 card with a 4-row bar.
+    const standing = shape(20, 20, (x, y) => x >= 8 && x <= 11 && y >= 6);
+    expect(framingProblems(standing, { ...rules, minFooting: 0, minFill: 0.35 })).toEqual([
+      'is too small in the frame, likely full-body (fills 13% of the card above the bar, needs 35%)',
+    ]);
+    expect(framingRules(style, 'medium', 'humanoid').minFill).toBe(0.35);
+    expect(framingRules(style, 'medium', 'blob').minFill).toBe(0);
+    expect(framingRules(style, 'tiny', 'humanoid').minFill).toBe(0);
   });
 
   it('drops a portrait onto the bottom edge, so a rounded bust ends behind the bar', () => {

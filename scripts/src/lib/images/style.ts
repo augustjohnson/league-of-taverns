@@ -41,7 +41,12 @@ const prompts = {
   negative: text,
 };
 
-const bodyPlan = z.strictObject({ anchor: text, framing: text, negative: text.exactOptional() });
+const bodyPlan = z.strictObject({
+  anchor: text,
+  framing: text,
+  negative: text.exactOptional(),
+  minFill: z.number().min(0).max(1).exactOptional(),
+});
 
 const portraitSize = size.extend({
   bleed: z.array(z.enum(EDGES)).exactOptional(),
@@ -78,6 +83,8 @@ const styleSchema = z.strictObject({
       maxChroma: z.number().nonnegative(),
     }),
     minFooting: z.number().min(0).max(1),
+    minMainShare: z.number().min(0).max(1),
+    minChroma: z.number().nonnegative(),
     tolerance: z.number().int().nonnegative(),
     bodyPlans: z.strictObject(
       Object.fromEntries(BODY_PLANS.map((p) => [p, bodyPlan])) as Record<BodyPlan, typeof bodyPlan>,
@@ -129,14 +136,18 @@ export function outputSize(style: ImageStyle, kind: ImageKind, size?: CreatureSi
   return { width, height };
 }
 
-/** How a portrait of this size must sit on its canvas (./framing.ts). */
-export function framingRules(style: ImageStyle, size: CreatureSize): FramingRules {
+/** How a portrait of this size and body plan must sit on its canvas (./framing.ts). */
+export function framingRules(style: ImageStyle, size: CreatureSize, plan: BodyPlan = 'humanoid'): FramingRules {
   const entry = style.portrait.sizes[size];
   return {
     bleed: entry.bleed ?? [],
     counter: entry.counter ?? style.portrait.counter,
     minFooting: entry.minFooting ?? style.portrait.minFooting,
     tolerance: style.portrait.tolerance,
+    minMainShare: style.portrait.minMainShare,
+    minChroma: style.portrait.minChroma,
+    // A size with its own framing (a tankard perch) isn't a waist-up portrait.
+    minFill: entry.framing === undefined ? (style.portrait.bodyPlans[plan].minFill ?? 0) : 0,
   };
 }
 
