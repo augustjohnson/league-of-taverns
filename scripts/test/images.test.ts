@@ -191,6 +191,14 @@ describe('pixelate', () => {
     expect(() => pixelate(render, options({ glass }))).toThrow(/glass needs a cutout/);
   });
 
+  it('grades contrast and saturation before snapping to the palette', () => {
+    const lightGrey = blockRender([[[200, 200, 200]]]);
+    const plain = pixelate(lightGrey, options());
+    const graded = pixelate(lightGrey, options({ grade: { contrast: 2, saturation: 1 } }));
+    expect(plain.palette[0]!.slice(0, 3)).not.toEqual([255, 255, 255]);
+    expect(graded.palette[0]!.slice(0, 3)).toEqual([255, 255, 255]);
+  });
+
   it('is deterministic', () => {
     const render = blockRender([
       [ink, moss, [120, 90, 60]],

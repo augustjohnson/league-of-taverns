@@ -8,7 +8,8 @@
  *    block's 1-pixel rim, where neighbours bleed in).
  * 2. Mask: with `cutout`, a block is opaque when most of its pixels are in
  *    the render's alpha (BiRefNet's cutout, done in ComfyUI).
- * 3. Quantize: k-means to `colorGroups` colours in OKLab, then map each group
+ * 3. Quantize (after an optional grade: contrast on OKLab lightness around
+ *    0.5, saturation on chroma): k-means to `colorGroups` colours in OKLab, then map each group
  *    to its nearest palette colour. Grouping first means one source colour
  *    always lands on one palette colour, which avoids speckle where a hue sits
  *    between two palette entries.
@@ -39,6 +40,8 @@ export interface PixelateOptions {
   readonly anchorBottom: boolean;
   /** Turn see-through parts of the figure into glass (needs `cutout`). */
   readonly glass?: GlassOptions;
+  /** Colour grade applied before snapping to the palette. */
+  readonly grade?: { readonly contrast: number; readonly saturation: number };
 }
 
 export interface GlassOptions {
@@ -145,6 +148,11 @@ function alphaCells(render: RgbaImage, cell: number): Uint8Array {
   return out;
 }
 
+function grade([l, a, b]: Lab, g: PixelateOptions['grade']): Lab {
+  if (g === undefined) return [l, a, b];
+  return [Math.min(1, Math.max(0, 0.5 + (l - 0.5) * g.contrast)), a * g.saturation, b * g.saturation];
+}
+
 /** Palette index per cell (transparent cells get 0, unused). */
 function quantize(colors: ReadonlyArray<Rgb>, opaque: Uint8Array, options: PixelateOptions): Uint8Array {
   const out = new Uint8Array(colors.length);
@@ -152,7 +160,7 @@ function quantize(colors: ReadonlyArray<Rgb>, opaque: Uint8Array, options: Pixel
   const at: number[] = [];
   colors.forEach((rgb, i) => {
     if (opaque[i] !== CLEAR) {
-      points.push(oklab(rgb));
+      points.push(grade(oklab(rgb), options.grade));
       at.push(i);
     }
   });

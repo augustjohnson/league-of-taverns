@@ -143,15 +143,24 @@ portrait:
         the bottom edge
       negative: *not-a-person
   cutout: true
+  # Colour grade before snapping to the palette: contrast stretches lightness
+  # around the middle, saturation scales chroma. Portraits only, so the cast
+  # stands out from the stage behind it.
+  grade: { contrast: 1.2, saturation: 1.2 }
   # One fixed light for every portrait. Tavern lighting is applied per scene
   # when the cards are composed (docs/images.md § Lighting), never baked in.
+  # Every portrait shares one camera: eye level, straight on, matching the bar.
+  # A view from above made a cube look like it floated behind the counter.
   positive: >-
-    pixel art, {{anchor}}, {{framing}}, {{subject}},
-    three-quarter view, looking at viewer, (soft even light from the upper
-    left:1.1), (thick dark outline around the character:1.3), plain white
-    background
+    pixel art, {{anchor}}, {{framing}}, {{subject}}, (eye-level front
+    view:1.2), three-quarter view, looking at viewer, (dynamic pose, bold
+    expressive features:1.2), (high contrast, bold shading:1.2), (soft even
+    light from the upper left:1.1), (thick dark outline around the
+    character:1.3), plain white background
   negative: >-
     (cropped:1.3), (out of frame:1.3), cut off, floating head, disembodied head,
+    (isometric, top-down view, view from above, bird's eye view:1.3),
+    washed out, flat colors, low contrast,
     (oversized head, big head, chibi, bobblehead, caricature:1.4),
     (modern clothing, jacket, hoodie, jeans, zipper, coffee cup, paper
     cup:1.3), colored lighting, dramatic shadows,

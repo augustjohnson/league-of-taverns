@@ -70,6 +70,7 @@ const styleSchema = z.strictObject({
   portrait: z.strictObject({
     sizes: z.strictObject(Object.fromEntries(CREATURE_SIZES.map((s) => [s, portraitSize])) as Record<CreatureSize, typeof portraitSize>),
     counter: z.number().int().nonnegative(),
+    grade: z.strictObject({ contrast: z.number().positive(), saturation: z.number().nonnegative() }).exactOptional(),
     glass: z.strictObject({
       alpha: z.number().int().min(1).max(254),
       maxDistance: z.number().nonnegative(),
@@ -173,6 +174,7 @@ export function pixelateOptions(style: ImageStyle, kind: ImageKind, translucent 
     palette: paletteOf(style),
     cutout: style[kind].cutout,
     anchorBottom: kind === 'portrait',
+    ...(kind === 'portrait' && style.portrait.grade !== undefined ? { grade: style.portrait.grade } : {}),
     ...(kind === 'portrait' && translucent ? { glass: style.portrait.glass } : {}),
   };
 }

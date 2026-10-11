@@ -177,6 +177,8 @@ encounter.
 | "thick dark outline" + BiRefNet cutout | BiRefNet alone erases a white shirt on a white background: there is no edge to find. The outline gives it one. A magenta background was tried and rejected: SDXL ignored it and painted magenta onto lips and eyelids. |
 | 12 colour groups, chroma weight 3 | More groups split one material (a leather strap) across two palette hues, which reads as speckle. Chroma weight 3 keeps hue over lightness when snapping. |
 | Renders are output × 8, multiples of 64 | SDXL needs multiples of 64. Medium (896×1152) and covers (1728×576, exactly 3:1) are SDXL training sizes; Huge (1152×1472) is past them but held up in testing. |
+| Eye-level camera, isometric and top-down in the negative | A cube seen from above looked like it floated behind the bar. Every portrait shares one straight-on camera at bar height. |
+| Portrait grade (contrast 1.2, saturation 1.2) | Lineups looked washed out against the stages. The grade runs before palette snapping, on portraits only, so the cast stands out from the background. |
 | Tiled VAE decode | Decoding a Huge canvas in one piece wants about 6 GB at once; it ran out of memory and crashed. Tile seams vanish in the pixel grid. |
 
 **Known quirks:** some seeds draw the outline in white, and the cutout keeps
