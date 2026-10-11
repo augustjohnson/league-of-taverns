@@ -306,7 +306,7 @@ function renderStatus(error: string | null, ms: number): void {
   status.innerHTML =
     `<span class="chip">${num(summary.events)} events</span>${replayChip}${verifyChip}` +
     `<span class="chip">${num(run.ms.toFixed(0))} ms</span>` +
-    `<span class="chip" title="sha256 of events.ndjson. It can differ from the CLI's events-1.ndjson in projected values only: Math.exp may round differently in the last bit between Node and this browser.">ndjson ${num(run.sha256.slice(0, 12))}</span>` +
+    `<span class="chip" title="sha256 of events.ndjson. Matches the CLI's events-1.ndjson for the same seed.">ndjson ${num(run.sha256.slice(0, 12))}</span>` +
     `<span class="chip brass">Champion: <b>${esc(tavernName(summary.champion.tavern))}</b> <span class="muted">${esc(summary.champion.bot)}</span></span>`;
 }
 

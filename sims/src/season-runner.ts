@@ -21,7 +21,8 @@
  * Seeds (docs/decisions.md D-13): a live week rolls real dice once, but sims
  * use `weekSeed({ season, week, tavern, salt: simSeed })` so every run is
  * reproducible. The draft order is the engine's (`draftOrderSeed(config.id)`),
- * so it does not vary with the sim seed.
+ * but the runner shuffles tavern join order per sim seed, so each seat's draft
+ * slot varies across runs.
  */
 import { BOT_IDS, botManager } from '@league-of-taverns/bots';
 import type { BotId, BotManager, PublicView } from '@league-of-taverns/bots';
@@ -716,7 +717,7 @@ export interface BotAggregate {
 export interface Aggregate {
   readonly runs: number;
   readonly byBot: Readonly<Record<string, BotAggregate>>;
-  /** Titles by tavern seat, since seats keep their draft slot in every run. */
+  /** Titles by tavern seat. Draft slots vary per run (join order is shuffled per seed). */
   readonly titlesByTavern: Readonly<Record<string, number>>;
   /** Matchups where projected points differed, and how often the higher-projected tavern won. */
   readonly higherProjectedWins: { readonly matchups: number; readonly wins: number; readonly share: number };
