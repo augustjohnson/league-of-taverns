@@ -1,6 +1,6 @@
 # Mock season for sims (TODO.md T5.5, milestone T9.2). Hand-built, not a live season.
 # Schema: docs/schema.md § Season config. Same rules as seasons/season-01/config.yaml
-# except: 3 weeks, 6 bot taverns, and no spellcasters anywhere (D-43).
+# except: 6 bot taverns (one week each, D-48), and no spellcasters anywhere (D-43).
 #
 # Validate: pnpm --filter @league-of-taverns/scripts validate -- --dir sims/fixtures/mock-season
 
@@ -8,7 +8,7 @@ id: mock-season
 name: Mock Season
 snapshot: open5e-v1-2026-10
 modifierRegistryVersion: 1
-weeks: 3
+weeks: 6
 schedule: schedule.yaml
 pool: pool.yaml
 managers: managers.yaml

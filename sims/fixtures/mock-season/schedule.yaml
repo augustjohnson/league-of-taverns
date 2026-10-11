@@ -1,9 +1,8 @@
 # Mock season schedule: one environment per week, so each mission in
 # missions/ maps to exactly one week by its environment.
 #
-# Sponsors: three weeks for six taverns, so only three taverns get a home
-# week (a real season has one week per tavern, D-48). Keep that in mind when
-# comparing bots: the home taverns are a random, a cr-greedy and a value seat.
+# Sponsors: six gods, one per tavern, each setting one week (D-48), so every
+# tavern gets exactly one home week.
 
 season: mock-season
 sponsors:
@@ -13,6 +12,12 @@ sponsors:
     tavern: the-gilded-flagon
   - id: the-storm-crow
     tavern: the-sleeping-giant
+  - id: the-bog-king
+    tavern: the-drowned-rat
+  - id: the-deep-miner
+    tavern: the-crooked-candle
+  - id: the-lamplighter
+    tavern: the-last-lantern
 weeks:
   - week: 1
     title: The Thornwood Trail
@@ -32,3 +37,21 @@ weeks:
     theme: A storm on the pass and a gap only wings can cross.
     commitment: null
     sponsor: the-storm-crow
+  - week: 4
+    title: The Fenmoor Toll
+    environment: swamp
+    theme: A drowned road, a ford nobody remembers, and a toll-keeper who does.
+    commitment: null
+    sponsor: the-bog-king
+  - week: 5
+    title: Lanterns Under Hollowmere
+    environment: underground
+    theme: A silver mine reopened after forty dark years.
+    commitment: null
+    sponsor: the-deep-miner
+  - week: 6
+    title: Night of the Long Bar
+    environment: urban
+    theme: Every tavern in the city, one night, one prize.
+    commitment: null
+    sponsor: the-lamplighter

@@ -1,0 +1,50 @@
+# Mock season, week 6 (urban). Case the bar, talk your way in, lift the prize.
+# A bad read or a bad lie brings the bouncers.
+#
+#  rank 0     1             2              3              4              5
+#  start ─▶ case-joint ─pass─▶ talk-in ─pass──────────────▶ lift-prize ─pass─▶ away-clean
+#               │                 └─fail─▶ bouncers ─win─▶ ▲        └─fail─▶ caught-out
+#               └─fail───────────────────▶ ▲
+
+schemaVersion: 1
+id: mock-long-bar
+season: mock-season
+environment: urban
+
+nodes:
+  - { id: start, rank: 0, kind: start }
+  - id: case-joint
+    rank: 1
+    kind: check
+    check: { type: skill, skill: insight, dc: 12 }
+    loot: 20
+  - id: talk-in
+    rank: 2
+    kind: check
+    check: { type: skill, skill: deception, dc: 13 }
+    loot: 30
+  - id: bouncers
+    rank: 3
+    kind: battle
+    encounter:
+      creatures:
+        - { ref: veteran, count: 1 }
+        - { ref: thug, count: 3 }
+        - { ref: bandit, count: 4 }
+  - id: lift-prize
+    rank: 4
+    kind: check
+    check: { type: skill, skill: sleight_of_hand, dc: 13 }
+    loot: 50
+  - { id: away-clean, rank: 5, kind: end }
+  - { id: caught-out, rank: 5, kind: end }
+
+edges:
+  - { from: start,      to: case-joint, on: always }
+  - { from: case-joint, to: talk-in,    on: pass }
+  - { from: case-joint, to: bouncers,   on: fail }
+  - { from: talk-in,    to: lift-prize, on: pass }
+  - { from: talk-in,    to: bouncers,   on: fail }
+  - { from: bouncers,   to: lift-prize, on: win }
+  - { from: lift-prize, to: away-clean, on: pass }
+  - { from: lift-prize, to: caught-out, on: fail }
