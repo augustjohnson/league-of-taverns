@@ -112,6 +112,13 @@ Owns `scripts/src/snapshot.ts`, `data/open5e/`, `engine/src/adapters/open5e/`.
   snapshot-wide run reports the warning count by field.
 - **Depends:** T1.2.
 
+#### T1.5 Flag spellcasters · S
+- **Goal:** `BaseStats.spellcaster: boolean`, true when the record has a
+  "Spellcasting" or "Innate Spellcasting" special ability or action (D-43).
+- **Acceptance:** 37 of 322 snapshot records flagged; mage, archmage, druid,
+  priest and the mephits are true, ogre and crocodile are false.
+- **Depends:** T1.3.
+
 #### T1.4 Snapshot integrity + loading · S
 - **Goal:** load a snapshot by id with its hash verified.
 - **Outputs:** `loadSnapshot` in `scripts/src/lib/repo.ts`; check wired into `validate`.
@@ -210,6 +217,11 @@ Owns `engine/src/characters/`, `characters/`, `seasons/*/pool.yaml` schema,
   managers have unique GitHub ids; the schedule has `weeks` entries.
 - **Depends:** T3.1, T3.2, T1.4.
 
+#### T3.7 Pool spellcaster limit · S
+- **Goal:** pool validation enforces `spellcasters.maxInPool` from season config (D-43).
+- **Acceptance:** a pool over the limit fails `validate` with the list of caster characters.
+- **Depends:** T1.5, T3.4.
+
 #### T3.5 Chrome isolation test · S
 - **Goal:** prove chrome can't affect outcomes.
 - **Outputs:** test that mutates every chrome field of every character and
@@ -293,6 +305,14 @@ Owns `engine/src/missions/`, `scripts/src/validate.ts`,
 - **Acceptance:** one failing fixture per rule code; all violations reported
   together; the example passes against the T1.2 fixtures.
 - **Depends:** T5.1, T1.2.
+
+#### T5.6 Encounter spellcaster rule · S
+- **Goal:** a validator rule `encounter.caster`: a battle may include at most
+  `spellcasters.maxPerEncounter` spellcaster creatures (D-43). Add the limit to
+  `MissionRules` and `SeasonConfig`.
+- **Acceptance:** an encounter with a mage fails under season-01 rules, and the
+  message names the creature and explains why.
+- **Depends:** T1.5, T5.2.
 
 #### T5.3 Validate CLI · S
 - **Goal:** `scripts/src/validate.ts` runs every content check for a season.

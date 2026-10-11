@@ -91,6 +91,17 @@ commands.
 after the run. Trades complete at any time but never touch a locked lineup.
 A character acquired mid-week first plays next week.
 
+**D-43 Low-spellcaster seasons: DECIDED (2026-10-10).** The battle model
+(T6.2) reads only weapon and spell *attacks*, so spellcasting monsters look
+almost harmless: a CR-12 archmage alone gives a CR-12 party about 0.98. Until
+the adapter models spells, the first season or two keep spellcasters to a
+minimum in both the pool and mission encounters. A spellcaster is any creature
+with a "Spellcasting" or "Innate Spellcasting" ability: 37 of the 322 SRD
+monsters, 21 of them at CR 8 or below. That leaves 210 non-casters from CR 1/8
+to 8, plenty for a pool of about 64. *Defaults (confirm):* no spellcasters in
+encounters, at most 4 in the pool. Both are per-season config limits. Tasks:
+T1.5, T3.7, T5.6.
+
 **D-42 Public missions and pre-lock projections: OPEN (new, 2026-10-10).**
 With missions open (D-08), managers can read each week's structure, and anyone
 with the engine can compute exact projected points for every lineup before the

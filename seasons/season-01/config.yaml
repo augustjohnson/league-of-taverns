@@ -55,6 +55,10 @@ schedules:                          # Actions cron, UTC
 secrecy: open                       # D-08 decided: missions are public. (private_repo | commit_reveal | encrypted kept for later)
 seedSalt: none                      # D-13: live weeks will use a real random roll. Seeds remain for sims
 
+spellcasters:                       # D-43: battle model can't see spells yet
+  maxInPool: 4
+  maxPerEncounter: 0
+
 missions:
   dcBand: { min: 8, max: 20 }
   maxNodes: 14
