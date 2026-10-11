@@ -39,7 +39,12 @@ T3.1 ─▶ T3.4 (pool + config loading for the sim)
 T3.4, T4.2, T4.3, T4.4, T4.6, T5.1, T5.2, T5.5, T6.1, T6.2, T6.3, T6.4, T9.1,
 T9.2.
 
-## Can start in parallel right now
+## Status
+
+- **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
+- **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
+
+## Phase 1 starting set (historical)
 
 No dependencies beyond T0.1: **T1.1** (snapshot), **T2.1** (RNG),
 **T2.3** (event codec), **T3.1** (character files), **T3.2** (modifier
@@ -78,7 +83,8 @@ Owns `scripts/src/snapshot.ts`, `data/open5e/`, `engine/src/adapters/open5e/`.
 - **Outputs:** `scripts/src/snapshot.ts`; `data/open5e/open5e-v1-2026-10/monsters.json`;
   entry in `data/open5e/manifest.json` (id, fetchedAt, sourceUrl, apiVersion,
   documents + license URLs, count, sha256, file).
-- **Acceptance:** records are byte-identical to the API (only sorted by slug);
+- **Acceptance:** records are value-identical to the API, with the same keys,
+  key order and values (only sorted by slug; `10.0` is written as `10`);
   re-running with an existing id refuses; the manifest sha256 matches the file;
   every record's `document__slug` is in the allowed list; README attribution
   matches the documents included.
@@ -558,7 +564,7 @@ Each task here can be specified but not finished until its decision in
 
 | Task | Blocked on | What's blocked |
 |---|---|---|
-| **T10.2 Seal + reveal** · M | D-08 secrecy, D-13 salt, D-18 candidates | `seal` (commitments, salts, encryption or withholding) and `reveal` (verify the commitment, emit `mission.revealed`). Commitment hashing (T5.1) is unblocked. |
+| **T10.2 Live roll + week start** · S | D-13 details | Missions are open (D-08), so there is no sealing. What's left: how `run-week` draws and records a real random roll, and whether `mission.revealed` stays. `seal` and `reveal` scripts can be deleted. |
 | **T10.3 Offseason carryover** · M | D-11 carryover | `offseason`: keeper eligibility, `character.retained`, keeper cost in draft order (T4.3 hook), modifier drift cap. |
 | **T4.7 Playoffs** · S | D-04 | Bracket generation and playoff standings. |
 | **T6.1 captain effect** · S | D-12 | The captain's mechanical role. Ship behind a config switch. |

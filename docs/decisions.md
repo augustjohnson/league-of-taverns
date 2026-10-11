@@ -68,6 +68,14 @@ seeded coin (*default*);
 Also: a DNF scores 0 under every option, so a DNF vs DNF matchup always goes to
 the tiebreakers.
 
+**D-15 Best-fit tiebreak: DEFAULTED.** When two starters have the same best
+modifier for a check, the actor is chosen deterministically: the captain first,
+then the allies in lineup order. Ties are common because many monsters share
+ability modifiers. The rule decides who appears as `{actor}` in the story, and
+which advantage applies if only one of the tied starters has it. *Note:* with
+advantage in play, prefer the tied starter who has advantage, since that's
+strictly better for the party. T6.1 implements this.
+
 **D-26 Draft pick timeout: DEFAULTED.** 24 h, then autopick with the `value`
 bot. Alternatives: skip (pick later), or wait indefinitely.
 
@@ -82,6 +90,15 @@ commands.
 **D-37 Timing of roster changes around the lock: DEFAULTED.** Waivers resolve
 after the run. Trades complete at any time but never touch a locked lineup.
 A character acquired mid-week first plays next week.
+
+**D-42 Public missions and pre-lock projections: OPEN (new, 2026-10-10).**
+With missions open (D-08), managers can read each week's structure, and anyone
+with the engine can compute exact projected points for every lineup before the
+lock. Lineup choice becomes an optimization problem, and only the real roll
+(D-13) adds variance. Options: (a) embrace it and publish a projection tool;
+(b) publish each mission only at its week's lock; (c) publish structure but
+hide DCs until the run. *Default:* (a), pending sims (T9.3) on how much skill
+vs luck decides weeks.
 
 **D-40 Roster-level CR cap: DEFAULTED.** None. B applies only to starters.
 Without a roster cap, drafting all high-CR characters is legal, but you can

@@ -52,8 +52,8 @@ schedules:                          # Actions cron, UTC
   weeklyRun: "15 18 * * 4"          # then reveal + run + finalize
   waivers: "0 12 * * 5"             # Fridays 12:00: waiver.resolved
 
-secrecy: encrypted                  # OPEN D-08: private_repo | commit_reveal | encrypted
-seedSalt: revealed_with_mission     # OPEN D-13: none | revealed_with_mission
+secrecy: open                       # D-08 decided: missions are public. (private_repo | commit_reveal | encrypted kept for later)
+seedSalt: none                      # D-13: live weeks will use a real random roll. Seeds remain for sims
 
 missions:
   dcBand: { min: 8, max: 20 }

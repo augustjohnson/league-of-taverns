@@ -18,7 +18,7 @@ and the better score wins the week.
 |---|---|
 | [docs/rules.md](docs/rules.md) | Draft rulebook: roster, budget, lineups, scoring, matchups, waivers, trades, reveals, carryover |
 | [docs/schema.md](docs/schema.md) | Draft schemas: character, modifiers, mission, chrome, season config, events, reducers |
-| [docs/season-lifecycle.md](docs/season-lifecycle.md) | Offseason → missions → curation → chrome → seal → draft → weekly runs → offseason |
+| [docs/season-lifecycle.md](docs/season-lifecycle.md) | Offseason → missions → curation → chrome → lock → draft → weekly runs → offseason |
 | [docs/decisions.md](docs/decisions.md) | Open decisions, plus every difference from the earlier specs |
 | [docs/glossary.md](docs/glossary.md) | Terms |
 | [docs/specs/](docs/specs/) | Earlier specs 00–06. Superseded where decisions.md says so |

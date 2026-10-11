@@ -5,7 +5,7 @@ it produces, and the script that does it. Scripts are in `scripts/src/`, and
 task ids refer to [TODO.md](../TODO.md).
 
 ```
-offseason ─▶ candidates ─▶ validate + report ─▶ select ─▶ chrome ─▶ lock + seal ─▶ draft ─▶ weekly ×N ─▶ offseason
+offseason ─▶ candidates ─▶ validate + report ─▶ select ─▶ chrome ─▶ lock ─▶ draft ─▶ weekly ×N ─▶ offseason
   (GM)         (LLM)         (engine)            (GM)     (LLM+GM)   (GM, CI gate)   (all)    (Actions)
 ```
 
@@ -41,7 +41,7 @@ offseason ─▶ candidates ─▶ validate + report ─▶ select ─▶ chrome
   full issue list. Only valid candidates are written to
   `missions/candidates/`.
 - Hand-written candidates are equally welcome.
-- **Candidates are secret** [D-18]. Where they live depends on D-08.
+- Candidates are committed in plaintext. Missions are open (D-08), so D-18 is moot.
 
 ## 2. Validation and difficulty report
 
@@ -55,8 +55,8 @@ For each candidate, against the whole season pool:
   up here.
 - node reach rates (dead branches)
 
-The output goes to `seasons/<id>/reports/`, which is git-ignored because it
-describes secret missions.
+The output goes to `seasons/<id>/reports/`, which is git-ignored because it is
+derived output.
 
 ## 3. Selection
 
@@ -80,22 +80,20 @@ possibly for reuse later.
 - The coverage check and lints run on every save. See
   [schema.md § Mission chrome](schema.md#mission-chrome).
 
-## 5. Lock and seal
+## 5. Lock
 
-**Who:** GM, then CI. **Scripts:** `lock-check`, `seal`.
+**Who:** GM, then CI. **Script:** `lock-check`.
 
 1. `lock-check` must pass: every scheduled week has a selected mission, each
    mission validates, and its chrome is `locked` with complete coverage.
    **CI blocks season start otherwise.**
-2. `seal` computes each mission's canonical sha256 commitment, writes it to
-   `schedule.yaml`, and seals the mission per D-08 (encrypt, withhold, or rely
-   on a private repo). Plaintext never lands in a public commit.
-3. The commissioner creates the season: the Action appends `season.created`
-   (config + schedule + commitments), `character.pooled` × about 64,
-   `tavern.joined` × N, and `character.retained` for keepers.
+2. The commissioner creates the season: the Action appends `season.created`
+   (config + schedule), `character.pooled` × about 64, `tavern.joined` × N,
+   and `character.retained` for keepers.
 
-**From here on, missions are frozen.** Changing one after `season.created`
-would break its commitment, and the reveal would be rejected.
+**From here on, missions are frozen.** Missions are open (D-08), so there's
+no sealing step. CI flags any change to a selected mission after
+`season.created`.
 
 ## 6. Draft
 
@@ -112,8 +110,8 @@ would break its commitment, and the reveal would be rejected.
 |---|---|---|---|
 | Any time before the lock | Managers submit lineups, claims and trades | `lineup.set`, `waiver.claimed`, `trade.*` | `apply-command` |
 | Thu 18:00 | **Lock.** Freeze every lineup (submitted, carried, or fallback) | `lineup.locked` | `run-week --lock` |
-| Thu 18:15 | **Reveal.** Unseal the week's mission, verify its commitment, publish the salt | `mission.revealed` | `reveal` |
-| Thu 18:15 | **Run.** For each tavern: seeded run plus projection | `mission.resolved` × N | `run-week` |
+| Thu 18:15 | **Start the week.** Record which mission runs | `mission.revealed` (kept for the record. Missions are already public) | `run-week` |
+| Thu 18:15 | **Run.** For each tavern: one real random run (D-13) plus projection | `mission.resolved` × N | `run-week` |
 | Thu 18:15 | **Finalize.** Close the week, then rebuild and deploy published JSON | `week.finalized` | `run-week`, `publish` |
 | Fri 12:00 | **Waivers.** Resolve all pending claims in rolling priority | `waiver.resolved` | `run-week --waivers` |
 | Hourly | **Trades.** Complete accepted trades whose veto window has passed | `trade.completed` / `trade.cancelled` | `apply-command --sweep` |

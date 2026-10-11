@@ -27,7 +27,7 @@ cyrb128 of `seed + '::' + key`.
 
 | Seed | Format | Substream keys |
 |---|---|---|
-| Week run | `<season>/week-<n>/tavern:<tavern-id>` + `/salt:<salt>` if salted [D-13] | `roll:<node-id>`, one per node regardless of path |
+| Week run | `<season>/week-<n>/tavern:<tavern-id>` + `/salt:<salt>` if salted. Per D-13, live weeks will use a single real random roll instead, and this seed serves sims, tests and reports | `roll:<node-id>`, one per node regardless of path |
 | Draft order | `<season>/draft-order` | `order` |
 | Sim | `sim:<sim-seed>/<run-index>` | `bot:<tavern>:<decision>`, `salt:week-<n>` |
 
@@ -171,9 +171,9 @@ edges:
 | `size` | node count ≤ `maxNodes`, max rank ≤ `maxRank`, battles on any path within `battlesPerPath` |
 | `environment` | when selected, matches the schedule entry |
 
-**Canonical form** (for commitments): JSON with sorted keys, nodes sorted by
-(rank, id), edges sorted by (from, on, to), no whitespace. The commitment is
-`sha256(canonical)`.
+**Commitments:** none. Missions are open (D-08). The `commitment` and `sha256`
+fields on `season.created` and `mission.revealed` stay in the event schema,
+nullable or unused, until D-13's details settle.
 
 ## Mission chrome
 

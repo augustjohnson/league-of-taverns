@@ -93,11 +93,13 @@
 - **Score** for a week = checks passed ÷ checks attempted on the path the party
   actually took. A DNF scores 0.
 - **Points** = score × 100, rounded **[OPEN D-14]**.
-- Each week runs **once**, with dice seeded by (season, week, tavern)
-  **[OPEN D-13: plus a secret salt]**. The result is final and reproducible.
+- Each week runs **once**, as a single real random roll per check and battle
+  **[D-13, details to come]**. The rolls are recorded in the event log, so the
+  result is final and auditable, though not re-derivable from a seed.
 - **Projected points** are the exact expected points for the lineup on that
   mission (no dice). They are published next to actual points after the run.
-  They cannot be known before the lock, because the mission is hidden.
+  Missions are public (§11), so managers can also work them out before the
+  lock **[OPEN D-42]**.
 
 ## 8. Matchups and standings
 
@@ -145,13 +147,12 @@
 | When | Public |
 |---|---|
 | Season announced | Config, schedule (title, environment, theme per week), H2H pairings, pool with bases and modifiers, character chrome |
-| Before the draft | A commitment hash of every locked mission **[D-08]** |
+| Once selected | Every mission's full structure. The repo is public and missions aren't secret **[D-08]** |
 | During the season | All rosters, transactions and lineup submissions (issues are public) **[D-24]** |
 | Weekly lock | Every tavern's lineup |
-| Weekly run | That week's mission structure and seed salt, every tavern's per-node rolls and path, actual and projected points, and the story |
-| Never | Future weeks' missions, until their run |
+| Weekly run | Every tavern's per-node rolls and path, actual and projected points, and the story |
 
-Candidate missions the GM did not select stay unpublished **[D-18]**.
+Candidate missions can be committed in plaintext too **[D-18, moot]**.
 
 ## 12. Carryover between seasons
 
@@ -172,8 +173,8 @@ Candidate missions the GM did not select stay unpublished **[D-18]**.
 
 - Every action is an event in an append-only log, written only by Actions.
   Anyone can replay the log and get the same standings.
-- Each `mission.resolved` records the exact rolls. Anyone can re-run it from
-  the recorded seed and get the same result.
-- Missions are locked and committed before the draft. A revealed mission that
-  doesn't match its commitment is rejected.
+- Each `mission.resolved` records the exact rolls, and anyone can check that
+  the recorded path and score follow from them.
+- Missions are locked before the draft. Changing a selected mission after
+  `season.created` is a rules violation that CI flags.
 - The GM knows every mission **[OPEN D-09]**.
