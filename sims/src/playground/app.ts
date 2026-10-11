@@ -14,12 +14,12 @@ import {
   checkOdds,
   evTtkBreakdown,
   freeAgents,
-  headToHeadSchedule,
   lineHash,
   projectMission,
   rngFor,
   runMission,
   seasonStandings,
+  standings,
   weekResults,
   weekSeed,
   validateLineup,
@@ -35,13 +35,12 @@ import type {
   Projection,
   RunResult,
 } from '@league-of-taverns/engine';
-import { SeasonSession, aggregate, decideMatchups, runMockSeason, runSeed, type MockSeasonResult, type RunSummary } from '../season-runner';
+import { SeasonSession, aggregate, runMockSeason, runSeed, type MockSeasonResult, type RunSummary } from '../season-runner';
 import { seasonInputFromData, type PlaygroundData } from './data';
 import {
   actorLabel,
   aggregateRows,
   checkLabel,
-  decidedBy,
   draftBoard,
   eventSummary,
   formatCr,
@@ -313,7 +312,7 @@ function renderStatus(error: string | null, ms: number): void {
     `<span class="chip">${num(summary.events)} events</span>${replayChip}${verifyChip}` +
     `<span class="chip">${num(run.ms.toFixed(0))} ms</span>` +
     `<span class="chip" title="sha256 of events.ndjson. Matches the CLI's events-1.ndjson for the same seed.">ndjson ${num(run.sha256.slice(0, 12))}</span>` +
-    `<span class="chip brass">Champion: <b>${esc(tavernName(summary.champion.tavern))}</b> <span class="muted">${esc(summary.champion.bot)}</span></span>`;
+    `<span class="chip brass">${summary.champions.length === 1 ? 'Champion' : 'Co-champions'}: ${summary.champions.map((c) => `<b>${esc(tavernName(c.tavern))}</b> <span class="muted">${esc(c.bot)}</span>`).join(', ')}</span>`;
 }
 
 function doRun(seed: string): void {
@@ -392,26 +391,21 @@ function renderStandings(r: Run): string {
     .map(
       (s) =>
         `<tr class="${s.rank === 1 ? 'champ' : ''}"><td class="n">${s.rank}</td><td><b>${esc(tavernName(s.tavern))}</b><div class="muted small">${esc(s.tavern)}</div></td>` +
-        `<td><span class="tag">${esc(s.bot)}</span></td><td class="n">${s.wins}-${s.losses}-${s.ties}</td><td class="n">${s.pointsFor}</td><td class="n">${s.pointsAgainst}</td><td class="n muted">${weekly(s.tavern)}</td></tr>`,
+        `<td><span class="tag">${esc(s.bot)}</span></td><td class="n">${s.points}</td><td class="n muted">${weekly(s.tavern)}</td></tr>`,
     )
     .join('');
-  const champ = summary.champion;
+  const champs = summary.champions;
   const weeks = summary.weeks
     .map((w) => {
       const results = new Map(weekResults(state, w.week).map((x) => [x.tavern, x]));
-      const matchRows = w.matchups
-        .map((m) => {
-          const h = results.get(m.home);
-          const a = results.get(m.away);
-          if (h === undefined || a === undefined) return '';
-          const by = decidedBy(h, a, config.scoring.tiebreakers);
-          const cell = (t: string): string => `<span class="${m.winner === t ? 'win' : ''}">${esc(tavernName(t))}</span>`;
+      const top = Math.max(...w.results.map((x) => x.projectedPoints));
+      const rankRows = [...w.results]
+        .sort((x, y) => x.rank - y.rank || y.points - x.points)
+        .map((x) => {
+          const checks = results.get(x.tavern)?.checksPassed ?? 0;
           return (
-            `<tr><td>${cell(m.home)} <span class="muted">vs</span> ${cell(m.away)}</td>` +
-            `<td class="n">${h.points} – ${a.points}</td><td class="n muted">${h.projected.toFixed(1)} – ${a.projected.toFixed(1)}</td>` +
-            `<td>${m.winner === null ? '<span class="muted">tie</span>' : esc(tavernName(m.winner))}</td>` +
-            `<td>${by === 'points' ? '<span class="muted">points</span>' : `<span class="tag brass">${esc(by)}</span>`}</td>` +
-            `<td>${m.higherProjected === null ? '<span class="muted">level</span>' : m.higherProjected === m.winner ? '<span class="pass">yes</span>' : '<span class="fail">no</span>'}</td></tr>`
+            `<tr><td class="n">${x.rank}</td><td><span class="${x.rank === 1 ? 'win' : ''}">${esc(tavernName(x.tavern))}</span></td>` +
+            `<td class="n">${x.points}</td><td class="n muted">${x.projectedPoints.toFixed(1)}${x.projectedPoints === top ? ' <span class="tag brass">best</span>' : ''}</td><td class="n muted">${checks}</td></tr>`
           );
         })
         .join('');
@@ -423,15 +417,15 @@ function renderStandings(r: Run): string {
               .join('; ')}</p>`;
       return (
         `<div class="stack"><h3>Week ${w.week} <span class="muted small">${esc(w.mission)} · ${esc(environmentOf(w.week))}</span></h3>` +
-        `<div class="scroll"><table><thead><tr><th>matchup</th><th class="n">points</th><th class="n">projected</th><th>winner</th><th>decided by</th><th>higher proj. won</th></tr></thead><tbody>${matchRows}</tbody></table></div>${waivers}</div>`
+        `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th class="n">points</th><th class="n">projected</th><th class="n">checks</th></tr></thead><tbody>${rankRows}</tbody></table></div>${waivers}</div>`
       );
     })
     .join('');
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Standings</h2><span class="chip brass">Champion: <b>${esc(tavernName(champ.tavern))}</b> <span class="muted">${esc(champ.bot)}</span></span></div>` +
-    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>bot</th><th class="n">W-L-T</th><th class="n">PF</th><th class="n">PA</th><th class="n">weekly</th></tr></thead><tbody>${rows}</tbody></table></div>` +
-    `<p class="hint">Ranked by wins, then points for, then points against. Ties in a matchup go to ${config.scoring.tiebreakers.map(esc).join(', then ')}.</p></section>` +
-    `<section class="card"><h2>Matchups</h2>${weeks}</section>`
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Standings</h2><span class="chip brass">${champs.length === 1 ? 'Champion' : 'Co-champions'}: ${champs.map((c) => `<b>${esc(tavernName(c.tavern))}</b> <span class="muted">${esc(c.bot)}</span>`).join(', ')}</span></div>` +
+    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>bot</th><th class="n">loot</th><th class="n">weekly</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+    `<p class="hint">Ranked by total loot. Equal totals share a rank; there are no tiebreakers.</p></section>` +
+    `<section class="card"><h2>Weekly tables</h2>${weeks}</section>`
   );
 }
 
@@ -529,7 +523,7 @@ function renderWeeks(r: Run): string {
 function seedLab(): void {
   if (run === null) return;
   lab.seeded = true;
-  lab.roster = run.result.summary.champion.tavern;
+  lab.roster = run.result.summary.champions[0]!.tavern;
   loadLocked();
 }
 
@@ -920,15 +914,15 @@ function renderBatch(): string {
   else if (b.summaries.length > 0 && !b.running) {
     const totals = aggregate(b.summaries);
     const { header, rows } = aggregateRows(totals);
-    const hp = totals.higherProjectedWins;
+    const bp = totals.bestProjectedTops;
     results =
       `<div class="scroll"><table><thead><tr>${header.map((h, i) => `<th class="${i === 0 ? '' : 'n'}">${esc(h)}</th>`).join('')}</tr></thead><tbody>` +
       rows.map((r) => `<tr>${r.map((c, i) => `<td class="${i === 0 ? '' : 'n'}">${esc(c)}</td>`).join('')}</tr>`).join('') +
       `</tbody></table></div>` +
-      `<p>Higher-projected tavern won ${num(`${hp.wins}/${hp.matchups}`)} matchups (${num(pct(hp.share))}).</p>` +
+      `<p>Best-projected tavern topped its week ${num(`${bp.tops}/${bp.weeks}`)} times (${num(pct(bp.share))}).</p>` +
       `<p>DNF rate: ${num(pct(totals.dnfRate))} of mission runs; tavern-weeks with no lineup: ${num(totals.noLineupWeeks)}.</p>` +
       `<p>Titles by seat: ${Object.entries(totals.titlesByTavern)
-        .map(([t, n]) => `${esc(tavernName(t))} ${num(n)}`)
+        .map(([t, n]) => `${esc(tavernName(t))} ${num(Number.isInteger(n) ? n : n.toFixed(1))}`)
         .join(', ')}</p>` +
       `<p class="hint">${totals.runs} seasons from seed ${esc(b.seed)} in ${(b.ms / 1000).toFixed(2)} s (${(b.ms / totals.runs).toFixed(1)} ms/season). Same as <span class="mono">mock-season -- --runs ${totals.runs} --seed ${esc(b.seed)}</span>.</p>`;
   }
@@ -1132,8 +1126,8 @@ function playHeader(s: SeasonSession): string {
   const where =
     stage.kind === 'draft' ? `Draft, pick ${stage.pick + 1} of ${total}` : stage.kind === 'week' ? `Week ${stage.week} of ${config.weeks}` : 'Season complete';
   const rows = seasonStandings(s.state);
-  const i = rows.findIndex((r) => r.tavern === me);
-  const rec = i < 0 || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip">${ordinal(i + 1)} of ${rows.length} · ${rows[i]!.wins}-${rows[i]!.losses}-${rows[i]!.ties}</span>`;
+  const row = rows.find((r) => r.tavern === me);
+  const rec = row === undefined || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip">${ordinal(row.rank)} of ${rows.length} · ${row.points} loot</span>`;
   return (
     `<section class="card"><div class="row" style="justify-content:space-between"><div class="row"><h2>${esc(tavernName(me))}</h2><span class="tag brass">you</span>` +
     `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}<button type="button" data-action="play-reset">New season</button></div></div></section>`
@@ -1188,8 +1182,6 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
 function renderPlayWeek(s: SeasonSession, week: number): string {
   const me = s.human!.tavern;
   const mission = missionOf(week);
-  const opp = headToHeadSchedule([...s.state.taverns.keys()], config.weeks).find((m) => m.week === week && (m.home === me || m.away === me));
-  const oppId = opp === undefined ? null : opp.home === me ? opp.away : opp.home;
   const roster = myRoster(s);
   const lineup = builderLineup();
   const pending = s.pendingLineup();
@@ -1218,9 +1210,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
         : `<span class="fail">Changed since you submitted</span> <span class="muted">(submitted: C ${esc(pending.captain)}, ${pending.allies.map(esc).join(', ')})</span>`;
 
   const lineupCardHtml =
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))}${
-      oppId === null ? ' · bye' : ` · vs <b>${esc(tavernName(oppId))}</b> <span class="tag">${esc(botOf(oppId))}</span>`
-    }</span></div>` +
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · against the whole league</span></div>` +
     `<div class="scroll"><table><thead><tr>${CHAR_HEAD}<th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` +
     `<p class="small">Starting ${play.picks.length} of ${config.roster.starters} · CR ${num(formatCr(total))} of ${num(formatCr(BUDGET))}</p>${crMeter(total)}` +
     (lineup === null
@@ -1273,23 +1263,19 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
 function renderPlayResult(s: SeasonSession, week: number): string {
   const me = s.human!.tavern;
   const results = new Map(weekResults(s.state, week).map((r) => [r.tavern, r]));
-  const matchups = decideMatchups(s.state).get(week) ?? [];
-  const mine = matchups.find((m) => m.home === me || m.away === me);
+  const table = standings([], [...results.values()]);
   const res = s.state.results.get(week)?.get(me);
   const mission = missionOf(week);
-  let headline = '<span class="muted">Bye week.</span>';
-  if (mine !== undefined) {
-    const oppId = mine.home === me ? mine.away : mine.home;
-    const verdict = mine.winner === me ? '<span class="pass">Won</span>' : mine.winner === null ? '<span class="muted">Tied</span>' : '<span class="fail">Lost</span>';
-    const by = decidedBy(results.get(mine.home)!, results.get(mine.away)!, config.scoring.tiebreakers);
-    headline = `<b>${verdict}</b> ${num(results.get(me)?.points ?? 0)} - ${num(results.get(oppId)?.points ?? 0)} vs ${esc(tavernName(oppId))}${by === 'points' ? '' : ` <span class="tag brass">${esc(by)}</span>`}`;
-  }
-  const others = matchups
-    .filter((m) => m !== mine)
-    .map((m) => {
-      const cell = (t: string): string => `<span class="${m.winner === t ? 'win' : ''}">${esc(tavernName(t))}</span>`;
-      return `<tr><td>${cell(m.home)} <span class="muted">vs</span> ${cell(m.away)}</td><td class="n">${results.get(m.home)?.points ?? 0} - ${results.get(m.away)?.points ?? 0}</td></tr>`;
-    })
+  const mine = table.find((r) => r.tavern === me);
+  const headline =
+    mine === undefined
+      ? ''
+      : `<b>${mine.rank === 1 ? '<span class="pass">Topped the week</span>' : `${ordinal(mine.rank)} of ${table.length}`}</b> with ${num(mine.points)} loot`;
+  const others = table
+    .map(
+      (r) =>
+        `<tr class="${r.tavern === me ? 'sel' : ''}"><td class="n">${r.rank}</td><td><span class="${r.rank === 1 ? 'win' : ''}">${esc(tavernName(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
+    )
     .join('');
   const waivers = s.events
     .flatMap((e) => (e.type === 'waiver.resolved' && e.payload.week === week ? e.payload.outcomes : []))
@@ -1299,7 +1285,7 @@ function renderPlayResult(s: SeasonSession, week: number): string {
     (res === undefined
       ? '<p class="muted">You fielded no lineup and scored 0.</p>'
       : graphSvg(layouts.get(week)!, { path: res.run.path, outcomes: outcomesOf(res.run) }) + `<details><summary>Your roll log</summary>${rollLog(mission, res.run)}</details>`) +
-    (others === '' ? '' : `<h3>Around the league</h3><div class="scroll"><table><tbody>${others}</tbody></table></div>`) +
+    (others === '' ? '' : `<h3>This week's table</h3><div class="scroll"><table><tbody>${others}</tbody></table></div>`) +
     (waivers.length === 0 ? '' : `<p class="small">Your claims: ${waivers.map((o) => `<span class="${o.awarded ? 'pass' : 'fail'}">${esc(o.reason)}</span>`).join(', ')}</p>`) +
     `</section>`
   );
@@ -1312,19 +1298,21 @@ function renderPlayStandings(s: SeasonSession): string {
   const done = s.stage.kind === 'complete';
   const body = rows
     .map(
-      (r, i) =>
-        `<tr class="${r.tavern === me ? 'sel' : ''} ${done && i === 0 ? 'champ' : ''}"><td class="n">${i + 1}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
-        `<td><span class="tag ${r.tavern === me ? 'brass' : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.wins}-${r.losses}-${r.ties}</td><td class="n">${r.pointsFor}</td><td class="n">${r.pointsAgainst}</td></tr>`,
+      (r) =>
+        `<tr class="${r.tavern === me ? 'sel' : ''} ${done && r.rank === 1 ? 'champ' : ''}"><td class="n">${r.rank}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
+        `<td><span class="tag ${r.tavern === me ? 'brass' : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
+  const champs = rows.filter((r) => r.rank === 1).map((r) => r.tavern);
+  const mine = rows.find((r) => r.tavern === me);
   const banner = !done
     ? ''
-    : rows[0]?.tavern === me
-      ? `<p><span class="chip ok"><span class="dot"></span>Champions!</span> ${esc(tavernName(me))} wins the season.</p>`
-      : `<p>${esc(tavernName(rows[0]?.tavern ?? ''))} wins the season. You finish ${ordinal(rows.findIndex((r) => r.tavern === me) + 1)}.</p>`;
+    : mine?.rank === 1
+      ? `<p><span class="chip ok"><span class="dot"></span>Champions!</span> ${esc(tavernName(me))} ${champs.length === 1 ? 'wins the season' : 'shares the title'}.</p>`
+      : `<p>${champs.map((t) => esc(tavernName(t))).join(' and ')} ${champs.length === 1 ? 'wins' : 'share'} the season. You finish ${ordinal(mine?.rank ?? rows.length)}.</p>`;
   return (
     `<section class="card"><h2>${done ? 'Final standings' : 'Standings'}</h2>${banner}` +
-    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">W-L-T</th><th class="n">PF</th><th class="n">PA</th></tr></thead><tbody>${body}</tbody></table></div>` +
+    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">loot</th></tr></thead><tbody>${body}</tbody></table></div>` +
     (done ? '<p class="hint">The season is loaded into the other tabs: Standings, Weeks, Draft board, Pool and Event log.</p>' : '') +
     `</section>`
   );

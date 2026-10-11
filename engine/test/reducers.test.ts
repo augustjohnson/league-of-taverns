@@ -4,7 +4,7 @@ import { lineHash, replay, replayLog } from '../src/events/replay';
 import { freeAgents, onTheClock, seasonStandings, weekResults } from '../src/events/selectors';
 import type { LeagueState } from '../src/events/state';
 import type { LeagueEvent, PayloadByType } from '../src/events/types';
-import { headToHeadSchedule, standings, type SeasonConfig } from '../src/league';
+import { standings, type SeasonConfig } from '../src/league';
 import { draftOrderSeed, rngFor } from '../src/rng';
 import { draftOrder, snakePickOwner, type Lineup } from '../src/roster';
 import type { CrEighths } from '../src/vocabulary';
@@ -185,20 +185,13 @@ describe('mini-season replay', () => {
     expect(weekResults(at.final, 3)).toEqual([]);
   });
 
-  it('seasonStandings: head to head over finalized weeks', () => {
+  it('seasonStandings: total points over finalized weeks', () => {
     const rows = seasonStandings(at.final);
-    const matchups = headToHeadSchedule([...TAVERNS], 2);
     const results = [...weekResults(at.final, 1), ...weekResults(at.final, 2)];
-    expect(rows).toEqual(standings(matchups, results, config, rngFor(`${SEASON}/standings`, 'coin')));
+    expect(rows).toEqual(standings([...TAVERNS], results));
     expect(rows).toHaveLength(4);
-    // Coin flips are in the tiebreak list, so no game ends tied: 4 games, 4 wins.
-    expect(rows.reduce((n, r) => n + r.wins, 0)).toBe(4);
-    expect(rows.reduce((n, r) => n + r.losses, 0)).toBe(4);
-    for (const row of rows) {
-      expect(row.wins + row.losses + row.ties).toBe(2);
-      expect(row.pointsFor).toBe(results.filter((r) => r.tavern === row.tavern).reduce((n, r) => n + r.points, 0));
-    }
-    expect(seasonStandings(at.w1Resolved).every((r) => r.wins + r.losses === 0)).toBe(true);
+    for (const row of rows) expect(row.points).toBe(results.filter((r) => r.tavern === row.tavern).reduce((n, r) => n + r.points, 0));
+    expect(seasonStandings(at.w1Resolved).every((r) => r.points === 0 && r.rank === 1)).toBe(true);
     expect(seasonStandings(initialState())).toEqual([]);
   });
 
@@ -583,8 +576,7 @@ describe('tiny leagues', () => {
     s = applyEvent(s, candidate(s, 'week.finalized', { week: 1 }));
     expect(s.phase).toBe('complete');
     expect(weekResults(s, 1).map((r) => r.points)).toEqual([0, 0]);
-    // 0–0, level on every tiebreak until the seeded coin decides it.
-    expect(seasonStandings(s).map((r) => r.wins + r.losses + r.ties)).toEqual([1, 1]);
-    expect(seasonStandings(s).reduce((n, r) => n + r.wins, 0)).toBe(1);
+    // 0–0 with no tiebreak: both share first.
+    expect(seasonStandings(s).map((r) => r.rank)).toEqual([1, 1]);
   });
 });

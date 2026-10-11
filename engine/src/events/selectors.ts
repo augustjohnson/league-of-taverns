@@ -2,7 +2,7 @@
  * Selectors: derived views over `LeagueState`. Pure, never stored
  * (docs/schema.md § Reducers, "Derived views").
  */
-import { headToHeadSchedule, standings, type StandingRow, type WeekResult } from '../league';
+import { standings, type StandingRow, type WeekResult } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
 import type { LeagueState } from './state';
@@ -62,16 +62,11 @@ export function weekResults(state: LeagueState, week: number): ReadonlyArray<Wee
 }
 
 /**
- * Season standings over every finalized week. The head-to-head schedule is
- * `headToHeadSchedule(taverns in join order, config.weeks)`, since rules §8
- * publishes it before the draft. The `seeded_coin` tiebreak draws from
- * `rngFor(season + '/standings', 'coin')`. Playoffs are not modelled.
+ * Season standings over every finalized week: total loot, taverns in join
+ * order, equal totals sharing a rank (rules §8). No playoffs.
  */
 export function seasonStandings(state: LeagueState): ReadonlyArray<StandingRow> {
-  const config = state.config;
-  if (config === null) return [];
-  const matchups = headToHeadSchedule([...state.taverns.keys()], config.weeks);
+  if (state.config === null) return [];
   const weeks = [...state.finalizedWeeks].sort((a, b) => a - b);
-  const results = weeks.flatMap((week) => weekResults(state, week));
-  return standings(matchups, results, config, rngFor(`${config.id}/standings`, 'coin'));
+  return standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)));
 }

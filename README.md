@@ -6,8 +6,8 @@ Each manager runs a **tavern** and drafts **characters** (named monsters, like
 Bruno the Bruiser, an ogre) from a curated pool of about 64. Each week the
 tavern fields a **party** of one captain and three allies under a CR budget.
 The party attempts that week's hidden **mission**: a branching run of skill
-checks and battles, resolved once with seeded dice. Taverns meet head to head,
-and the better score wins the week.
+checks and battles, resolved once with seeded dice. Every tavern runs the same
+mission, and the season table ranks taverns by total loot.
 
 > **Status: scaffold.** Types, stubs, draft rules and schemas only. No game
 > logic yet. Start with [TODO.md](TODO.md).
@@ -16,7 +16,7 @@ and the better score wins the week.
 
 | Doc | What |
 |---|---|
-| [docs/rules.md](docs/rules.md) | Draft rulebook: roster, budget, lineups, scoring, matchups, waivers, trades, reveals, carryover |
+| [docs/rules.md](docs/rules.md) | Draft rulebook: roster, budget, lineups, scoring, standings, waivers, trades, reveals, carryover |
 | [docs/schema.md](docs/schema.md) | Draft schemas: character, modifiers, mission, chrome, season config, events, reducers |
 | [docs/season-lifecycle.md](docs/season-lifecycle.md) | Offseason → missions → curation → chrome → lock → draft → weekly runs → offseason |
 | [docs/decisions.md](docs/decisions.md) | Open decisions, plus every difference from the earlier specs |
@@ -58,7 +58,7 @@ engine/src/          pure game engine (no I/O)
   adapters/open5e/     verbatim Open5e record → BaseStats
   characters/          base + modifiers → effective stats; modifier registry
   roster/              ownership, CR budget, lineups, snake draft, waivers, trades
-  league/              season config type, head-to-head schedule, standings
+  league/              season config type, standings (total loot)
   missions/            mission schema + validator (no generator)
   resolution/          check odds, battle p(win), the single seeded run
   projection/          exact expected score by DAG propagation

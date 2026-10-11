@@ -29,13 +29,8 @@ draft:
   pickWindowHours: 24
   onTimeout: autopick
 
-matchups:
-  format: head_to_head
-  playoffs: { enabled: false, teams: 4, weeks: [] }
-
 scoring:
   pointsScale: 100
-  tiebreakers: [projected, checks_passed, seeded_coin]
 
 waivers:
   priority: rolling

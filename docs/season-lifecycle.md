@@ -122,8 +122,8 @@ are serialized.
 
 ## 8. Season end and back to offseason
 
-- `week.finalized` for the last week sets phase `complete`. The champion comes
-  from the standings (or from playoffs, if D-04 enables them).
+- `week.finalized` for the last week sets phase `complete`. The champion is
+  the top of the table by total loot (D-04). A tie gives co-champions.
 - `offseason` summarizes final rosters, career stats per character id, and
   carryover eligibility. Then go back to step 0 for the next season.
 - The finished season's log is frozen. It stays replayable forever against its

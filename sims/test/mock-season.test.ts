@@ -75,7 +75,7 @@ describe('one seeded mock season', () => {
   });
 
   it('pins the sim-1 champion', () => {
-    expect(sim1.summary.champion).toEqual({ tavern: 'the-gilded-flagon', bot: 'cr-greedy' });
+    expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'cr-greedy' }]);
     expect(sim1.summary.standings[0]!.tavern).toBe('the-gilded-flagon');
   });
 });
@@ -99,9 +99,9 @@ describe('many seasons', () => {
     const summaries = Array.from({ length: 20 }, (_, i) => runMockSeason(input, { seed: runSeed('batch', i + 1) }).summary);
     const totals = aggregate(summaries);
     expect(totals.runs).toBe(20);
-    expect(Object.values(totals.byBot).reduce((n, b) => n + b.titles, 0)).toBe(20);
+    expect(Object.values(totals.byBot).reduce((n, b) => n + b.titles, 0)).toBeCloseTo(20);
     expect(Object.values(totals.byBot).reduce((n, b) => n + b.seats, 0)).toBe(120);
-    expect(totals.higherProjectedWins.share).toBeGreaterThan(0);
+    expect(totals.bestProjectedTops.share).toBeGreaterThan(0);
     expect(totals.dnfRate).toBeGreaterThanOrEqual(0);
     expect(totals.dnfRate).toBeLessThan(1);
   });

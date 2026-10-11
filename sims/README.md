@@ -29,8 +29,8 @@ Paths are relative to the repo root. The default `--out` is
 `sims/output/<seed>-x<runs>`. Each run writes `events-<n>.ndjson`, and the
 batch writes `summary.json` (per season: standings, champion, each tavern's
 bot, weekly points and lineups, draft picks, waiver outcomes; aggregate:
-titles, mean points, win and DNF rates per bot, and how often the
-higher-projected tavern won its matchup), plus a table on the console.
+titles, mean points, week-top and DNF rates per bot, and how often the
+best-projected tavern topped its week), plus a table on the console.
 
 Each season is built event by event through the engine's `applyEvent`
 (`season.created` → `character.pooled` → `tavern.joined` → draft →
@@ -74,9 +74,9 @@ open. The tabs:
   (`replayLog` deep-equals the built state), the verify check
   (`verifyResolutions` finds no mismatches), run time, the NDJSON sha256 and
   the champion.
-- **Standings:** W-L-T, points for and against, each tavern's bot and the
-  champion; every matchup with actual and projected points, the winner and the
-  tiebreak that decided it; waiver outcomes.
+- **Standings:** total loot, weekly loot, each tavern's bot and the
+  champion; each week's table with actual and projected points and checks
+  passed; waiver outcomes.
 - **Weeks:** a week's mission as a layered graph; a tavern's locked lineup,
   its path taken and each node's projected reach; the node-by-node roll log.
 - **Lineup lab:** any four characters from the pool or a roster, any captain,

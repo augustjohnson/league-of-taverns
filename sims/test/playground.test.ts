@@ -3,14 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { projectMission, replayLog, rngFor } from '@league-of-taverns/engine';
-import type { WeekResult } from '@league-of-taverns/engine';
 import { afterAll, describe, expect, it } from 'vitest';
 import { deepEqual } from '../src/deep-equal';
 import { loadMockSeason, loadMockSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
 import {
-  decidedBy,
   draftBoard,
   formatCr,
   layoutMission,
@@ -129,16 +127,6 @@ describe('view helpers', () => {
     expect(scoreHistogram(sample.scores, projection.distribution.map(([s]) => s)).other).toBe(0);
     expect(Math.abs(sample.mean - projection.expectedScore)).toBeLessThan(0.02);
     expect(Math.abs(sample.dnfs / 4000 - projection.pDnf)).toBeLessThan(0.03);
-  });
-
-  it('names the tiebreak that decided a matchup', () => {
-    const r = (points: number, projected: number, checksPassed: number): WeekResult => ({ week: 1, tavern: 't', points, projected, checksPassed });
-    const tb = ['projected', 'checks_passed', 'seeded_coin'] as const;
-    expect(decidedBy(r(50, 1, 1), r(40, 9, 9), tb)).toBe('points');
-    expect(decidedBy(r(50, 60, 1), r(50, 55, 9), tb)).toBe('projected');
-    expect(decidedBy(r(50, 60, 3), r(50, 60, 2), tb)).toBe('checks_passed');
-    expect(decidedBy(r(50, 60, 3), r(50, 60, 3), tb)).toBe('seeded_coin');
-    expect(decidedBy(r(50, 60, 3), r(50, 60, 3), ['projected'])).toBe('tie');
   });
 
   it('puts every draft pick in its snake slot', () => {

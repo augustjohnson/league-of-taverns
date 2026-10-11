@@ -48,7 +48,7 @@ T9.2.
 
 No dependencies beyond T0.1: **T1.1** (snapshot), **T2.1** (RNG),
 **T2.3** (event codec), **T3.1** (character files), **T3.2** (modifier
-registry), **T4.3** and **T4.6** (draft order, H2H schedule), **T5.1**
+registry), **T4.3** and **T4.6** (draft order, standings), **T5.1**
 (mission schema), **T8.1** (chrome schema), **T11.1** (issue-form parser).
 **T6.1** can also start against hand-built `EffectiveStats` fixtures.
 
@@ -276,11 +276,11 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   tavern's own claims are tried in seq order; trades rechecked at completion.
 - **Depends:** T4.1.
 
-#### T4.6 ★ Head-to-head schedule + standings · S
-- **Goal:** `headToHeadSchedule` and `standings(matchups, results, config, rng)`.
-  The rng serves the coin-flip tiebreaker.
-- **Acceptance:** each tavern plays once per week; odd tavern counts get a
-  bye; standings order and tiebreakers follow the config.
+#### T4.6 ★ Standings · S
+- **Goal:** `standings(taverns, results)`: a league table by total loot (D-04).
+  Head to head was built first and removed.
+- **Acceptance:** every tavern gets a row; equal totals share a rank; no
+  tiebreakers (D-14).
 - **Depends:** T0.1.
 
 ---
@@ -586,7 +586,6 @@ Each task here can be specified but not finished until its decision in
 |---|---|---|
 | **T10.2 Live roll + week start** · S | D-13 details | Missions are open (D-08), so there is no sealing. What's left: how `run-week` draws and records a real random roll, and whether `mission.revealed` stays. `seal` and `reveal` scripts can be deleted. |
 | **T10.3 Offseason carryover** · M | D-11 carryover | `offseason`: keeper eligibility, `character.retained`, keeper cost in draft order (T4.3 hook), modifier drift cap. |
-| **T4.7 Playoffs** · S | D-04 | Bracket generation and playoff standings. |
 | **T6.1 captain effect** · S | D-12 | The captain's mechanical role. Ship behind a config switch. |
 | **T5.4 / T8.5 live provider** · S | D-32 | The real `LlmClient`. Everything else in those tasks uses the fake. |
 | **T8.7 Portraits and images** · M | D-10 | Storage, the `portrait.path` convention, and any image generation script. |

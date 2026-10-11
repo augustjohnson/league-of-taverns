@@ -11,7 +11,7 @@ the same types in T2.3, T3.1, T5.1 and T8.1.
   `the-gilded-flagon`, `example-drowned-toll`, `thick-skull`.
 - **Keys** in YAML and JSON are camelCase: `partyCr`, `schemaVersion`.
 - **Vocabulary values** are snake_case: `skill_bonus`, `animal_handling`,
-  `head_to_head`.
+  `carry_over`.
 - **CR** is written as Open5e writes it in authored files (`2`, `"1/2"`) and is
   held as an integer count of eighths inside the engine (`CrEighths`: 1/8 → 1,
   1/2 → 4, 12 → 96) [D-16].
@@ -235,8 +235,7 @@ The annotated example in the file is the reference. Key groups:
 | `budget` | `partyCr` (B), `modifierPointsPerCharacter` |
 | `roster` | `size`, `starters` (4), `ownership` |
 | `draft` | `format`, `rounds`, `order`, `pickWindowHours`, `onTimeout` |
-| `matchups` | `format`, `playoffs` |
-| `scoring` | `pointsScale`, `tiebreakers` |
+| `scoring` | `pointsScale` |
 | `waivers` | `priority`, `initialOrder` |
 | `trades` | `vetoWindowHours`, `vetoBy`, `deadlineWeek` |
 | `missedLineup` | `carry_over` |
@@ -348,7 +347,7 @@ State shape: `LeagueState` in `engine/src/events/state.ts`.
 | `week.finalized` | add to `finalizedWeeks`. On the last week, phase `complete` |
 
 **Derived views** (selectors over state, never stored): `standings` from
-`results` + the H2H schedule (`engine/src/league`), `freeAgents` = pool −
+`results`, total loot per tavern (`engine/src/league`), `freeAgents` = pool −
 owned, `onTheClock` from the draft order and pick count, career stats across
 season logs.
 
