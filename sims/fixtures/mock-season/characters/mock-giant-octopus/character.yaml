@@ -1,0 +1,5 @@
+id: mock-giant-octopus
+base: giant-octopus
+status: active
+chrome:
+  name: Mock Giant Octopus

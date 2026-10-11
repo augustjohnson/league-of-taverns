@@ -1,0 +1,5 @@
+id: mock-panther
+base: panther
+status: active
+chrome:
+  name: Mock Panther

@@ -1,0 +1,5 @@
+id: mock-pegasus
+base: pegasus
+status: active
+chrome:
+  name: Mock Pegasus

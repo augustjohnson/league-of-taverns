@@ -1,0 +1,5 @@
+id: mock-reef-shark
+base: reef-shark
+status: active
+chrome:
+  name: Mock Reef Shark

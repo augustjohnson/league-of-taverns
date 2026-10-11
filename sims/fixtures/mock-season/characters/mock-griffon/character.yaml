@@ -1,0 +1,5 @@
+id: mock-griffon
+base: griffon
+status: active
+chrome:
+  name: Mock Griffon

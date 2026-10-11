@@ -1,0 +1,5 @@
+id: mock-wyvern
+base: wyvern
+status: active
+chrome:
+  name: Mock Wyvern

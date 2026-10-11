@@ -1,0 +1,61 @@
+# Mock season, week 1 (forest). Skill-heavy, one battle.
+#
+#  rank 0     1              2               3               4            5
+#  start ─▶ track-quarry ─pass─▶ sneak-camp ─pass─▶ dodge-snare ─pass/fail─▶ haul-loot ─pass─▶ cleared
+#                 │                  │                                   ▲          │
+#                 fail               fail─▶ camp-brawl ─win──────────────┘          fail─▶ scraped
+#                 ▼                          ▲
+#             read-signs ─pass─▶ dodge-snare │
+#                 └──fail────────────────────┘
+
+schemaVersion: 1
+id: mock-thornwood-trail
+season: mock-season
+environment: forest
+
+nodes:
+  - { id: start, rank: 0, kind: start }
+  - id: track-quarry
+    rank: 1
+    kind: check
+    check: { type: skill, skill: survival, dc: 12 }
+  - id: sneak-camp
+    rank: 2
+    kind: check
+    check: { type: skill, skill: stealth, dc: 13 }
+  - id: read-signs
+    rank: 2
+    kind: check
+    check: { type: skill, skill: perception, dc: 12 }
+  - id: dodge-snare
+    rank: 3
+    kind: check
+    check: { type: save, ability: dex, dc: 12 }
+  - id: camp-brawl
+    rank: 3
+    kind: battle
+    encounter:
+      creatures:
+        - { ref: bugbear, count: 2 }
+        - { ref: hobgoblin, count: 2 }
+        - { ref: goblin, count: 4 }
+  - id: haul-loot
+    rank: 4
+    kind: check
+    check: { type: skill, skill: athletics, dc: 13 }
+  - { id: cleared, rank: 5, kind: end }
+  - { id: scraped, rank: 5, kind: end }
+
+edges:
+  - { from: start,        to: track-quarry, on: always }
+  - { from: track-quarry, to: sneak-camp,   on: pass }
+  - { from: track-quarry, to: read-signs,   on: fail }
+  - { from: sneak-camp,   to: dodge-snare,  on: pass }
+  - { from: sneak-camp,   to: camp-brawl,   on: fail }
+  - { from: read-signs,   to: dodge-snare,  on: pass }
+  - { from: read-signs,   to: camp-brawl,   on: fail }
+  - { from: dodge-snare,  to: haul-loot,    on: pass }
+  - { from: dodge-snare,  to: haul-loot,    on: fail }
+  - { from: camp-brawl,   to: haul-loot,    on: win }
+  - { from: haul-loot,    to: cleared,      on: pass }
+  - { from: haul-loot,    to: scraped,      on: fail }

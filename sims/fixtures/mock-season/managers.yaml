@@ -1,0 +1,25 @@
+# Mock season managers: six bot taverns (strategies from bots/src/strategies).
+# The commissioner and GM are placeholders; sims never act as them.
+
+commissioner: { login: mock-commissioner, githubId: null }
+gm: { login: mock-gm, githubId: null }
+
+taverns:
+  - id: the-rusty-tankard
+    name: The Rusty Tankard
+    manager: { bot: random }
+  - id: the-gilded-flagon
+    name: The Gilded Flagon
+    manager: { bot: cr-greedy }
+  - id: the-drowned-rat
+    name: The Drowned Rat
+    manager: { bot: skill-coverage }
+  - id: the-sleeping-giant
+    name: The Sleeping Giant
+    manager: { bot: value }
+  - id: the-crooked-candle
+    name: The Crooked Candle
+    manager: { bot: random }
+  - id: the-last-lantern
+    name: The Last Lantern
+    manager: { bot: value }

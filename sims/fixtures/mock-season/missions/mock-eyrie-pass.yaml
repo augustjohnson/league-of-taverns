@@ -1,0 +1,66 @@
+# Mock season, week 3 (mountain). One gated check (D-39): soaring the gap
+# needs a flyer. Without one it auto-fails and the party falls back to the climb.
+#
+#  rank 0     1              2                3              4              5             6
+#  start ─▶ read-weather ─pass─▶ soar-gap ─pass──────────────────────────▶ plant-banner ─pass/fail─▶ summit
+#                │           (requires fly)                                                          ▲
+#                │                └─fail─▶ climb-face ─pass─▶ ledge-watch ─pass──────────────────────┤
+#                fail─▶ brace-storm ─always─▶ │        │              └─fail─▶ ambush ─win─▶ hard-won
+#                                             └────────┴─fail────────────────▶ (rank 5)
+
+schemaVersion: 1
+id: mock-eyrie-pass
+season: mock-season
+environment: mountain
+
+nodes:
+  - { id: start, rank: 0, kind: start }
+  - id: read-weather
+    rank: 1
+    kind: check
+    check: { type: skill, skill: survival, dc: 12 }
+  - id: soar-gap
+    rank: 2
+    kind: check
+    check: { type: skill, skill: acrobatics, dc: 11, requires: { speed: fly } }
+  - id: brace-storm
+    rank: 2
+    kind: check
+    check: { type: save, ability: con, dc: 12 }
+  - id: climb-face
+    rank: 3
+    kind: check
+    check: { type: skill, skill: athletics, dc: 13 }
+  - id: ledge-watch
+    rank: 4
+    kind: check
+    check: { type: skill, skill: perception, dc: 12 }
+  - id: plant-banner
+    rank: 5
+    kind: check
+    check: { type: skill, skill: intimidation, dc: 12 }
+  - id: ambush
+    rank: 5
+    kind: battle
+    encounter:
+      creatures:
+        - { ref: ogre, count: 1 }
+        - { ref: orc, count: 4 }
+        - { ref: worg, count: 2 }
+  - { id: summit, rank: 6, kind: end }
+  - { id: hard-won, rank: 6, kind: end }
+
+edges:
+  - { from: start,        to: read-weather, on: always }
+  - { from: read-weather, to: soar-gap,     on: pass }
+  - { from: read-weather, to: brace-storm,  on: fail }
+  - { from: soar-gap,     to: plant-banner, on: pass }
+  - { from: soar-gap,     to: climb-face,   on: fail }
+  - { from: brace-storm,  to: climb-face,   on: always }
+  - { from: climb-face,   to: ledge-watch,  on: pass }
+  - { from: climb-face,   to: ambush,       on: fail }
+  - { from: ledge-watch,  to: summit,       on: pass }
+  - { from: ledge-watch,  to: ambush,       on: fail }
+  - { from: plant-banner, to: summit,       on: pass }
+  - { from: plant-banner, to: summit,       on: fail }
+  - { from: ambush,       to: hard-won,     on: win }

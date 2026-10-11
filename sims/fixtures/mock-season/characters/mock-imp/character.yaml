@@ -1,0 +1,5 @@
+id: mock-imp
+base: imp
+status: active
+chrome:
+  name: Mock Imp

@@ -1,0 +1,5 @@
+id: mock-ettercap
+base: ettercap
+status: active
+chrome:
+  name: Mock Ettercap

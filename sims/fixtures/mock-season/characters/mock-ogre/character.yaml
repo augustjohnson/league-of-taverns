@@ -1,0 +1,5 @@
+id: mock-ogre
+base: ogre
+status: active
+chrome:
+  name: Mock Ogre

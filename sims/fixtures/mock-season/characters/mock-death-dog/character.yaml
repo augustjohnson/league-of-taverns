@@ -1,0 +1,5 @@
+id: mock-death-dog
+base: death-dog
+status: active
+chrome:
+  name: Mock Death Dog
