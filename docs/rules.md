@@ -7,7 +7,9 @@
 
 ## 1. The league
 
-- A **season** has a short schedule of weekly **missions**: 6 in Season 1.
+- A **season** has one weekly **mission** per tavern **[D-48]**. Each tavern
+  has a **sponsor** (a god), and each week is one sponsor's mission
+  ([lore.md](lore.md)).
 - Each **manager** runs one **tavern**. Managers are listed in
   `managers.yaml` and identified by GitHub account.
 - A **commissioner** administers the league: vetoes, disputes, and
@@ -84,15 +86,21 @@
 - Some checks need a capability (a fly speed, darkvision). If no starter has
   it, the check fails automatically **[OPEN D-39]**.
 - **Battles:** the party's odds of winning come from its combined strength
-  against the encounter. **Losing any battle ends the mission (DNF) with score 0.**
+  against the encounter. **Losing any battle ends the mission (DNF).** The
+  party keeps the loot banked so far **[D-46]**.
 - Passing or failing a check decides which way the mission branches. Failing
   often leads into a battle.
 
 ## 7. Scoring
 
-- **Score** for a week = checks passed ÷ checks attempted on the path the party
-  actually took. A DNF scores 0.
-- **Points** = score × 100, rounded **[OPEN D-14]**.
+- **Loot:** each check carries a loot value. Passing a check banks it, and
+  failing banks nothing **[D-45]**.
+- **Score** for a week = loot banked. **Points** = loot.
+- **Fixed haul:** every mission's best path pays the same total loot, so every
+  week counts equally **[D-45]**.
+- **Home bonus:** on its sponsor's mission, a tavern's loot × 1.25 **[D-47]**.
+- *Not yet in the engine,* which still scores checks passed ÷ checks attempted,
+  ×100, with 0 for a DNF.
 - Each week runs **once**, as a single real random roll per check and battle
   **[D-13, details to come]**. The rolls are recorded in the event log, so the
   result is final and auditable, though not re-derivable from a seed.
@@ -103,7 +111,7 @@
 
 ## 8. Matchups and standings
 
-- **Head to head** **[OPEN D-04]:** each week, every tavern is paired with an
+- **Head to head** **[OPEN D-04; leaning toward a league table]:** each week, every tavern is paired with an
   opponent on a round-robin schedule published before the draft. Higher points
   wins the week.
 - **Ties** **[OPEN D-14]:** broken in order by higher projected points, then

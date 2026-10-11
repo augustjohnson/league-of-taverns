@@ -20,6 +20,7 @@ and the better score wins the week.
 | [docs/schema.md](docs/schema.md) | Draft schemas: character, modifiers, mission, chrome, season config, events, reducers |
 | [docs/season-lifecycle.md](docs/season-lifecycle.md) | Offseason → missions → curation → chrome → lock → draft → weekly runs → offseason |
 | [docs/decisions.md](docs/decisions.md) | Open decisions, plus every difference from the earlier specs |
+| [docs/lore.md](docs/lore.md) | Story frame: barkeeps, sponsoring gods, loot, and where story touches the rules |
 | [docs/glossary.md](docs/glossary.md) | Terms |
 | [docs/specs/](docs/specs/) | Earlier specs 00–06. Superseded where decisions.md says so |
 | [TODO.md](TODO.md) | Workstreams and tasks, one subagent per workstream |
