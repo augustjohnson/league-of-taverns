@@ -35,6 +35,9 @@ and the budget. Confirm with sims (T9.3: how often is the bench used?).
 (H2H record with a points tiebreak). Playoffs in a 6-week season would take
 2 of the 6 weeks. *Default:* H2H round-robin, no playoffs, champion = top of
 the standings. *Blocks:* T4.7 (playoffs).
+*Leaning (2026-10-11):* a league table (total loot, or placement points per
+week) rather than H2H. With a home bonus (D-47), H2H makes it matter whom you
+meet in their home week. A league table spreads that evenly. Not yet decided.
 
 **D-05 Waivers: DEFAULTED.** Rolling priority (winner moves to the back),
 initial order reverse draft. Alternatives: a fixed reverse-standings order, or
@@ -61,7 +64,10 @@ gives it no effect. Options:
 This changes lineup strategy a lot, so decide before T9 balance work.
 *Blocks:* T6.1 final form, T9.3.
 
-**D-14 Points scale and ties: OPEN.** Score is a fraction with small
+**D-14 Points scale and ties: SUPERSEDED in part by D-45 (2026-10-11).**
+Score is now loot, not a ratio. The tiebreak question remains: the
+tiebreakers are projected loot, then a seeded coin. "More checks passed" may
+go. The original text follows. Score is a fraction with small
 denominators (about 3–6 checks), so many taverns land on the same values
 (0, 1/3, 1/2, 2/3, 1), and H2H ties will be common. Options:
 (a) points = round(100 × score) with tiebreakers projected → checks passed →
@@ -118,6 +124,60 @@ vs luck decides weeks.
 Without a roster cap, drafting all high-CR characters is legal, but you can
 only start about 12 CR worth. Sims will show whether high-CR hoarding is a
 problem.
+
+### Story and scoring (2026-10-11)
+
+The story behind these is in [lore.md](lore.md). None of them are in the
+engine yet.
+
+**D-44 Story frame: DECIDED (2026-10-11).**
+- Managers play barkeeps, each pushed around by a different god.
+- Each god sponsors one tavern and sets one mission.
+- The draft is recruitment night.
+- Story-shaped rules are allowed if they treat every tavern the same over a
+  season.
+- Sponsorship (which god backs which tavern, and which mission is whose) is
+  mechanical data. The gods' names and voices are chrome.
+
+**D-45 Score is loot, with a fixed haul: DECIDED (2026-10-11).** Replaces
+"score = checks passed ÷ checks attempted" (rules §7).
+- Each check node carries a loot value. Passing banks it, and failing banks
+  nothing.
+- A week's score is the loot banked, and points equal loot.
+- Every mission is authored so its best path pays the same fixed haul (e.g.
+  100), which makes weeks count equally. The validator checks this.
+- Branches may pay different amounts. A failure branch paying less is
+  intended.
+- Projected points become expected loot, which is still exact by propagation.
+- *Needs:* a `loot` field on check nodes (schema), a scoring change in
+  `resolution/` and `projection/`, and a fixed-haul validator rule.
+- *Open:* the haul amount, and how loot is spread across a path. Rising loot
+  late in the path is an idea (lore.md).
+
+**D-46 DNF keeps banked loot: DECIDED (2026-10-11).** Replaces "a DNF scores
+0". Losing a battle ends the mission, and the party keeps the loot banked
+before the battle. The penalty for a DNF is the loot it didn't reach, so
+where battles sit in a mission sets the penalty. Sims (200 seasons, mock
+missions, old scoring) showed about 21% DNF, which is the target, and a score
+spread of about ±34 points that came mostly from DNFs scoring 0. Banking is
+expected to cut that substantially. Confirm with T9.3.
+
+**D-47 Home bonus ×1.25: DECIDED (2026-10-11).** On its sponsor's mission, a
+tavern's loot is multiplied by 1.25.
+- Mock sims, old scoring: the home tavern beat a given rival about 61% of the
+  time (NFL home teams win about 57%) and topped its week about 34% of the
+  time, against a baseline of 17%.
+- ×2 was rejected: the home tavern topped the week about 67% of the time, so
+  weekly wins would mostly rotate through the home taverns.
+- Re-measure after D-45 and D-46.
+- *Needs:* a sponsor per tavern and per week in the season config.
+
+**D-48 One mission per sponsor: DECIDED (2026-10-11).** The season has as many
+weeks as taverns, and each week is one sponsor's mission.
+- `weeks` follows the tavern count, so the tavern count must be fixed before
+  missions are sealed. That means before the draft.
+- D-01 caps a 64-character pool at 9 taverns.
+- A mystery mission set by the GM is parked as an idea.
 
 ### Missions and secrecy
 

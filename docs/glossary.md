@@ -5,6 +5,7 @@
 | **Actor** | The starter who makes a given check: the one with the best modifier for it (best fit). Shown as `{actor}` in story text. |
 | **Advantage** | Roll two d20s and keep the higher. Pass chance becomes `1 − (1 − p)²`. Granted only by modifiers. |
 | **B** | The party CR budget. The total CR of the four starters must be ≤ B. |
+| **Barkeep** | Story name for a manager: an ordinary tavern owner pushed around by a god (lore.md). |
 | **Base** | A character's raw Open5e stat block, identified by slug (e.g. `ogre`), from the season's pinned snapshot. |
 | **Battle** | A mission node won or lost on a black-box `p(win)` from party vs encounter. A loss is a DNF. |
 | **Bench** | Rostered characters not starting this week. |
@@ -20,26 +21,33 @@
 | **CR** | Challenge rating from the base stat block. Works as salary against B. Held in eighths internally. |
 | **DAG (layered)** | Mission graph whose edges always point to a higher rank, so every traversal terminates. |
 | **DC** | Difficulty class of a check. |
-| **DNF** | Did not finish: lost a battle. Scores 0. |
+| **DNF** | Did not finish: lost a battle. The mission ends and the party keeps the loot banked so far (D-46). |
 | **Effective stats** | Base stats with season modifiers applied. All the engine ever sees. |
 | **Encounter** | The creatures in a battle node, as Open5e slugs with counts. |
 | **Event** | One append-only record in a season's log. All state is folded from events. |
+| **Fixed haul** | The loot every mission's best path pays, the same for every week (D-45). |
 | **GM** | Curates characters, modifiers, missions and chrome. Knows every mission. |
+| **Home bonus** | ×1.25 loot for a tavern on its sponsor's mission (D-47). |
+| **Home mission** | The mission set by a tavern's own sponsor. |
+| **Loot** | Value banked by passing a check. Sums to the score (D-45). |
 | **Manager** | A human (or bot) running a tavern. |
 | **Mission** | One week's hidden challenge: a layered DAG of checks and battles. |
 | **Modifier** | A GM-authored mechanical delta from the closed registry, within a per-character budget. |
 | **Party** | A tavern's four starters for one week: captain + 3 allies. |
-| **Points** | Score × 100, rounded. |
+| **Points** | Equal to loot (D-45). |
 | **Pool** | The season's ~64 draftable characters with their modifiers. |
 | **Projected points** | Exact expected points for a lineup on a mission, by propagation. No dice. |
 | **Propagation** | Pushing probability forward through the DAG to get an exact expectation. |
 | **Rank** | A node's layer index in the mission DAG. |
+| **Recruitment night** | Story name for the draft. |
 | **Reveal** | Unsealing a week's mission at run time and checking it against its commitment. |
 | **Roster** | A tavern's owned characters (7). |
 | **Salt** | Optional per-week secret mixed into the dice seed and revealed with the mission (D-13). |
-| **Score** | Checks passed ÷ checks attempted on the path taken, or 0 on DNF. |
+| **Score** | Loot banked on the week's mission, × 1.25 on the home mission (D-45, D-47). |
+| **Scrying ball** | Story device that shows a tavern its party's run. |
 | **Seal** | Keeping selected missions secret until their week (D-08). |
 | **Snapshot** | An immutable, verbatim pull of Open5e records, pinned per season. |
+| **Sponsor** | The god behind a tavern. Each sponsor sets one mission per season (D-44, D-48). |
 | **Starter** | One of the four characters in this week's party. |
 | **Tavern** | A manager's team. |
 | **Through-line** | A season-long story thread in chrome. |
