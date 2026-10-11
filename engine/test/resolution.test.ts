@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { BaseStats } from '../src/adapters/open5e';
+import { TRAITS, effectiveStats } from '../src/characters';
 import type { CheckSpec, Encounter } from '../src/missions';
-import { battleOdds, checkOdds, passChance, type BattleModel } from '../src/resolution';
-import { baseOf, constantModel, member, partyOf } from './support/builders';
+import { battleOdds, checkOdds, passChance, runMission, type BattleModel, type RunResult } from '../src/resolution';
+import { rngFor, rollD20, weekSeed, type Rng } from '../src/rng';
+// The engine has no YAML parser, so the example mission and Bruno's ref are
+// read through the scripts loaders, as in missions.test.ts.
+import { loadCharacterRef, loadMission } from '../../scripts/src/lib/repo';
+import { baseOf, battle, check, constantModel, edge, end, member, missionOf, partyOf, skillCheck, start } from './support/builders';
+
+const EXAMPLE_MISSION = 'seasons/season-01/missions/candidates/example-drowned-toll.yaml';
 
 const stealth = (dc: number, extra: Partial<CheckSpec> = {}): CheckSpec => ({ type: 'skill', skill: 'stealth', dc, ...extra }) as CheckSpec;
 
@@ -207,5 +214,167 @@ describe('battleOdds', () => {
     expect(battleOdds(party, encounter, stub, constantModel(1.7)).pWin).toBe(1);
     expect(battleOdds(party, encounter, stub, constantModel(-0.2)).pWin).toBe(0);
     expect(() => battleOdds(party, encounter, stub, constantModel(Number.NaN))).toThrow(/NaN/);
+  });
+});
+
+// T6.3.
+describe('runMission', () => {
+  const SEED = 'season-01/week-1/tavern:test-tavern';
+  const seeded = (seed: string) => (id: string) => rngFor(seed, 'roll:' + id);
+  /** Each node's stream returns its listed values in order, then repeats the last. */
+  const scripted =
+    (values: Readonly<Record<string, ReadonlyArray<number>>>) =>
+    (id: string): Rng => {
+      const list = values[id] ?? [0];
+      let i = 0;
+      return () => list[Math.min(i++, list.length - 1)] ?? 0;
+    };
+
+  // start → a ─pass→ b ─pass/fail→ done
+  //           └fail→ fight ─win→ b
+  const branching = missionOf(
+    [start(), skillCheck('a', 1, 'stealth', 12), battle('fight', 2), skillCheck('b', 3, 'athletics', 10), end('done', 4)],
+    [
+      edge('start', 'a', 'always'),
+      edge('a', 'b', 'pass'),
+      edge('a', 'fight', 'fail'),
+      edge('fight', 'b', 'win'),
+      edge('b', 'done', 'pass'),
+      edge('b', 'done', 'fail'),
+    ],
+  );
+  const party = partyOf([member('cap', { skills: { stealth: 2, athletics: 1 } }), member('ally', { skills: { athletics: 3 } })]);
+
+  it('is deterministic for a seed, and each die depends only on its node id', () => {
+    const first = runMission(party, branching, seeded(SEED), baseOf, constantModel(0.6));
+    const again = runMission(party, branching, seeded(SEED), baseOf, constantModel(0.6));
+    expect(again).toEqual(first);
+    for (const record of first.nodes) {
+      const rng = rngFor(SEED, 'roll:' + record.node);
+      if (record.kind === 'check') expect(record.d20).toBe(rollD20(rng));
+      else expect(record.roll).toBe(rng());
+    }
+    // Across seeds both routes to `b` occur, and b's die is the same either way.
+    const routes = new Set<string>();
+    for (let k = 0; k < 40; k++) {
+      const seed = `${SEED}/k-${k}`;
+      const run = runMission(party, branching, seeded(seed), baseOf, constantModel(1));
+      routes.add(run.path.join(' '));
+      const b = run.nodes.find((r) => r.node === 'b');
+      expect(b?.kind === 'check' ? b.d20 : undefined).toBe(rollD20(rngFor(seed, 'roll:b')));
+    }
+    expect(routes).toEqual(new Set(['start a b done', 'start a fight b done']));
+  });
+
+  it('records each check, and scores passed / attempted', () => {
+    // a: d20 10 + 2 = 12 ≥ 12 passes. b: d20 6 + 3 = 9 < 10 fails.
+    const run = runMission(party, branching, scripted({ a: [0.45], b: [0.25] }), baseOf, constantModel(0.6));
+    expect(run).toEqual({
+      path: ['start', 'a', 'b', 'done'],
+      nodes: [
+        { node: 'a', kind: 'check', actor: 'cap', d20: 10, modifier: 2, dc: 12, advantage: false, outcome: 'pass' },
+        { node: 'b', kind: 'check', actor: 'ally', d20: 6, modifier: 3, dc: 10, advantage: false, outcome: 'fail' },
+      ],
+      dnf: false,
+      checksPassed: 1,
+      checksAttempted: 2,
+      score: 0.5,
+    });
+  });
+
+  it('wins a battle iff roll < pWin', () => {
+    const at = (roll: number): RunResult =>
+      runMission(party, branching, scripted({ a: [0], fight: [roll], b: [0.99] }), baseOf, constantModel(0.5));
+    const won = at(0.4999);
+    expect(won.nodes[1]).toEqual({ node: 'fight', kind: 'battle', pWin: 0.5, roll: 0.4999, outcome: 'win' });
+    expect(won.path).toEqual(['start', 'a', 'fight', 'b', 'done']);
+    expect(won.score).toBe(0.5);
+    expect(at(0.5).nodes[1]).toMatchObject({ outcome: 'lose' });
+  });
+
+  it('a lost battle is a DNF: the run stops there and scores 0', () => {
+    const run = runMission(party, branching, scripted({ a: [0], fight: [0.3] }), baseOf, constantModel(0.2));
+    expect(run).toEqual({
+      path: ['start', 'a', 'fight'],
+      nodes: [
+        { node: 'a', kind: 'check', actor: 'cap', d20: 1, modifier: 2, dc: 12, advantage: false, outcome: 'fail' },
+        { node: 'fight', kind: 'battle', pWin: 0.2, roll: 0.3, outcome: 'lose' },
+      ],
+      dnf: true,
+      checksPassed: 0,
+      checksAttempted: 1,
+      score: 0,
+    });
+    // pWin 0 always loses, even on a roll of 0.
+    expect(runMission(party, branching, scripted({ a: [0], fight: [0] }), baseOf, constantModel(0)).dnf).toBe(true);
+  });
+
+  it('with advantage, draws a second d20 from the same stream and keeps the higher', () => {
+    const lucky = partyOf([member('a', { skills: { stealth: 2 }, advantages: ['skill:stealth'] })]);
+    const one = missionOf([start(), skillCheck('c', 1, 'stealth', 16), end('done', 2)], [edge('start', 'c', 'always'), edge('c', 'done', 'always')]);
+    // 3 and 15: keeps 15, and 15 + 2 ≥ 16. 13 and 2: keeps 13, and 13 + 2 < 16.
+    const high = runMission(lucky, one, scripted({ c: [0.1, 0.7] }), baseOf, constantModel(1));
+    expect(high.nodes[0]).toMatchObject({ d20: 15, advantage: true, outcome: 'pass' });
+    const low = runMission(lucky, one, scripted({ c: [0.6, 0.05] }), baseOf, constantModel(1));
+    expect(low.nodes[0]).toMatchObject({ d20: 13, advantage: true, outcome: 'fail' });
+    // A check with one `always` edge still counts.
+    expect(low).toMatchObject({ path: ['start', 'c', 'done'], checksAttempted: 1, checksPassed: 0, score: 0 });
+  });
+
+  it('has no natural-20 rule', () => {
+    const weak = partyOf([member('a', { skills: { stealth: -5 } })]);
+    const one = missionOf([start(), skillCheck('c', 1, 'stealth', 16), end('done', 2)], [edge('start', 'c', 'always'), edge('c', 'done', 'always')]);
+    expect(runMission(weak, one, scripted({ c: [0.99] }), baseOf, constantModel(1)).nodes[0]).toMatchObject({ d20: 20, outcome: 'fail' });
+  });
+
+  it('auto-fails a gated check nobody qualifies for, but still records its die', () => {
+    const gated = missionOf(
+      [start(), check('c', 1, { type: 'skill', skill: 'stealth', dc: 2, requires: { speed: 'fly' } }), end('done', 2)],
+      [edge('start', 'c', 'always'), edge('c', 'done', 'pass'), edge('c', 'done', 'fail')],
+    );
+    const run = runMission(party, gated, scripted({ c: [0.99] }), baseOf, constantModel(1));
+    expect(run.nodes).toEqual([{ node: 'c', kind: 'check', actor: 'cap', d20: 20, modifier: 2, dc: 2, advantage: false, outcome: 'fail' }]);
+    expect(run.score).toBe(0);
+  });
+
+  it('throws on a mission it cannot walk', () => {
+    const noStart = missionOf([skillCheck('c', 1, 'stealth', 10), end('done', 2)], [edge('c', 'done', 'always')]);
+    expect(() => runMission(party, noStart, seeded(SEED), baseOf, constantModel(1))).toThrow(/exactly one start/);
+    const deadEnd = missionOf([start(), skillCheck('c', 1, 'stealth', 10), end('done', 2)], [edge('start', 'c', 'always'), edge('c', 'done', 'pass')]);
+    expect(() => runMission(party, deadEnd, scripted({ c: [0] }), baseOf, constantModel(1))).toThrow(/no `fail` edge/);
+    const flat = missionOf([start(), skillCheck('c', 1, 'stealth', 10), end('done', 1)], [edge('start', 'c', 'always'), edge('c', 'done', 'always')]);
+    expect(() => runMission(party, flat, scripted({}), baseOf, constantModel(1))).toThrow(/higher rank/);
+  });
+
+  it('pinned regression: Bruno solo on the example mission', () => {
+    // seasons/season-01/pool.yaml: ogre + intimidation +2 + thick-skull.
+    const ref = loadCharacterRef('bruno-the-bruiser');
+    const bruno = effectiveStats(
+      {
+        ref,
+        modifiers: [
+          { kind: 'skill_bonus', skill: 'intimidation', value: 2 },
+          { kind: 'trait', trait: 'thick-skull' },
+        ],
+      },
+      baseOf(ref.base),
+      TRAITS,
+    );
+    const seed = weekSeed({ season: 'season-01', week: 1, tavern: 'bruno-solo' });
+    const run = runMission(partyOf([bruno]), loadMission(EXAMPLE_MISSION), seeded(seed), baseOf, constantModel(0.5));
+    // Survival −2 vs DC 12 fails on a 12, the bog ambush is won (0.347 < 0.5),
+    // and Athletics +4 vs DC 13 passes on a 14: 1 of 2.
+    expect(run).toEqual({
+      path: ['start', 'find-path', 'bog-ambush', 'haul-chain', 'crossed-dry'],
+      nodes: [
+        { node: 'find-path', kind: 'check', actor: 'bruno-the-bruiser', d20: 12, modifier: -2, dc: 12, advantage: false, outcome: 'fail' },
+        { node: 'bog-ambush', kind: 'battle', pWin: 0.5, roll: 0.34700014791451395, outcome: 'win' },
+        { node: 'haul-chain', kind: 'check', actor: 'bruno-the-bruiser', d20: 14, modifier: 4, dc: 13, advantage: false, outcome: 'pass' },
+      ],
+      dnf: false,
+      checksPassed: 1,
+      checksAttempted: 2,
+      score: 0.5,
+    });
   });
 });

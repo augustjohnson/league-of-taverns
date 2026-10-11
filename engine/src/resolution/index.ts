@@ -19,9 +19,8 @@
  */
 import type { BaseStats } from '../adapters/open5e';
 import { checkTargetKey, type EffectiveStats } from '../characters';
-import type { CheckSpec, Encounter, Mission, Requirement } from '../missions';
-import type { Rng } from '../rng';
-import { notImplemented } from '../internal/not-implemented';
+import type { CheckSpec, Encounter, Mission, MissionNode, Requirement } from '../missions';
+import { rollD20, type Rng } from '../rng';
 
 /**
  * The four starters for a week. The captain is one of them.
@@ -139,18 +138,134 @@ export interface RunResult {
 }
 
 /**
- * One seeded traversal. `rngForNode(nodeId)` must return
- * `rngFor(weekSeed, 'roll:' + nodeId)`. Passing a factory keeps dice per node
- * independent of path order.
+ * One traversal of `mission` by `party`, with dice from `rngForNode`.
+ *
+ * Starts at the start node and follows its `always` edge. At a check, with
+ * `rng = rngForNode(node.id)`, the actor from `checkOdds` rolls
+ * `d20 = rollD20(rng)`; with advantage a second d20 comes from the same stream
+ * and the higher is kept. The check passes iff it is eligible and
+ * `d20 + modifier ≥ dc`. There is no natural-20 rule, matching `passChance`.
+ * An auto-failed (ineligible) check still draws and records its die. At a
+ * battle, `roll = rngForNode(node.id)()` and the party wins iff
+ * `roll < pWin` from `battleOdds`. Losing ends the run as a DNF.
+ *
+ * `path` lists every visited node, start and end included (on a DNF it ends at
+ * the lost battle). Score is `checksPassed / checksAttempted`, or 0 on a DNF.
+ *
+ * `rngForNode` is a factory so each node's dice depend only on its id, never
+ * on path order. Sims, tests and the difficulty report pass
+ * `(id) => rngFor(weekSeed, 'roll:' + id)`. A live week (docs/decisions.md
+ * D-13) may pass a factory backed by real randomness instead; its rolls are
+ * then recorded in the event, since they cannot be recomputed.
+ *
+ * Throws on a mission whose shape breaks the walk: not exactly one start
+ * node, a missing outgoing edge, or an edge to a node that does not exist or
+ * is not at a higher rank.
  */
 export function runMission(
-  _party: Party,
-  _mission: Mission,
-  _rngForNode: (nodeId: string) => Rng,
-  _baseOf: (slug: string) => BaseStats,
-  _model: BattleModel,
+  party: Party,
+  mission: Mission,
+  rngForNode: (nodeId: string) => Rng,
+  baseOf: (slug: string) => BaseStats,
+  model: BattleModel,
 ): RunResult {
-  return notImplemented('runMission', 'T6.3');
+  const graph = missionGraph(mission, 'runMission');
+  const path: string[] = [];
+  const nodes: NodeRecord[] = [];
+  let checksPassed = 0;
+  let checksAttempted = 0;
+
+  let node: MissionNode | undefined = graph.start;
+  while (node !== undefined) {
+    path.push(node.id);
+    switch (node.kind) {
+      case 'start':
+        node = graph.next(node, 'always');
+        break;
+      case 'check': {
+        const odds = checkOdds(party, node.check);
+        const rng = rngForNode(node.id);
+        const first = rollD20(rng);
+        const d20 = odds.advantage ? Math.max(first, rollD20(rng)) : first;
+        const passed = odds.eligible && d20 + odds.modifier >= node.check.dc;
+        nodes.push({
+          node: node.id,
+          kind: 'check',
+          actor: odds.actor,
+          d20,
+          modifier: odds.modifier,
+          dc: node.check.dc,
+          advantage: odds.advantage,
+          outcome: passed ? 'pass' : 'fail',
+        });
+        checksAttempted++;
+        if (passed) checksPassed++;
+        node = graph.next(node, passed ? 'pass' : 'fail');
+        break;
+      }
+      case 'battle': {
+        const { pWin } = battleOdds(party, node.encounter, baseOf, model);
+        const roll = rngForNode(node.id)();
+        const won = roll < pWin;
+        nodes.push({ node: node.id, kind: 'battle', pWin, roll, outcome: won ? 'win' : 'lose' });
+        if (!won) return { path, nodes, dnf: true, checksPassed, checksAttempted, score: 0 };
+        node = graph.next(node, 'win');
+        break;
+      }
+      case 'end':
+        node = undefined;
+        break;
+    }
+  }
+  return { path, nodes, dnf: false, checksPassed, checksAttempted, score: runScore(checksPassed, checksAttempted) };
+}
+
+/**
+ * The score of a run that reached an end: `passed / attempted`, or 0 if no
+ * check was attempted (the validator's `scored` rule forbids such a path).
+ * Shared with projection.
+ */
+export function runScore(passed: number, attempted: number): number {
+  return attempted === 0 ? 0 : passed / attempted;
+}
+
+/** A mission indexed for walking. Shared by `runMission` and `projectMission`. */
+export interface MissionGraph {
+  readonly start: MissionNode;
+  /**
+   * The node an outcome leads to. A check follows its `pass` or `fail` edge,
+   * or else its `always` edge. Throws if there is no such edge, or it points
+   * to a missing node or to a rank that is not higher.
+   */
+  next(from: MissionNode, on: 'always' | 'pass' | 'fail' | 'win'): MissionNode;
+}
+
+/** Index `mission` for walking. Throws unless it has exactly one start node. `caller` prefixes errors. */
+export function missionGraph(mission: Mission, caller: string): MissionGraph {
+  const byId = new Map<string, MissionNode>();
+  for (const node of mission.nodes) if (!byId.has(node.id)) byId.set(node.id, node);
+  const starts = mission.nodes.filter((node) => node.kind === 'start');
+  const start = starts[0];
+  if (start === undefined || starts.length !== 1) {
+    throw new Error(`${caller}: mission "${mission.id}" needs exactly one start node, found ${starts.length}`);
+  }
+  return {
+    start,
+    next(from, on) {
+      const out = mission.edges.filter((edge) => edge.from === from.id);
+      // A check with a single `always` edge goes there whatever the outcome.
+      const edge = out.find((e) => e.on === on) ?? (from.kind === 'check' ? out.find((e) => e.on === 'always') : undefined);
+      if (edge === undefined) {
+        throw new Error(`${caller}: ${from.kind} "${from.id}" in mission "${mission.id}" has no \`${on}\` edge`);
+      }
+      const to = byId.get(edge.to);
+      if (to === undefined) throw new Error(`${caller}: edge ${from.id} → ${edge.to} points to a node that does not exist`);
+      if (to.rank <= from.rank) {
+        throw new Error(`${caller}: edge ${from.id} → ${to.id} does not go to a higher rank (${from.rank} → ${to.rank})`);
+      }
+      return to;
+    },
+  };
 }
 
 // ── internals ──────────────────────────────────────────────────────────────
