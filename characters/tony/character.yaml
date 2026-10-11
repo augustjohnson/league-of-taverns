@@ -10,6 +10,8 @@ chrome:
   epithet: Can't Clap
   tagline: The most dangerous thing in the league. Defeated daily by doorknobs, high-fives and shirts.
   portrait:
-    status: prompt
+    status: draft
     prompt: huge green tyrannosaurus with a scarred snout and tiny arms straining toward a wooden tankard balanced on its own head, (frustrated toothy grimace:1.3)
     bodyPlan: beast
+    path: portrait.png
+    seed: 29916148

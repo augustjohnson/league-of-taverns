@@ -10,6 +10,8 @@ chrome:
   epithet: Unravelling
   tagline: Four thousand years old. Still trailing linen behind him everywhere he goes.
   portrait:
-    status: prompt
+    status: draft
     prompt: dusty tan mummy with loose bandages trailing off one arm and one glowing green eye, (sheepish grin:1.3)
     bodyPlan: humanoid
+    path: portrait.png
+    seed: 532486624

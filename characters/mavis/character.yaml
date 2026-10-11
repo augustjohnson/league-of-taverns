@@ -10,6 +10,8 @@ chrome:
   epithet: Salon Owner
   tagline: Gives the worst haircuts in the realm. No client has complained, or moved, since.
   portrait:
-    status: prompt
+    status: draft
     prompt: green-skinned medusa with hissing snakes for hair tied up with ribbons and round smoked-glass spectacles, (bored gum-chewing smirk:1.3)
     bodyPlan: humanoid
+    path: portrait.png
+    seed: 9001

@@ -10,6 +10,8 @@ chrome:
   epithet: the Lifter
   tagline: Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.
   portrait:
-    status: prompt
+    status: draft
     prompt: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and small folded dragonfly wings, (fully clothed in a plain brown linen tunic:1.3), (intense focused stare:1.3)
     bodyPlan: winged
+    path: portrait.png
+    seed: 9102

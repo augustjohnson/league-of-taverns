@@ -10,6 +10,8 @@ chrome:
   epithet: Dessert
   tagline: Looks like dessert. Eats like a siege engine.
   portrait:
-    status: prompt
+    status: draft
     prompt: glossy black blob of pudding with a single red cherry on top, (gleeful gooey grin:1.3)
     bodyPlan: blob
+    path: portrait.png
+    seed: 668055897

@@ -10,6 +10,8 @@ chrome:
   epithet: the Complaint
   tagline: Has written a strongly worded letter to every mountain he has lived under.
   portrait:
-    status: prompt
+    status: draft
     prompt: ash-grey dwarf with a long beard braided into tight knots, a quill pen tucked into the beard and an iron helm, (bitter permanent scowl:1.3)
     bodyPlan: humanoid
+    path: portrait.png
+    seed: 560466621

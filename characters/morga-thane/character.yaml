@@ -10,6 +10,8 @@ chrome:
   epithet: the Poet
   tagline: Writes tender sonnets about the moon. Every one rhymes with "smash".
   portrait:
-    status: prompt
+    status: draft
     prompt: broad grey-green orc woman with a broken left tusk, a quill behind her ear and small round reading glasses, (dreamy wistful smile:1.3)
     bodyPlan: humanoid
+    path: portrait.png
+    seed: 739659698

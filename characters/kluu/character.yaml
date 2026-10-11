@@ -10,6 +10,8 @@ chrome:
   epithet: Ill Repute
   tagline: Runs a dice game under every bridge in the league. Wins by holding the dice.
   portrait:
-    status: prompt
+    status: draft
     prompt: dark green lobster-like chuul with face tentacles, a gold tooth and a cracked claw, (shady dealmaker grin:1.3)
     bodyPlan: beast
+    path: portrait.png
+    seed: 9000

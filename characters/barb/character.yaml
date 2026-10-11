@@ -10,6 +10,8 @@ chrome:
   epithet: the Duchess
   tagline: Controls every tavern bin within forty miles. Accepts tribute in pie crusts.
   portrait:
-    status: prompt
+    status: draft
     prompt: black bear with a white chest blaze, a crushed wicker bread basket worn as a crown and crumbs in her fur, (regal calm stare:1.3)
     bodyPlan: beast
+    path: portrait.png
+    seed: 995820949

@@ -10,6 +10,8 @@ chrome:
   epithet: Notary
   tagline: Requires a signed form before he will pass the salt.
   portrait:
-    status: prompt
+    status: draft
     prompt: small red imp with bat wings and one horn capped in brass, holding a quill and a wax seal stamp, (fussy glare:1.3)
     bodyPlan: winged
+    path: portrait.png
+    seed: 96174384

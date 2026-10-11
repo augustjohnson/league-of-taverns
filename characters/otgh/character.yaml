@@ -10,6 +10,8 @@ chrome:
   epithet: Sanitation
   tagline: Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.
   portrait:
-    status: prompt
+    status: draft
     prompt: lumpy brown three-legged otyugh with a single eyestalk and a rotten cabbage leaf draped on its head, (proud gap-toothed grin:1.3)
     bodyPlan: beast
+    path: portrait.png
+    seed: 727755527
