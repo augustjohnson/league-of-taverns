@@ -153,7 +153,7 @@ ComfyUI cuts out the background, the figure is scaled to fit the
 character's canvas (4 art pixels clear on each side, 8 above) and placed
 bottom-centre, then pixelated and checked like any render. Accepting it
 records `imported: <file name>` instead of a seed. Ask for a composition
-the shape of the card: portrait, about 4:5, plain white background. A wide
+the shape of the card: portrait, about 4:5, plain white background. JPEG and WebP work too. A wide
 image fits by width and ends up small, mostly hidden by the bar.
 
 ## Writing subjects

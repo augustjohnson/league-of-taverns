@@ -101,12 +101,14 @@ export class ComfyUi {
   }
 
   /**
-   * Cut the subject out of an outside image with the style's background
-   * removal model; returns an RGBA PNG whose background is transparent.
+   * Cut the subject out of an outside image (PNG, JPEG or WebP) with the
+   * style's background removal model; returns an RGBA PNG whose background
+   * is transparent.
    */
   async cutout(style: ImageStyle, png: Uint8Array, name: string): Promise<Uint8Array> {
     const form = new FormData();
-    form.append('image', new Blob([png], { type: 'image/png' }), name);
+    const type = /\.jpe?g$/i.test(name) ? 'image/jpeg' : /\.webp$/i.test(name) ? 'image/webp' : 'image/png';
+    form.append('image', new Blob([png], { type }), name);
     form.append('overwrite', 'true');
     const uploaded = (await (await this.fetch('/upload/image', { method: 'POST', body: form })).json()) as { name?: string; subfolder?: string };
     if (typeof uploaded.name !== 'string') throw new Error(`ComfyUI upload failed: ${JSON.stringify(uploaded)}`);
