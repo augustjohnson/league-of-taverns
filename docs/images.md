@@ -140,6 +140,22 @@ file's comments. Review it in the PR and set `status: final`.
 season: it must exist, be exactly the style's size, use only palette colours
 with no partial transparency, and be under 32 KB.
 
+## Importing outside images
+
+When the local model can't get a character right, generate it elsewhere
+(Gemini, a drawing) and import it:
+
+```bash
+pnpm draft-images import --character rhaa-baeh-skraa the-committee-gemini.png
+```
+
+ComfyUI cuts out the background, the figure is scaled to fit the
+character's canvas (4 art pixels clear on each side, 8 above) and placed
+bottom-centre, then pixelated and checked like any render. Accepting it
+records `imported: <file name>` instead of a seed. Ask for a composition
+the shape of the card: portrait, about 4:5, plain white background. A wide
+image fits by width and ends up small, mostly hidden by the bar.
+
 ## Writing subjects
 
 **Portraits:** who, what makes them recognisable, what they wear, and their
