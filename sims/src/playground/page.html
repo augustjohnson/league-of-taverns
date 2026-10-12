@@ -22,6 +22,8 @@
   --font-ui: 'Public Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-num: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 4px;
+  /* Series colours, one per tavern in managers-file order (validated for CVD separation in both themes). */
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -39,6 +41,7 @@
     --bad: #ea7c69;
     --bad-soft: #3c1f1a;
     --node: #1e2a25;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
     color-scheme: dark;
   }
 }
@@ -57,6 +60,7 @@
   --bad: #ea7c69;
   --bad-soft: #3c1f1a;
   --node: #1e2a25;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   color-scheme: dark;
 }
 
@@ -221,6 +225,25 @@ textarea#ndjson-fallback { width: 100%; height: 160px; font: 11px var(--font-num
 .slot.empty { border-style: dashed; color: var(--muted); }
 .slot .who { min-width: 0; overflow-wrap: anywhere; }
 .hint { color: var(--muted); font-size: 12.5px; }
+/* Reports */
+i.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+svg.odds { display: block; max-width: none; }
+svg.odds .grid { stroke: var(--line); stroke-width: 1; }
+svg.odds .tick { font: 10.5px var(--font-num); fill: var(--muted); }
+svg.odds .series polyline { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; }
+svg.odds .series circle { fill: var(--c); stroke: var(--surface); stroke-width: 2; }
+svg.odds .end { font: 600 11px var(--font-ui); fill: var(--ink); }
+svg.odds .hit { fill: transparent; }
+svg.odds .hit:hover { fill: color-mix(in srgb, var(--brass) 10%, transparent); }
+.dbar { position: relative; height: 10px; background: var(--sunken); border-radius: 2px; }
+.dbar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+.dbar i { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.dbar i.up { background: var(--good); }
+.dbar i.down { background: var(--bad); }
+.legend i.alt { background: var(--muted); opacity: 0.55; }
+.legend i.par { width: 2px; height: 12px; background: var(--ink); opacity: 0.6; }
+.bar .track i.par { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.6; }
+.luck-ranks .bar { grid-template-columns: 3.4em 1fr 7em; }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 </style>
 
@@ -247,6 +270,7 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line)
   <nav class="tabs" role="tablist" id="tabs">
     <button type="button" role="tab" data-tab="play" aria-selected="false">Play vs bots</button>
     <button type="button" role="tab" data-tab="standings" aria-selected="true">Standings</button>
+    <button type="button" role="tab" data-tab="reports" aria-selected="false">Reports</button>
     <button type="button" role="tab" data-tab="weeks" aria-selected="false">Weeks</button>
     <button type="button" role="tab" data-tab="lab" aria-selected="false">Lineup lab</button>
     <button type="button" role="tab" data-tab="draft" aria-selected="false">Draft board</button>
