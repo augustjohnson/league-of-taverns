@@ -169,6 +169,7 @@ const IMPORT_MARGINS = { side: 4, top: 8 } as const;
 
 async function importOne(args: Args): Promise<void> {
   if (args.file === undefined) throw new ValidationFailure(`import needs an image file.\n\n${USAGE}`);
+  if (!existsSync(args.file)) throw new ValidationFailure(`No image at ${args.file}. Save the file there first (a PNG), then run this again.`);
   const targets = targetsFor(args);
   const target = targets[0];
   if (targets.length !== 1 || target?.kind !== 'portrait') throw new ValidationFailure(`import takes exactly one --character.\n\n${USAGE}`);
