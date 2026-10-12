@@ -181,6 +181,18 @@ export function encodeIndexedPng(image: IndexedImage): Buffer {
   ]);
 }
 
+/** Plain RGBA PNG, every row unfiltered. For staging prepared renders, not for committed sprites. */
+export function encodeRgbaPng(image: RgbaImage): Buffer {
+  const { width, height, data } = image;
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 6, 0, 0, 0], 8);
+  const raw = Buffer.alloc(height * (width * 4 + 1));
+  for (let y = 0; y < height; y++) raw.set(data.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);
+  return Buffer.concat([SIGNATURE, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 6 })), chunk('IEND', Buffer.alloc(0))]);
+}
+
 function chunk(type: string, body: Buffer): Buffer {
   const head = Buffer.alloc(8);
   head.writeUInt32BE(body.length, 0);

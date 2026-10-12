@@ -4,6 +4,7 @@
  * Usage:
  *   draft-images portraits (--character <id>... | --all) [--snapshot <id>] [--candidates 4] [--seed <n>]
  *   draft-images covers --season <id> [--mission <id>...] [--candidates 4] [--seed <n>]
+ *   draft-images import --character <id> <image.png>
  *   draft-images accept --character <id> --seed <n> [--force]
  *   draft-images accept --season <id> --mission <id> --seed <n>
  *
@@ -18,24 +19,32 @@
  * failures; `accept` refuses them without --force. `accept` copies one candidate into the repo and, for
  * a portrait, records path and seed in character.yaml with status draft.
  *
+ * `import` stages an outside image (Gemini, a drawing) as a portrait
+ * candidate: ComfyUI cuts out its background, it is scaled to fit the
+ * character's canvas, then pixelated and checked like any render. Accepting
+ * it records `imported: <file name>` instead of a seed.
+ *
  * Needs a running ComfyUI (COMFYUI_URL, default http://127.0.0.1:8188).
  * Offline and human-triggered; never in CI. Setup and style: docs/images.md.
  */
-import { existsSync } from 'node:fs';
-import { relative } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ComfyUi } from './lib/images/comfyui';
-import { accept, coverTargets, defaultSeed, portraitTargets, snapshotSizes, stage, stagedPaths, writeReviewPage } from './lib/images/drafts';
+import { accept, coverTargets, defaultSeed, portraitTargets, snapshotSizes, stage, stageImport, stagedPaths, writeReviewPage } from './lib/images/drafts';
 import type { DraftTarget } from './lib/images/drafts';
 import { pixelate } from './lib/images/pixelate';
-import { decodePng, encodeIndexedPng } from './lib/images/png';
-import { loadImageStyle, pixelateOptions } from './lib/images/style';
+import { decodePng, encodeIndexedPng, encodeRgbaPng } from './lib/images/png';
+import { fitToCanvas } from './lib/images/resample';
+import { loadImageStyle, pixelateOptions, renderSize } from './lib/images/style';
 import { ValidationFailure, runMain } from './lib/main';
 import { REPO_ROOT, rootDir } from './lib/repo';
 
 const USAGE = `Usage:
   draft-images portraits (--character <id>... | --all) [--snapshot <id>] [--candidates 4] [--seed <n>]
   draft-images covers --season <id> [--mission <id>...] [--candidates 4] [--seed <n>]
+  draft-images import --character <id> <image.png>
   draft-images accept --character <id> --seed <n> [--force]
   draft-images accept --season <id> --mission <id> --seed <n>`;
 
@@ -56,7 +65,8 @@ function parse(argv: ReadonlyArray<string>) {
     allowPositionals: true,
   });
   const [command, ...rest] = positionals;
-  if (rest.length > 0 || (command !== 'portraits' && command !== 'covers' && command !== 'accept')) throw new ValidationFailure(USAGE);
+  const commands = ['portraits', 'covers', 'accept', 'import'];
+  if (!commands.includes(command ?? '') || rest.length > (command === 'import' ? 1 : 0)) throw new ValidationFailure(USAGE);
   const integer = (name: string, raw: string | undefined, min: number): number | undefined => {
     if (raw === undefined) return undefined;
     const n = Number(raw);
@@ -73,6 +83,7 @@ function parse(argv: ReadonlyArray<string>) {
     candidates: integer('candidates', values.candidates, 1) ?? 4,
     seed: integer('seed', values.seed, 0),
     force: values.force === true,
+    file: rest[0],
   };
 }
 
@@ -153,8 +164,34 @@ function acceptOne(args: Args): void {
   console.log(`Wrote ${written}.${targets[0]!.kind === 'portrait' ? ' Portrait status is draft: set it to final in review.' : ''}`);
 }
 
+/** Margins kept around an imported figure, in art pixels: room on the sides and above the head. */
+const IMPORT_MARGINS = { side: 4, top: 8 } as const;
+
+async function importOne(args: Args): Promise<void> {
+  if (args.file === undefined) throw new ValidationFailure(`import needs an image file.\n\n${USAGE}`);
+  const targets = targetsFor(args);
+  const target = targets[0];
+  if (targets.length !== 1 || target?.kind !== 'portrait') throw new ValidationFailure(`import takes exactly one --character.\n\n${USAGE}`);
+  const style = loadImageStyle();
+  const comfy = new ComfyUi();
+  await comfy.checkReady(style);
+  const original = readFileSync(args.file);
+  const cut = decodePng(await comfy.cutout(style, original, basename(args.file)));
+  const { cell } = style.pixelate;
+  const render = fitToCanvas(cut, renderSize(style, 'portrait', target.size).width, renderSize(style, 'portrait', target.size).height, {
+    side: IMPORT_MARGINS.side * cell,
+    top: IMPORT_MARGINS.top * cell,
+  });
+  const sprite = encodeIndexedPng(pixelate(render, pixelateOptions(style, 'portrait', target.translucent)));
+  const seed = createHash('sha256').update(original).digest().readUInt32BE(0) % 1_000_000_000;
+  const problems = stageImport(target, seed, basename(args.file), encodeRgbaPng(render), sprite, style);
+  console.log(`Staged ${target.id} s${seed} from ${basename(args.file)}: ${problems.length === 0 ? 'layers cleanly' : problems.join('; ')}`);
+  console.log(`Compare it in ${relative(rootDir(REPO_ROOT), writeReviewPage(style))}, then: pnpm draft-images accept --character ${target.id} --seed ${seed}`);
+}
+
 runMain(async (argv) => {
   const args = parse(argv);
   if (args.command === 'accept') acceptOne(args);
+  else if (args.command === 'import') await importOne(args);
   else await draft(args);
 });

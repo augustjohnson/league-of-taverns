@@ -170,6 +170,25 @@ export function stage(target: DraftTarget, seed: number, render: Uint8Array, spr
   return problems;
 }
 
+/** Stage an imported image as a candidate, remembering its source file for accept. */
+export function stageImport(
+  target: DraftTarget,
+  seed: number,
+  from: string,
+  render: Uint8Array,
+  sprite: Uint8Array,
+  style: ImageStyle,
+  root: RepoRoot = REPO_ROOT,
+): string[] {
+  const problems = stage(target, seed, render, sprite, style, root);
+  writeFileSync(importRecord(stagedPaths(target, seed, root).sprite), `${JSON.stringify({ from })}\n`);
+  return problems;
+}
+
+function importRecord(sprite: string): string {
+  return sprite.replace(/\.png$/, '.import.json');
+}
+
 // ── accept ─────────────────────────────────────────────────────────────────
 
 /**
@@ -202,7 +221,14 @@ export function accept(target: DraftTarget, seed: number, style: ImageStyle, roo
     const doc = parseDocument(readFileSync(yamlFile, 'utf8'));
     doc.setIn(['chrome', 'portrait', 'status'], 'draft');
     doc.setIn(['chrome', 'portrait', 'path'], basename(target.destination));
-    doc.setIn(['chrome', 'portrait', 'seed'], seed);
+    const record = importRecord(staged);
+    if (existsSync(record)) {
+      doc.setIn(['chrome', 'portrait', 'imported'], (JSON.parse(readFileSync(record, 'utf8')) as { from: string }).from);
+      doc.deleteIn(['chrome', 'portrait', 'seed']);
+    } else {
+      doc.setIn(['chrome', 'portrait', 'seed'], seed);
+      doc.deleteIn(['chrome', 'portrait', 'imported']);
+    }
     writeFileSync(yamlFile, doc.toString({ lineWidth: 0 }));
   }
   return relative(rootDir(root), target.destination);

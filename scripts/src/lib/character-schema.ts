@@ -34,6 +34,8 @@ export interface CharacterChrome {
     readonly bodyPlan?: BodyPlan;
     /** See-through body (an ice-clear gelatinous cube): pale parts become glass. */
     readonly translucent?: boolean;
+    /** The outside image an accepted portrait was imported from, instead of a ComfyUI seed. */
+    readonly imported?: string;
   };
   readonly history?: ReadonlyArray<string>;
 }
@@ -66,6 +68,7 @@ const chromeSchema = z.strictObject({
       seed: z.number().int().nonnegative().exactOptional(),
       bodyPlan: z.enum(BODY_PLANS).exactOptional(),
       translucent: z.boolean().exactOptional(),
+      imported: text.exactOptional(),
     })
     .exactOptional(),
   history: z.array(z.string()).exactOptional(),

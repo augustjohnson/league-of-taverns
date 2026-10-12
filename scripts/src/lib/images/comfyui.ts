@@ -101,6 +101,30 @@ export class ComfyUi {
   }
 
   /**
+   * Cut the subject out of an outside image with the style's background
+   * removal model; returns an RGBA PNG whose background is transparent.
+   */
+  async cutout(style: ImageStyle, png: Uint8Array, name: string): Promise<Uint8Array> {
+    const form = new FormData();
+    form.append('image', new Blob([png], { type: 'image/png' }), name);
+    form.append('overwrite', 'true');
+    const uploaded = (await (await this.fetch('/upload/image', { method: 'POST', body: form })).json()) as { name?: string; subfolder?: string };
+    if (typeof uploaded.name !== 'string') throw new Error(`ComfyUI upload failed: ${JSON.stringify(uploaded)}`);
+    const image = uploaded.subfolder ? `${uploaded.subfolder}/${uploaded.name}` : uploaded.name;
+    const graph: Graph = {
+      load: { class_type: 'LoadImage', inputs: { image } },
+      cutoutModel: { class_type: 'LoadBackgroundRemovalModel', inputs: { bg_removal_name: style.model.backgroundRemoval } },
+      foreground: { class_type: 'RemoveBackground', inputs: { bg_removal_model: ['cutoutModel', 0], image: ['load', 0] } },
+      background: { class_type: 'InvertMask', inputs: { mask: ['foreground', 0] } },
+      rgba: { class_type: 'JoinImageWithAlpha', inputs: { image: ['load', 0], alpha: ['background', 0] } },
+      save: { class_type: 'SaveImage', inputs: { filename_prefix: 'league-of-taverns/import/cutout', images: ['rgba', 0] } },
+    };
+    const queued = (await this.json('/prompt', { prompt: graph })) as { prompt_id?: string };
+    if (typeof queued.prompt_id !== 'string') throw new Error(`ComfyUI rejected the cutout graph: ${JSON.stringify(queued)}`);
+    return this.waitForImage(queued.prompt_id);
+  }
+
+  /**
    * Queue renders, wait for each, and return its PNG bytes in request order.
    * `onDone` gets each image as soon as it finishes, so a long batch can save
    * as it goes and survive a crash part-way.

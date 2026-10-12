@@ -12,7 +12,8 @@ import { framingProblems } from '../src/lib/images/framing';
 import type { Edge } from '../src/lib/images/framing';
 import { PixelateError, checkSprite, pixelate } from '../src/lib/images/pixelate';
 import type { PixelateOptions } from '../src/lib/images/pixelate';
-import { PngError, decodePng, encodeIndexedPng } from '../src/lib/images/png';
+import { PngError, decodePng, encodeIndexedPng, encodeRgbaPng } from '../src/lib/images/png';
+import { fitToCanvas } from '../src/lib/images/resample';
 import type { RgbaImage } from '../src/lib/images/png';
 import {
   CREATURE_SIZES,
@@ -285,6 +286,35 @@ describe('framing', () => {
       ),
     );
     expect(framingProblems(sprite, { ...rules, counter: 1 })).toEqual([]);
+  });
+});
+
+describe('import fitting', () => {
+  it('trims, scales inside the margins and places the figure bottom-centre', () => {
+    // A 40×20 opaque block in the middle of a 100×100 transparent image.
+    const src: RgbaImage = {
+      width: 100,
+      height: 100,
+      data: Uint8Array.from({ length: 100 * 100 * 4 }, (_, i) => {
+        const p = i >> 2;
+        const [x, y] = [p % 100, Math.floor(p / 100)];
+        return x >= 30 && x < 70 && y >= 40 && y < 60 ? (i % 4 === 3 ? 255 : 120) : 0;
+      }),
+    };
+    const fitted = fitToCanvas(src, 64, 80, { side: 4, top: 8 });
+    const opaque = (x: number, y: number) => fitted.data[(y * 64 + x) * 4 + 3]! > 127;
+    // Width-limited: 56 wide (64 - 2×4), 28 tall, flush with the bottom.
+    expect(opaque(4, 79)).toBe(true);
+    expect(opaque(59, 79)).toBe(true);
+    expect(opaque(3, 79)).toBe(false);
+    expect(opaque(60, 79)).toBe(false);
+    expect(opaque(30, 52)).toBe(true);
+    expect(opaque(30, 51)).toBe(false);
+  });
+
+  it('round-trips an RGBA PNG', () => {
+    const img: RgbaImage = { width: 2, height: 1, data: Uint8Array.from([1, 2, 3, 4, 250, 251, 252, 253]) };
+    expect(decodePng(encodeRgbaPng(img)).data).toEqual(img.data);
   });
 });
 
