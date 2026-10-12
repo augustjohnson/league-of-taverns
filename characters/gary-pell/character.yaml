@@ -14,5 +14,5 @@ chrome:
     prompt: grey-green zombie man in a stained grey wool tunic, missing his left ear, ink-stained fingers holding a dented pewter tankard, (dead-eyed polite smile:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 277533076
+    imported: gary-pell-s701.png
   height: 5.9

@@ -14,5 +14,5 @@ chrome:
     prompt: ash-grey dwarf with a long beard braided into tight knots, a quill pen tucked into the beard and an iron helm, (bitter permanent scowl:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 560466621
+    imported: grimbold-s703.png
   height: 4.3

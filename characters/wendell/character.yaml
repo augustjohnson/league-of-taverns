@@ -15,5 +15,5 @@ chrome:
     bodyPlan: object
     translucent: true
     path: portrait.png
-    seed: 275686928
+    seed: 275686925
   height: 10

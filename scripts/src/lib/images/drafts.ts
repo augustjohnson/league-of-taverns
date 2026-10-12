@@ -171,7 +171,7 @@ export function stagedPaths(target: TargetKey, seed: number, root: RepoRoot = RE
  */
 export function candidateProblems(target: DraftTarget, sprite: Uint8Array, style: ImageStyle, render: Uint8Array): string[] {
   if (target.kind !== 'portrait' || target.size === undefined) return [];
-  if (style.mode === 'painted') return paintedProblems(decodePng(render), paintedRules(style));
+  if (style.mode === 'painted') return paintedProblems(decodePng(render), paintedRules(style, target.bodyPlan));
   return framingProblems(decodePng(sprite), framingRules(style, shapeOfTarget(target)!));
 }
 
@@ -289,7 +289,7 @@ export function storedImageProblems(
   style: ImageStyle,
 ): string[] {
   if (style.mode === 'painted') {
-    return kind === 'cover' ? checkPainted(image, style.painted.cover.render) : checkPainted(image, 'portrait', paintedRules(style));
+    return kind === 'cover' ? checkPainted(image, style.painted.cover.render) : checkPainted(image, 'portrait', paintedRules(style, shape?.plan));
   }
   return checkSprite(image, outputSize(style, kind, shape), paletteOf(style, kind), glassAlpha(style, kind, translucent));
 }

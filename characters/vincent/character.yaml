@@ -14,5 +14,5 @@ chrome:
     prompt: translucent pale-blue ghost man with a droopy mustache, holding a wilted flower, (mournful puppy-dog eyes:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 172026792
+    imported: vincent-s702.png
   height: 6

@@ -14,5 +14,5 @@ chrome:
     prompt: grey-furred ape with a scarred upper lip, in a moth-eaten black academic gown and a monocle on a chain, (pompous lecturing frown:1.3)
     bodyPlan: beast
     path: portrait.png
-    seed: 849778324
+    imported: professor-albright-s701.png
   height: 5.5

@@ -654,6 +654,8 @@ describe('paint', () => {
     expect(paintedProblems(rectRender(100, 200, [[30, 20, 40, 180, RUST]]), rules)).toEqual(['is cut off at the bottom (40 pixels on the edge)']);
     expect(paintedProblems(rectRender(100, 200, [[30, 20, 40, 40, RUST]]), rules)[0]).toMatch(/too small in the frame/);
     expect(paintedProblems(rectRender(100, 200, [[5, 20, 40, 160, RUST], [55, 20, 40, 160, RUST]]), rules)[0]).toMatch(/more than one figure/);
+    // A swarm is many shapes by design.
+    expect(paintedProblems(rectRender(100, 200, [[5, 20, 40, 160, RUST], [55, 20, 40, 160, RUST]]), paintedRules(painted, 'swarm'))).toEqual([]);
     expect(paintedProblems(rectRender(100, 200, [[30, 20, 40, 160, [120, 120, 120]]]), rules)[0]).toMatch(/greyscale/);
     expect(paintedProblems(rectRender(10, 10, []), rules)).toEqual(['is empty: nothing survived the cutout']);
   });

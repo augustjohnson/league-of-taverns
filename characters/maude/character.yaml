@@ -14,5 +14,5 @@ chrome:
     prompt: brown-feathered owlbear with huge amber eyes, a cracked beak tip and a heart tattoo on one arm, (overjoyed beaming face:1.3)
     bodyPlan: beast
     path: portrait.png
-    seed: 327082643
+    imported: maude-s721.png
   height: 8

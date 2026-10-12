@@ -14,5 +14,5 @@ chrome:
     prompt: gaunt pale-grey ghoul with long yellow nails, a stained linen bib and gravy on his chin, (ravenous drooling grin:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 368000613
+    imported: lou-varga-s703.png
   height: 5.8

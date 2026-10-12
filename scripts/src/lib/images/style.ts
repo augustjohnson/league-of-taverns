@@ -392,8 +392,12 @@ export function pixelViewOptions(style: ImageStyle, name: string, shownFt: numbe
   };
 }
 
-/** Painted mode: the checks a portrait render must pass to be scaled onto the stage (./paint.ts). */
-export function paintedRules(style: ImageStyle): PaintedRules {
+/**
+ * Painted mode: the checks a portrait render must pass to be scaled onto the
+ * stage (./paint.ts). A swarm is many small shapes by design, so it skips the
+ * one-figure check.
+ */
+export function paintedRules(style: ImageStyle, plan: BodyPlan = 'humanoid'): PaintedRules {
   const { tolerance, minFill } = style.painted.portrait;
-  return { tolerance, minFill, minMainShare: style.portrait.minMainShare, minChroma: style.portrait.minChroma };
+  return { tolerance, minFill, minMainShare: plan === 'swarm' ? 0 : style.portrait.minMainShare, minChroma: style.portrait.minChroma };
 }

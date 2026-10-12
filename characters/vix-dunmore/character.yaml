@@ -14,5 +14,5 @@ chrome:
     prompt: small rust-red kobold with a chipped left horn and a brass ring through one nostril, wearing a battered felt hat, a ledger under one arm, (flat businesslike stare:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 341061045
+    imported: vix-dunmore-s703.png
   height: 2.5
