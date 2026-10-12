@@ -6,8 +6,8 @@
 # Season-specific mechanics (modifiers) live in seasons/<id>/pool.yaml, not here.
 
 id: bruno-the-bruiser
-base: ogre                # Open5e slug, resolved against each season's pinned snapshot
-status: active            # active | retired
+base: ogre # Open5e slug, resolved against each season's pinned snapshot
+status: active # active | retired
 debut: season-01
 
 chrome:
@@ -17,9 +17,12 @@ chrome:
   tagline: Has never once used the door.
   backstory: backstory.md
   portrait:
-    status: none          # none | prompt | draft | final
+    status: draft # none | prompt | draft | final
+    # The subject only; content/images/style.yaml adds the style. docs/images.md.
     prompt: >-
-      A hulking, good-natured ogre in a too-small tavern apron, holding a
-      splintered barrel stave like a club, warm lantern light, painterly.
-    # path: set once image storage is decided (docs/decisions.md D-10)
-  history: []             # optional cosmetic notes per season, e.g. "Season 1: carried the Gilded Flagon"
+      hulking green-skinned ogre with small tusks and a notch missing from his left ear, in a too-small brown leather tavern apron, (friendly lopsided grin:1.3)
+    bodyPlan: humanoid
+    path: portrait.png
+    seed: 723
+  history: [] # optional cosmetic notes per season, e.g. "Season 1: carried the Gilded Flagon"
+  height: 9.5

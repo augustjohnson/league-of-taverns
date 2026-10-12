@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: gary-pell
+base: zombie
+status: active
+debut: season-01
+chrome:
+  name: Gary Pell
+  epithet: from Accounting
+  tagline: Died at his desk in 1102. Has not missed a day since.
+  portrait:
+    status: draft
+    prompt: grey-green zombie man in a stained grey wool tunic, missing his left ear, ink-stained fingers holding a dented pewter tankard, (dead-eyed polite smile:1.3)
+    bodyPlan: humanoid
+    path: portrait.png
+    seed: 277533076
+  height: 5.9

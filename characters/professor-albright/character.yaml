@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: professor-albright
+base: ape
+status: active
+debut: season-01
+chrome:
+  name: Professor Albright
+  epithet: Tenured
+  tagline: Lectures on decorum. Throws dung at anyone who asks a question.
+  portrait:
+    status: draft
+    prompt: grey-furred ape with a scarred upper lip, in a moth-eaten black academic gown and a monocle on a chain, (pompous lecturing frown:1.3)
+    bodyPlan: beast
+    path: portrait.png
+    seed: 849778324
+  height: 5.5

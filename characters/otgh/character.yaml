@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: otgh
+base: otyugh
+status: active
+debut: season-01
+chrome:
+  name: Ö'tʰǧh
+  epithet: Sanitation
+  tagline: Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.
+  portrait:
+    status: draft
+    prompt: lumpy brown three-legged otyugh with a single eyestalk and a rotten cabbage leaf draped on its head, (proud gap-toothed grin:1.3)
+    bodyPlan: beast
+    path: portrait.png
+    seed: 727755527
+  height: 6

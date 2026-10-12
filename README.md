@@ -22,6 +22,7 @@ mission, and the season table ranks taverns by total loot.
 | [docs/decisions.md](docs/decisions.md) | Open decisions, plus every difference from the earlier specs |
 | [docs/lore.md](docs/lore.md) | Story frame: barkeeps, sponsoring gods, loot, and where story touches the rules |
 | [docs/glossary.md](docs/glossary.md) | Terms |
+| [docs/images.md](docs/images.md) | Pixel-art portraits and mission covers: style, `draft-images`, local ComfyUI setup |
 | [docs/specs/](docs/specs/) | Earlier specs 00–06. Superseded where decisions.md says so |
 | [TODO.md](TODO.md) | Workstreams and tasks, one subagent per workstream |
 
@@ -66,15 +67,16 @@ engine/src/          pure game engine (no I/O)
 engine/test/
 bots/                draft / lineup / waiver strategies
 scripts/             the I/O edge: snapshot, validate, draft-missions, difficulty-report,
-                     draft-chrome, lock-check, seal, reveal, apply-command, run-week,
-                     offseason, publish
+                     draft-chrome, draft-images, lock-check, seal, reveal, apply-command,
+                     run-week, offseason, publish
 sims/                mock-season runner + balance report (output git-ignored)
   src/playground/      browser playground: one HTML page running the real engine and
                        bots. Unlike explorer/, it may import the engine.
 data/open5e/         raw pinned snapshots + manifest
-characters/<id>/     character.yaml (id, base, chrome, status) + backstory.md
+characters/<id>/     character.yaml (id, base, chrome, status) + backstory.md + portrait.png
 seasons/season-01/   config, managers, schedule, pool, missions, chrome, events
 content/prompts/     LLM prompt templates (missions, chrome)
+content/images/      style.yaml: the fixed image style (docs/images.md)
 explorer/            placeholder, out of scope
 docs/
 .github/             issue forms, workflows

@@ -29,8 +29,11 @@ must never state or decide a mechanical fact.
 3. For every battle node: `win` and `lose` beats, plus an optional `enter`.
    `lose` ends the mission, so write it as an ending.
 4. For every end node: an `outro`.
-5. Optional: `imagePrompts.cover`, one sentence describing an illustration,
-   with no names of real artists, brands, or trademarked settings.
+5. Optional: `imagePrompts.cover`, one phrase describing the place for a wide
+   banner: landmarks, weather, time of day, sky. Only the place: no people,
+   creatures or party members, and no style words ("painterly", "pixel art"),
+   because a fixed style is added later. No names of real artists, brands, or
+   trademarked settings.
 
 Every variant must read naturally whatever path led to it.
 

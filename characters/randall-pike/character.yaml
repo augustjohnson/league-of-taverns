@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: randall-pike
+base: satyr
+status: active
+debut: season-01
+chrome:
+  name: Randall Pike
+  epithet: Wedding Guest
+  tagline: Has attended four hundred weddings. Was invited to none.
+  portrait:
+    status: draft
+    prompt: curly-haired satyr with one curled horn and one broken stub, a wreath of wilted flowers and a tin whistle in his mouth, (cheeky wink:1.3)
+    bodyPlan: humanoid
+    path: portrait.png
+    seed: 989365660
+  height: 5.6

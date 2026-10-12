@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: nell-malone
+base: skeleton
+status: active
+debut: season-01
+chrome:
+  name: Nell Malone
+  epithet: the Lightweight
+  tagline: Cannot hold her drink. It passes straight through. Orders another.
+  portrait:
+    status: draft
+    prompt: yellowed skeleton with a cracked skull patched with a copper plate and beer foam dripping through its ribcage, (cheerful hollow grin:1.3)
+    bodyPlan: humanoid
+    path: portrait.png
+    seed: 119581666
+  height: 5.5

@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: ghhurzh
+base: dretch
+status: active
+debut: season-01
+chrome:
+  name: Ghh'ŭrzh
+  epithet: the Intern
+  tagline: Fired from the Abyss for incompetence, which is difficult to arrange.
+  portrait:
+    status: draft
+    prompt: pot-bellied grey demon with one snapped-off horn and a crooked parchment name tag pinned to his chest, (nervous sweaty grin:1.3)
+    bodyPlan: humanoid
+    path: portrait.png
+    seed: 780276509
+  height: 4

@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: shag
+base: rug-of-smothering
+status: active
+debut: season-01
+chrome:
+  name: Shag
+  epithet: Origin Unknown
+  tagline: Has a stain nobody explains. Nobody asks twice.
+  portrait:
+    status: draft
+    prompt: shaggy burnt-orange rug with tasselled edges, a large suspicious brown stain and two woven eyes, (sly lurking stare:1.3)
+    bodyPlan: object
+    path: portrait.png
+    seed: 823958789
+  height: 6

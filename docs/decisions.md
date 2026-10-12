@@ -309,10 +309,15 @@ third-party documents under OGL 1.0a. *Default:* v1, **SRD 5.1 only**
 eighths (`CrEighths`). Floats would make budget checks with 1/8, 1/4 and 1/2
 fragile.
 
-**D-10 Image storage: OPEN.** Git LFS (in the repo, quota-limited, PR-able)
-vs an external bucket (cheap and scalable, but a second system and links can
-rot). Never plain-git binaries. *Default:* none. Portraits stay at
-`status: prompt`. *Blocks:* T8.7.
+**D-10 Image storage: DECIDED (2026-10-11).** Plain git, because the images
+are tiny: palette-locked pixel art, 112×144 portraits at
+`characters/<id>/portrait.png` and 216×72 covers at
+`seasons/<s>/chrome/<mission>.cover.png`, about 2–3 KB each. `validate`
+enforces size, palette and a 32 KB cap per file, so nothing large slips in.
+Raw renders and candidates are never committed (`.image-drafts/` is
+git-ignored). This replaces "never plain-git binaries". LFS or a bucket only
+comes back if the style moves to large painted images. Style and pipeline:
+[images.md](images.md). *Unblocks:* T8.7.
 
 **D-33 Code license: OPEN.** No LICENSE file yet. Content license interplay:
 SRD 5.1 is CC-BY-4.0, and chrome is original. Choose a code license (MIT?)

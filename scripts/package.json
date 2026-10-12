@@ -14,6 +14,7 @@
     "draft-missions": "tsx src/draft-missions.ts",
     "difficulty-report": "tsx src/difficulty-report.ts",
     "draft-chrome": "tsx src/draft-chrome.ts",
+    "draft-images": "tsx src/draft-images.ts",
     "lock-check": "tsx src/lock-check.ts",
     "seal": "tsx src/seal.ts",
     "reveal": "tsx src/reveal.ts",

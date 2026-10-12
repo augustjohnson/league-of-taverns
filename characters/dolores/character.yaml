@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: dolores
+base: mimic
+status: active
+debut: season-01
+chrome:
+  name: Dolores
+  epithet: the Chest
+  tagline: Does a flawless treasure chest, a passable barrel and an upsetting wardrobe.
+  portrait:
+    status: draft
+    prompt: brown wooden treasure chest with brass corners, one corner missing, a long pink tongue and red lipstick on jagged teeth, (seductive toothy grin:1.3)
+    bodyPlan: object
+    path: portrait.png
+    seed: 754637424
+  height: 3

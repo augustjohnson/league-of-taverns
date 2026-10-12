@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: vrraal
+base: troll
+status: active
+debut: season-01
+chrome:
+  name: Vʁʁaał
+  epithet: Can't Stay Down
+  tagline: Has died nine times this season. Attended every post-match party.
+  portrait:
+    status: draft
+    prompt: lanky mossy-green troll with a long hooked nose, bandages and one smaller regrowing arm, (cheerful unbothered grin:1.3)
+    bodyPlan: humanoid
+    path: portrait.png
+    seed: 575506690
+  height: 9

@@ -7,6 +7,8 @@
  */
 import { kebabIdSchema } from '@league-of-taverns/engine';
 import { z } from 'zod';
+import { BODY_PLANS } from './images/body-plans';
+import type { BodyPlan } from './images/body-plans';
 import type { AssertTrue, SchemaMatches } from '@league-of-taverns/engine';
 
 export type CharacterStatus = 'active' | 'retired';
@@ -18,13 +20,24 @@ export interface CharacterChrome {
   readonly epithet?: string;
   readonly pronouns?: { readonly subject: string; readonly object: string; readonly possessive: string };
   readonly tagline?: string;
+  /** Standing height in feet. Places the portrait at the bar (docs/images.md § Heights). */
+  readonly height?: number;
   /** Path relative to the character's folder, e.g. `backstory.md`. */
   readonly backstory?: string;
   readonly portrait?: {
     readonly status: PortraitStatus;
+    /** The subject only (who, wearing what, expression); content/images/style.yaml adds the style. */
     readonly prompt?: string;
-    /** Storage location, once decided (docs/decisions.md D-10). */
+    /** The accepted image, relative to the character's folder: `portrait.png` (D-10). */
     readonly path?: string;
+    /** ComfyUI seed of the accepted image, so it can be re-rendered. */
+    readonly seed?: number;
+    /** What shape the character is, for framing (docs/images.md). Default humanoid. */
+    readonly bodyPlan?: BodyPlan;
+    /** See-through body (an ice-clear gelatinous cube): pale parts become glass. */
+    readonly translucent?: boolean;
+    /** The outside image an accepted portrait was imported from, instead of a ComfyUI seed. */
+    readonly imported?: string;
   };
   readonly history?: ReadonlyArray<string>;
 }
@@ -48,12 +61,17 @@ const chromeSchema = z.strictObject({
   epithet: text.exactOptional(),
   pronouns: z.strictObject({ subject: text, object: text, possessive: text }).exactOptional(),
   tagline: text.exactOptional(),
+  height: z.number().positive().max(100).exactOptional(),
   backstory: text.exactOptional(),
   portrait: z
     .strictObject({
       status: z.enum(['none', 'prompt', 'draft', 'final']),
       prompt: text.exactOptional(),
       path: text.exactOptional(),
+      seed: z.number().int().nonnegative().exactOptional(),
+      bodyPlan: z.enum(BODY_PLANS).exactOptional(),
+      translucent: z.boolean().exactOptional(),
+      imported: text.exactOptional(),
     })
     .exactOptional(),
   history: z.array(z.string()).exactOptional(),

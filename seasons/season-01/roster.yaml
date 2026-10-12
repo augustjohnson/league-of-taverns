@@ -1,0 +1,665 @@
+# DRAFT roster pass for the season-01 pool: one row per character, for
+# checking variety before the detail pass writes characters/<id>/.
+# Not read by any script yet. Bases are Open5e slugs in open5e-v1-2026-10.
+#
+#   size:     the base's creature size; it sets the portrait canvas
+#             (content/images/style.yaml portrait.sizes)
+#   hook:     the joke, played straight
+#   look:     the portrait's subject text: colour, identifying marks, expression
+#   name:     creatures with a language other than Common are named in it;
+#             animals and the mindless keep the names tavern regulars gave them
+#   bodyPlan: portrait framing: humanoid | beast | winged | blob | swarm | object | plant | multihead
+#   translucent: see-through body; its pale parts become glass
+
+season: season-01
+status: draft
+characters:
+
+  # ── CR 1/8 ──────────────────────────────────────────────────────────────
+  - id: vix-dunmore
+    base: kobold
+    size: small
+    name: Vix Dunmore
+    epithet: the Landlord
+    hook: Has declared ownership of eleven caves. Collects rent from the bats.
+    look: small rust-red kobold with a chipped left horn and a brass ring through one nostril, wearing a battered felt hat, a ledger under one arm, (flat businesslike stare:1.3)
+    bodyPlan: humanoid
+    height: 2.5
+
+  - id: mott
+    base: giant-rat-diseased
+    size: small
+    name: Mott
+    epithet: Patient Zero
+    hook: The first recorded case of four separate illnesses. Maintains he feels fine.
+    look: mangy grey giant rat with bald patches, a torn left ear and a runny red nose, (calm unbothered expression:1.3)
+    bodyPlan: beast
+    height: 1.5
+
+  - id: tiffany
+    base: stirge
+    size: tiny
+    name: Tiffany
+    epithet: the Regular
+    hook: Drinks from the same three people every week. They have stopped complaining.
+    look: brown leathery bat-winged stirge with a long needle proboscis, one milky white eye and a tiny pearl stud in one ear, (patient half-lidded gaze:1.3)
+    bodyPlan: winged
+    height: 1
+
+  - id: deborah
+    base: mule
+    size: medium
+    name: Deborah
+    epithet: Chief Steward
+    hook: Has refused every order she has ever been given, in writing.
+    look: grey mule with a white blaze, a notch cut in her right ear and a red cloth band tied around one foreleg, (deeply unimpressed stare:1.3)
+    bodyPlan: beast
+    height: 5.5
+
+  - id: carmichael
+    base: giant-crab
+    size: medium
+    name: Carmichael
+    epithet: Sideways
+    hook: Has never moved forward. Describes this as a strategy, when asked and when not.
+    look: big orange crab with one oversized barnacle-crusted claw, a cracked shell plate and a knotted cloth headband, (blank beady stare:1.3)
+    bodyPlan: beast
+    height: 3
+
+  - id: gus-tallow
+    base: bandit
+    size: medium
+    name: Gus Tallow
+    epithet: Two Pockets
+    hook: Owns two pockets. Both were stolen, off different trousers.
+    look: stubbly sunburnt man with a crooked broken nose, an eyepatch worn up on his forehead and a mismatched patched vest, (shifty sideways glance:1.3)
+    bodyPlan: humanoid
+    height: 5.8
+
+  - id: lady-constance-fopsworth
+    base: noble
+    size: medium
+    name: Lady Constance Fopsworth
+    epithet: the Expense Account
+    hook: Invoices the tavern after every fight. Line items include "emotional armour".
+    look: pale noblewoman in a tall powdered wig with a painted beauty mark, holding a lorgnette, in a lace ruff collar, (nose-in-the-air disdain:1.3)
+    bodyPlan: humanoid
+    height: 5.4
+
+  # ── CR 1/4 ──────────────────────────────────────────────────────────────
+  - id: gizzik
+    base: goblin
+    size: small
+    name: Gizzik
+    epithet: Rookie of the Year
+    hook: Made his own trophy from a bucket. Has not taken it off, including to sleep.
+    look: scrawny green goblin with huge ears, three rings in one ear, a dented tin bucket hung around his neck like a medal, (proud gap-toothed grin:1.3)
+    bodyPlan: humanoid
+    height: 3.5
+
+  - id: the-ratsby-collective
+    base: swarm-of-rats
+    size: medium
+    name: The Ratsby Collective
+    hook: Holds a binding referendum before every step. Turnout is excellent.
+    look: heap of brown rats piled into the rough shape of a face, one white rat sitting on top, (many solemn beady eyes:1.3)
+    bodyPlan: swarm
+    height: 3
+
+  - id: gary-pell
+    base: zombie
+    size: medium
+    name: Gary Pell
+    epithet: from Accounting
+    hook: Died at his desk in 1102. Has not missed a day since.
+    look: grey-green zombie man in a stained grey wool tunic, missing his left ear, ink-stained fingers holding a dented pewter tankard, (dead-eyed polite smile:1.3)
+    bodyPlan: humanoid
+    height: 5.9
+
+  - id: nell-malone
+    base: skeleton
+    size: medium
+    name: Nell Malone
+    epithet: the Lightweight
+    hook: Cannot hold her drink. It passes straight through. Orders another.
+    look: yellowed skeleton with a cracked skull patched with a copper plate and beer foam dripping through its ribcage, (cheerful hollow grin:1.3)
+    bodyPlan: humanoid
+    height: 5.5
+
+  - id: doug
+    base: pseudodragon
+    size: tiny
+    name: Doug
+    epithet: Fully Grown
+    hook: The size of a loaf of bread. Does not want to discuss loaves.
+    look: (tiny red dragon with scales:1.4), a torn left wing, a scar across his snout and a small studded leather collar, (tough-guy scowl:1.3)
+    bodyPlan: winged
+    height: 1.5
+
+  - id: wren-ashby
+    base: sprite
+    size: tiny
+    name: Wren Ashby
+    epithet: the Lifter
+    hook: Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.
+    look: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and small folded dragonfly wings, (fully clothed in a plain brown linen tunic:1.3), (intense focused stare:1.3)
+    bodyPlan: winged
+    height: 0.4
+
+  - id: mike
+    base: violet-fungus
+    size: medium
+    name: Mike
+    epithet: the Life of the Party
+    hook: Nobody remembers anything after he arrives. Everyone wakes up purple.
+    look: chunky violet mushroom with white spots, drooping tendrils and small round smoked-glass spectacles, (blissed-out lazy smile:1.3)
+    bodyPlan: plant
+    height: 5
+
+  - id: lenore
+    base: giant-frog
+    size: medium
+    name: Lenore
+    epithet: the Tongue
+    hook: Has caught flies, coins, a lute and, on two occasions, the bard.
+    look: fat green frog with a yellow throat, a gold hoop earring and a long pink tongue hanging out, (heavy-lidded smirk:1.3)
+    bodyPlan: beast
+    height: 2.5
+
+  - id: ghhurzh
+    base: dretch
+    size: small
+    name: "Ghh'ŭrzh"
+    epithet: the Intern
+    hook: Fired from the Abyss for incompetence, which is difficult to arrange.
+    look: pot-bellied grey demon with one snapped-off horn and a crooked parchment name tag pinned to his chest, (nervous sweaty grin:1.3)
+    bodyPlan: humanoid
+    height: 4
+
+  # ── CR 1/2 ──────────────────────────────────────────────────────────────
+  - id: gloria
+    base: gray-ooze
+    size: medium
+    name: Gloria
+    epithet: Aisle Four
+    hook: Has been mopped up eleven times. Comes back a little angrier each time.
+    look: glossy grey puddle of ooze with two eyes, an old mop head stuck in it and an overturned wooden bucket beside it, (smug smirk:1.3)
+    bodyPlan: blob
+    height: 2
+
+  - id: prudence
+    base: rust-monster
+    size: medium
+    name: Prudence
+    epithet: the Critic
+    hook: Rates every suit of armour she eats. Has never given more than two stars.
+    look: rust-brown insect-like rust monster with feathery antennae, one antenna bent, a white napkin tied as a bib, (sour unimpressed frown:1.3)
+    bodyPlan: beast
+    height: 5
+
+  - id: pierre
+    base: darkmantle
+    size: small
+    name: Pierre
+    epithet: Probably a Hat
+    hook: Hangs on hat racks. Is hurt when nobody tries him on.
+    look: black squid-like darkmantle draped over a head like a floppy beret, one tentacle tip curled, (shifty eyes peeking out:1.3)
+    bodyPlan: blob
+    height: 1.5
+
+  - id: hyekh-kaa
+    base: gnoll
+    size: medium
+    name: "Hyekh!k'ka'a"
+    epithet: Laughs First
+    hook: Has never finished a joke. Starts laughing at the setup.
+    look: spotted tan hyena-headed gnoll with a notched ear, a gold canine tooth and a loud striped vest, (wide-open howling laugh:1.3)
+    bodyPlan: humanoid
+    height: 7
+
+  - id: morga-thane
+    base: orc
+    size: medium
+    name: Morga Thane
+    epithet: the Poet
+    hook: Writes tender sonnets about the moon. Every one rhymes with "smash".
+    look: broad grey-green orc woman with a broken left tusk, a quill behind her ear and small round reading glasses, (dreamy wistful smile:1.3)
+    bodyPlan: humanoid
+    height: 6.2
+
+  - id: barb
+    base: black-bear
+    size: medium
+    name: Barb
+    epithet: the Duchess
+    hook: Controls every tavern bin within forty miles. Accepts tribute in pie crusts.
+    look: black bear with a white chest blaze, a crushed wicker bread basket worn as a crown and crumbs in her fur, (regal calm stare:1.3)
+    bodyPlan: beast
+    height: 6
+
+  - id: professor-albright
+    base: ape
+    size: medium
+    name: Professor Albright
+    epithet: Tenured
+    hook: Lectures on decorum. Throws dung at anyone who asks a question.
+    look: grey-furred ape with a scarred upper lip, in a moth-eaten black academic gown and a monocle on a chain, (pompous lecturing frown:1.3)
+    bodyPlan: beast
+    height: 5.5
+
+  - id: rocco
+    base: cockatrice
+    size: small
+    name: Rocco
+    epithet: the Collector
+    hook: Petrifies anything he likes and keeps it in his museum, which is a field.
+    look: scraggly rooster-lizard cockatrice with orange wattles, a bald patch on its neck and a chunky gold chain, (puffed-up proud stare:1.3)
+    bodyPlan: winged
+    height: 2
+
+  - id: randall-pike
+    base: satyr
+    size: medium
+    name: Randall Pike
+    epithet: Wedding Guest
+    hook: Has attended four hundred weddings. Was invited to none.
+    look: curly-haired satyr with one curled horn and one broken stub, a wreath of wilted flowers and a tin whistle in his mouth, (cheeky wink:1.3)
+    bodyPlan: humanoid
+    height: 5.6
+
+  # ── CR 1 ────────────────────────────────────────────────────────────────
+  - id: big-linda
+    base: brown-bear
+    size: large
+    name: Big Linda
+    epithet: Den Mother
+    hook: Hugs every teammate after every fight. The hugs have a body count.
+    look: (huge brown grizzly bear:1.4), (dark brown fur:1.2), a grey muzzle, (a plain white cloth apron tied around her chest:1.2) and a wooden spoon tucked behind her ear, (warm motherly smile:1.3)
+    bodyPlan: beast
+    height: 8
+
+  - id: sir-nobody
+    base: animated-armor
+    size: medium
+    name: Sir Nobody
+    epithet: the Empty Suit
+    hook: There is no one inside. He has never been more sure of anything.
+    look: dented silver plate armour with a deep dent in the breastplate, the visor open on darkness and a limp blue plume, (puffed-out heroic pose:1.2)
+    bodyPlan: humanoid
+    height: 6
+
+  - id: lou-varga
+    base: ghoul
+    size: medium
+    name: Lou Varga
+    epithet: Banned
+    hook: Banned from every all-you-can-eat in the realm for taking the phrase literally.
+    look: gaunt pale-grey ghoul with long yellow nails, a stained linen bib and gravy on his chin, (ravenous drooling grin:1.3)
+    bodyPlan: humanoid
+    height: 5.8
+
+  - id: hoss
+    base: giant-toad
+    size: large
+    name: Hoss
+    epithet: the Swallower
+    hook: Has swallowed three teammates. They recovered. None will discuss it.
+    look: enormous brown warty toad with a white scar across his back and a boot sticking out of his mouth, (sleepy contented expression:1.3)
+    bodyPlan: beast
+    height: 5
+
+  - id: vera-shrike
+    base: harpy
+    size: medium
+    name: Vera Shrike
+    epithet: Karaoke
+    hook: Has won every singing contest she has entered. The judges left early each time.
+    look: bird-woman harpy with wild teal feathered hair and a chipped beak, holding a battered brass speaking trumpet, (mid-song open mouth:1.3)
+    bodyPlan: winged
+    height: 5.6
+
+  - id: mortimer
+    base: imp
+    size: tiny
+    name: Mortimer
+    epithet: Notary
+    hook: Requires a signed form before he will pass the salt.
+    look: small red imp with bat wings and one horn capped in brass, holding a quill and a wax seal stamp, (fussy glare:1.3)
+    bodyPlan: winged
+    height: 2
+
+  - id: patsy
+    base: giant-hyena
+    size: large
+    name: Patsy
+    epithet: the Laugher
+    hook: Laughs at funerals, apologies and her own injuries. Mostly her own injuries.
+    look: big spotted hyena with a torn left ear and tears of laughter running down her face, (uncontrollable cackle:1.3)
+    bodyPlan: beast
+    height: 4
+
+  - id: grimbold
+    base: duergar
+    size: medium
+    name: Grimbold
+    epithet: the Complaint
+    hook: Has written a strongly worded letter to every mountain he has lived under.
+    look: ash-grey dwarf with a long beard braided into tight knots, a quill pen tucked into the beard and an iron helm, (bitter permanent scowl:1.3)
+    bodyPlan: humanoid
+    height: 4.3
+
+  - id: vincent
+    base: specter
+    size: medium
+    name: Vincent
+    epithet: Your Ex
+    hook: Shows up uninvited at three in the morning, through the wall. Cannot speak. Stays anyway.
+    look: translucent pale-blue ghost man with a droopy mustache, holding a wilted flower, (mournful puppy-dog eyes:1.3)
+    bodyPlan: humanoid
+    height: 6
+
+  # ── CR 2 ────────────────────────────────────────────────────────────────
+  - id: bruno-the-bruiser # existing character
+    base: ogre
+    size: large
+    name: Bruno
+    epithet: the Bruiser
+    hook: Has never once used the door.
+    look: hulking green-skinned ogre with small tusks and a notch missing from his left ear, in a too-small brown leather tavern apron, (friendly lopsided grin:1.3)
+    bodyPlan: humanoid
+    height: 9.5
+
+  - id: wendell
+    base: gelatinous-cube
+    size: large
+    name: Wendell
+    epithet: Lost and Found
+    hook: Contains three hundred items, sixty coins and a man named Phil, who says he's fine.
+    look: (a big perfectly clear gelatinous cube like a giant ice cube:1.4), faintly green, sharp straight edges, (a leather boot, gold coins and a startled bearded man's face frozen inside it:1.3)
+    bodyPlan: object
+    translucent: true # clear like ice: see-through parts become glass
+    height: 10
+
+  - id: dolores
+    base: mimic
+    size: medium
+    name: Dolores
+    epithet: the Chest
+    hook: Does a flawless treasure chest, a passable barrel and an upsetting wardrobe.
+    look: brown wooden treasure chest with brass corners, one corner missing, a long pink tongue and red lipstick on jagged teeth, (seductive toothy grin:1.3)
+    bodyPlan: object
+    height: 3
+
+  - id: babble
+    base: gibbering-mouther
+    size: medium
+    name: Babble
+    epithet: the Group Chat
+    hook: Forty mouths, forty opinions. None of them has read the plan.
+    look: lumpy pink mass of flesh covered in eyes and mouths, one mouth with a gold tooth, (every mouth talking at once:1.3)
+    bodyPlan: blob
+    height: 3
+
+  - id: helga-dunn
+    base: berserker
+    size: medium
+    name: Helga Dunn
+    epithet: Hall of Fame
+    hook: Has started a brawl in every tavern on the continent. Finished most of them herself.
+    look: ruddy blonde woman with thick braids, a missing front tooth and a scar through one eyebrow, holding a broken bottle, (feral grin:1.3)
+    bodyPlan: humanoid
+    height: 6.1
+
+  - id: shag
+    base: rug-of-smothering
+    size: large
+    name: Shag
+    epithet: Origin Unknown
+    hook: Has a stain nobody explains. Nobody asks twice.
+    look: shaggy burnt-orange rug with tasselled edges, a large suspicious brown stain and two woven eyes, (sly lurking stare:1.3)
+    bodyPlan: object
+    height: 6
+
+  - id: ronnie-vermicelli
+    base: wererat
+    size: medium
+    name: Ronnie Vermicelli
+    epithet: Lounge Singer
+    hook: Changes at the full moon. Does a full set every time, stage or no stage.
+    look: rat-man wererat with slicked-back black hair and a chipped front incisor, in a gaudy maroon ruffled shirt open at the collar, (crooning eyes-closed smile:1.3)
+    bodyPlan: humanoid
+    height: 5.7
+
+  - id: krrth
+    base: gargoyle
+    size: medium
+    name: Kʀʀṭh
+    epithet: Never Convicted
+    hook: Suspect in forty-one break-ins. Every witness describes a statue.
+    look: grey stone gargoyle with one chipped horn, moss on his shoulders and folded wings, (sly guilty grin:1.3)
+    bodyPlan: winged
+    height: 6
+
+  - id: oakley
+    base: awakened-tree
+    size: huge
+    name: Oakley
+    epithet: the Rookie
+    hook: Three hundred years old and still the newest member of the team. Sensitive about it.
+    look: gnarled brown oak with a bark face, a bird's nest on its head and a carved heart with initials on its trunk, (shy hopeful smile:1.3)
+    bodyPlan: plant
+    height: 18
+
+  - id: herb
+    base: rhinoceros
+    size: large
+    name: Herb
+    epithet: the Speed Bump
+    hook: Cannot stop or turn. Has not been asked to do either.
+    look: grey rhinoceros with a chipped horn with a dented iron cooking pot stuck on his horn, (determined charging glare:1.3)
+    bodyPlan: beast
+    height: 6
+
+  - id: jenkins
+    base: will-o-wisp
+    size: tiny
+    name: Jenkins
+    epithet: Directions
+    hook: Gives directions to everyone, unprompted. Has never once been right.
+    look: glowing pale-blue orb of light with a smug little face, (helpful know-it-all smirk:1.3)
+    bodyPlan: blob
+    height: 1
+
+  # ── CR 3 ────────────────────────────────────────────────────────────────
+  - id: maude
+    base: owlbear
+    size: large
+    name: Maude
+    epithet: the Hugger
+    hook: Hugs everyone. The healers have asked her, formally, to stop.
+    look: brown-feathered owlbear with huge amber eyes, a cracked beak tip and a heart tattoo on one arm, (overjoyed beaming face:1.3)
+    bodyPlan: beast
+    height: 8
+
+  - id: mhruugh
+    base: minotaur
+    size: large
+    name: "Mhʀ'ūūgh"
+    epithet: Maze Specialist
+    hook: The league's leading expert on labyrinths. Gets lost in hallways.
+    look: hulking brown bull-headed minotaur with a gold nose ring and one sawn-off horn, (confused squinting frown:1.3)
+    bodyPlan: humanoid
+    height: 8.5
+
+  - id: stanley
+    base: basilisk
+    size: medium
+    name: Stanley
+    epithet: Undefeated
+    hook: Has never lost a staring contest. His opponents are now garden ornaments.
+    look: green eight-legged lizard with a scar along its jaw and smoked-glass spectacles pushed up on its head, (unblinking intense stare:1.3)
+    bodyPlan: beast
+    height: 3
+
+  - id: nobody-special
+    base: doppelganger
+    size: medium
+    name: Nobody Special
+    epithet: Literally Anyone
+    hook: Appears in every team portrait as a different person. Denies being in any of them.
+    look: grey smooth-skinned featureless humanoid wearing an obviously fake black mustache, (blank innocent expression:1.3)
+    bodyPlan: humanoid
+    height: 5.8
+
+  - id: uncle-amon
+    base: mummy
+    size: medium
+    name: Uncle Amon
+    epithet: Unravelling
+    hook: Four thousand years old. Still trailing linen behind him everywhere he goes.
+    look: dusty tan mummy with loose bandages trailing off one arm and one glowing green eye, (sheepish grin:1.3)
+    bodyPlan: humanoid
+    height: 5.9
+
+  - id: zhaal
+    base: hell-hound
+    size: medium
+    name: "Zh'aaʔl"
+    epithet: Good Boy (Allegedly)
+    hook: Fetches anything you throw. Sets it on fire first. Brings back the ashes.
+    look: black hell-hound with a white patch over one eye, flames curling from its mouth and a spiked red collar, (happy panting dog smile:1.3)
+    bodyPlan: beast
+    height: 4
+
+  - id: kevin
+    base: werewolf
+    size: medium
+    name: Kevin
+    epithet: Weekends Only
+    hook: Only turns when the full moon falls on a Saturday. Plans his whole life around it.
+    look: shaggy grey werewolf with reading glasses, in a patched wool nightshirt and nightcap, holding a clay mug of mead, (tired resigned expression:1.3)
+    bodyPlan: humanoid
+    height: 6.5
+
+  - id: auntie-grizelda
+    base: green-hag # spellcaster (1 of 4 allowed)
+    size: medium
+    name: Auntie Grizelda
+    epithet: Your Aunt
+    hook: Attends every family event uninvited, with a casserole nobody should eat.
+    look: green-skinned warty hag with a single long tooth, rag curls tied in her grey hair and a smoking clay pipe, (gossipy knowing smirk:1.3)
+    bodyPlan: humanoid
+    height: 5.4
+
+  # ── CR 4 ────────────────────────────────────────────────────────────────
+  - id: hrok-and-hrok
+    base: ettin
+    size: large
+    name: Hrök and Hrøk
+    epithet: the Coworkers
+    hook: Two heads, one body, and a twenty-year argument about whose turn it is to scratch.
+    look: (one giant with exactly two heads on one body:1.4), grey-skinned ettin, one bald head with an eyepatch and one with a ginger beard, turned toward each other mid-argument, (both heads yelling:1.3)
+    bodyPlan: multihead
+    height: 13
+
+  - id: pudding
+    base: black-pudding
+    size: large
+    name: Pudding
+    epithet: Dessert
+    hook: Looks like dessert. Eats like a siege engine.
+    look: glossy black blob of pudding with a single red cherry on top, (gleeful gooey grin:1.3)
+    bodyPlan: blob
+    height: 4
+
+  - id: kluu
+    base: chuul
+    size: large
+    name: "Ḱʟʟuu'ʘ"
+    epithet: Ill Repute
+    hook: Runs a dice game under every bridge in the league. Wins by holding the dice.
+    look: dark green lobster-like chuul with face tentacles, a gold tooth and a cracked claw, (shady dealmaker grin:1.3)
+    bodyPlan: beast
+    height: 8
+
+  - id: peanut
+    base: elephant
+    size: huge
+    name: Peanut
+    epithet: Remembers Everything
+    hook: Keeps a written list of everyone who has ever wronged her. The list has a second volume.
+    look: (close view of the head, ears and shoulders of a huge elephant with natural grey skin:1.4), one broken tusk and a tiny leather-bound journal tucked behind her ear, (narrow-eyed grudge-holding glare:1.3)
+    bodyPlan: beast
+    height: 11
+
+  # ── CR 5 ────────────────────────────────────────────────────────────────
+  - id: vrraal
+    base: troll
+    size: large
+    name: Vʁʁaał
+    epithet: Can't Stay Down
+    hook: Has died nine times this season. Attended every post-match party.
+    look: lanky mossy-green troll with a long hooked nose, bandages and one smaller regrowing arm, (cheerful unbothered grin:1.3)
+    bodyPlan: humanoid
+    height: 9
+
+  - id: thungk
+    base: hill-giant
+    size: huge
+    name: Thüŋk
+    epithet: Eats for Two
+    hook: Ate the opposing team's mascot, then their snacks, then their bench.
+    look: fat ruddy hill giant with a cauliflower ear and gravy stains down his tunic, holding a turkey leg, (greedy mouth-full grin:1.3)
+    bodyPlan: humanoid
+    height: 16
+
+  - id: pete
+    base: flesh-golem
+    size: medium
+    name: Pete
+    epithet: Some Assembly Required
+    hook: Built from eleven people. Four were left-handed, and it shows.
+    look: grey-skinned stitched flesh golem with mismatched arms, a bolt in his neck and one blue and one brown eye, (bewildered lopsided smile:1.3)
+    bodyPlan: humanoid
+    height: 8
+
+  - id: otgh
+    base: otyugh
+    size: large
+    name: "Ö'tʰǧh"
+    epithet: Sanitation
+    hook: Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.
+    look: lumpy brown three-legged otyugh with a single eyestalk and a rotten cabbage leaf draped on its head, (proud gap-toothed grin:1.3)
+    bodyPlan: beast # three legs and tentacles; blob's no-limbs rule would fight it
+    height: 6
+
+  # ── CR 6–8 ──────────────────────────────────────────────────────────────
+  - id: rhaa-baeh-skraa
+    base: chimera
+    size: large
+    name: Rhaa-Bǣh-Skʀaa
+    epithet: No Consensus
+    hook: Three heads. No agreement yet on direction, dinner or a name.
+    look: chimera with a tawny lion head, a white goat head with a broken horn and a red dragon head, all glaring at each other, (three heads bickering:1.3)
+    bodyPlan: multihead
+    height: 8
+
+  - id: mavis
+    base: medusa
+    size: medium
+    name: Mavis
+    epithet: Salon Owner
+    hook: Gives the worst haircuts in the realm. No client has complained, or moved, since.
+    look: green-skinned medusa with hissing snakes for hair tied up with ribbons and round smoked-glass spectacles, (bored gum-chewing smirk:1.3)
+    bodyPlan: humanoid
+    height: 5.8
+
+  - id: tony
+    base: tyrannosaurus-rex
+    size: huge
+    name: Tony
+    epithet: Can't Clap
+    hook: The most dangerous thing in the league. Defeated daily by doorknobs, high-fives and shirts.
+    look: huge green tyrannosaurus with a scarred snout and tiny arms straining toward a wooden tankard balanced on its own head, (frustrated toothy grimace:1.3)
+    bodyPlan: beast
+    height: 20

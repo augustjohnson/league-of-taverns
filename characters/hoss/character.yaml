@@ -1,0 +1,18 @@
+# Drafted from seasons/season-01/roster.yaml (roster pass). Schema: docs/schema.md § Character.
+# Still to come in the detail pass: pronouns, backstory.
+
+id: hoss
+base: giant-toad
+status: active
+debut: season-01
+chrome:
+  name: Hoss
+  epithet: the Swallower
+  tagline: Has swallowed three teammates. They recovered. None will discuss it.
+  portrait:
+    status: draft
+    prompt: enormous brown warty toad with a white scar across his back and a boot sticking out of his mouth, (sleepy contented expression:1.3)
+    bodyPlan: beast
+    path: portrait.png
+    seed: 740454966
+  height: 5
