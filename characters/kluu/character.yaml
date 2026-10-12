@@ -15,3 +15,4 @@ chrome:
     bodyPlan: beast
     path: portrait.png
     seed: 9000
+  height: 8

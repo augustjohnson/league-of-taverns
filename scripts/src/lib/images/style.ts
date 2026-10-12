@@ -51,6 +51,8 @@ const bodyPlan = z.strictObject({
 });
 
 const portraitSize = size.extend({
+  /** Render pixels per art pixel for this size, instead of pixelate.cell. */
+  cell: z.number().int().positive().exactOptional(),
   bleed: z.array(z.enum(EDGES)).exactOptional(),
   minFooting: z.number().min(0).max(1).exactOptional(),
   counter: z.number().int().nonnegative().exactOptional(),
@@ -77,6 +79,7 @@ const styleSchema = z.strictObject({
   portrait: z.strictObject({
     sizes: z.strictObject(Object.fromEntries(CREATURE_SIZES.map((s) => [s, portraitSize])) as Record<CreatureSize, typeof portraitSize>),
     counter: z.number().int().nonnegative(),
+    outline: z.boolean(),
     grade: z.strictObject({ contrast: z.number().positive(), saturation: z.number().nonnegative() }).exactOptional(),
     glass: z.strictObject({
       alpha: z.number().int().min(1).max(254),
@@ -122,14 +125,13 @@ export function loadImageStyle(root: RepoRoot = REPO_ROOT): ImageStyle {
   const result = styleSchema.safeParse(readYaml(stylePath(root), label));
   if (!result.success) throw issuesFailure(label, toSchemaIssues(result.error));
   const style = result.data;
-  const { cell } = style.pixelate;
-  const outputs: Array<[string, Size]> = [
-    ...CREATURE_SIZES.map((s): [string, Size] => [`portrait.sizes.${s}`, style.portrait.sizes[s]]),
-    ['cover.output', style.cover.output],
+  const outputs: Array<[string, Size, number]> = [
+    ...CREATURE_SIZES.map((s): [string, Size, number] => [`portrait.sizes.${s}`, style.portrait.sizes[s], style.portrait.sizes[s].cell ?? style.pixelate.cell]),
+    ['cover.output', style.cover.output, style.pixelate.cell],
   ];
   const problems = outputs
-    .filter(([, { width, height }]) => (width * cell) % 64 !== 0 || (height * cell) % 64 !== 0)
-    .map(([path, { width, height }]) => `${label}: ${path}: ${width}×${height} renders at ${width * cell}×${height * cell}, which must be multiples of 64`);
+    .filter(([, { width, height }, cell]) => (width * cell) % 64 !== 0 || (height * cell) % 64 !== 0)
+    .map(([path, { width, height }, cell]) => `${label}: ${path}: ${width}×${height} renders at ${width * cell}×${height * cell}, which must be multiples of 64`);
   if (problems.length > 0) throw new ValidationFailure(problems.join('\n'));
   return style;
 }
@@ -166,7 +168,7 @@ export function stageFit(style: ImageStyle, arg: ShapeArg): { readonly visibleFt
   const { stage } = style;
   const visibleFt = Math.min(stage.maxVisibleFt, Math.max(stage.minVisibleFt, heightFt - stage.barFt));
   const height = up8(visibleFt * stage.pxPerFt + style.portrait.counter + stage.headroom);
-  const aspect = style.portrait.bodyPlans[plan].aspect ?? 0.8;
+  const aspect = style.portrait.bodyPlans[plan].aspect ?? 0.9;
   const width = up8(Math.min(stage.maxWidth, Math.max(stage.minWidth, height * aspect)));
   return { visibleFt, card: { width, height } };
 }
@@ -192,7 +194,9 @@ export function framingRules(style: ImageStyle, arg: ShapeArg, planArg?: BodyPla
   const { size, plan: shapePlan } = shapeOf(arg);
   const plan = planArg ?? shapePlan ?? 'humanoid';
   const entry = style.portrait.sizes[size];
+  const pinned = stageFit(style, { ...shapeOf(arg), plan }) !== undefined;
   return {
+    reachBottom: !pinned,
     bleed: entry.bleed ?? [],
     counter: entry.counter ?? style.portrait.counter,
     minFooting: entry.minFooting ?? style.portrait.minFooting,
@@ -204,10 +208,16 @@ export function framingRules(style: ImageStyle, arg: ShapeArg, planArg?: BodyPla
   };
 }
 
+/** Render pixels per art pixel: a size's own cell (Tiny draws on a coarser grid), else pixelate.cell. */
+export function cellOf(style: ImageStyle, kind: ImageKind, arg?: ShapeArg): number {
+  return (kind === 'portrait' && arg !== undefined ? style.portrait.sizes[shapeOf(arg).size].cell : undefined) ?? style.pixelate.cell;
+}
+
 /** The ComfyUI render size: the output times the pixel cell. */
 export function renderSize(style: ImageStyle, kind: ImageKind, arg?: ShapeArg): Size {
   const { width, height } = outputSize(style, kind, arg);
-  return { width: width * style.pixelate.cell, height: height * style.pixelate.cell };
+  const cell = cellOf(style, kind, arg);
+  return { width: width * cell, height: height * cell };
 }
 
 /** The palette an image of this kind snaps to: the league palette, or 'own' for a background that keeps its colours. */
@@ -250,7 +260,9 @@ export function pixelateOptions(style: ImageStyle, kind: ImageKind, translucent 
   const pinned = kind === 'portrait' && arg !== undefined && stageFit(style, arg) !== undefined;
   return {
     ...style.pixelate,
+    cell: cellOf(style, kind, arg),
     ...(own === undefined ? {} : { colorGroups: own }),
+    ...(kind === 'portrait' && style.portrait.outline ? { outline: true } : {}),
     palette: paletteOf(style, kind),
     cutout: style[kind].cutout,
     anchorBottom: kind === 'portrait',

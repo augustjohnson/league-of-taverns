@@ -36,8 +36,12 @@ portrait:
   # flagon, whatever its shape).
   sizes:
     tiny:
-      width: 80
-      height: 104
+      # A coarser grid (cell 16): the creature and its tankard come out about
+      # 2 ft tall at the stage's 28 px/ft, with pixels the cast's size, where
+      # an 80×104 card drew them at twice the detail of everyone else.
+      width: 40
+      height: 52
+      cell: 16
       # Tiny creatures perch on a flagon that stands ON the bar, so nothing of
       # theirs is hidden (counter 0): the flagon's base is the card's bottom
       # edge. The base is narrower than the creature, hence the lower minFooting.
@@ -71,6 +75,9 @@ portrait:
   # bottom edge, plus a size's bleed edges, may cut it. Proportions (a big
   # head on a small body) are left to the GM, who sees the bar on the review page.
   counter: 20
+  # A 1-pixel outline in the palette's darkest colour around every portrait,
+  # so line art matches across the cast whatever the model drew.
+  outline: true
   # Translucent characters (chrome.portrait.translucent): see-through parts of
   # the figure (close to the render's background colour, or pale and washed
   # out) become glass at this opacity, so the tavern shows through.

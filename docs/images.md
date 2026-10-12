@@ -30,6 +30,24 @@ Cards line up on their bottom edge, so big creatures stand taller in a lineup.
 | Huge | 144×184 | 1152×1472 |
 | Gargantuan | 160×200 | 1280×1600 |
 
+## Heights
+
+Each character has `chrome.height` in feet: standing height for people,
+head height at the bar for animals, the top of a shape for objects. The
+stage (`content/images/style.yaml` `stage`) puts a 3.5 ft bar in front of
+everyone and draws 28 art pixels per foot at the bar, so a character shows
+(height − 3.5 ft) above it. Short characters stand on an unseen stool and
+show at least 1.75 ft; very tall ones are capped at 6 ft. A Small to Large
+character's canvas is sized from that (plus the 20 rows behind the bar and
+8 rows of headroom), and the top of the head is pinned 8 rows down, so a
+9.5 ft ogre towers over a 4.3 ft dwarf. Humanoid framing follows how much of
+the body is in the card. Tiny creatures stand on the bar on a coarser grid
+(cell 16, a 40×52 card), so they come out about 2 ft tall with pixels the
+cast's size; Huge creatures keep entering from the top left.
+
+Every portrait also gets a 1-pixel outline in the palette's darkest colour,
+so line art matches across the cast.
+
 ## Layering over the tavern
 
 Portraits are made to stand side by side behind the bar in a tavern scene:

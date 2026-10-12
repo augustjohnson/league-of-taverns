@@ -24,6 +24,11 @@ export interface FramingRules {
   readonly counter: number;
   /** Least share of the figure's width that must be solid at the counter line. */
   readonly minFooting: number;
+  /**
+   * Whether the figure must reach the bottom edge. A head-pinned card only
+   * needs to be solid at the counter line: rows below it are behind the bar.
+   */
+  readonly reachBottom?: boolean;
   /** Opaque pixels allowed on a forbidden edge (a stray hair, an antenna tip). */
   readonly tolerance: number;
   /**
@@ -78,7 +83,7 @@ export function framingProblems(image: RgbaImage, rules: FramingRules): string[]
   const figureWidth = right - left + 1;
   const line = Math.max(0, height - 1 - rules.counter);
   const footing = rowWidth(line);
-  if (rowWidth(height - 1) === 0) {
+  if (rules.reachBottom !== false && rowWidth(height - 1) === 0) {
     problems.push('floats: nothing reaches the bottom edge');
   } else if (footing < rules.minFooting * figureWidth) {
     problems.push(

@@ -14,3 +14,4 @@ chrome:
     bodyPlan: swarm
     path: portrait.png
     seed: 891726515
+  height: 3

@@ -23,5 +23,6 @@ chrome:
       hulking green-skinned ogre with small tusks and a notch missing from his left ear, in a too-small brown leather tavern apron, (friendly lopsided grin:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 412608729
+    seed: 723
   history: [] # optional cosmetic notes per season, e.g. "Season 1: carried the Gilded Flagon"
+  height: 9.5

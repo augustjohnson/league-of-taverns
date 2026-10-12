@@ -16,3 +16,4 @@ chrome:
     translucent: true
     path: portrait.png
     seed: 275686928
+  height: 10

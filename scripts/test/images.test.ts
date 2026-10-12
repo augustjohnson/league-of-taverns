@@ -194,6 +194,19 @@ describe('pixelate', () => {
     expect(() => pixelate(render, options({ glass }))).toThrow(/glass needs a cutout/);
   });
 
+  it('draws a 1-pixel outline in the darkest palette colour around the figure', () => {
+    const render = blockRender([
+      [null, null, null, null],
+      [null, moss, moss, null],
+      [null, moss, moss, null],
+    ]);
+    const sprite = decodePng(encodeIndexedPng(pixelate(render, options({ cutout: true, outline: true }))));
+    expect(pixel(sprite, 1, 1)).toEqual([...moss, 255]);
+    expect(pixel(sprite, 0, 1)).toEqual([...PALETTE[0]!, 255]); // #2e222f, Resurrect 64's darkest
+    expect(pixel(sprite, 1, 0)).toEqual([...PALETTE[0]!, 255]);
+    expect(pixel(sprite, 0, 0)[3]).toBe(0); // diagonal corners stay clear
+  });
+
   it('grades contrast and saturation before snapping to the palette', () => {
     const lightGrey = blockRender([[[200, 200, 200]]]);
     const plain = pixelate(lightGrey, options());
@@ -391,7 +404,7 @@ describe('heights', () => {
   const cardHeight = (visibleFt: number) => Math.ceil((visibleFt * stage.pxPerFt + style.portrait.counter + stage.headroom) / 8) * 8;
 
   it('sizes Small to Large canvases from height, with a stool for the short and a cap for the tall', () => {
-    expect(stageFit(style, { size: 'medium', heightFt: 6 })).toEqual({ visibleFt: 2.5, card: { width: Math.ceil((cardHeight(2.5) * 0.8) / 8) * 8, height: cardHeight(2.5) } });
+    expect(stageFit(style, { size: 'medium', heightFt: 6 })).toEqual({ visibleFt: 2.5, card: { width: Math.ceil((cardHeight(2.5) * 0.9) / 8) * 8, height: cardHeight(2.5) } });
     // A 4 ft dwarf stands on a stool: at least minVisibleFt shows.
     expect(stageFit(style, { size: 'medium', heightFt: 4 })!.visibleFt).toBe(stage.minVisibleFt);
     // A 13 ft ettin is capped.

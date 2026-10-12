@@ -51,6 +51,11 @@ export interface PixelateOptions {
   readonly anchorTop?: number;
   /** Turn see-through parts of the figure into glass (needs `cutout`). */
   readonly glass?: GlassOptions;
+  /**
+   * Draw a 1-pixel outline in the palette's darkest colour around the
+   * figure, so every sprite has the same line art whatever the model drew.
+   */
+  readonly outline?: boolean;
   /** Colour grade applied before snapping to the palette. */
   readonly grade?: { readonly contrast: number; readonly saturation: number };
 }
@@ -95,6 +100,8 @@ export function pixelate(render: RgbaImage, options: PixelateOptions): IndexedIm
   const { index: paletteIndex, palette } = quantize(colors, opaque, options);
   despeckle(paletteIndex, opaque, width, height);
   const framed = options.anchorBottom ? anchorBottom(paletteIndex, opaque, width, height, options.anchorTop) : { paletteIndex, opaque };
+  if (options.outline === true && palette !== options.palette) throw new PixelateError('an outline needs the league palette');
+  if (options.outline === true) outline(framed.paletteIndex, framed.opaque, width, height, darkest(palette));
   return toIndexed(framed.paletteIndex, framed.opaque, width, height, palette, options.glass?.alpha ?? 255);
 }
 
@@ -227,6 +234,33 @@ function despeckle(index: Uint8Array, opaque: Uint8Array, width: number, height:
       if (!around.every((n) => opaque[n] === opaque[i])) continue;
       const first = source[around[0]!]!;
       if (first !== source[i] && around.every((n) => source[n] === first)) index[i] = first;
+    }
+  }
+}
+
+function darkest(palette: ReadonlyArray<Rgb>): number {
+  let best = 0;
+  palette.forEach((rgb, i) => {
+    if (oklab(rgb)[0] < oklab(palette[best]!)[0]) best = i;
+  });
+  return best;
+}
+
+/** Every clear cell touching the figure (4-neighbours) becomes a solid outline cell. */
+function outline(paletteIndex: Uint8Array, opaque: Uint8Array, width: number, height: number, ink: number): void {
+  const source = opaque.slice();
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (source[i] !== CLEAR) continue;
+      const touches =
+        (x > 0 && source[i - 1] !== CLEAR) ||
+        (x < width - 1 && source[i + 1] !== CLEAR) ||
+        (y > 0 && source[i - width] !== CLEAR) ||
+        (y < height - 1 && source[i + width] !== CLEAR);
+      if (!touches) continue;
+      opaque[i] = SOLID;
+      paletteIndex[i] = ink;
     }
   }
 }

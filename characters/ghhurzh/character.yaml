@@ -15,3 +15,4 @@ chrome:
     bodyPlan: humanoid
     path: portrait.png
     seed: 780276509
+  height: 4
