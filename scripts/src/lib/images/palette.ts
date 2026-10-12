@@ -45,6 +45,23 @@ export function oklab([r, g, b]: Rgb): Lab {
   ];
 }
 
+/** OKLab back to sRGB (0–255), clamped. */
+export function fromOklab([L, a, b]: Lab): Rgb {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const lin = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+  const [r, g, bl] = lin.map((v) => {
+    const c = v <= 0.0031308 ? 12.92 * v : 1.055 * Math.max(v, 0) ** (1 / 2.4) - 0.055;
+    return Math.round(Math.min(1, Math.max(0, c)) * 255);
+  }) as [number, number, number];
+  return [r, g, bl];
+}
+
 /**
  * Index of the palette colour nearest to `lab`. `chromaWeight` > 1 favours
  * keeping hue over keeping lightness, so a mid green stays green rather than

@@ -32,7 +32,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ComfyUi } from './lib/images/comfyui';
-import { accept, coverTargets, defaultSeed, portraitTargets, snapshotSizes, stage, stageImport, stagedPaths, writeReviewPage } from './lib/images/drafts';
+import { accept, coverTargets, defaultSeed, portraitTargets, shapeOfTarget, snapshotSizes, stage, stageImport, stagedPaths, writeReviewPage } from './lib/images/drafts';
 import type { DraftTarget } from './lib/images/drafts';
 import { pixelate } from './lib/images/pixelate';
 import { decodePng, encodeIndexedPng, encodeRgbaPng } from './lib/images/png';
@@ -133,13 +133,14 @@ async function draft(args: Args): Promise<void> {
       kind: target.kind,
       ...(target.size === undefined ? {} : { size: target.size }),
       ...(target.bodyPlan === undefined ? {} : { bodyPlan: target.bodyPlan }),
+      ...(target.heightFt === undefined ? {} : { heightFt: target.heightFt }),
       subject: target.subject,
       seed,
       prefix: `league-of-taverns/${target.kind}/${target.id}-s${seed}`,
     })),
     (_request, render) => {
       const { target, seed } = jobs[done]!;
-      const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind, target.translucent)));
+      const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind, target.translucent, shapeOfTarget(target))));
       const problems = stage(target, seed, render, sprite, style);
       clean.set(target.id, (clean.get(target.id) ?? 0) + (problems.length === 0 ? 1 : 0));
       done++;
@@ -179,11 +180,12 @@ async function importOne(args: Args): Promise<void> {
   const original = readFileSync(args.file);
   const cut = decodePng(await comfy.cutout(style, original, basename(args.file)));
   const { cell } = style.pixelate;
-  const render = fitToCanvas(cut, renderSize(style, 'portrait', target.size).width, renderSize(style, 'portrait', target.size).height, {
+  const { width: rw, height: rh } = renderSize(style, 'portrait', shapeOfTarget(target));
+  const render = fitToCanvas(cut, rw, rh, {
     side: IMPORT_MARGINS.side * cell,
     top: IMPORT_MARGINS.top * cell,
   });
-  const sprite = encodeIndexedPng(pixelate(render, pixelateOptions(style, 'portrait', target.translucent)));
+  const sprite = encodeIndexedPng(pixelate(render, pixelateOptions(style, 'portrait', target.translucent, shapeOfTarget(target))));
   const seed = createHash('sha256').update(original).digest().readUInt32BE(0) % 1_000_000_000;
   const problems = stageImport(target, seed, basename(args.file), encodeRgbaPng(render), sprite, style);
   console.log(`Staged ${target.id} s${seed} from ${basename(args.file)}: ${problems.length === 0 ? 'layers cleanly' : problems.join('; ')}`);

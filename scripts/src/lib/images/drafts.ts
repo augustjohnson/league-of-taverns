@@ -23,7 +23,7 @@ import { checkSprite } from './pixelate';
 import { decodePng, pngSize } from './png';
 import { creatureSize, framingRules, glassAlpha, outputSize, paletteOf } from './style';
 import type { BodyPlan } from './body-plans';
-import type { CreatureSize, ImageKind, ImageStyle } from './style';
+import type { CreatureSize, ImageKind, ImageStyle, PortraitShape } from './style';
 
 export interface DraftTarget {
   readonly kind: ImageKind;
@@ -37,6 +37,8 @@ export interface DraftTarget {
   readonly bodyPlan?: BodyPlan;
   /** Portraits only: see-through parts become glass. */
   readonly translucent?: boolean;
+  /** Portraits only: standing height in feet, from chrome.height. */
+  readonly heightFt?: number;
   readonly subject: string;
   /** Where an accepted image goes, absolute. */
   readonly destination: string;
@@ -76,7 +78,8 @@ export function portraitTargets(
   const names = all ? readdirSync(charactersDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort() : ids;
   const targets: DraftTarget[] = [];
   for (const id of names) {
-    const portrait = loadCharacterChrome(id, root).portrait;
+    const chrome = loadCharacterChrome(id, root);
+    const portrait = chrome.portrait;
     if (all && portrait?.status !== 'prompt' && portrait?.status !== 'draft') continue;
     if (portrait?.prompt === undefined) {
       throw new ValidationFailure(`characters/${id}/character.yaml: chrome.portrait.prompt is not set, so there is nothing to draw`);
@@ -90,6 +93,7 @@ export function portraitTargets(
       size,
       bodyPlan: portrait.bodyPlan ?? 'humanoid',
       translucent: portrait.translucent === true,
+      ...(chrome.height === undefined ? {} : { heightFt: chrome.height }),
       subject: portrait.prompt, destination: join(charactersDir, id, 'portrait.png') });
   }
   return targets;
@@ -121,6 +125,16 @@ export function coverTargets(season: string, missions: ReadonlyArray<string> = [
   return targets;
 }
 
+/** A portrait target's shape, for canvas size, framing and checks. */
+export function shapeOfTarget(target: DraftTarget): PortraitShape | undefined {
+  if (target.size === undefined) return undefined;
+  return {
+    size: target.size,
+    ...(target.bodyPlan === undefined ? {} : { plan: target.bodyPlan }),
+    ...(target.heightFt === undefined ? {} : { heightFt: target.heightFt }),
+  };
+}
+
 // ── seeds and staging ──────────────────────────────────────────────────────
 
 type TargetKey = Pick<DraftTarget, 'kind' | 'id' | 'season'>;
@@ -147,7 +161,7 @@ export function stagedPaths(target: TargetKey, seed: number, root: RepoRoot = RE
 
 /** Problems that would stop a staged candidate from being layered cleanly (none for covers). */
 export function candidateProblems(target: DraftTarget, sprite: Uint8Array, style: ImageStyle): string[] {
-  return target.kind === 'portrait' && target.size !== undefined ? framingProblems(decodePng(sprite), framingRules(style, target.size, target.bodyPlan)) : [];
+  return target.kind === 'portrait' && target.size !== undefined ? framingProblems(decodePng(sprite), framingRules(style, shapeOfTarget(target)!)) : [];
 }
 
 /** What the review page needs about a staged candidate. */
@@ -162,7 +176,7 @@ export function stage(target: DraftTarget, seed: number, render: Uint8Array, spr
   const paths = stagedPaths(target, seed, root);
   const problems = candidateProblems(target, sprite, style);
   const framing: StagedFraming =
-    target.kind === 'portrait' && target.size !== undefined ? { problems, counter: framingRules(style, target.size, target.bodyPlan).counter } : { problems };
+    target.kind === 'portrait' && target.size !== undefined ? { problems, counter: framingRules(style, shapeOfTarget(target)!).counter } : { problems };
   mkdirSync(dirname(paths.sprite), { recursive: true });
   writeFileSync(paths.render, render);
   writeFileSync(paths.sprite, sprite);
@@ -203,8 +217,8 @@ export function accept(target: DraftTarget, seed: number, style: ImageStyle, roo
   }
   const problems = checkSprite(
     decodePng(readFileSync(staged)),
-    outputSize(style, target.kind, target.size),
-    paletteOf(style),
+    outputSize(style, target.kind, shapeOfTarget(target)),
+    paletteOf(style, target.kind),
     glassAlpha(style, target.kind, target.translucent),
   );
   if (problems.length > 0) throw new ValidationFailure(`${relative(rootDir(root), staged)} ${problems.join('; ')}`);

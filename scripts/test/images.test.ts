@@ -25,6 +25,7 @@ import {
   negativePrompt,
   positivePrompt,
   renderSize,
+  stageFit,
   stylePath,
 } from '../src/lib/images/style';
 import { ValidationFailure } from '../src/lib/main';
@@ -382,6 +383,50 @@ describe('style and graph', () => {
   it('pixelates portraits with a cutout and covers without', () => {
     expect(pixelateOptions(style, 'portrait')).toMatchObject({ cutout: true, anchorBottom: true });
     expect(pixelateOptions(style, 'cover')).toMatchObject({ cutout: false, anchorBottom: false });
+  });
+});
+
+describe('heights', () => {
+  const { stage } = style;
+  const cardHeight = (visibleFt: number) => Math.ceil((visibleFt * stage.pxPerFt + style.portrait.counter + stage.headroom) / 8) * 8;
+
+  it('sizes Small to Large canvases from height, with a stool for the short and a cap for the tall', () => {
+    expect(stageFit(style, { size: 'medium', heightFt: 6 })).toEqual({ visibleFt: 2.5, card: { width: Math.ceil((cardHeight(2.5) * 0.8) / 8) * 8, height: cardHeight(2.5) } });
+    // A 4 ft dwarf stands on a stool: at least minVisibleFt shows.
+    expect(stageFit(style, { size: 'medium', heightFt: 4 })!.visibleFt).toBe(stage.minVisibleFt);
+    // A 13 ft ettin is capped.
+    expect(stageFit(style, { size: 'large', heightFt: 13 })!.visibleFt).toBe(stage.maxVisibleFt);
+    // Taller characters get taller cards, and every render is on the 64-pixel grid.
+    const heights = [4.5, 5.5, 6.5, 8, 9.5].map((h) => outputSize(style, 'portrait', { size: 'medium', heightFt: h }).height);
+    expect(heights).toEqual([...heights].sort((a, b) => a - b));
+    for (const h of heights) expect((h * style.pixelate.cell) % 64).toBe(0);
+    // Tiny and Huge, and anyone without a height, keep the size table.
+    expect(stageFit(style, { size: 'tiny', heightFt: 1 })).toBeUndefined();
+    expect(stageFit(style, { size: 'huge', heightFt: 20 })).toBeUndefined();
+    expect(outputSize(style, 'portrait', { size: 'medium' })).toEqual({ width: 112, height: 144 });
+  });
+
+  it('frames a humanoid by how much of them shows above the bar', () => {
+    // A dwarf on a stool shows about half of himself; a tall human shows less, so is closer.
+    expect(positivePrompt(style, 'portrait', 'a dwarf', { size: 'medium', heightFt: 4.5 })).toContain('waist-up');
+    expect(positivePrompt(style, 'portrait', 'a tall human', { size: 'medium', heightFt: 7 })).toContain('waist-up');
+    expect(positivePrompt(style, 'portrait', 'a giant', { size: 'large', heightFt: 16 })).toContain('head, shoulders and upper chest');
+    expect(positivePrompt(style, 'portrait', 'a halfling', { size: 'small', heightFt: 3 })).toContain('thigh-up');
+    expect(positivePrompt(style, 'portrait', 'a bear', { size: 'large', heightFt: 8, plan: 'beast' })).not.toContain('thigh-up');
+  });
+
+  it('pins the top of the head headroom rows down, and leaves a short figure floating for the checks', () => {
+    const moss = PALETTE[30]!;
+    const render = (rows: (y: number) => boolean) =>
+      blockRender(Array.from({ length: 8 }, (_, y) => Array.from({ length: 5 }, (_, x) => (x >= 1 && x <= 3 && rows(y) ? moss : null))));
+    const tall = decodePng(encodeIndexedPng(pixelate(render((y) => y >= 0), options({ cutout: true, anchorBottom: true, anchorTop: 2 }))));
+    expect(pixel(tall, 2, 1)[3]).toBe(0);
+    expect(pixel(tall, 2, 2)[3]).toBe(255);
+    expect(pixel(tall, 2, 7)[3]).toBe(255);
+    // A short figure pinned at the top no longer reaches the bottom edge.
+    const short = decodePng(encodeIndexedPng(pixelate(render((y) => y >= 4 && y <= 5), options({ cutout: true, anchorBottom: true, anchorTop: 2 }))));
+    expect(pixel(short, 2, 2)[3]).toBe(255);
+    expect(pixel(short, 2, 7)[3]).toBe(0);
   });
 });
 

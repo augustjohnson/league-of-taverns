@@ -20,6 +20,8 @@ export interface CharacterChrome {
   readonly epithet?: string;
   readonly pronouns?: { readonly subject: string; readonly object: string; readonly possessive: string };
   readonly tagline?: string;
+  /** Standing height in feet. Places the portrait at the bar (docs/images.md § Heights). */
+  readonly height?: number;
   /** Path relative to the character's folder, e.g. `backstory.md`. */
   readonly backstory?: string;
   readonly portrait?: {
@@ -59,6 +61,7 @@ const chromeSchema = z.strictObject({
   epithet: text.exactOptional(),
   pronouns: z.strictObject({ subject: text, object: text, possessive: text }).exactOptional(),
   tagline: text.exactOptional(),
+  height: z.number().positive().max(100).exactOptional(),
   backstory: text.exactOptional(),
   portrait: z
     .strictObject({

@@ -24,7 +24,7 @@
  *
  * Deterministic: the same render and options give the same bytes.
  */
-import { nearest, oklab } from './palette';
+import { fromOklab, nearest, oklab } from './palette';
 import type { Lab, Rgb } from './palette';
 import type { IndexedImage, RgbaImage } from './png';
 
@@ -33,11 +33,22 @@ export interface PixelateOptions {
   readonly cell: number;
   readonly colorGroups: number;
   readonly chromaWeight: number;
-  readonly palette: ReadonlyArray<Rgb>;
+  /**
+   * The league palette to snap to, or 'own': keep the image's own
+   * `colorGroups` colours (backgrounds, which needn't match the cast).
+   */
+  readonly palette: ReadonlyArray<Rgb> | 'own';
   /** Make the background transparent using the render's alpha channel. */
   readonly cutout: boolean;
   /** Re-anchor the opaque area bottom-centre (portraits). */
   readonly anchorBottom: boolean;
+  /**
+   * With `anchorBottom`: put the top of the figure exactly this many rows
+   * from the top instead of dropping it onto the bottom edge. Whatever moves
+   * past the bottom is cut (the bar hides it); a gap left underneath is a
+   * floating figure for ./framing.ts to reject.
+   */
+  readonly anchorTop?: number;
   /** Turn see-through parts of the figure into glass (needs `cutout`). */
   readonly glass?: GlassOptions;
   /** Colour grade applied before snapping to the palette. */
@@ -81,10 +92,10 @@ export function pixelate(render: RgbaImage, options: PixelateOptions): IndexedIm
     markGlass(render, colors, opaque, options.glass);
   }
 
-  const paletteIndex = quantize(colors, opaque, options);
+  const { index: paletteIndex, palette } = quantize(colors, opaque, options);
   despeckle(paletteIndex, opaque, width, height);
-  const framed = options.anchorBottom ? anchorBottom(paletteIndex, opaque, width, height) : { paletteIndex, opaque };
-  return toIndexed(framed.paletteIndex, framed.opaque, width, height, options.palette, options.glass?.alpha ?? 255);
+  const framed = options.anchorBottom ? anchorBottom(paletteIndex, opaque, width, height, options.anchorTop) : { paletteIndex, opaque };
+  return toIndexed(framed.paletteIndex, framed.opaque, width, height, palette, options.glass?.alpha ?? 255);
 }
 
 /** Mark see-through solid cells as glass, judged against the median colour of the render's removed background. */
@@ -153,8 +164,8 @@ function grade([l, a, b]: Lab, g: PixelateOptions['grade']): Lab {
   return [Math.min(1, Math.max(0, 0.5 + (l - 0.5) * g.contrast)), a * g.saturation, b * g.saturation];
 }
 
-/** Palette index per cell (transparent cells get 0, unused). */
-function quantize(colors: ReadonlyArray<Rgb>, opaque: Uint8Array, options: PixelateOptions): Uint8Array {
+/** Palette index per cell (transparent cells get 0, unused), and the palette those indices refer to. */
+function quantize(colors: ReadonlyArray<Rgb>, opaque: Uint8Array, options: PixelateOptions): { index: Uint8Array; palette: ReadonlyArray<Rgb> } {
   const out = new Uint8Array(colors.length);
   const points: Lab[] = [];
   const at: number[] = [];
@@ -164,7 +175,7 @@ function quantize(colors: ReadonlyArray<Rgb>, opaque: Uint8Array, options: Pixel
       at.push(i);
     }
   });
-  if (points.length === 0) return out;
+  if (points.length === 0) return { index: out, palette: options.palette === 'own' ? [[0, 0, 0]] : options.palette };
 
   const k = Math.min(options.colorGroups, points.length);
   // Evenly spaced starting points: deterministic, and spread over the image.
@@ -192,12 +203,18 @@ function quantize(colors: ReadonlyArray<Rgb>, opaque: Uint8Array, options: Pixel
     if (!moved && iteration > 0) break;
   }
 
+  if (options.palette === 'own') {
+    at.forEach((cellIndex, i) => {
+      out[cellIndex] = label[i]!;
+    });
+    return { index: out, palette: centres.map(fromOklab) };
+  }
   const paletteLab = options.palette.map(oklab);
   const groupToPalette = centres.map((c) => nearest(c, paletteLab, options.chromaWeight));
   at.forEach((cellIndex, i) => {
     out[cellIndex] = groupToPalette[label[i]!]!;
   });
-  return out;
+  return { index: out, palette: options.palette };
 }
 
 function despeckle(index: Uint8Array, opaque: Uint8Array, width: number, height: number): void {
@@ -220,6 +237,7 @@ function anchorBottom(
   opaque: Uint8Array,
   width: number,
   height: number,
+  topRow?: number,
 ): { paletteIndex: Uint8Array; opaque: Uint8Array } {
   let [left, right, top, bottom] = [width, -1, height, -1];
   for (let y = 0; y < height; y++) {
@@ -234,10 +252,11 @@ function anchorBottom(
   if (right < 0) return { paletteIndex, opaque };
   const touchesSide = left === 0 || right === width - 1;
   const dx = touchesSide ? 0 : Math.floor((width - (right - left + 1)) / 2) - left;
-  const dy = height - 1 - bottom;
+  const dy = topRow === undefined ? height - 1 - bottom : topRow - top;
   const movedIndex = new Uint8Array(width * height);
   const movedOpaque = new Uint8Array(width * height);
   for (let y = top; y <= bottom; y++) {
+    if (y + dy < 0 || y + dy >= height) continue;
     for (let x = left; x <= right; x++) {
       const from = y * width + x;
       const to = (y + dy) * width + (x + dx);
@@ -280,14 +299,14 @@ function toIndexed(
 export function checkSprite(
   image: RgbaImage,
   expected: { readonly width: number; readonly height: number },
-  palette: ReadonlyArray<Rgb>,
+  palette: ReadonlyArray<Rgb> | 'own',
   glassAlpha?: number,
 ): string[] {
   const problems: string[] = [];
   if (image.width !== expected.width || image.height !== expected.height) {
     problems.push(`is ${image.width}×${image.height}, expected ${expected.width}×${expected.height}`);
   }
-  const allowed = new Set(palette.map(([r, g, b]) => (r << 16) | (g << 8) | b));
+  const allowed = palette === 'own' ? undefined : new Set(palette.map(([r, g, b]) => (r << 16) | (g << 8) | b));
   let partial = 0;
   const off = new Set<string>();
   for (let i = 0; i < image.data.length; i += 4) {
@@ -295,7 +314,7 @@ export function checkSprite(
     if (a === 0) continue;
     if (a !== 255 && a !== glassAlpha) partial++;
     const rgb = (image.data[i]! << 16) | (image.data[i + 1]! << 8) | image.data[i + 2]!;
-    if (!allowed.has(rgb)) off.add(`#${rgb.toString(16).padStart(6, '0')}`);
+    if (allowed !== undefined && !allowed.has(rgb)) off.add(`#${rgb.toString(16).padStart(6, '0')}`);
   }
   if (partial > 0) problems.push(`has ${partial} semi-transparent pixel${partial === 1 ? '' : 's'}; pixels must be fully opaque or fully transparent`);
   if (off.size > 0) problems.push(`uses ${off.size} colour${off.size === 1 ? '' : 's'} outside the palette (${[...off].slice(0, 5).join(', ')}${off.size > 5 ? ', …' : ''})`);

@@ -18,6 +18,8 @@ export interface RenderRequest {
   readonly size?: CreatureSize;
   /** Portraits: the body plan, which sets anchor, framing and extra negatives. Default humanoid. */
   readonly bodyPlan?: BodyPlan;
+  /** Portraits: standing height in feet, which sizes a Small to Large canvas. */
+  readonly heightFt?: number;
   readonly subject: string;
   readonly seed: number;
   /** ComfyUI output filename prefix, e.g. "league-of-taverns/portrait/bruno-the-bruiser-s42". */
@@ -30,7 +32,8 @@ type Graph = Record<string, { readonly class_type: string; readonly inputs: Reco
 export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
   const { model } = style;
   const kind = style[request.kind];
-  const render = renderSize(style, request.kind, request.size);
+  const shape = request.size === undefined ? undefined : { size: request.size, ...(request.bodyPlan === undefined ? {} : { plan: request.bodyPlan }), ...(request.heightFt === undefined ? {} : { heightFt: request.heightFt }) };
+  const render = renderSize(style, request.kind, shape);
   const graph: Graph = {
     checkpoint: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: model.checkpoint } },
     lora: {
@@ -43,7 +46,7 @@ export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
         clip: ['checkpoint', 1],
       },
     },
-    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(style, request.kind, request.subject, request.size, request.bodyPlan), clip: ['lora', 1] } },
+    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(style, request.kind, request.subject, shape), clip: ['lora', 1] } },
     negative: { class_type: 'CLIPTextEncode', inputs: { text: negativePrompt(style, request.kind, request.bodyPlan), clip: ['lora', 1] } },
     latent: { class_type: 'EmptyLatentImage', inputs: { width: render.width, height: render.height, batch_size: 1 } },
     sample: {

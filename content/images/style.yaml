@@ -101,6 +101,7 @@ portrait:
         shoulders:1.2), (centered, with empty space above the head and on both
         sides:1.3), torso continuing past the bottom edge
     beast:
+      aspect: 1
       anchor: (animal with true animal anatomy:1.2)
       framing: >-
         (head, neck and front shoulders of the animal:1.3), (centered, with
@@ -109,6 +110,7 @@ portrait:
       negative: &not-a-person >-
         (human, person, man, woman, humanoid body, knight, armor:1.4)
     winged:
+      aspect: 0.9
       anchor: (small winged fantasy creature:1.3)
       framing: >-
         (head, body and folded wings of the creature:1.3), (centered, with
@@ -116,6 +118,7 @@ portrait:
         past the bottom edge
       negative: *not-a-person
     blob:
+      aspect: 1.1
       anchor: (fantasy ooze monster with no limbs and no head:1.3)
       framing: >-
         (the whole creature, wide and low, resting on the bottom edge:1.3),
@@ -124,12 +127,14 @@ portrait:
         (human, person, man, woman, humanoid body, knight, armor:1.4),
         (legs, arms, frog, toad, lizard, salamander, animal:1.3)
     swarm:
+      aspect: 1.1
       anchor: (a swarm of many small creatures heaped together:1.3)
       framing: >-
         (the whole heap, wide and low, resting on the bottom edge:1.3),
         (centered, with empty space above and on both sides:1.2)
       negative: *not-a-person
     object:
+      aspect: 1
       anchor: (an animated object, a living thing that is still an object:1.3)
       framing: >-
         (the whole object, resting on the bottom edge:1.3), (centered, with
@@ -143,6 +148,7 @@ portrait:
         bottom edge
       negative: *not-a-person
     multihead:
+      aspect: 1
       anchor: (a single fantasy monster, one body with two or three heads:1.3)
       framing: >-
         (all heads and the shoulders they share:1.3), (centered, with empty
@@ -181,8 +187,45 @@ portrait:
     legs, feet, floor, shadow, text, letters,
     watermark, frame, border, blurry, photo, 3d render
 
+# Height-based portraits (docs/images.md § Heights). Cards stand behind a
+# bar barFt tall, drawn at pxPerFt art pixels per foot at the bar. A
+# character with chrome.height shows (height − barFt) above it, at least
+# minVisibleFt (shorter ones stand on a stool) and at most maxVisibleFt.
+# Their canvas is that height plus the hidden counter rows plus headroom,
+# and the top of the head is pinned `headroom` rows down. Tiny and Huge
+# characters keep their size's canvas.
+stage:
+  barFt: 3.5
+  pxPerFt: 28
+  headroom: 8
+  minVisibleFt: 1.75
+  maxVisibleFt: 6
+  minWidth: 64
+  maxWidth: 192
+  # Humanoid framing by the share of the body in the card (visible + hidden
+  # counter rows, over standing height).
+  framing:
+    - upTo: 0.42
+      text: >-
+        (head, shoulders and upper chest:1.3), (realistic adult proportions,
+        broad shoulders:1.2), (centered, with empty space above the head and on
+        both sides:1.3), chest continuing past the bottom edge
+    - upTo: 0.62
+      text: >-
+        (waist-up view:1.3), (realistic adult proportions, small head, broad
+        shoulders:1.2), (centered, with empty space above the head and on both
+        sides:1.3), torso continuing past the bottom edge
+    - upTo: 1
+      text: >-
+        (thigh-up view of a towering figure:1.3), (realistic proportions, small
+        head, massive shoulders:1.2), (centered, with empty space above the head
+        and on both sides:1.3), legs continuing past the bottom edge
+
 cover:
   output: { width: 216, height: 72 }  # 3:1; renders at 1728×576, an SDXL training size
+  # Backgrounds keep their own colours: snapped to the league palette, a dim
+  # brown tavern collapsed to 5–10 colours. Only the cast needs to match.
+  ownColors: 48
   cutout: false
   positive: >-
     pixel art, wide panoramic landscape, {{subject}}, no people, establishing

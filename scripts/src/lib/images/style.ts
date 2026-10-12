@@ -43,6 +43,8 @@ const prompts = {
 
 const bodyPlan = z.strictObject({
   anchor: text,
+  /** Card width as a share of its height, for height-based canvases. */
+  aspect: z.number().positive().exactOptional(),
   framing: text,
   negative: text.exactOptional(),
   minFill: z.number().min(0).max(1).exactOptional(),
@@ -95,7 +97,17 @@ const styleSchema = z.strictObject({
       .refine(once(FRAMING), `must contain ${FRAMING} exactly once`)
       .refine(once(ANCHOR), `must contain ${ANCHOR} exactly once`),
   }),
-  cover: z.strictObject({ output: size, ...prompts }),
+  stage: z.strictObject({
+    barFt: z.number().positive(),
+    pxPerFt: z.number().positive(),
+    headroom: z.number().int().nonnegative(),
+    minVisibleFt: z.number().positive(),
+    maxVisibleFt: z.number().positive(),
+    minWidth: z.number().int().positive(),
+    maxWidth: z.number().int().positive(),
+    framing: z.array(z.strictObject({ upTo: z.number().positive(), text })).min(1),
+  }),
+  cover: z.strictObject({ output: size, ownColors: z.number().int().min(2).max(255).exactOptional(), ...prompts }),
 });
 
 export type ImageStyle = z.infer<typeof styleSchema>;
@@ -122,22 +134,63 @@ export function loadImageStyle(root: RepoRoot = REPO_ROOT): ImageStyle {
   return style;
 }
 
+/**
+ * What a portrait's canvas and framing depend on: creature size, body plan
+ * and, when known, height in feet. Small to Large characters with a height
+ * get a canvas sized from it (`stage`); Tiny and Huge keep their size's.
+ */
+export interface PortraitShape {
+  readonly size: CreatureSize;
+  readonly plan?: BodyPlan;
+  readonly heightFt?: number;
+}
+
+type ShapeArg = CreatureSize | PortraitShape;
+
+function shapeOf(arg: ShapeArg): PortraitShape {
+  return typeof arg === 'string' ? { size: arg } : arg;
+}
+
+const HEIGHT_SIZES: ReadonlyArray<CreatureSize> = ['small', 'medium', 'large'];
+const up8 = (n: number): number => Math.ceil(n / 8) * 8;
+
+/**
+ * Where a height-based portrait stands: feet showing above the bar (short
+ * characters stand on a stool behind it, very tall ones are capped) and the
+ * canvas that holds them, headroom on top and `counter` rows behind the bar.
+ * Undefined when the canvas comes from the size table instead.
+ */
+export function stageFit(style: ImageStyle, arg: ShapeArg): { readonly visibleFt: number; readonly card: Size } | undefined {
+  const { size, plan = 'humanoid', heightFt } = shapeOf(arg);
+  if (heightFt === undefined || !HEIGHT_SIZES.includes(size)) return undefined;
+  const { stage } = style;
+  const visibleFt = Math.min(stage.maxVisibleFt, Math.max(stage.minVisibleFt, heightFt - stage.barFt));
+  const height = up8(visibleFt * stage.pxPerFt + style.portrait.counter + stage.headroom);
+  const aspect = style.portrait.bodyPlans[plan].aspect ?? 0.8;
+  const width = up8(Math.min(stage.maxWidth, Math.max(stage.minWidth, height * aspect)));
+  return { visibleFt, card: { width, height } };
+}
+
 /** Normalise an Open5e size ("Large") to a `CreatureSize`, or undefined if it isn't one. */
 export function creatureSize(openSize: string): CreatureSize | undefined {
   const lower = openSize.toLowerCase();
   return (CREATURE_SIZES as ReadonlyArray<string>).includes(lower) ? (lower as CreatureSize) : undefined;
 }
 
-/** The committed image's size in art pixels. Portraits need the creature size. */
-export function outputSize(style: ImageStyle, kind: ImageKind, size?: CreatureSize): Size {
+/** The committed image's size in art pixels. Portraits need the creature size (and height, when known). */
+export function outputSize(style: ImageStyle, kind: ImageKind, arg?: ShapeArg): Size {
   if (kind === 'cover') return style.cover.output;
-  if (size === undefined) throw new Error('a portrait needs a creature size');
-  const { width, height } = style.portrait.sizes[size];
+  if (arg === undefined) throw new Error('a portrait needs a creature size');
+  const fit = stageFit(style, arg);
+  if (fit !== undefined) return fit.card;
+  const { width, height } = style.portrait.sizes[shapeOf(arg).size];
   return { width, height };
 }
 
 /** How a portrait of this size and body plan must sit on its canvas (./framing.ts). */
-export function framingRules(style: ImageStyle, size: CreatureSize, plan: BodyPlan = 'humanoid'): FramingRules {
+export function framingRules(style: ImageStyle, arg: ShapeArg, planArg?: BodyPlan): FramingRules {
+  const { size, plan: shapePlan } = shapeOf(arg);
+  const plan = planArg ?? shapePlan ?? 'humanoid';
   const entry = style.portrait.sizes[size];
   return {
     bleed: entry.bleed ?? [],
@@ -152,25 +205,37 @@ export function framingRules(style: ImageStyle, size: CreatureSize, plan: BodyPl
 }
 
 /** The ComfyUI render size: the output times the pixel cell. */
-export function renderSize(style: ImageStyle, kind: ImageKind, size?: CreatureSize): Size {
-  const { width, height } = outputSize(style, kind, size);
+export function renderSize(style: ImageStyle, kind: ImageKind, arg?: ShapeArg): Size {
+  const { width, height } = outputSize(style, kind, arg);
   return { width: width * style.pixelate.cell, height: height * style.pixelate.cell };
 }
 
-export function paletteOf(style: ImageStyle): ReadonlyArray<Rgb> {
-  return PALETTES[style.palette];
+/** The palette an image of this kind snaps to: the league palette, or 'own' for a background that keeps its colours. */
+export function paletteOf(style: ImageStyle, kind: ImageKind = 'portrait'): ReadonlyArray<Rgb> | 'own' {
+  return kind === 'cover' && style.cover.ownColors !== undefined ? 'own' : PALETTES[style.palette];
 }
 
 /**
  * The full positive prompt for one subject. Portraits get their body plan's
- * anchor, and its framing unless the size has its own (a Tiny flagon).
+ * anchor, and its framing unless the size has its own (a Tiny flagon). A
+ * height-based humanoid is framed by how much of them shows above the bar:
+ * chest-up for a dwarf on a stool, waist-up for a person, thigh-up for an ogre.
  */
-export function positivePrompt(style: ImageStyle, kind: ImageKind, subject: string, size?: CreatureSize, plan: BodyPlan = 'humanoid'): string {
+export function positivePrompt(style: ImageStyle, kind: ImageKind, subject: string, arg?: ShapeArg, planArg?: BodyPlan): string {
   const filled = style[kind].positive.replace(SUBJECT, subject.trim().replace(/\.$/, ''));
   if (kind === 'cover') return filled;
-  if (size === undefined) throw new Error('a portrait needs a creature size');
+  if (arg === undefined) throw new Error('a portrait needs a creature size');
+  const shape = shapeOf(arg);
+  const plan = planArg ?? shape.plan ?? 'humanoid';
   const { anchor, framing } = style.portrait.bodyPlans[plan];
-  return filled.replace(ANCHOR, anchor.trim()).replace(FRAMING, (style.portrait.sizes[size].framing ?? framing).trim());
+  let text = style.portrait.sizes[shape.size].framing ?? framing;
+  const fit = stageFit(style, { ...shape, plan });
+  if (fit !== undefined && plan === 'humanoid') {
+    // Share of the body inside the card: what shows above the bar plus the hidden counter rows, over real height.
+    const shown = (fit.visibleFt + style.portrait.counter / style.stage.pxPerFt) / shape.heightFt!;
+    text = (style.stage.framing.find((band) => shown <= band.upTo) ?? style.stage.framing.at(-1)!).text;
+  }
+  return filled.replace(ANCHOR, anchor.trim()).replace(FRAMING, text.trim());
 }
 
 /** The negative prompt, plus the body plan's own for portraits. */
@@ -179,12 +244,17 @@ export function negativePrompt(style: ImageStyle, kind: ImageKind, plan: BodyPla
   return extra === undefined ? style[kind].negative : `${style[kind].negative}, ${extra.trim()}`;
 }
 
-export function pixelateOptions(style: ImageStyle, kind: ImageKind, translucent = false): PixelateOptions {
+export function pixelateOptions(style: ImageStyle, kind: ImageKind, translucent = false, arg?: ShapeArg): PixelateOptions {
+  const own = kind === 'cover' ? style.cover.ownColors : undefined;
+  // A height-based portrait pins the top of the head `headroom` rows down, so heads land at the right height.
+  const pinned = kind === 'portrait' && arg !== undefined && stageFit(style, arg) !== undefined;
   return {
     ...style.pixelate,
-    palette: paletteOf(style),
+    ...(own === undefined ? {} : { colorGroups: own }),
+    palette: paletteOf(style, kind),
     cutout: style[kind].cutout,
     anchorBottom: kind === 'portrait',
+    ...(pinned ? { anchorTop: style.stage.headroom } : {}),
     ...(kind === 'portrait' && style.portrait.grade !== undefined ? { grade: style.portrait.grade } : {}),
     ...(kind === 'portrait' && translucent ? { glass: style.portrait.glass } : {}),
   };
