@@ -22,7 +22,7 @@ mission, and the season table ranks taverns by total loot.
 | [docs/decisions.md](docs/decisions.md) | Open decisions, plus every difference from the earlier specs |
 | [docs/lore.md](docs/lore.md) | Story frame: barkeeps, sponsoring gods, loot, and where story touches the rules |
 | [docs/glossary.md](docs/glossary.md) | Terms |
-| [docs/images.md](docs/images.md) | Pixel-art portraits and mission covers: style, `draft-images`, local ComfyUI setup |
+| [docs/images.md](docs/images.md) | Painted portraits and mission covers: style, stage placement by height, `draft-images`, local ComfyUI setup |
 | [docs/specs/](docs/specs/) | Earlier specs 00–06. Superseded where decisions.md says so |
 | [TODO.md](TODO.md) | Workstreams and tasks, one subagent per workstream |
 

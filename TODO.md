@@ -456,13 +456,15 @@ Owns `scripts/src/lib/chrome.ts`, `scripts/src/draft-chrome.ts`,
 - **Depends:** T8.2, T6.3, T3.1.
 
 #### T8.7 Portraits and covers · M
-- **Goal:** pixel-art portraits and mission covers, generated locally and
-  committed small (D-10). See docs/images.md.
-- *Built (2026-10-11):* `draft-images` (ComfyUI client, pixelate to the
-  Resurrect 64 palette, staging and accept), `content/images/style.yaml`, and
-  image checks in `validate`.
-- **Left:** generate the season's portraits once the pool's subject prompts
-  are written; show images in `publish` and the explorer.
+- **Goal:** portraits and mission covers, generated locally and committed
+  small (D-10). See docs/images.md.
+- *Built (2026-10-11):* `draft-images` (ComfyUI client, staging, review page,
+  accept, import), `content/images/style.yaml` in two modes (painted, the
+  current one, and pixel), stage placement by height
+  (`scripts/src/lib/images/stage.ts`), and image checks in `validate`.
+- **Left:** tavern scenes as an image kind, with per-tavern light and bar;
+  a stage composer for `publish` and the explorer; portraits the local
+  model can't draw (multi-headed, see-through) imported from elsewhere.
 
 ---
 

@@ -6,11 +6,17 @@
 # like the rulebook: change it by PR, and expect to regenerate the set.
 # How it's used, and why each setting is what it is: docs/images.md.
 
+# painted: hand-painted illustrations at full colour, full-body portraits the
+# stage scales to each character's height (the `painted` section).
+# pixel: palette-locked pixel art on fixed cards (`pixelate`, `portrait`,
+# `cover`). docs/images.md § Modes.
+mode: painted
+
 palette: resurrect-64
 
 model:
   checkpoint: sd_xl_base_1.0.safetensors
-  lora: pixel-art-xl.safetensors
+  lora: pixel-art-xl.safetensors  # pixel mode only
   loraStrength: 0.7               # 1.0 pulls every subject into a full-body game sprite
   steps: 28
   cfg: 6.5
@@ -194,6 +200,78 @@ portrait:
     legs, feet, floor, shadow, text, letters,
     watermark, frame, border, blurry, photo, 3d render
 
+# Painted mode. Same checkpoint, no LoRA: the model follows the subject far
+# better without it (species, framing, one figure). Portraits are full-body,
+# cut out and trimmed to the figure; covers are kept as rendered. Both are
+# stored at full resolution and colour: everything lossy is post-processing
+# when they're shown (`views`), and the stage scales portraits to height.
+painted:
+  # Post-processing (scripts/src/lib/images/postprocess.ts): pixel art cut
+  # from the original at display time. `pxPerFt` is the zoom, in art pixels
+  # per foot of the figure as the stage draws it. `colors` is the budget:
+  # `palette` (the league palette above) or a count of the image's own
+  # colours. Edges are hard, with no anti-aliasing; `outline` adds a 1-pixel
+  # line in the darkest colour.
+  views:
+    pixel: { pxPerFt: 28, colors: palette, outline: true }
+    pixel-fine: { pxPerFt: 56, colors: 32, outline: true }
+  portrait:
+    # Render canvas by pose: upright figures tall, Huge beasts wide, the rest square.
+    renders:
+      tall: { width: 832, height: 1216 }
+      square: { width: 1024, height: 1024 }
+      wide: { width: 1216, height: 832 }
+    # The pose that opens the prompt, by body plan. A cropped figure can't be
+    # scaled to its height, so every portrait asks for the whole figure.
+    poses:
+      default: (the whole creature in frame, resting on the ground:1.3)
+      humanoid: (full body, standing upright, the whole figure from head to feet:1.3)
+      plant: (full body, standing upright, the whole figure from head to feet:1.3)
+    # The Warcraft cue pulls every face toward a green orc. Pushed back unless
+    # the subject names one of these words.
+    drift:
+      words: [orc, goblin, green skin, green-skinned]
+      negative: (orc, green skin:1.3)
+    # Checks on the cut-out render: the whole figure inside the canvas (a few
+    # pixels of tolerance per edge), filling at least minFill of its height,
+    # one figure, in colour (portrait.minMainShare and minChroma).
+    tolerance: 8
+    minFill: 0.4
+    positive: >-
+      single character, hand-painted stylized fantasy character illustration,
+      (World of Warcraft art style:1.1), painterly textures, vibrant saturated
+      colours, chunky stylized proportions, {{anchor}}, {{pose}},
+      ({{subject}}:1.35), front view, three-quarter view, looking at viewer,
+      bold expressive face, soft even light from the upper left, plain white
+      background
+    negative: >-
+      (cropped:1.3), (out of frame:1.3), cut off, floating head, disembodied head,
+      (isometric, top-down view, view from above, bird's eye view:1.3),
+      washed out, low contrast,
+      (monochrome, grayscale, black and white, desaturated, sketch, line art,
+      ink drawing:1.4),
+      (cleavage, bikini, lingerie, revealing clothing, bare midriff, nsfw:1.5),
+      (character sheet, turnaround, concept sheet, model sheet, multiple views,
+      lineup, logo, title text:1.5),
+      (two characters, multiple creatures, separate figures, companion, pet,
+      baby, small creature beside it:1.5),
+      (sitting, seated, kneeling, crouching, cropped feet, medallion, badge,
+      circle frame, vignette:1.3),
+      (oversized head, big head, chibi, bobblehead, caricature:1.4),
+      (modern clothing, jacket, hoodie, jeans, zipper, coffee cup, paper
+      cup:1.3), (suit, necktie, blazer, business attire:1.3), colored lighting,
+      text, letters, watermark, frame, border, blurry, photo, photorealistic,
+      3d render, anime, manga, pixel art
+  cover:
+    render: { width: 1728, height: 576 }   # 3:1, an SDXL training size
+    positive: >-
+      (stylized hand-painted World of Warcraft art style:1.2), painterly
+      environment concept art, vibrant colours, wide panoramic view,
+      {{subject}}, no people, establishing shot
+    negative: >-
+      people, person, character, creature, monster, text, letters, watermark,
+      frame, border, blurry, photo, photorealistic, 3d render, pixel art
+
 # Height-based portraits (docs/images.md § Heights). Cards stand behind a
 # bar barFt tall, drawn at pxPerFt art pixels per foot at the bar. A
 # character with chrome.height shows (height − barFt) above it, at least
@@ -203,6 +281,19 @@ portrait:
 # characters keep their size's canvas.
 stage:
   barFt: 3.5
+  # Painted placement (scripts/src/lib/images/stage.ts): the frame shows
+  # frameFt above the bar. Everyone stands on the floor, so a figure drawn at
+  # its height has its head where it belongs; short folk stand on a stool
+  # (at least minVisibleFt shows, minHiddenFt stays hidden), the smallest
+  # stand on the bar (drawn at least minShownFt tall, so a pixie still
+  # reads), and anything taller than loomAboveFt looms in with its head at
+  # the top of the frame, drawn at most twice the frame's height.
+  frameFt: 6.5
+  minHiddenFt: 0.5
+  onBarMaxFt: 2.5
+  minShownFt: 0.8
+  loomAboveFt: 10
+  # Pixel mode: cards drawn at pxPerFt art pixels per foot.
   pxPerFt: 28
   headroom: 8
   minVisibleFt: 1.75

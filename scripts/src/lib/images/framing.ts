@@ -110,7 +110,7 @@ export function framingProblems(image: RgbaImage, rules: FramingRules): string[]
 }
 
 /** Share of visible pixels in the largest 4-connected shape. */
-function mainShare({ width, height, data }: RgbaImage): number {
+export function mainShare({ width, height, data }: RgbaImage): number {
   const seen = new Uint8Array(width * height);
   let total = 0;
   let largest = 0;
@@ -135,7 +135,8 @@ function mainShare({ width, height, data }: RgbaImage): number {
   return total === 0 ? 0 : largest / total;
 }
 
-function meanChroma({ data }: RgbaImage): number {
+/** Mean OKLab chroma of the visible pixels: below about 0.025 an image reads as greyscale. */
+export function meanChroma({ data }: RgbaImage): number {
   let sum = 0;
   let n = 0;
   for (let i = 0; i < data.length; i += 4) {

@@ -19,9 +19,14 @@ import { REPO_ROOT, loadCharacterChrome, loadCharacterRef, loadSnapshot, readYam
 import type { RepoRoot } from '../repo';
 import { seasonDir } from '../season';
 import { framingProblems } from './framing';
+import { checkPainted, paintedProblems } from './paint';
+import { pixelView } from './postprocess';
 import { checkSprite } from './pixelate';
-import { decodePng, pngSize } from './png';
-import { creatureSize, framingRules, glassAlpha, outputSize, paletteOf } from './style';
+import { decodePng, encodeIndexedPng, pngSize } from './png';
+import type { RgbaImage } from './png';
+import { placeOnStage } from './stage';
+import type { Placement } from './stage';
+import { creatureSize, framingRules, glassAlpha, outputSize, paintedRules, paletteOf, pixelViewOptions } from './style';
 import type { BodyPlan } from './body-plans';
 import type { CreatureSize, ImageKind, ImageStyle, PortraitShape } from './style';
 
@@ -159,29 +164,56 @@ export function stagedPaths(target: TargetKey, seed: number, root: RepoRoot = RE
   return { sprite: join(dir, `s${seed}.png`), render: join(dir, `s${seed}.render.png`), framing: join(dir, `s${seed}.framing.json`) };
 }
 
-/** Problems that would stop a staged candidate from being layered cleanly (none for covers). */
-export function candidateProblems(target: DraftTarget, sprite: Uint8Array, style: ImageStyle): string[] {
-  return target.kind === 'portrait' && target.size !== undefined ? framingProblems(decodePng(sprite), framingRules(style, shapeOfTarget(target)!)) : [];
+/**
+ * Problems that would stop a staged candidate from going on the stage (none
+ * for covers). Pixel: the card's framing (./framing.ts). Painted: the cut-out
+ * render, before trimming, must hold one whole figure (./paint.ts).
+ */
+export function candidateProblems(target: DraftTarget, sprite: Uint8Array, style: ImageStyle, render: Uint8Array): string[] {
+  if (target.kind !== 'portrait' || target.size === undefined) return [];
+  if (style.mode === 'painted') return paintedProblems(decodePng(render), paintedRules(style));
+  return framingProblems(decodePng(sprite), framingRules(style, shapeOfTarget(target)!));
 }
 
 /** What the review page needs about a staged candidate. */
 interface StagedFraming {
   readonly problems: ReadonlyArray<string>;
-  /** Rows the bar hides; 0 means the card stands on top of the bar. Absent for covers. */
+  /** Pixel portraits: rows the bar hides; 0 means the card stands on top of the bar. */
   readonly counter?: number;
+  /** Painted portraits with a height: where the figure stands on the stage, and the height it stands for. */
+  readonly placement?: Placement & { readonly heightFt: number };
 }
 
 /** Stage a candidate with its framing problems, for the review page. Returns the problems. */
 export function stage(target: DraftTarget, seed: number, render: Uint8Array, sprite: Uint8Array, style: ImageStyle, root: RepoRoot = REPO_ROOT): string[] {
   const paths = stagedPaths(target, seed, root);
-  const problems = candidateProblems(target, sprite, style);
-  const framing: StagedFraming =
-    target.kind === 'portrait' && target.size !== undefined ? { problems, counter: framingRules(style, shapeOfTarget(target)!).counter } : { problems };
+  const problems = candidateProblems(target, sprite, style, render);
+  const portrait = target.kind === 'portrait' && target.size !== undefined;
+  const framing: StagedFraming = !portrait
+    ? { problems }
+    : style.mode === 'pixel'
+      ? { problems, counter: framingRules(style, shapeOfTarget(target)!).counter }
+      : target.heightFt === undefined
+        ? { problems }
+        : { problems, placement: { ...placeOnStage(style, target.size!, target.heightFt), heightFt: target.heightFt } };
   mkdirSync(dirname(paths.sprite), { recursive: true });
   writeFileSync(paths.render, render);
   writeFileSync(paths.sprite, sprite);
   writeFileSync(paths.framing, `${JSON.stringify(framing)}\n`);
+  // Post-processed views of a painted portrait, at the size the stage draws it, for the review page.
+  if (framing.placement !== undefined && problems.length === 0) {
+    const original = decodePng(sprite);
+    for (const name of Object.keys(style.painted.views)) {
+      const view = pixelView(original, pixelViewOptions(style, name, framing.placement.shownFt, target.translucent));
+      writeFileSync(viewPath(paths.sprite, name), encodeIndexedPng(view));
+    }
+  }
   return problems;
+}
+
+/** A staged view of a candidate: s<seed>.<view>.png beside s<seed>.png. */
+function viewPath(sprite: string, name: string): string {
+  return sprite.replace(/\.png$/, `.${name}.png`);
 }
 
 /** Stage an imported image as a candidate, remembering its source file for accept. */
@@ -215,14 +247,10 @@ export function accept(target: DraftTarget, seed: number, style: ImageStyle, roo
   if (!existsSync(staged)) {
     throw new ValidationFailure(`no staged ${target.kind} for ${target.id} with seed ${seed} (looked for ${relative(rootDir(root), staged)})`);
   }
-  const problems = checkSprite(
-    decodePng(readFileSync(staged)),
-    outputSize(style, target.kind, shapeOfTarget(target)),
-    paletteOf(style, target.kind),
-    glassAlpha(style, target.kind, target.translucent),
-  );
+  const problems = storedImageProblems(decodePng(readFileSync(staged)), target.kind, shapeOfTarget(target), target.translucent, style);
   if (problems.length > 0) throw new ValidationFailure(`${relative(rootDir(root), staged)} ${problems.join('; ')}`);
-  const framing = candidateProblems(target, readFileSync(staged), style);
+  const render = stagedPaths(target, seed, root).render;
+  const framing = candidateProblems(target, readFileSync(staged), style, existsSync(render) ? readFileSync(render) : new Uint8Array());
   if (framing.length > 0 && !force) {
     throw new ValidationFailure(
       `${relative(rootDir(root), staged)} can't be layered cleanly: it ${framing.join('; ')}. Pick another seed, or pass --force to accept it anyway.`,
@@ -248,6 +276,24 @@ export function accept(target: DraftTarget, seed: number, style: ImageStyle, roo
   return relative(rootDir(root), target.destination);
 }
 
+/**
+ * Whether a stored image is what the style makes. Pixel: a palette sprite of
+ * the canvas size. Painted: a portrait trimmed to one figure, or an opaque
+ * cover of the output size.
+ */
+export function storedImageProblems(
+  image: RgbaImage,
+  kind: ImageKind,
+  shape: PortraitShape | undefined,
+  translucent: boolean | undefined,
+  style: ImageStyle,
+): string[] {
+  if (style.mode === 'painted') {
+    return kind === 'cover' ? checkPainted(image, style.painted.cover.render) : checkPainted(image, 'portrait', paintedRules(style));
+  }
+  return checkSprite(image, outputSize(style, kind, shape), paletteOf(style, kind), glassAlpha(style, kind, translucent));
+}
+
 // ── review page ────────────────────────────────────────────────────────────
 
 /** Rewrite .image-drafts/index.html: every staged candidate, scaled up, with the command that accepts it. */
@@ -269,23 +315,23 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
       .map((f) => /^s(\d+)\.png$/.exec(f)?.[1])
       .filter((seed): seed is string => seed !== undefined)
       .sort((a, b) => Number(a) - Number(b));
-    const scale = target.kind === 'portrait' ? 3 : 4;
+    const scale = style.mode === 'painted' ? 1 : target.kind === 'portrait' ? 3 : 4;
     const which = target.kind === 'portrait' ? `--character ${target.id}` : `--season ${target.season} --mission ${target.id}`;
     const cards = seeds.map((seed) => {
       const src = `${segments.join('/')}/s${seed}`;
-      // Portraits differ in size by creature size; show each at its own size so they compare as they'll appear.
-      const { width, height } = pngSize(readFileSync(join(base, `${src}.png`)));
-      // Portraits show the bar as the scene will: in front of the card, or under a card standing on it.
       const framing = readFraming(join(base, `${src}.framing.json`));
-      const counter = framing?.counter;
-      const bar =
-        counter === undefined
-          ? ''
-          : counter > 0
-            ? `<div class="bar" style="height:${counter * scale}px"></div>`
-            : `<div class="bar under" style="height:${style.portrait.counter * scale}px"></div>`;
+      const alt = `${target.kind} ${target.id} seed ${seed}`;
+      const card = framing?.placement !== undefined ? stageCard(`${src}.png`, alt, framing.placement, style) : spriteCard(`${src}.png`, alt, join(base, `${src}.png`), framing?.counter, scale, style);
+      const views = Object.keys(style.mode === 'painted' ? style.painted.views : {})
+        .filter((name) => existsSync(viewPath(join(base, `${src}.png`), name)))
+        .map((name) => {
+          const { width, height } = pngSize(readFileSync(viewPath(join(base, `${src}.png`), name)));
+          const zoom = Math.max(1, Math.floor(Math.min(160 / width, 240 / height)));
+          return `<img class="sprite pixel" src="${viewPath(`${src}.png`, name)}" width="${width * zoom}" height="${height * zoom}" alt="${name} view" title="${name}">`;
+        });
       return `<figure>
-  <div class="card"><img class="sprite" src="${src}.png" width="${width * scale}" height="${height * scale}" alt="${target.kind} ${target.id} seed ${seed}">${bar}</div>
+  ${card}
+  ${views.length > 0 ? `<div class="views">${views.join('')}</div>` : ''}
   <img class="render" src="${src}.render.png" alt="raw render">
   ${framingNote(framing)}
   <figcaption>seed ${seed}<code>pnpm draft-images accept ${which} --seed ${seed}</code></figcaption>
@@ -293,6 +339,45 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
     });
     return `<section><h2>${target.kind}: ${target.season === undefined ? '' : `${target.season} / `}${target.id}</h2><div class="row">${cards.join('\n')}</div></section>`;
   });
+  return writePage(base, sections);
+}
+
+/**
+ * A staged image at its own size. Pixel portraits differ in size by creature
+ * size, and show the bar as the scene will: in front of the card, or under a
+ * card standing on it.
+ */
+function spriteCard(src: string, alt: string, file: string, counter: number | undefined, scale: number, style: ImageStyle): string {
+  const { width, height } = pngSize(readFileSync(file));
+  const bar =
+    counter === undefined
+      ? ''
+      : counter > 0
+        ? `<div class="bar" style="height:${counter * scale}px"></div>`
+        : `<div class="bar under" style="height:${style.portrait.counter * scale}px"></div>`;
+  const pixel = style.mode === 'pixel' ? ' pixel' : '';
+  return `<div class="card"><img class="sprite${pixel}" src="${src}" width="${width * scale}" height="${height * scale}" alt="${alt}">${bar}</div>`;
+}
+
+/** Review-page pixels per foot on the painted stage. */
+const FT = 32;
+const BAR = 26;
+
+/**
+ * A painted portrait on a slice of the stage, at its true height
+ * (./stage.ts): behind the bar, standing on it, or looming in from the left.
+ */
+function stageCard(src: string, alt: string, placement: NonNullable<StagedFraming['placement']>, style: ImageStyle): string {
+  const { frameFt } = style.stage;
+  const { where, shownFt, topFt, heightFt } = placement;
+  const top = Math.round((frameFt - topFt) * FT);
+  return `<div class="stage ${where}" style="height:${Math.round(frameFt * FT) + BAR}px">
+    <img src="${src}" alt="${alt}" style="top:${top}px;height:${Math.round(shownFt * FT)}px">
+    <div class="bar" style="height:${BAR}px"></div><span class="ft">${heightFt} ft</span>
+  </div>`;
+}
+
+function writePage(base: string, sections: ReadonlyArray<string>): string {
   const page = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -303,7 +388,15 @@ export function writeReviewPage(style: ImageStyle, root: RepoRoot = REPO_ROOT): 
   h2 { font-weight: 600; margin: 24px 0 8px; }
   .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
   figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
-  .sprite { image-rendering: pixelated; background: var(--tavern); display: block; }
+  .sprite { background: var(--tavern); display: block; }
+  .pixel { image-rendering: pixelated; }
+  .stage { position: relative; width: 300px; overflow: hidden; background: var(--tavern); }
+  .stage img { position: absolute; left: 50%; transform: translateX(-50%); }
+  .stage.loom img { left: 0; transform: none; }
+  .stage .bar { z-index: 1; }
+  .stage.bar img { z-index: 2; }
+  .views { display: flex; gap: 8px; align-items: flex-end; }
+  .ft { position: absolute; z-index: 3; right: 6px; bottom: 4px; font-size: 12px; color: #f3d9a4; }
   .card { position: relative; }
   .bar { position: absolute; left: 0; right: 0; bottom: 0; background: #5a3a22; border-top: 3px solid #8a5a32; }
   .bar.under { position: static; }
