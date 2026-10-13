@@ -2,13 +2,14 @@
  * The I/O half of the mock season: read a season folder through the scripts
  * loaders and hand `seasonParts` plain data.
  *
- * The folder keeps its own characters/ (like sims/fixtures/mock-season/), and
+ * The pool resolves against the folder's own characters/ when it has one,
+ * else the repo's characters/ (as sims/fixtures/mock-season/ does), and
  * every *.yaml directly in its missions/ (or missions/selected/) is a
  * selected mission. Each mission is checked with `validateMission` against
  * the season's rules, the snapshot and its week's environment before any run.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { validateMission } from '@league-of-taverns/engine';
 import type { Mission, MissionRules } from '@league-of-taverns/engine';
 import { ValidationFailure } from '@league-of-taverns/scripts/lib/main';
@@ -24,9 +25,15 @@ export function loadMockSeason(dir: string = DEFAULT_SEASON_DIR): SeasonInput {
   return seasonInput(loadMockSeasonParts(dir));
 }
 
+/** The absolute directory whose characters/ `dir`'s pool resolves against: `dir` itself when it has a characters/, else the repo root. */
+export function charactersRootOf(dir: string = DEFAULT_SEASON_DIR): string {
+  const own = resolve(rootDir(REPO_ROOT), dir);
+  return existsSync(join(own, 'characters')) ? own : rootDir(REPO_ROOT);
+}
+
 /** Load `dir` as plain `SeasonParts` (the full snapshot included). `loadMockSeason` is `seasonInput` of this. */
 export function loadMockSeasonParts(dir: string = DEFAULT_SEASON_DIR): SeasonParts {
-  const location: SeasonLocation = { dir, charactersRoot: dir };
+  const location: SeasonLocation = { dir, charactersRoot: charactersRootOf(dir) };
   const season = loadSeason(location);
   const { config } = season;
   const { battleModel: _battleModel, ...missionRules } = config.missions;

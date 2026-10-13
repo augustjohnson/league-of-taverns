@@ -1,5 +1,0 @@
-id: mock-troll
-base: troll
-status: active
-chrome:
-  name: Mock Troll

@@ -1,5 +1,0 @@
-id: mock-phase-spider
-base: phase-spider
-status: active
-chrome:
-  name: Mock Phase Spider

@@ -51,7 +51,7 @@ import {
   type LuckSeason,
   type TitleOddsPoint,
 } from '../reports';
-import { seasonInputFromData, type PlaygroundData } from './data';
+import { seasonInputFromData, type PlaygroundChrome, type PlaygroundData } from './data';
 import {
   actorLabel,
   aggregateRows,
@@ -196,6 +196,37 @@ function cryptoRand(): number {
 function charLabel(id: string): string {
   const s = input.statsOf(id);
   return `${esc(id)} <span class="muted small">${esc(s.base.typeName)} · CR ${formatCr(crOf(id))}</span>`;
+}
+
+// ── character chrome ───────────────────────────────────────────────────────
+
+const chromeOf = (id: string): PlaygroundChrome | undefined => data.chrome[id];
+/** The chrome name, or the id when the season has no chrome for the character. */
+const charName = (id: string): string => chromeOf(id)?.name ?? id;
+
+/** Name in bold, then the epithet, muted. */
+function charTitle(id: string): string {
+  const epithet = chromeOf(id)?.epithet;
+  return `<b>${esc(charName(id))}</b>${epithet === undefined ? '' : ` <span class="muted">${esc(epithet)}</span>`}`;
+}
+
+/** The portrait in a square frame (sm 28 px, md 44, lg 80), feet on the frame's floor; the name's initial when there is none. */
+function portrait(id: string, size: 'sm' | 'md' | 'lg'): string {
+  const src = chromeOf(id)?.portrait;
+  return src === undefined
+    ? `<span class="pt ${size} none" aria-hidden="true">${esc(charName(id).charAt(0).toUpperCase())}</span>`
+    : `<img class="pt ${size}" src="${esc(src)}" alt="" title="${esc(charName(id))}">`;
+}
+
+/** Portrait, name and base on one line, for lists. */
+function charFace(id: string): string {
+  const s = input.statsOf(id);
+  return `<span class="face">${portrait(id, 'sm')}<span>${charTitle(id)} <span class="muted small">${esc(s.base.typeName)} · CR ${formatCr(crOf(id))}</span></span></span>`;
+}
+
+/** A draft board cell's contents: pick number, portrait and name. */
+function draftPick(pick: number, id: string): string {
+  return `<span class="face">${portrait(id, 'sm')}<span><span class="pk">#${pick + 1}</span> <span class="ch">${esc(charName(id))}</span></span></span>`;
 }
 
 // ── mission graph ──────────────────────────────────────────────────────────
@@ -1052,7 +1083,7 @@ function renderDraft(r: Run): string {
           .map((c) => {
             if (c === null) return '<td></td>';
             const s = input.statsOf(c.character);
-            return `<td class="${draftUi.hot === c.tavern ? 'hot' : ''}"><span class="pk">#${c.pick + 1}</span> <span class="ch">${esc(c.character)}</span><div class="muted small">${esc(s.base.typeName)} · CR ${formatCr(crOf(c.character))}</div></td>`;
+            return `<td class="${draftUi.hot === c.tavern ? 'hot' : ''}">${draftPick(c.pick, c.character)}<div class="muted small">${esc(s.base.typeName)} · CR ${formatCr(crOf(c.character))}</div></td>`;
           })
           .join('')}</tr>`,
     )
@@ -1347,18 +1378,20 @@ function charRow(id: string, action: string, extra = ''): string {
     .map(([k, v]) => `${k} ${v}`)
     .join(', ');
   return (
-    `<tr><td>${action}</td><td><b>${esc(id)}</b><div class="muted small">${esc(s.base.typeName)}</div></td><td class="n">${formatCr(crOf(id))}</td>` +
+    `<tr><td>${action}</td><td class="pt-cell">${portrait(id, 'md')}</td><td>${charTitle(id)}<div class="muted small">${esc(s.base.typeName)}</div></td><td class="n">${formatCr(crOf(id))}</td>` +
     `<td class="small">${topSkills(s)
       .map((t) => `${esc(t.skill.replaceAll('_', ' '))} ${signed(t.modifier)}`)
       .join(', ')}</td><td class="small muted">${esc(moves || '-')}</td><td class="n small">${s.base.ac} / ${s.base.hp}</td>${extra}</tr>`
   );
 }
-const CHAR_HEAD = '<th></th><th>character</th><th class="n">CR</th><th>best skills</th><th>moves</th><th class="n">AC / HP</th>';
+const CHAR_HEAD = '<th></th><th></th><th>character</th><th class="n">CR</th><th>best skills</th><th>moves</th><th class="n">AC / HP</th>';
 
 function matchesFilter(id: string, q: string): boolean {
   if (q === '') return true;
   const s = input.statsOf(id);
-  return id.includes(q) || s.base.slug.includes(q) || s.base.typeName.toLowerCase().includes(q) || topSkills(s).some((t) => t.skill.includes(q));
+  const c = chromeOf(id);
+  const named = c !== undefined && `${c.name} ${c.epithet ?? ''}`.toLowerCase().includes(q);
+  return named || id.includes(q) || s.base.slug.includes(q) || s.base.typeName.toLowerCase().includes(q) || topSkills(s).some((t) => t.skill.includes(q));
 }
 
 function renderPlay(): string {
@@ -1431,23 +1464,35 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     .map(
       (row) =>
         `<tr class="${row.direction}"><td class="rd">R${row.round}</td>${row.cells
-          .map((c) => (c === null ? '<td></td>' : `<td class="${c.tavern === me ? 'hot' : ''}"><span class="pk">#${c.pick + 1}</span> <span class="ch">${esc(c.character)}</span></td>`))
+          .map((c) => (c === null ? '<td></td>' : `<td class="${c.tavern === me ? 'hot' : ''}">${draftPick(c.pick, c.character)}</td>`))
           .join('')}</tr>`,
     )
     .join('');
   return (
     `<section class="card"><div class="row" style="justify-content:space-between"><h2>You are on the clock</h2><span class="muted small">pick #${pick + 1}, round ${Math.floor(pick / n) + 1} of ${config.draft.rounds}</span></div>` +
-    (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(p.character)}</b>`).join('; ')}.</p>`) +
-    `<p class="small">Advisor (${esc(tavernById.get(me)?.bot ?? '?')}) suggests <b>${esc(advice)}</b> <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
-    `<button type="button" class="small" data-action="play-draft" data-id="${esc(advice)}">Take it</button></p>` +
+    (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(charName(p.character))}</b>`).join('; ')}.</p>`) +
+    renderAdvice(me, advice) +
     `<div class="cols"><div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
-    (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<ul class="stack" style="list-style:none;margin:0;padding:0">${mine.map((id) => `<li>${charLabel(id)}</li>`).join('')}</ul>`) +
+    (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<ul class="stack" style="list-style:none;margin:0;padding:0">${mine.map((id) => `<li>${charFace(id)}</li>`).join('')}</ul>`) +
     `<p class="hint">Each week you start ${config.roster.starters} with total CR at most ${formatCr(BUDGET)}.</p></div>` +
-    `<div class="stack"><div class="row"><span class="label">Free agents</span><input type="text" id="play-filter" placeholder="Filter by id, base or skill" value="${esc(play.filter)}" data-action="play-filter"></div>` +
-    `<div id="play-fa" class="scroll" style="max-height:420px;overflow-y:auto"><table><thead><tr>${CHAR_HEAD}</tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">No match.</td></tr>'}</tbody></table></div></div></div></section>` +
+    `<div class="stack"><div class="row"><span class="label">Free agents</span><input type="text" id="play-filter" placeholder="Filter by name, base or skill" value="${esc(play.filter)}" data-action="play-filter"></div>` +
+    `<div id="play-fa" class="scroll" style="max-height:420px;overflow-y:auto"><table><thead><tr>${CHAR_HEAD}</tr></thead><tbody>${rows || '<tr><td colspan="7" class="muted">No match.</td></tr>'}</tbody></table></div></div></div></section>` +
     `<section class="card"><h3>Draft board</h3><div class="scroll"><table class="draft"><thead><tr><th>round</th>${s.state.draft.order
       .map((t) => `<th class="${t === me ? 'hot' : ''}">${esc(tavernName(t))}</th>`)
       .join('')}</tr></thead><tbody>${boardRows || `<tr><td colspan="${n + 1}" class="muted">No picks yet.</td></tr>`}</tbody></table></div></section>`
+  );
+}
+
+/** The advisor's pick as a card: portrait, name, base and tagline, and a button to take it. */
+function renderAdvice(me: string, id: string): string {
+  const s = input.statsOf(id);
+  const tagline = chromeOf(id)?.tagline;
+  return (
+    `<div class="advice">${portrait(id, 'lg')}<div class="stack" style="gap:2px">` +
+    `<span class="label">Advisor (${esc(tavernById.get(me)?.bot ?? '?')}) suggests</span>` +
+    `<div>${charTitle(id)}</div><div class="muted small">${esc(s.base.typeName)} · CR ${formatCr(crOf(id))}</div>` +
+    (tagline === undefined ? '' : `<p class="small tagline">${esc(tagline)}</p>`) +
+    `<div><button type="button" class="small" data-action="play-draft" data-id="${esc(id)}">Take it</button></div></div></div>`
   );
 }
 

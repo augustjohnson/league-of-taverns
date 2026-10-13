@@ -65,12 +65,19 @@ pnpm --filter @league-of-taverns/sims playground -- [--dir sims/fixtures/mock-se
 ```
 
 Then open `sims/output/playground/index.html` directly in a browser (no server
-needed). The file is git-ignored and about 0.7 MB. It loads seed `sim-1` on
-open. The tabs:
+needed). The file is git-ignored and about 1.5 MB: half of it is a 160 px
+thumbnail of each pooled character's painted portrait, cut at build time
+(`playgroundChrome`). Names, epithets and portraits are chrome: the page
+shows them, and they never reach `seasonInput`. The mock season pools 48 of
+the real cast (`sims/fixtures/mock-season/pool.yaml`, with mock-season
+modifiers), so every character has a face. It loads seed `sim-1` on open.
+The tabs:
 
 - **Play vs bots:** manage one tavern yourself against the bots. Pick a
-  tavern and a seed and start; draft when you are on the clock, then before
-  each week set a lineup (with `validateLineup`, the projection and the
+  tavern and a seed and start; draft when you are on the clock (the
+  advisor's pick shows as a card with portrait and tagline, and free agents,
+  your roster and the board show portraits), then before each week set a
+  lineup (with `validateLineup`, the projection and the
   mission graph live) and make waiver claims, and press Play week. The bots
   draft, set lineups and claim through the same `SeasonSession`. Your tavern's
   bot stays on as an advisor that can suggest a pick, a lineup or claims.
