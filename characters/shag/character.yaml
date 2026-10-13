@@ -14,5 +14,5 @@ chrome:
     prompt: shaggy burnt-orange rug with tasselled edges, a large suspicious brown stain and two woven eyes, (sly lurking stare:1.3)
     bodyPlan: object
     path: portrait.png
-    seed: 823958787
+    imported: shag-gemini-1.webp
   height: 6
