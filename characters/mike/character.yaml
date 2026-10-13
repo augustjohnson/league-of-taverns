@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Mike
   epithet: the Life of the Party
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Nobody remembers anything after he arrives. Everyone wakes up purple.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: chunky violet mushroom with white spots, drooping tendrils and small round smoked-glass spectacles, (blissed-out lazy smile:1.3)

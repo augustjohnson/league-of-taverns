@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Morga Thane
   epithet: the Poet
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Writes tender sonnets about the moon. Every one rhymes with "smash".
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: broad grey-green orc woman with a broken left tusk, a quill behind her ear and small round reading glasses, (dreamy wistful smile:1.3)

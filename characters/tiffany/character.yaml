@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Tiffany
   epithet: the Regular
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Drinks from the same three people every week. They have stopped complaining.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: brown leathery bat-winged stirge with a long needle proboscis, one milky white eye and a tiny pearl stud in one ear, (patient half-lidded gaze:1.3)

@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Hyekh!k'ka'a
   epithet: Laughs First
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Has never finished a joke. Starts laughing at the setup.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: spotted tan hyena-headed gnoll with a notched ear, a gold canine tooth and a loud striped vest, (wide-open howling laugh:1.3)

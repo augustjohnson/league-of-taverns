@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Grimbold
   epithet: the Complaint
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Has written a strongly worded letter to every mountain he has lived under.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: ash-grey dwarf with a long beard braided into tight knots, a quill pen tucked into the beard and an iron helm, (bitter permanent scowl:1.3)

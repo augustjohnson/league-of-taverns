@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Pudding
   epithet: Dessert
+  pronouns: { subject: it, object: it, possessive: its }
   tagline: Looks like dessert. Eats like a siege engine.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: glossy black blob of pudding with a single red cherry on top, (gleeful gooey grin:1.3)

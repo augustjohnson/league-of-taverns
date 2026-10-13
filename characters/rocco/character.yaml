@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Rocco
   epithet: the Collector
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Petrifies anything he likes and keeps it in his museum, which is a field.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: scraggly rooster-lizard cockatrice with orange wattles, a bald patch on its neck and a chunky gold chain, (puffed-up proud stare:1.3)

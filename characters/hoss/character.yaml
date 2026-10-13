@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Hoss
   epithet: the Swallower
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Has swallowed three teammates. They recovered. None will discuss it.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: enormous brown warty toad with a white scar across his back and a boot sticking out of his mouth, (sleepy contented expression:1.3)

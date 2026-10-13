@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Wren Ashby
   epithet: the Lifter
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: tiny pink-skinned fairy woman with absurdly muscular arms, cropped silver hair and small folded dragonfly wings, (fully clothed in a plain brown linen tunic:1.3), (intense focused stare:1.3)

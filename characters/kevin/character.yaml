@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Kevin
   epithet: Weekends Only
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Only turns when the full moon falls on a Saturday. Plans his whole life around it.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: shaggy grey werewolf with reading glasses, in a patched wool nightshirt and nightcap, holding a clay mug of mead, (tired resigned expression:1.3)

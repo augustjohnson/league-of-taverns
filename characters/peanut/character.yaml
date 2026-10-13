@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Peanut
   epithet: Remembers Everything
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Keeps a written list of everyone who has ever wronged her. The list has a second volume.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: (close view of the head, ears and shoulders of a huge elephant with natural grey skin:1.4), one broken tusk and a tiny leather-bound journal tucked behind her ear, (narrow-eyed grudge-holding glare:1.3)

@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Patsy
   epithet: the Laugher
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Laughs at funerals, apologies and her own injuries. Mostly her own injuries.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: big spotted hyena with a torn left ear and tears of laughter running down her face, (uncontrollable cackle:1.3)

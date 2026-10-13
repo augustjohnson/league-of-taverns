@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Mortimer
   epithet: Notary
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Requires a signed form before he will pass the salt.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: small red imp with bat wings and one horn capped in brass, holding a quill and a wax seal stamp, (fussy glare:1.3)

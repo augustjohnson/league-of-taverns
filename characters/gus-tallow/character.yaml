@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Gus Tallow
   epithet: Two Pockets
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Owns two pockets. Both were stolen, off different trousers.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: stubbly sunburnt man with a crooked broken nose, an eyepatch worn up on his forehead and a mismatched patched vest, (shifty sideways glance:1.3)

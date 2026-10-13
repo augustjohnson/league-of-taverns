@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Uncle Amon
   epithet: Unravelling
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Four thousand years old. Still trailing linen behind him everywhere he goes.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: dusty tan mummy with loose bandages trailing off one arm and one glowing green eye, (sheepish grin:1.3)

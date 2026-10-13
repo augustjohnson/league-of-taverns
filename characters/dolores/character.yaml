@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Dolores
   epithet: the Chest
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Does a flawless treasure chest, a passable barrel and an upsetting wardrobe.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: brown wooden treasure chest with brass corners, one corner missing, a long pink tongue and red lipstick on jagged teeth, (seductive toothy grin:1.3)

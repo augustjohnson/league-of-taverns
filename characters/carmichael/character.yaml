@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Carmichael
   epithet: Sideways
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Has never moved forward. Describes this as a strategy, when asked and when not.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: big orange crab with one oversized barnacle-crusted claw, a cracked shell plate and a knotted cloth headband, (blank beady stare:1.3)

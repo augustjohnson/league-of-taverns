@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Helga Dunn
   epithet: Hall of Fame
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Has started a brawl in every tavern on the continent. Finished most of them herself.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: ruddy blonde woman with thick braids, a missing front tooth and a scar through one eyebrow, holding a broken bottle, (feral grin:1.3)

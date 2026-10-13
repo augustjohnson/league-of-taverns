@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Gary Pell
   epithet: from Accounting
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Died at his desk in 1102. Has not missed a day since.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: grey-green zombie man in a stained grey wool tunic, missing his left ear, ink-stained fingers holding a dented pewter tankard, (dead-eyed polite smile:1.3)

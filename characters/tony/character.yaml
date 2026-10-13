@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Tony
   epithet: Can't Clap
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: The most dangerous thing in the league. Defeated daily by doorknobs, high-fives and shirts.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: huge green tyrannosaurus with a scarred snout and tiny arms straining toward a wooden tankard balanced on its own head, (frustrated toothy grimace:1.3)

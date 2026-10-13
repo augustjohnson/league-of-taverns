@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Zh'aaʔl
   epithet: Good Boy (Allegedly)
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Fetches anything you throw. Sets it on fire first. Brings back the ashes.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: black hell-hound with a white patch over one eye, flames curling from its mouth and a spiked red collar, (happy panting dog smile:1.3)

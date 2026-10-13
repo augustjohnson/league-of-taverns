@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Vʁʁaał
   epithet: Can't Stay Down
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Has died nine times this season. Attended every post-match party.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: lanky mossy-green troll with a long hooked nose, bandages and one smaller regrowing arm, (cheerful unbothered grin:1.3)

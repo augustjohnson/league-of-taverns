@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Lenore
   epithet: the Tongue
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Has caught flies, coins, a lute and, on two occasions, the bard.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: fat green frog with a yellow throat, a gold hoop earring and a long pink tongue hanging out, (heavy-lidded smirk:1.3)

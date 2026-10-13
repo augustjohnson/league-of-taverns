@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Vera Shrike
   epithet: Karaoke
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Has won every singing contest she has entered. The judges left early each time.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: bird-woman harpy with wild teal feathered hair and a chipped beak, holding a battered brass speaking trumpet, (mid-song open mouth:1.3)

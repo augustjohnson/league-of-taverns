@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Mavis
   epithet: Salon Owner
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Gives the worst haircuts in the realm. No client has complained, or moved, since.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: green-skinned medusa with hissing snakes for hair tied up with ribbons and round smoked-glass spectacles, (bored gum-chewing smirk:1.3)

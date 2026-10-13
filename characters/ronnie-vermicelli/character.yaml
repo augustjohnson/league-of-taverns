@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Ronnie Vermicelli
   epithet: Lounge Singer
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Changes at the full moon. Does a full set every time, stage or no stage.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: rat-man wererat with slicked-back black hair and a chipped front incisor, in a gaudy maroon ruffled shirt open at the collar, (crooning eyes-closed smile:1.3)

@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Babble
   epithet: the Group Chat
+  pronouns: { subject: they, object: them, possessive: their }
   tagline: Forty mouths, forty opinions. None of them has read the plan.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: lumpy pink mass of flesh covered in eyes and mouths, one mouth with a gold tooth, (every mouth talking at once:1.3)

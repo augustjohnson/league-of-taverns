@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Wendell
   epithet: Lost and Found
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Contains three hundred items, sixty coins and a man named Phil, who says he's fine.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: (a big perfectly clear gelatinous cube like a giant ice cube:1.4), faintly green, sharp straight edges, (a leather boot, gold coins and a startled bearded man's face frozen inside it:1.3)

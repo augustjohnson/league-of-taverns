@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Thüŋk
   epithet: Eats for Two
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Ate the opposing team's mascot, then their snacks, then their bench.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: fat ruddy hill giant with a cauliflower ear and gravy stains down his tunic, holding a turkey leg, (greedy mouth-full grin:1.3)

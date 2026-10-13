@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Vix Dunmore
   epithet: the Landlord
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Has declared ownership of eleven caves. Collects rent from the bats.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: small rust-red kobold with a chipped left horn and a brass ring through one nostril, wearing a battered felt hat, a ledger under one arm, (flat businesslike stare:1.3)

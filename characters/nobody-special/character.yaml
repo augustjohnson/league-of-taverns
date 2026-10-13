@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Nobody Special
   epithet: Literally Anyone
+  pronouns: { subject: they, object: them, possessive: their }
   tagline: Appears in every team portrait as a different person. Denies being in any of them.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: grey smooth-skinned featureless humanoid wearing an obviously fake black mustache, (blank innocent expression:1.3)

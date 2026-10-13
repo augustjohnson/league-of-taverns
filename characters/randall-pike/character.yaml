@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Randall Pike
   epithet: Wedding Guest
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Has attended four hundred weddings. Was invited to none.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: curly-haired satyr with one curled horn and one broken stub, a wreath of wilted flowers and a tin whistle in his mouth, (cheeky wink:1.3)

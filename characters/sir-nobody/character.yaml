@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Sir Nobody
   epithet: the Empty Suit
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: There is no one inside. He has never been more sure of anything.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: dented silver plate armour with a deep dent in the breastplate, the visor open on darkness and a limp blue plume, (puffed-out heroic pose:1.2)

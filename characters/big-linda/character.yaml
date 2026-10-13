@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Big Linda
   epithet: Den Mother
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Hugs every teammate after every fight. The hugs have a body count.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: (huge brown grizzly bear:1.4), (dark brown fur:1.2), a grey muzzle, (a plain white cloth apron tied around her chest:1.2) and a wooden spoon tucked behind her ear, (warm motherly smile:1.3)

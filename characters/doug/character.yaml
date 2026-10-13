@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Doug
   epithet: Fully Grown
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: The size of a loaf of bread. Does not want to discuss loaves.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: (tiny red dragon with scales:1.4), a torn left wing, a scar across his snout and a small studded leather collar, (tough-guy scowl:1.3)

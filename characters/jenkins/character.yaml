@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Jenkins
   epithet: Directions
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Gives directions to everyone, unprompted. Has never once been right.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: glowing pale-blue orb of light with a smug little face, (helpful know-it-all smirk:1.3)
