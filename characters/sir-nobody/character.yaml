@@ -14,5 +14,5 @@ chrome:
     prompt: dented silver plate armour with a deep dent in the breastplate, the visor open on darkness and a limp blue plume, (puffed-out heroic pose:1.2)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 921593131
+    imported: sir-nobody-gemini-1.jpg
   height: 6
