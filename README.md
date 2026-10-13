@@ -68,7 +68,7 @@ engine/test/
 bots/                draft / lineup / waiver strategies
 scripts/             the I/O edge: snapshot, validate, draft-missions, difficulty-report,
                      draft-chrome, draft-images, lock-check, seal, reveal, apply-command,
-                     run-week, offseason, publish
+                     run-week, offseason, publish, package-characters
 sims/                mock-season runner + balance report (output git-ignored)
   src/playground/      browser playground: one HTML page running the real engine and
                        bots. Unlike explorer/, it may import the engine.
