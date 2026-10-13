@@ -15,5 +15,5 @@ chrome:
     bodyPlan: object
     translucent: true
     path: portrait.png
-    seed: 275686925
+    imported: wendell-gemini-1.webp
   height: 10
