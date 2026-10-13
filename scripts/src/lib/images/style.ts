@@ -80,6 +80,7 @@ const painted = z.strictObject({
     drift: z.strictObject({ words: z.array(text).min(1), negative: text }),
     tolerance: z.number().int().nonnegative(),
     minFill: z.number().min(0).max(1),
+    minChroma: z.number().nonnegative(),
     positive: text
       .refine(once(SUBJECT), `must contain ${SUBJECT} exactly once`)
       .refine(once(POSE), `must contain ${POSE} exactly once`)
@@ -398,6 +399,6 @@ export function pixelViewOptions(style: ImageStyle, name: string, shownFt: numbe
  * one-figure check.
  */
 export function paintedRules(style: ImageStyle, plan: BodyPlan = 'humanoid'): PaintedRules {
-  const { tolerance, minFill } = style.painted.portrait;
-  return { tolerance, minFill, minMainShare: plan === 'swarm' ? 0 : style.portrait.minMainShare, minChroma: style.portrait.minChroma };
+  const { tolerance, minFill, minChroma } = style.painted.portrait;
+  return { tolerance, minFill, minMainShare: plan === 'swarm' ? 0 : style.portrait.minMainShare, minChroma };
 }

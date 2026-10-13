@@ -234,9 +234,12 @@ painted:
       negative: (orc, green skin:1.3)
     # Checks on the cut-out render: the whole figure inside the canvas (a few
     # pixels of tolerance per edge), filling at least minFill of its height,
-    # one figure, in colour (portrait.minMainShare and minChroma).
+    # one figure (portrait.minMainShare), in colour. Painted shading is softer
+    # than a pixel sprite's, so the colour floor is lower: a grey-skinned
+    # golem in olive trousers measures 0.025, an ink drawing about 0.005.
     tolerance: 8
     minFill: 0.4
+    minChroma: 0.015
     positive: >-
       single character, hand-painted stylized fantasy character illustration,
       (World of Warcraft art style:1.1), painterly textures, vibrant saturated

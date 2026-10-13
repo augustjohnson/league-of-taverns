@@ -51,7 +51,9 @@ subject text ──▶ style.yaml `painted` wraps it ──▶ ComfyUI renders (
 - **Checks** (`scripts/src/lib/images/paint.ts`), on the cut-out render
   before it is trimmed: nothing on any edge (a cut-off figure can't be
   scaled to height), the figure spans at least 40% of the canvas height, one
-  figure (the largest shape holds 80% of the cutout), and not greyscale.
+  figure (the largest shape holds 80% of the cutout), and not greyscale
+  (mean colour at least 0.015, lower than pixel mode's 0.025: painted shading
+  is softer, and a grey-skinned golem in olive trousers measures 0.025).
 - **Translucency** works as in pixel mode: pale, washed-out parts become
   see-through, at most alpha 112.
 - **Covers** render at 1728×576 and are stored as rendered, opaque.
