@@ -11,6 +11,7 @@ import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } 
 import {
   draftBoard,
   formatCr,
+  formatCrTotal,
   layoutMission,
   partyFrom,
   rostersAtLock,
@@ -19,6 +20,7 @@ import {
   scoreHistogram,
   seedWords,
   topSkills,
+  waiverReasonLabel,
 } from '../src/playground/view';
 import { runMockSeason } from '../src/season-runner';
 
@@ -155,6 +157,8 @@ describe('view helpers', () => {
   it('formats CRs, scores, skills and seeds', () => {
     expect([0, 1, 2, 4, 8, 12, 96, 100].map(formatCr)).toEqual(['0', '1/8', '1/4', '1/2', '1', '1 1/2', '12', '12 1/2']);
     expect([0, 1, 0.5, 2 / 3, 0.8, 3 / 7].map(scoreFraction)).toEqual(['0', '1', '1/2', '2/3', '4/5', '3/7']);
+    expect([0, 2, 30, 58, 96, 100].map(formatCrTotal)).toEqual(['0', '0.25', '3.75', '7.25', '12', '12.5']);
+    expect(['awarded', 'add_unavailable', 'roster_full', 'something_new'].map(waiverReasonLabel)).toEqual(['awarded', 'already taken', 'roster full', 'something new']);
     const skills = topSkills(nodeInput.statsOf('mock-goblin'));
     expect(skills).toHaveLength(3);
     expect(skills[0]!.modifier).toBeGreaterThanOrEqual(skills[2]!.modifier);

@@ -69,17 +69,22 @@ needed). The file is git-ignored and about 0.7 MB. It loads seed `sim-1` on
 open. The tabs:
 
 - **Play vs bots:** manage one tavern yourself against the bots. Pick a
-  tavern and a seed and start; draft when you are on the clock, then before
-  each week set a lineup (with `validateLineup`, the projection and the
-  mission graph live) and make waiver claims, and press Play week. The bots
-  draft, set lineups and claim through the same `SeasonSession`. Your tavern's
-  bot stays on as an advisor that can suggest a pick, a lineup or claims.
-  Your events carry a `manager` actor. When the season ends it is audited
-  like any run and loads into the other tabs.
-- **Run bar:** any seed, Run, New seed; event count, the replay check
-  (`replayLog` deep-equals the built state), the verify check
-  (`verifyResolutions` finds no mismatches), run time, the NDJSON sha256 and
-  the champion.
+  tavern and a seed and start; draft when you are on the clock (free agents
+  sorted by the bots' `valueOf` rating, the advisor's pick marked), then
+  before each week set a lineup (starters and bench grouped, with
+  `validateLineup`, the projection and the mission graph live) and make waiver
+  claims, and press Play week, which locks in the lineup on screen (it stays
+  disabled while that lineup is illegal). The bots draft, set lineups and
+  claim through the same `SeasonSession`. Your tavern's bot stays on as an
+  advisor that can suggest a pick, a lineup or claims. Your events carry a
+  `manager` actor. The season is saved in the browser's localStorage as its
+  seed, tavern and your moves, and replayed on reload; New season asks for a
+  second click before abandoning one in progress. When the season ends it is
+  audited like any run and loads into the other tabs.
+- **Bot run bar** (hidden on the Play tab): any seed, Run, New seed; event
+  count, the replay check (`replayLog` deep-equals the built state), the
+  verify check (`verifyResolutions` finds no mismatches), run time, the NDJSON
+  sha256 and the champion.
 - **Standings:** total loot, weekly loot, each tavern's bot and the
   champion; each week's table with actual and projected points and checks
   passed; waiver outcomes.
@@ -104,8 +109,8 @@ open. The tabs:
   any mission: `validateLineup`, CR vs B, `checkOdds` per check, `battleOdds`
   and the `evTtkBreakdown` per battle, the projection and its score
   distribution; Roll once, and Roll 1,000 against the projection.
-- **Draft board, Pool, Event log** (filterable, pretty JSON, copy the NDJSON
-  to the clipboard) and **Batch**: the CLI's aggregate table for 10–200
+- **Draft board, Pool, Event log** (filterable, pretty JSON, Copy
+  events.ndjson to the clipboard) and **Batch**: the CLI's aggregate table for 10–200
   seasons, plus luck over the batch. A season's total loot is exactly its
   projected loot (strength) plus its loot above projection (luck), so it
   shows each one's share of the spread of totals within a season, the share
@@ -115,8 +120,9 @@ open. The tabs:
 
 How it is built: `src/build-playground.ts` loads the season with the scripts
 loaders (`loadMockSeasonParts`), serializes it with `serializeSeason`
-(`src/playground/data.ts`: the config, schedule, taverns, pool, missions and
-only the snapshot records used), bundles `src/playground/app.ts` with esbuild
+(`src/playground/data.ts`: the config, schedule, taverns, pool, missions,
+only the snapshot records used, and each pooled character's chrome name for
+display; names never reach the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI
 uses, so a seed gives the same season, byte for byte: the engine avoids

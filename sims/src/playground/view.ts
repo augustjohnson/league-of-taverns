@@ -51,7 +51,7 @@ export interface GraphLayout {
   readonly edges: ReadonlyArray<LaidOutEdge>;
 }
 
-export const GRAPH = { nodeW: 132, nodeH: 46, colGap: 46, rowGap: 22, pad: 14 } as const;
+export const GRAPH = { nodeW: 132, nodeH: 46, colGap: 32, rowGap: 22, pad: 14 } as const;
 
 /**
  * Lay a mission out as columns by rank. Within a column, nodes sit in the
@@ -257,6 +257,30 @@ export function formatCr(eighths: number): string {
     den /= 2;
   }
   return whole === 0 ? `${num}/${den}` : `${whole} ${num}/${den}`;
+}
+
+/**
+ * A CR total from eighths as a decimal: 58 → "7.25", 96 → "12". Totals are
+ * compared with the budget, and "7 1/4 of 12" reads like a ratio.
+ */
+export function formatCrTotal(eighths: number): string {
+  return String(Math.round((eighths / 8) * 1000) / 1000);
+}
+
+/** A waiver outcome reason in words. */
+export function waiverReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'awarded':
+      return 'awarded';
+    case 'add_unavailable':
+      return 'already taken';
+    case 'drop_not_owned':
+      return 'drop no longer on roster';
+    case 'roster_full':
+      return 'roster full';
+    default:
+      return reason.replaceAll('_', ' ');
+  }
 }
 
 export function signed(n: number): string {

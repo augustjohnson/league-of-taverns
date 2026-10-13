@@ -1,4 +1,5 @@
 <title>League of Taverns Playground</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Public+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
@@ -65,6 +66,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   background: var(--bg);
   color: var(--ink);
@@ -244,6 +246,21 @@ svg.odds .hit:hover { fill: color-mix(in srgb, var(--brass) 10%, transparent); }
 .legend i.par { width: 2px; height: 12px; background: var(--ink); opacity: 0.6; }
 .bar .track i.par { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.6; }
 .luck-ranks .bar { grid-template-columns: 3.4em 1fr 7em; }
+/* Tab groups: Play | the loaded season | tools */
+.tabs button.group-start { margin-left: 13px; position: relative; overflow: visible; }
+.tabs button.group-start::before { content: ''; position: absolute; left: -8px; top: 9px; bottom: 9px; width: 1px; background: var(--line); }
+.runbar-title { font-family: var(--font-display); font-size: 1.05rem; margin-right: 4px; }
+/* Small buttons stay big enough to hit */
+button.small { padding: 4px 10px; font-size: 12.5px; min-height: 28px; }
+/* Lineup builder: starters and bench as two labelled groups */
+tr.group td { background: var(--sunken); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; padding-block: 4px; }
+tr.group td b { color: var(--ink); }
+tr.advised td { background: var(--brass-soft); }
+td.skills { white-space: normal; min-width: 11em; }
+td.flow { white-space: normal; }
+.graph svg { height: auto; }
+.kv .v.muted { color: var(--muted); }
+#run-error.off-tab { display: none; }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 </style>
 
@@ -256,8 +273,9 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line)
     <button type="button" id="theme" title="Switch colour theme">Theme: auto</button>
   </header>
 
-  <section class="runbar" aria-label="Run a season">
+  <section class="runbar" id="runbar" aria-label="The bot run: a season with bots in every seat">
     <form id="run-form">
+      <span class="runbar-title">Bot run</span>
       <label class="label" for="seed">Seed</label>
       <input type="text" id="seed" value="sim-1" spellcheck="false" autocomplete="off">
       <button type="submit" class="primary" id="run">Run</button>
@@ -267,19 +285,19 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line)
   </section>
   <div id="run-error" class="error" hidden></div>
 
-  <nav class="tabs" role="tablist" id="tabs">
-    <button type="button" role="tab" data-tab="play" aria-selected="false">Play vs bots</button>
-    <button type="button" role="tab" data-tab="standings" aria-selected="true">Standings</button>
-    <button type="button" role="tab" data-tab="reports" aria-selected="false">Reports</button>
-    <button type="button" role="tab" data-tab="weeks" aria-selected="false">Weeks</button>
-    <button type="button" role="tab" data-tab="lab" aria-selected="false">Lineup lab</button>
-    <button type="button" role="tab" data-tab="draft" aria-selected="false">Draft board</button>
-    <button type="button" role="tab" data-tab="pool" aria-selected="false">Pool</button>
-    <button type="button" role="tab" data-tab="events" aria-selected="false">Event log</button>
-    <button type="button" role="tab" data-tab="batch" aria-selected="false">Batch</button>
+  <nav class="tabs" role="tablist" id="tabs" aria-label="Playground views">
+    <button type="button" role="tab" id="tab-play" aria-controls="panel" data-tab="play" aria-selected="false" tabindex="-1">Play vs bots</button>
+    <button type="button" role="tab" id="tab-standings" aria-controls="panel" data-tab="standings" aria-selected="true" class="group-start" title="The loaded season: the bot run, or your finished season">Standings</button>
+    <button type="button" role="tab" id="tab-weeks" aria-controls="panel" data-tab="weeks" aria-selected="false" tabindex="-1">Weeks</button>
+    <button type="button" role="tab" id="tab-draft" aria-controls="panel" data-tab="draft" aria-selected="false" tabindex="-1">Draft board</button>
+    <button type="button" role="tab" id="tab-reports" aria-controls="panel" data-tab="reports" aria-selected="false" tabindex="-1">Reports</button>
+    <button type="button" role="tab" id="tab-lab" aria-controls="panel" data-tab="lab" aria-selected="false" tabindex="-1" class="group-start" title="Tools">Lineup lab</button>
+    <button type="button" role="tab" id="tab-pool" aria-controls="panel" data-tab="pool" aria-selected="false" tabindex="-1">Pool</button>
+    <button type="button" role="tab" id="tab-events" aria-controls="panel" data-tab="events" aria-selected="false" tabindex="-1">Event log</button>
+    <button type="button" role="tab" id="tab-batch" aria-controls="panel" data-tab="batch" aria-selected="false" tabindex="-1">Batch</button>
   </nav>
 
-  <main id="panel" class="panel"><p class="muted">Running seed sim-1…</p></main>
+  <main id="panel" class="panel" role="tabpanel" aria-labelledby="tab-standings" tabindex="-1"><p class="muted">Running seed sim-1…</p></main>
 
   <footer>
     Runs the real <span class="mono">@league-of-taverns/engine</span> and bots in your browser. A seed gives the same season as
