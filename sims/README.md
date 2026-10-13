@@ -67,8 +67,9 @@ pnpm --filter @league-of-taverns/sims playground -- [--dir sims/fixtures/mock-se
 Then open `sims/output/playground/index.html` directly in a browser (no server
 needed). The file is git-ignored and about 1.5 MB: half of it is a 160 px
 thumbnail of each pooled character's painted portrait, cut at build time
-(`playgroundChrome`). Names, epithets and portraits are chrome: the page
-shows them, and they never reach `seasonInput`. The mock season pools 48 of
+(`playgroundChrome`). Names, epithets and portraits are chrome: every tab
+but the event log (which shows ids, as the NDJSON does) shows them, and
+they never reach `seasonInput`. The mock season pools 48 of
 the real cast (`sims/fixtures/mock-season/pool.yaml`, with mock-season
 modifiers), so every character has a face. It loads seed `sim-1` on open.
 The tabs:

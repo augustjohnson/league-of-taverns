@@ -193,10 +193,6 @@ function cryptoRand(): number {
   return a[0]! / 2 ** 32;
 }
 
-function charLabel(id: string): string {
-  const s = input.statsOf(id);
-  return `${esc(id)} <span class="muted small">${esc(s.base.typeName)} · CR ${formatCr(crOf(id))}</span>`;
-}
 
 // ── character chrome ───────────────────────────────────────────────────────
 
@@ -219,9 +215,19 @@ function portrait(id: string, size: 'sm' | 'md' | 'lg'): string {
 }
 
 /** Portrait, name and base on one line, for lists. */
-function charFace(id: string): string {
+function charLabel(id: string): string {
   const s = input.statsOf(id);
   return `<span class="face">${portrait(id, 'sm')}<span>${charTitle(id)} <span class="muted small">${esc(s.base.typeName)} · CR ${formatCr(crOf(id))}</span></span></span>`;
+}
+
+/** Portrait and name, compact, for inline mentions. */
+function charChip(id: string): string {
+  return `<span class="face">${portrait(id, 'sm')}<span>${esc(charName(id))}</span></span>`;
+}
+
+/** Several characters as chips that wrap. */
+function charList(ids: ReadonlyArray<string>): string {
+  return `<span class="faces">${ids.map(charChip).join('')}</span>`;
 }
 
 /** A draft board cell's contents: pick number, portrait and name. */
@@ -306,7 +312,7 @@ function rollLog(mission: Mission, run: RunResult, extra = ''): string {
       const gated = node?.kind === 'check' && node.check.requires !== undefined && meets && r.outcome === 'fail';
       const what = node?.kind === 'check' ? checkLabel(node.check) : '';
       return (
-        `<tr><td class="n">${i + 1}</td><td>${esc(r.node)}<div class="muted small">${esc(what)}</div></td><td>${esc(r.actor)}</td>` +
+        `<tr><td class="n">${i + 1}</td><td>${esc(r.node)}<div class="muted small">${esc(what)}</div></td><td>${charChip(r.actor)}</td>` +
         `<td><span class="die ${r.d20 === 20 ? 'hi' : r.d20 === 1 ? 'lo' : ''}">${r.d20}</span>${r.advantage ? ' <span class="tag brass">adv</span>' : ''}</td>` +
         `<td class="sum">${signed(r.modifier)} = <b>${total}</b> ${meets ? '≥' : '<'} DC ${r.dc}</td>` +
         `<td class="${r.outcome}">${r.outcome}${gated ? ' <span class="tag bad">gate</span>' : ''}</td></tr>`
@@ -465,7 +471,7 @@ function renderStandings(r: Run): string {
         w.waivers.length === 0
           ? ''
           : `<p class="small muted">Waivers after week ${w.week}: ${w.waivers
-              .map((x) => `${esc(tavernName(x.tavern))} +${esc(x.add)}${x.drop === null ? '' : ` −${esc(x.drop)}`} <span class="${x.awarded ? 'pass' : 'fail'}">${esc(x.reason)}</span>`)
+              .map((x) => `${esc(tavernName(x.tavern))} +${esc(charName(x.add))}${x.drop === null ? '' : ` −${esc(charName(x.drop))}`} <span class="${x.awarded ? 'pass' : 'fail'}">${esc(x.reason)}</span>`)
               .join('; ')}</p>`;
       return (
         `<div class="stack"><h3>Week ${w.week} <span class="muted small">${esc(w.mission)} · ${esc(environmentOf(w.week))}</span></h3>` +
@@ -646,7 +652,7 @@ function renderBench(bench: ReadonlyArray<BenchRow>): string {
     )
     .join('');
   const sel = bench.find((b) => b.tavern === reportsUi.tavern)!;
-  const ids = (xs: ReadonlyArray<string>): string => xs.map(esc).join(', ');
+  const ids = charList;
   const diff = (o: BenchOption, points: number, projected: number, showStarters = true): string => {
     const d = o.points === null ? null : o.points - points;
     const dp = o.projected - projected;
@@ -673,7 +679,7 @@ function renderBench(bench: ReadonlyArray<BenchRow>): string {
           ? '<span class="muted">no legal swap</span>'
           : !better(w.bestSwap)
             ? '<span class="muted">none better</span>'
-            : `<span class="fail">−${esc(w.bestSwap.out)}</span> <span class="pass">+${esc(w.bestSwap.in)}</span><div>${diff(w.bestSwap, w.points, w.projected, false)}</div>`;
+            : `<span class="fail">−${esc(charName(w.bestSwap.out))}</span> <span class="pass">+${esc(charName(w.bestSwap.in))}</span><div>${diff(w.bestSwap, w.points, w.projected, false)}</div>`;
       const rank =
         `${ordinal(w.rank)}` +
         (w.rankWithBest !== null && w.rankWithBest < w.rank ? ` <span class="pass" title="With the best same-dice lineup, everyone else unchanged">→ ${ordinal(w.rankWithBest)}</span>` : '');
@@ -764,7 +770,7 @@ function renderWeeks(r: Run): string {
       return (
         `<tr class="click ${tavern === weeksUi.tavern ? 'sel' : ''}" data-action="pick-tavern" data-tavern="${esc(tavern)}">` +
         `<td>${esc(tavernName(tavern))}</td><td><span class="tag">${esc(botOf(tavern))}</span></td><td class="muted">${esc(source)}</td>` +
-        `<td class="wrap-ok small">${lineup === null ? '—' : `<span class="cap">C</span>${esc(lineup.captain)}, ${lineup.allies.map(esc).join(', ')}`}</td>` +
+        `<td class="wrap-ok small">${lineup === null ? '—' : `<span class="faces"><span class="cap">C</span>${[lineup.captain, ...lineup.allies].map(charChip).join('')}</span>`}</td>` +
         `<td class="n">${res === undefined ? '—' : `${res.run.checksPassed}/${res.run.checksAttempted}`}</td>` +
         `<td class="n"><b>${res?.points ?? 0}</b></td><td class="n muted">${res === undefined ? '—' : res.projectedPoints.toFixed(1)}</td>` +
         `<td>${res?.run.dnf === true ? '<span class="fail">DNF</span>' : ''}</td></tr>`
@@ -867,7 +873,7 @@ function renderLab(r: Run): string {
     `<button type="button" data-action="lab-load" ${lab.roster === 'pool' ? 'disabled' : ''}>Load its locked lineup</button>` +
     `<button type="button" data-action="lab-clear">Clear</button></div>` +
     `<div class="cols"><div class="stack"><span class="label">Party (lineup order)</span><div id="lab-party">${renderLabParty()}</div></div>` +
-    `<div class="stack"><div class="row"><span class="label">Candidates</span><input type="text" id="lab-filter" placeholder="Filter by id, base or skill" value="${esc(lab.filter)}" data-action="lab-filter"></div>` +
+    `<div class="stack"><div class="row"><span class="label">Candidates</span><input type="text" id="lab-filter" placeholder="Filter by name, base or skill" value="${esc(lab.filter)}" data-action="lab-filter"></div>` +
     `<div id="lab-cands" class="scroll" style="max-height:340px;overflow-y:auto">${renderLabCandidates(r)}</div></div></div></section>` +
     `<div id="lab-analysis" class="panel">${renderLabAnalysis(r)}</div>`
   );
@@ -895,11 +901,7 @@ function renderLabCandidates(r: Run): string {
   const ids = lab.roster !== 'pool' && lab.onlyRoster ? rosterIds : poolIds;
   const q = lab.filter.trim().toLowerCase();
   const rows = ids
-    .filter((id) => {
-      if (q === '') return true;
-      const s = input.statsOf(id);
-      return id.includes(q) || s.base.slug.includes(q) || s.base.typeName.toLowerCase().includes(q) || topSkills(s).some((t) => t.skill.includes(q));
-    })
+    .filter((id) => matchesFilter(id, q))
     .map((id) => {
       const s = input.statsOf(id);
       const chosen = lab.picks.includes(id);
@@ -910,14 +912,14 @@ function renderLabCandidates(r: Run): string {
         .join(', ');
       return (
         `<tr class="${chosen ? 'sel' : ''}"><td><button type="button" class="${chosen ? '' : 'primary'} small" data-action="${chosen ? 'lab-remove' : 'lab-add'}" data-id="${esc(id)}" ${!chosen && full ? 'disabled' : ''}>${chosen ? 'remove' : 'add'}</button></td>` +
-        `<td>${esc(id)}<div class="muted small">${esc(s.base.typeName)}</div></td><td class="n">${formatCr(crOf(id))}</td>` +
+        `<td class="pt-cell">${portrait(id, 'md')}</td><td>${charTitle(id)}<div class="muted small">${esc(s.base.typeName)}</div></td><td class="n">${formatCr(crOf(id))}</td>` +
         `<td class="small">${topSkills(s)
           .map((t) => `${esc(t.skill.replaceAll('_', ' '))} ${signed(t.modifier)}`)
           .join(', ')}</td><td class="small muted">${esc(moves || '—')}</td><td class="small">${esc(owner.has(id) ? tavernName(owner.get(id)!) : 'free agent')}</td></tr>`
       );
     })
     .join('');
-  return `<table><thead><tr><th></th><th>character</th><th class="n">CR</th><th>best skills</th><th>moves</th><th>owner (wk ${lab.week} lock)</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">No match.</td></tr>'}</tbody></table>`;
+  return `<table><thead><tr><th></th><th></th><th>character</th><th class="n">CR</th><th>best skills</th><th>moves</th><th>owner (wk ${lab.week} lock)</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="muted">No match.</td></tr>'}</tbody></table>`;
 }
 
 function breakdownTable(b: EvTtkBreakdown): string {
@@ -978,7 +980,7 @@ function renderLabAnalysis(r: Run): string {
       const o = checkOdds(party, n.check);
       const gate = n.check.requires === undefined ? '<span class="muted">—</span>' : o.eligible ? '<span class="pass">met</span>' : '<span class="fail">unmet: auto-fail</span>';
       return [
-        `<tr><td>${esc(n.id)}</td><td class="small">${esc(checkLabel(n.check))}</td><td>${esc(o.actor)}${o.actor === captain ? ' <span class="cap">C</span>' : ''}</td>` +
+        `<tr><td>${esc(n.id)}</td><td class="small">${esc(checkLabel(n.check))}</td><td>${charChip(o.actor)}${o.actor === captain ? ' <span class="cap">C</span>' : ''}</td>` +
           `<td class="n">${signed(o.modifier)}</td><td>${o.advantage ? '<span class="tag brass">adv</span>' : ''}</td><td>${gate}</td><td class="n"><b>${pct(o.pPass)}</b></td><td class="n muted">${pct(projection.reach[n.id] ?? 0)}</td></tr>`,
       ];
     })
@@ -1100,7 +1102,7 @@ function renderDraft(r: Run): string {
 function renderPool(r: Run): string {
   return (
     `<section class="card"><div class="row"><h2>Pool</h2><span class="muted small">${poolIds.length} characters, base + modifiers as the engine sees them</span></div>` +
-    `<div class="row"><input type="text" id="pool-filter" placeholder="Filter by id, base, owner or skill" value="${esc(poolUi.filter)}" data-action="pool-filter">` +
+    `<div class="row"><input type="text" id="pool-filter" placeholder="Filter by name, base, owner or skill" value="${esc(poolUi.filter)}" data-action="pool-filter">` +
     `<label class="label" for="pool-sort">Sort</label><select id="pool-sort" data-action="pool-sort">` +
     ['pool', 'cr', 'owner'].map((k) => `<option value="${k}" ${poolUi.sort === k ? 'selected' : ''}>${k === 'pool' ? 'pool order' : k === 'cr' ? 'CR, high first' : 'owner'}</option>`).join('') +
     `</select></div><div id="pool-table" class="scroll">${renderPoolTable(r)}</div></section>`
@@ -1119,7 +1121,8 @@ function renderPoolTable(r: Run): string {
   });
   const filtered = items.filter(({ id, s, owner, drafted }) => {
     if (q === '') return true;
-    const hay = [id, s.base.slug, s.base.typeName, owner ?? 'free agent', drafted?.tavern ?? '', ...topSkills(s).map((t) => t.skill)].join(' ').toLowerCase();
+    const c = chromeOf(id);
+    const hay = [id, c?.name ?? '', c?.epithet ?? '', s.base.slug, s.base.typeName, owner ?? 'free agent', drafted?.tavern ?? '', ...topSkills(s).map((t) => t.skill)].join(' ').toLowerCase();
     return hay.includes(q);
   });
   if (poolUi.sort === 'cr') filtered.sort((a, b) => b.p.cr - a.p.cr || a.i - b.i);
@@ -1130,7 +1133,7 @@ function renderPoolTable(r: Run): string {
       const senses = Object.entries(s.senses).map(([k, v]) => `${k} ${v}`).join(', ');
       const moved = drafted !== null && owner !== drafted.tavern;
       return (
-        `<tr><td><b>${esc(id)}</b></td><td>${esc(s.base.typeName)}<div class="muted small">${esc(s.base.slug)}</div></td><td class="n">${formatCr(p.cr)}</td>` +
+        `<tr><td class="pt-cell">${portrait(id, 'md')}</td><td>${charTitle(id)}</td><td>${esc(s.base.typeName)}<div class="muted small">${esc(s.base.slug)}</div></td><td class="n">${formatCr(p.cr)}</td>` +
         `<td>${drafted === null ? '<span class="muted">undrafted</span>' : `${esc(tavernName(drafted.tavern))}<div class="muted small">pick #${drafted.pick + 1}</div>`}</td>` +
         `<td>${owner === null ? '<span class="muted">free agent</span>' : esc(tavernName(owner))}${moved ? ' <span class="tag brass">waivers</span>' : ''}</td>` +
         `<td class="small wrap-ok">${p.character.modifiers.length === 0 ? '<span class="muted">—</span>' : p.character.modifiers.map((m) => esc(formatModifier(m))).join('<br>')}</td>` +
@@ -1142,7 +1145,7 @@ function renderPoolTable(r: Run): string {
       );
     })
     .join('');
-  return `<table><thead><tr><th>character</th><th>base</th><th class="n">CR</th><th>drafted by</th><th>owner at end</th><th>modifiers</th><th>best 3 skills</th><th class="n">AC / HP</th><th>speeds, senses</th><th class="n">battle</th></tr></thead><tbody>${rows || '<tr><td colspan="10" class="muted">No match.</td></tr>'}</tbody></table>`;
+  return `<table><thead><tr><th></th><th>character</th><th>base</th><th class="n">CR</th><th>drafted by</th><th>owner at end</th><th>modifiers</th><th>best 3 skills</th><th class="n">AC / HP</th><th>speeds, senses</th><th class="n">battle</th></tr></thead><tbody>${rows || '<tr><td colspan="11" class="muted">No match.</td></tr>'}</tbody></table>`;
 }
 
 // ── event log ──────────────────────────────────────────────────────────────
@@ -1473,7 +1476,7 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(charName(p.character))}</b>`).join('; ')}.</p>`) +
     renderAdvice(me, advice) +
     `<div class="cols"><div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
-    (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<ul class="stack" style="list-style:none;margin:0;padding:0">${mine.map((id) => `<li>${charFace(id)}</li>`).join('')}</ul>`) +
+    (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<ul class="stack" style="list-style:none;margin:0;padding:0">${mine.map((id) => `<li>${charLabel(id)}</li>`).join('')}</ul>`) +
     `<p class="hint">Each week you start ${config.roster.starters} with total CR at most ${formatCr(BUDGET)}.</p></div>` +
     `<div class="stack"><div class="row"><span class="label">Free agents</span><input type="text" id="play-filter" placeholder="Filter by name, base or skill" value="${esc(play.filter)}" data-action="play-filter"></div>` +
     `<div id="play-fa" class="scroll" style="max-height:420px;overflow-y:auto"><table><thead><tr>${CHAR_HEAD}</tr></thead><tbody>${rows || '<tr><td colspan="7" class="muted">No match.</td></tr>'}</tbody></table></div></div></div></section>` +
@@ -1524,7 +1527,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
       ? '<span class="muted">No lineup submitted: at the lock your last lineup carries over (or a legal fallback).</span>'
       : same
         ? '<span class="pass">Submitted.</span>'
-        : `<span class="fail">Changed since you submitted</span> <span class="muted">(submitted: C ${esc(pending.captain)}, ${pending.allies.map(esc).join(', ')})</span>`;
+        : `<span class="fail">Changed since you submitted</span> <span class="muted">(submitted: C ${esc(charName(pending.captain))}, ${pending.allies.map((id) => esc(charName(id))).join(', ')})</span>`;
 
   const lineupCardHtml =
     `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · ${homeLine(s, week)}</span></div>` +
@@ -1553,19 +1556,19 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
       `<section class="card"><h2>Waivers</h2>` +
       `<p class="small muted">Claims resolve after week ${week}'s run, in waiver priority order (yours: ${s.state.waivers.priority.indexOf(me) + 1} of ${s.state.waivers.priority.length}). A claim cannot be withdrawn.</p>` +
       `<div class="row"><label class="label" for="play-add">Add</label><select id="play-add" data-action="play-add"><option value="">choose a free agent</option>${fa
-        .map((id) => `<option value="${esc(id)}" ${id === play.add ? 'selected' : ''}>${esc(id)} (CR ${formatCr(crOf(id))})</option>`)
+        .map((id) => `<option value="${esc(id)}" ${id === play.add ? 'selected' : ''}>${esc(charName(id))} (CR ${formatCr(crOf(id))})</option>`)
         .join('')}</select>` +
       `<label class="label" for="play-drop">Drop</label><select id="play-drop" data-action="play-drop"><option value="">nobody${roster.length >= config.roster.size ? ' (roster is full)' : ''}</option>${roster
-        .map((id) => `<option value="${esc(id)}" ${id === play.drop ? 'selected' : ''}>${esc(id)} (CR ${formatCr(crOf(id))})</option>`)
+        .map((id) => `<option value="${esc(id)}" ${id === play.drop ? 'selected' : ''}>${esc(charName(id))} (CR ${formatCr(crOf(id))})</option>`)
         .join('')}</select>` +
       `<button type="button" data-action="play-claim" ${play.add === '' ? 'disabled' : ''}>Claim</button></div>` +
       `<p class="small">Advisor: ${
         advice.length === 0
           ? '<span class="muted">no claims</span>'
-          : advice.map((c) => `+${esc(c.add)}${c.drop === null ? '' : ` -${esc(c.drop)}`}`).join(', ') +
+          : advice.map((c) => `+${esc(charName(c.add))}${c.drop === null ? '' : ` −${esc(charName(c.drop))}`}`).join(', ') +
             ` <button type="button" class="small" data-action="play-claim-advice">Make these claims</button>`
       }</p>` +
-      (claims.length === 0 ? '' : `<p class="small">Your pending claims: ${claims.map((c) => `+<b>${esc(c.add)}</b>${c.drop === null ? '' : ` -${esc(c.drop)}`}`).join('; ')}</p>`) +
+      (claims.length === 0 ? '' : `<p class="small">Your pending claims: ${claims.map((c) => `+<b>${esc(charName(c.add))}</b>${c.drop === null ? '' : ` −${esc(charName(c.drop))}`}`).join('; ')}</p>`) +
       `</section>`;
   }
 
