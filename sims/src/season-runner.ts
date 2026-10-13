@@ -24,7 +24,7 @@
  * but the runner shuffles tavern join order per sim seed, so each seat's draft
  * slot varies across runs.
  */
-import { BOT_IDS, botManager } from '@league-of-taverns/bots';
+import { BOT_IDS, botManager, valueOf } from '@league-of-taverns/bots';
 import type { BotId, BotManager, PublicView } from '@league-of-taverns/bots';
 import {
   BATTLE_MODELS,
@@ -526,6 +526,13 @@ export class SeasonSession {
     const stage = this.stage;
     if (stage.kind !== 'draft') throw new Error('the draft is over');
     return this.botOf(stage.tavern).manager.draft.pick(this.viewFor(stage.tavern, `advice:draft:${stage.pick}`), freeAgents(this.log.state));
+  }
+
+  /** The bots' `value` rating (strength and skill breadth per CR) for each id, as the person's view sees the pool. Higher is better. */
+  draftValues(ids: ReadonlyArray<string>): ReadonlyMap<string, number> {
+    const human = this.requireHuman();
+    const view = this.viewFor(human.tavern, 'advice:value');
+    return new Map(ids.map((id) => [id, valueOf(view, id)]));
   }
 
   // ── between weeks ────────────────────────────────────────────────────────
