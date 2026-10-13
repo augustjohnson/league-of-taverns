@@ -1,5 +1,0 @@
-id: mock-bugbear
-base: bugbear
-status: active
-chrome:
-  name: Mock Bugbear

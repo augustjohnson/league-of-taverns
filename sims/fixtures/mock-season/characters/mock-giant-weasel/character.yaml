@@ -1,5 +1,0 @@
-id: mock-giant-weasel
-base: giant-weasel
-status: active
-chrome:
-  name: Mock Giant Weasel

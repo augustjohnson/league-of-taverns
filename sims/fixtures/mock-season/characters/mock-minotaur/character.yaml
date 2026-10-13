@@ -1,5 +1,0 @@
-id: mock-minotaur
-base: minotaur
-status: active
-chrome:
-  name: Mock Minotaur

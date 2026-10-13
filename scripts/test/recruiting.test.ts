@@ -82,5 +82,5 @@ describe('recruiting bundle', () => {
     }
     for (const [name, view] of Object.entries(style.painted.views)) expect(ogre!.portrait!.views[name]!.height).toBe(9 * view.pxPerFt + 2);
     expect(existsSync(join(out, 'portraits', 'old-three.png'))).toBe(false);
-  });
+  }, 30_000); // decodes painted portraits; slow while the suite runs other image work in parallel
 });

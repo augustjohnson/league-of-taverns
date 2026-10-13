@@ -1,5 +1,0 @@
-id: mock-giant-eagle
-base: giant-eagle
-status: active
-chrome:
-  name: Mock Giant Eagle

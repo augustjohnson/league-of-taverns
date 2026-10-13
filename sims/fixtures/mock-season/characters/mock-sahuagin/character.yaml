@@ -1,5 +1,0 @@
-id: mock-sahuagin
-base: sahuagin
-status: active
-chrome:
-  name: Mock Sahuagin

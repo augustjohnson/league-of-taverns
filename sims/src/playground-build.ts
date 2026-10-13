@@ -1,7 +1,8 @@
 /**
  * Build the browser playground: one self-contained HTML file.
  *
- * 1. Load the mock season in Node with the scripts loaders (./load.ts).
+ * 1. Load the mock season in Node with the scripts loaders (./load.ts), and
+ *    each pooled character's chrome, with a thumbnail of its portrait.
  * 2. Serialize what the page needs (./playground/data.ts).
  * 3. Bundle ./playground/app.ts with esbuild as a minified browser IIFE.
  * 4. Inline the data and the bundle into ./playground/page.html as one
@@ -14,11 +15,40 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { webImage } from '@league-of-taverns/scripts/lib/images/postprocess';
+import { decodePng, encodeIndexedPng } from '@league-of-taverns/scripts/lib/images/png';
+import { loadCharacterChrome } from '@league-of-taverns/scripts/lib/repo';
 import { build } from 'esbuild';
-import { DEFAULT_SEASON_DIR, loadMockSeasonParts } from './load';
-import { serializeSeason, type PlaygroundData } from './playground/data';
+import { DEFAULT_SEASON_DIR, charactersRootOf, loadMockSeasonParts } from './load';
+import { serializeSeason, type PlaygroundChrome, type PlaygroundData } from './playground/data';
 
 const PLAYGROUND_SRC = join(dirname(fileURLToPath(import.meta.url)), 'playground');
+
+/** Portrait thumbnails: longest side (twice the largest frame the page draws, 80 px) and colour budget. */
+const THUMB = { longSide: 160, colors: 256 } as const;
+
+/**
+ * Chrome for each character in `ids`, read from `<charactersRoot>/characters/<id>/`,
+ * with the painted portrait (when it has one) cut down to a thumbnail
+ * (docs/images.md § Post-processing).
+ */
+export function playgroundChrome(ids: ReadonlyArray<string>, charactersRoot: string): Record<string, PlaygroundChrome> {
+  const out: Record<string, PlaygroundChrome> = {};
+  for (const id of ids) {
+    const { name, epithet, tagline, portrait } = loadCharacterChrome(id, charactersRoot);
+    const thumb =
+      portrait?.path === undefined
+        ? undefined
+        : encodeIndexedPng(webImage(decodePng(readFileSync(join(charactersRoot, 'characters', id, portrait.path))), THUMB.longSide, THUMB.colors));
+    out[id] = {
+      name,
+      ...(epithet === undefined ? {} : { epithet }),
+      ...(tagline === undefined ? {} : { tagline }),
+      ...(thumb === undefined ? {} : { portrait: `data:image/png;base64,${thumb.toString('base64')}` }),
+    };
+  }
+  return out;
+}
 
 /** Bundle the page script: app.ts with the engine and bots, as a minified IIFE for browsers. */
 export async function bundleApp(): Promise<string> {
@@ -72,7 +102,12 @@ export function renderPage(template: string, data: PlaygroundData, bundle: strin
 
 /** Load the season in `dir`, bundle the app and return the page. */
 export async function buildPlaygroundHtml(dir: string = DEFAULT_SEASON_DIR): Promise<{ readonly html: string; readonly data: PlaygroundData }> {
-  const data = serializeSeason(loadMockSeasonParts(dir), dir);
+  const parts = loadMockSeasonParts(dir);
+  const chrome = playgroundChrome(
+    parts.pool.map((p) => p.character.ref.id),
+    charactersRootOf(dir),
+  );
+  const data = serializeSeason(parts, dir, chrome);
   const template = readFileSync(join(PLAYGROUND_SRC, 'page.html'), 'utf8');
   const html = renderPage(template, data, await bundleApp());
   return { html, data };

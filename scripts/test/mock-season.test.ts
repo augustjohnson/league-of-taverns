@@ -1,7 +1,7 @@
 import { indexSnapshot, modifierCost, TRAITS, validateMission } from '@league-of-taverns/engine';
 import type { BattleNode, Mission, MissionRules } from '@league-of-taverns/engine';
 import { describe, expect, it } from 'vitest';
-import { loadMission } from '../src/lib/repo';
+import { loadCharacterChrome, loadMission } from '../src/lib/repo';
 import { MOCK_SEASON, isSpellcaster, loadSeason, missionFiles, snapshotCrIndex } from '../src/lib/season';
 import { validateSeason } from '../src/lib/validate-season';
 
@@ -57,7 +57,10 @@ describe('mock season config, managers and schedule', () => {
 describe('mock season pool', () => {
   it('has enough characters to fill every roster, with spares', () => {
     expect(pool.characters.length).toBeGreaterThanOrEqual(managers.taverns.length * config.roster.size + 4);
-    expect(pool.characters.every((c) => c.ref.id === `mock-${c.ref.base}`)).toBe(true);
+  });
+
+  it("draws from the repo's characters, each with a portrait", () => {
+    for (const c of pool.characters) expect(loadCharacterChrome(c.ref.id).portrait?.path, c.ref.id).toBeDefined();
   });
 
   it('spreads CR from 1/8 to 6', () => {
@@ -82,8 +85,8 @@ describe('mock season pool', () => {
   it('includes flyers and swimmers', () => {
     const speeds = (kind: string): number =>
       pool.characters.filter((c) => (bySlug.get(c.ref.base)!.speed[kind] ?? 0) !== 0).length;
-    expect(speeds('fly')).toBeGreaterThanOrEqual(8);
-    expect(speeds('swim')).toBeGreaterThanOrEqual(8);
+    expect(speeds('fly')).toBeGreaterThanOrEqual(8); // the Eyrie Pass's shortcut needs one
+    expect(speeds('swim')).toBeGreaterThanOrEqual(5); // no mission requires swim, and the cast has few swimmers
   });
 });
 
@@ -92,7 +95,7 @@ describe('mock season missions', () => {
     const report = validateSeason(MOCK_SEASON);
     expect(report.issues).toEqual([]);
     expect(report.checked.missions).toHaveLength(6);
-  });
+  }, 60_000); // decodes every pooled character's full-size portrait
 
   it('has one mission per week, matched by environment, each valid for its week', () => {
     for (const week of schedule.weeks) {

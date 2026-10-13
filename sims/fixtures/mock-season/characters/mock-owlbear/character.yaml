@@ -1,5 +1,0 @@
-id: mock-owlbear
-base: owlbear
-status: active
-chrome:
-  name: Mock Owlbear

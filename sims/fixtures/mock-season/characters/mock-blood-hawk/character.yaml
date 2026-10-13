@@ -1,5 +1,0 @@
-id: mock-blood-hawk
-base: blood-hawk
-status: active
-chrome:
-  name: Mock Blood Hawk

@@ -1,5 +1,0 @@
-id: mock-sprite
-base: sprite
-status: active
-chrome:
-  name: Mock Sprite

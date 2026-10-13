@@ -1,5 +1,0 @@
-id: mock-giant-frog
-base: giant-frog
-status: active
-chrome:
-  name: Mock Giant Frog

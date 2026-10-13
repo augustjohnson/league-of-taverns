@@ -75,8 +75,8 @@ describe('one seeded mock season', () => {
   });
 
   it('pins the sim-1 champion', () => {
-    expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'cr-greedy' }]);
-    expect(sim1.summary.standings[0]!.tavern).toBe('the-gilded-flagon');
+    expect(sim1.summary.champions).toEqual([{ tavern: 'the-sleeping-giant', bot: 'value' }]);
+    expect(sim1.summary.standings[0]!.tavern).toBe('the-sleeping-giant');
   });
 });
 

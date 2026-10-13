@@ -4,7 +4,7 @@
  *
  * - A season is named by id (`seasons/<id>/` under the repo root) or by a
  *   `SeasonLocation`, for fixtures that live elsewhere (the mock season in
- *   sims/fixtures/mock-season/ keeps its own characters/ folder).
+ *   sims/fixtures/mock-season/ pools the repo's own characters).
  * - Every loader collects all the issues it finds and throws one
  *   `ValidationFailure` with a line per issue: `<file>: <field>: <message>`.
  * - Each public loader reads only what it needs. `loadSeason` loads everything
@@ -56,11 +56,8 @@ export interface SeasonLocation {
 /** A season id (seasons/<id>/ under the root) or an explicit location. */
 export type SeasonSource = string | SeasonLocation;
 
-/** The mock season used by sims (T5.5). */
-export const MOCK_SEASON: SeasonLocation = {
-  dir: 'sims/fixtures/mock-season',
-  charactersRoot: 'sims/fixtures/mock-season',
-};
+/** The mock season used by sims (T5.5). Its pool is drawn from the repo's own characters/. */
+export const MOCK_SEASON: SeasonLocation = { dir: 'sims/fixtures/mock-season' };
 
 interface SeasonContext {
   readonly root: RepoRoot;

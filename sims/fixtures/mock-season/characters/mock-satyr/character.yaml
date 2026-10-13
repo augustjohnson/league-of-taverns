@@ -1,5 +1,0 @@
-id: mock-satyr
-base: satyr
-status: active
-chrome:
-  name: Mock Satyr

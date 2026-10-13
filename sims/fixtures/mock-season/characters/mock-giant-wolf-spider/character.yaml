@@ -1,5 +1,0 @@
-id: mock-giant-wolf-spider
-base: giant-wolf-spider
-status: active
-chrome:
-  name: Mock Giant Wolf Spider
