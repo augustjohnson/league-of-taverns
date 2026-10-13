@@ -1,0 +1,4601 @@
+{
+  "format": 1,
+  "season": "season-01",
+  "snapshot": "open5e-v1-2026-10",
+  "stage": {
+    "barFt": 3.5,
+    "frameFt": 6.5
+  },
+  "characters": [
+    {
+      "id": "auntie-grizelda",
+      "name": "Auntie Grizelda",
+      "epithet": "Your Aunt",
+      "tagline": "Attends every family event uninvited, with a casserole nobody should eat.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Auntie Grizelda attends every family event uninvited, with a casserole nobody should eat. Nobody knows whose aunt she is. Everybody calls her Auntie anyway, because it seems safer.\n\nShe is green and warty, with a single long tooth, rag curls in her grey hair and a smoking clay pipe. She knows everybody's business. She smirks as if she knows yours.",
+      "heightFt": 5.4,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "green-hag",
+        "name": "Green Hag",
+        "size": "Medium",
+        "type": "Fey",
+        "subtype": "",
+        "alignment": "neutral evil",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 17,
+        "hitPoints": 82,
+        "hitDice": "11d8+33",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 18,
+          "dex": 12,
+          "con": 16,
+          "int": 13,
+          "wis": 14,
+          "cha": 14
+        },
+        "skills": {
+          "arcana": 3,
+          "deception": 4,
+          "perception": 4,
+          "stealth": 3
+        },
+        "senses": "darkvision 60 ft., passive Perception 14",
+        "languages": "Common, Draconic, Sylvan"
+      },
+      "portrait": {
+        "original": "characters/auntie-grizelda/portrait.png",
+        "web": {
+          "file": "portraits/auntie-grizelda.png",
+          "width": 437,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/auntie-grizelda.pixel.png",
+            "width": 105,
+            "height": 153,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/auntie-grizelda.pixel-fine.png",
+            "width": 208,
+            "height": 304,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.4,
+          "topFt": 1.9000000000000004
+        }
+      }
+    },
+    {
+      "id": "babble",
+      "name": "Babble",
+      "epithet": "the Group Chat",
+      "tagline": "Forty mouths, forty opinions. None of them has read the plan.",
+      "pronouns": {
+        "subject": "they",
+        "object": "them",
+        "possessive": "their"
+      },
+      "story": "Babble is forty mouths and forty opinions. None of them has read the plan. They are a lumpy pink mass of eyes and mouths, one with a gold tooth, and every mouth is talking at once, mostly about the plan.\n\nThey vote on nothing and agree on less. In a fight they are effective, because nobody can hear themselves think. Neither can Babble.",
+      "heightFt": 3,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "gibbering-mouther",
+        "name": "Gibbering Mouther",
+        "size": "Medium",
+        "type": "Aberration",
+        "subtype": "",
+        "alignment": "neutral",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 9,
+        "hitPoints": 67,
+        "hitDice": "9d8+27",
+        "speed": {
+          "walk": 10,
+          "swim": 10
+        },
+        "abilities": {
+          "str": 10,
+          "dex": 8,
+          "con": 16,
+          "int": 3,
+          "wis": 10,
+          "cha": 6
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/babble/portrait.png",
+        "web": {
+          "file": "portraits/babble.png",
+          "width": 597,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/babble.pixel.png",
+            "width": 80,
+            "height": 86,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/babble.pixel-fine.png",
+            "width": 159,
+            "height": 170,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 3,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "barb",
+      "name": "Barb",
+      "epithet": "the Duchess",
+      "tagline": "Controls every tavern bin within forty miles. Accepts tribute in pie crusts.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Barb controls every tavern bin within forty miles. Raccoons pay her a cut. Foxes ask permission. She accepts tribute in pie crusts and wears a crushed wicker bread basket as a crown, which nobody has been brave enough to correct.\n\nShe has a white blaze on her chest and crumbs in her fur at all times, as befits her station. Her stare is calm, regal and fixed on your sandwich.",
+      "heightFt": 6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "black-bear",
+        "name": "Black Bear",
+        "size": "Medium",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 11,
+        "hitPoints": 19,
+        "hitDice": "3d8+6",
+        "speed": {
+          "walk": 40,
+          "climb": 30
+        },
+        "abilities": {
+          "str": 15,
+          "dex": 10,
+          "con": 14,
+          "int": 2,
+          "wis": 12,
+          "cha": 7
+        },
+        "skills": {},
+        "senses": "passive Perception 13",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/barb/portrait.png",
+        "web": {
+          "file": "portraits/barb.png",
+          "width": 640,
+          "height": 608
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/barb.pixel.png",
+            "width": 179,
+            "height": 170,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/barb.pixel-fine.png",
+            "width": 356,
+            "height": 338,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "big-linda",
+      "name": "Big Linda",
+      "epithet": "Den Mother",
+      "tagline": "Hugs every teammate after every fight. The hugs have a body count.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Big Linda hugs every teammate after every fight. The hugs are warm, sincere and have a body count. She wears a white apron tied around her chest and keeps a wooden spoon behind her ear for stirring and, occasionally, for emphasis.\n\nHer muzzle has gone grey with years of looking after people who did not survive being looked after. She does not hold it against them. She brings soup to the funerals.",
+      "heightFt": 8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "brown-bear",
+        "name": "Brown Bear",
+        "size": "Large",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 11,
+        "hitPoints": 34,
+        "hitDice": "4d10+12",
+        "speed": {
+          "walk": 40,
+          "climb": 30
+        },
+        "abilities": {
+          "str": 19,
+          "dex": 10,
+          "con": 16,
+          "int": 2,
+          "wis": 13,
+          "cha": 7
+        },
+        "skills": {
+          "perception": 3
+        },
+        "senses": "passive Perception 13",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/big-linda/portrait.png",
+        "web": {
+          "file": "portraits/big-linda.png",
+          "width": 611,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/big-linda.pixel.png",
+            "width": 216,
+            "height": 226,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/big-linda.pixel-fine.png",
+            "width": 430,
+            "height": 450,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 8,
+          "topFt": 4.5
+        }
+      }
+    },
+    {
+      "id": "bruno-the-bruiser",
+      "name": "Bruno",
+      "epithet": "the Bruiser",
+      "tagline": "Has never once used the door.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Bruno arrived at the Gilded Flagon through the wall. The owner kept the hole as a window and kept Bruno as a bouncer, and in that order neither has regretted it.\n\nHe is not clever and knows it, which makes him wiser than most of the regulars. He keeps a tally of every brawl he has ended on the underside of the bar. He has started none of them. He counts that as his finest record.",
+      "heightFt": 9.5,
+      "pooled": true,
+      "modifiers": [
+        {
+          "kind": "skill_bonus",
+          "skill": "intimidation",
+          "value": 2
+        },
+        {
+          "kind": "trait",
+          "trait": "thick-skull"
+        }
+      ],
+      "base": {
+        "slug": "ogre",
+        "name": "Ogre",
+        "size": "Large",
+        "type": "Giant",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 11,
+        "hitPoints": 59,
+        "hitDice": "7d10+21",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 19,
+          "dex": 8,
+          "con": 16,
+          "int": 5,
+          "wis": 7,
+          "cha": 7
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 8",
+        "languages": "Common, Giant"
+      },
+      "portrait": {
+        "original": "characters/bruno-the-bruiser/portrait.png",
+        "web": {
+          "file": "portraits/bruno-the-bruiser.png",
+          "width": 384,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/bruno-the-bruiser.pixel.png",
+            "width": 162,
+            "height": 268,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/bruno-the-bruiser.pixel-fine.png",
+            "width": 321,
+            "height": 534,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 9.5,
+          "topFt": 6
+        }
+      }
+    },
+    {
+      "id": "carmichael",
+      "name": "Carmichael",
+      "epithet": "Sideways",
+      "tagline": "Has never moved forward. Describes this as a strategy, when asked and when not.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Carmichael has never moved forward in his life. He goes sideways, quickly and with conviction, and calls it a strategy whether or not anyone asks. His one oversized claw is crusted with barnacles he refuses to have removed.\n\nHe wears a knotted cloth headband for reasons that are, he says, between him and the headband. His record in head-on confrontations is spotless, because he has never been in one.",
+      "heightFt": 3,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "giant-crab",
+        "name": "Giant Crab",
+        "size": "Medium",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/8",
+        "crValue": 0.125,
+        "armorClass": 15,
+        "hitPoints": 13,
+        "hitDice": "3d8",
+        "speed": {
+          "walk": 30,
+          "swim": 30
+        },
+        "abilities": {
+          "str": 13,
+          "dex": 15,
+          "con": 11,
+          "int": 1,
+          "wis": 9,
+          "cha": 3
+        },
+        "skills": {
+          "stealth": 4
+        },
+        "senses": "blindsight 30 ft., passive Perception 9",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/carmichael/portrait.png",
+        "web": {
+          "file": "portraits/carmichael.png",
+          "width": 640,
+          "height": 539
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/carmichael.pixel.png",
+            "width": 102,
+            "height": 86,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/carmichael.pixel-fine.png",
+            "width": 201,
+            "height": 170,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 3,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "deborah",
+      "name": "Deborah",
+      "epithet": "Chief Steward",
+      "tagline": "Has refused every order she has ever been given, in writing.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Deborah has served as chief steward to three noble houses and has refused every order any of them gave her, in writing, with copies. The refusals are filed by date. The houses are all still standing, which she takes as proof that the orders were unnecessary.\n\nShe has a notch in her right ear from a disagreement she won and a red band on one foreleg whose meaning she will not discuss. She is a mule. She has heard the jokes. She has filed those too.",
+      "heightFt": 5.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "mule",
+        "name": "Mule",
+        "size": "Medium",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/8",
+        "crValue": 0.125,
+        "armorClass": 10,
+        "hitPoints": 11,
+        "hitDice": "2d8+2",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 14,
+          "dex": 10,
+          "con": 13,
+          "int": 2,
+          "wis": 10,
+          "cha": 5
+        },
+        "skills": {},
+        "senses": "passive Perception 10",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/deborah/portrait.png",
+        "web": {
+          "file": "portraits/deborah.png",
+          "width": 640,
+          "height": 582
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/deborah.pixel.png",
+            "width": 171,
+            "height": 156,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/deborah.pixel-fine.png",
+            "width": 341,
+            "height": 310,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.5,
+          "topFt": 2
+        }
+      }
+    },
+    {
+      "id": "dolores",
+      "name": "Dolores",
+      "epithet": "the Chest",
+      "tagline": "Does a flawless treasure chest, a passable barrel and an upsetting wardrobe.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Dolores does a flawless treasure chest, a passable barrel and an upsetting wardrobe. She has brass corners, one of them missing, and wears red lipstick on jagged teeth because presentation matters.\n\nShe prefers to be opened slowly. Her tongue is long and pink and has introduced itself to several adventurers, who did not stay long enough to introduce themselves back.",
+      "heightFt": 3,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "mimic",
+        "name": "Mimic",
+        "size": "Medium",
+        "type": "Monstrosity",
+        "subtype": "shapechanger",
+        "alignment": "neutral",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 12,
+        "hitPoints": 58,
+        "hitDice": "9d8+18",
+        "speed": {
+          "walk": 15
+        },
+        "abilities": {
+          "str": 17,
+          "dex": 12,
+          "con": 15,
+          "int": 5,
+          "wis": 13,
+          "cha": 8
+        },
+        "skills": {
+          "stealth": 5
+        },
+        "senses": "darkvision 60 ft., passive Perception 11",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/dolores/portrait.png",
+        "web": {
+          "file": "portraits/dolores.png",
+          "width": 490,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/dolores.pixel.png",
+            "width": 66,
+            "height": 86,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/dolores.pixel-fine.png",
+            "width": 131,
+            "height": 170,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 3,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "doug",
+      "name": "Doug",
+      "epithet": "Fully Grown",
+      "tagline": "The size of a loaf of bread. Does not want to discuss loaves.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Doug is fully grown. He is the size of a loaf of bread. He does not want to discuss loaves, bakeries, rising or the word \"crust\". He has a scar across his snout and a torn left wing from the last person who brought it up.\n\nHe wears a studded leather collar and a scowl he practises in puddles. He believes he is the most dangerous thing in any room. In fairness to Doug, he has been right twice.",
+      "heightFt": 1.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "pseudodragon",
+        "name": "Pseudodragon",
+        "size": "Tiny",
+        "type": "Dragon",
+        "subtype": "",
+        "alignment": "neutral good",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 13,
+        "hitPoints": 7,
+        "hitDice": "2d4+2",
+        "speed": {
+          "walk": 15,
+          "fly": 60
+        },
+        "abilities": {
+          "str": 6,
+          "dex": 15,
+          "con": 13,
+          "int": 10,
+          "wis": 12,
+          "cha": 10
+        },
+        "skills": {
+          "perception": 3,
+          "stealth": 4
+        },
+        "senses": "blindsight 10 ft., darkvision 60 ft., passive Perception 13",
+        "languages": "understands Common and Draconic but can't speak"
+      },
+      "portrait": {
+        "original": "characters/doug/portrait.png",
+        "web": {
+          "file": "portraits/doug.png",
+          "width": 640,
+          "height": 594
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/doug.pixel.png",
+            "width": 47,
+            "height": 44,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/doug.pixel-fine.png",
+            "width": 92,
+            "height": 86,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 1.5,
+          "topFt": 1.5
+        }
+      }
+    },
+    {
+      "id": "gary-pell",
+      "name": "Gary Pell",
+      "epithet": "from Accounting",
+      "tagline": "Died at his desk in 1102. Has not missed a day since.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Gary died at his desk in 1102 and has not missed a day of work since. He is grey-green, short one ear, and has ink on fingers that no longer have feeling in them. Accounting has not noticed any difference in his output.\n\nAfter work he holds a dented pewter tankard, smiles politely and does not drink from it. He has filed a request for annual leave every year since his death. It is always approved. He never takes it.",
+      "heightFt": 5.9,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "zombie",
+        "name": "Zombie",
+        "size": "Medium",
+        "type": "Undead",
+        "subtype": "",
+        "alignment": "neutral evil",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 8,
+        "hitPoints": 22,
+        "hitDice": "3d8+9",
+        "speed": {
+          "walk": 20
+        },
+        "abilities": {
+          "str": 13,
+          "dex": 6,
+          "con": 16,
+          "int": 3,
+          "wis": 6,
+          "cha": 5
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 8",
+        "languages": "understands the languages it knew in life but can't speak"
+      },
+      "portrait": {
+        "original": "characters/gary-pell/portrait.png",
+        "web": {
+          "file": "portraits/gary-pell.png",
+          "width": 387,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/gary-pell.pixel.png",
+            "width": 102,
+            "height": 167,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/gary-pell.pixel-fine.png",
+            "width": 201,
+            "height": 332,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.9,
+          "topFt": 2.4000000000000004
+        }
+      }
+    },
+    {
+      "id": "ghhurzh",
+      "name": "Ghh'ŭrzh",
+      "epithet": "the Intern",
+      "tagline": "Fired from the Abyss for incompetence, which is difficult to arrange.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Ghh'ŭrzh was fired from the Abyss for incompetence, which is very difficult to arrange. He still wears the name tag. It is pinned crooked to his chest and reads, in a script that hurts to look at, something like \"Hello, Intern\".\n\nHe is pot-bellied, grey, short one horn and sweating at all times. He is eager to please and terrified of doing so. He would like a reference.",
+      "heightFt": 4,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "dretch",
+        "name": "Dretch",
+        "size": "Small",
+        "type": "Fiend",
+        "subtype": "demon",
+        "alignment": "chaotic evil",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 11,
+        "hitPoints": 18,
+        "hitDice": "4d6+4",
+        "speed": {
+          "walk": 20
+        },
+        "abilities": {
+          "str": 11,
+          "dex": 11,
+          "con": 12,
+          "int": 5,
+          "wis": 8,
+          "cha": 3
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 9",
+        "languages": "Abyssal, telepathy 60 ft. (works only with creatures that understand Abyssal)"
+      },
+      "portrait": {
+        "original": "characters/ghhurzh/portrait.png",
+        "web": {
+          "file": "portraits/ghhurzh.png",
+          "width": 396,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/ghhurzh.pixel.png",
+            "width": 71,
+            "height": 114,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/ghhurzh.pixel-fine.png",
+            "width": 141,
+            "height": 226,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 4,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "gizzik",
+      "name": "Gizzik",
+      "epithet": "Rookie of the Year",
+      "tagline": "Made his own trophy from a bucket. Has not taken it off, including to sleep.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Gizzik was named Rookie of the Year by Gizzik, at a ceremony he organised, and presented himself with a trophy made from a dented tin bucket. He wears it around his neck like a medal. He has not taken it off since, including to sleep, which has not been good for his neck.\n\nHe has three rings in one enormous ear and a gap-toothed grin he aims at everyone. He intends to win the award again this year. The judging panel is confident he will.",
+      "heightFt": 3.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "goblin",
+        "name": "Goblin",
+        "size": "Small",
+        "type": "Humanoid",
+        "subtype": "goblinoid",
+        "alignment": "neutral evil",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 15,
+        "hitPoints": 7,
+        "hitDice": "2d6",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 8,
+          "dex": 14,
+          "con": 10,
+          "int": 10,
+          "wis": 8,
+          "cha": 8
+        },
+        "skills": {
+          "stealth": 6
+        },
+        "senses": "darkvision 60 ft., passive Perception 9",
+        "languages": "Common, Goblin"
+      },
+      "portrait": {
+        "original": "characters/gizzik/portrait.png",
+        "web": {
+          "file": "portraits/gizzik.png",
+          "width": 371,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/gizzik.pixel.png",
+            "width": 59,
+            "height": 100,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/gizzik.pixel-fine.png",
+            "width": 116,
+            "height": 198,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 3.5,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "gloria",
+      "name": "Gloria",
+      "epithet": "Aisle Four",
+      "tagline": "Has been mopped up eleven times. Comes back a little angrier each time.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Gloria has been mopped up eleven times. Each time she comes back a little angrier and a little glossier. Someone left a mop head in her the eighth time, and she has kept it as a reminder.\n\nShe lives near an overturned wooden bucket she regards as hers. She does not speak, but she has a smirk that says she remembers which aisle it was, and who held the mop.",
+      "heightFt": 2,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "gray-ooze",
+        "name": "Gray Ooze",
+        "size": "Medium",
+        "type": "Ooze",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 8,
+        "hitPoints": 22,
+        "hitDice": "3d8+9",
+        "speed": {
+          "walk": 10,
+          "climb": 10
+        },
+        "abilities": {
+          "str": 12,
+          "dex": 6,
+          "con": 16,
+          "int": 1,
+          "wis": 6,
+          "cha": 2
+        },
+        "skills": {
+          "stealth": 2
+        },
+        "senses": "blindsight 60 ft. (blind beyond this radius), passive Perception 8",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/gloria/portrait.png",
+        "web": {
+          "file": "portraits/gloria.png",
+          "width": 640,
+          "height": 623
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/gloria.pixel.png",
+            "width": 60,
+            "height": 58,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/gloria.pixel-fine.png",
+            "width": 117,
+            "height": 114,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 2,
+          "topFt": 2
+        }
+      }
+    },
+    {
+      "id": "grimbold",
+      "name": "Grimbold",
+      "epithet": "the Complaint",
+      "tagline": "Has written a strongly worded letter to every mountain he has lived under.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Grimbold has written a strongly worded letter to every mountain he has lived under. None has replied. He takes this as an admission of guilt and keeps copies, in triplicate, in a chest that is now too heavy to move.\n\nHe is ash-grey, with a long beard braided into tight knots, a quill tucked in the braids and an iron helm he has never taken off in company. His scowl is permanent. Nobody remembers what started it, including him.",
+      "heightFt": 4.3,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "duergar",
+        "name": "Duergar",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "dwarf",
+        "alignment": "lawful evil",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 16,
+        "hitPoints": 26,
+        "hitDice": "4d8+8",
+        "speed": {
+          "walk": 25
+        },
+        "abilities": {
+          "str": 14,
+          "dex": 11,
+          "con": 14,
+          "int": 11,
+          "wis": 10,
+          "cha": 9
+        },
+        "skills": {},
+        "senses": "darkvision 120 ft., passive Perception 10",
+        "languages": "Dwarvish, Undercommon"
+      },
+      "portrait": {
+        "original": "characters/grimbold/portrait.png",
+        "web": {
+          "file": "portraits/grimbold.png",
+          "width": 374,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/grimbold.pixel.png",
+            "width": 72,
+            "height": 122,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/grimbold.pixel-fine.png",
+            "width": 143,
+            "height": 243,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 4.3,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "gus-tallow",
+      "name": "Gus Tallow",
+      "epithet": "Two Pockets",
+      "tagline": "Owns two pockets. Both were stolen, off different trousers.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Gus owns two pockets. Both are stolen, from two different pairs of trousers, and he has sewn them onto a vest that he also, technically, found. He keeps a spare eyepatch pushed up on his forehead in case a situation calls for one.\n\nHis nose has been broken in three directions and points in a fourth. He looks at most things sideways, which is either suspicion or the nose. He has never been caught, and has been chased constantly.",
+      "heightFt": 5.8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "bandit",
+        "name": "Bandit",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "any race",
+        "alignment": "any non-lawful alignment",
+        "cr": "1/8",
+        "crValue": 0.125,
+        "armorClass": 12,
+        "hitPoints": 11,
+        "hitDice": "2d8+2",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 11,
+          "dex": 12,
+          "con": 12,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "skills": {},
+        "senses": "passive Perception 10",
+        "languages": "any one language (usually Common)"
+      },
+      "portrait": {
+        "original": "characters/gus-tallow/portrait.png",
+        "web": {
+          "file": "portraits/gus-tallow.png",
+          "width": 348,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/gus-tallow.pixel.png",
+            "width": 90,
+            "height": 164,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/gus-tallow.pixel-fine.png",
+            "width": 179,
+            "height": 327,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.8,
+          "topFt": 2.3
+        }
+      }
+    },
+    {
+      "id": "helga-dunn",
+      "name": "Helga Dunn",
+      "epithet": "Hall of Fame",
+      "tagline": "Has started a brawl in every tavern on the continent. Finished most of them herself.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Helga has started a brawl in every tavern on the continent and finished most of them herself. She is in the Hall of Fame, which is a wall in a cellar where her name is carved over several others.\n\nShe has thick blonde braids, a missing front tooth and a scar through one eyebrow. She carries a broken bottle, and has done since the second brawl. She grins like it's the first.",
+      "heightFt": 6.1,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "berserker",
+        "name": "Berserker",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "any race",
+        "alignment": "any chaotic alignment",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 13,
+        "hitPoints": 67,
+        "hitDice": "9d8+27",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 12,
+          "con": 17,
+          "int": 9,
+          "wis": 11,
+          "cha": 9
+        },
+        "skills": {},
+        "senses": "passive Perception 10",
+        "languages": "any one language (usually Common)"
+      },
+      "portrait": {
+        "original": "characters/helga-dunn/portrait.png",
+        "web": {
+          "file": "portraits/helga-dunn.png",
+          "width": 310,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/helga-dunn.pixel.png",
+            "width": 85,
+            "height": 173,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/helga-dunn.pixel-fine.png",
+            "width": 167,
+            "height": 344,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6.1,
+          "topFt": 2.5999999999999996
+        }
+      }
+    },
+    {
+      "id": "herb",
+      "name": "Herb",
+      "epithet": "the Speed Bump",
+      "tagline": "Cannot stop or turn. Has not been asked to do either.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Herb cannot stop or turn. He has not been asked to do either. He is a grey rhinoceros with a chipped horn and a dented iron cooking pot stuck on it, which he collected at speed and has not been able to remove.\n\nHe is the team's speed bump, which works because opponents can't stop either. His glare is determined. His direction is forward. Everything else is somebody else's problem.",
+      "heightFt": 6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "rhinoceros",
+        "name": "Rhinoceros",
+        "size": "Large",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 11,
+        "hitPoints": 45,
+        "hitDice": "6d10+12",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 21,
+          "dex": 8,
+          "con": 15,
+          "int": 2,
+          "wis": 12,
+          "cha": 6
+        },
+        "skills": {},
+        "senses": "passive Perception 11",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/herb/portrait.png",
+        "web": {
+          "file": "portraits/herb.png",
+          "width": 640,
+          "height": 638
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/herb.pixel.png",
+            "width": 170,
+            "height": 170,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/herb.pixel-fine.png",
+            "width": 339,
+            "height": 338,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "hoss",
+      "name": "Hoss",
+      "epithet": "the Swallower",
+      "tagline": "Has swallowed three teammates. They recovered. None will discuss it.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Hoss has swallowed three teammates. They all recovered. None of them will discuss it, and all three now stand at least a toad's length away from him in team portraits.\n\nHe is enormous, brown and warty, with a white scar across his back and a boot sticking out of his mouth that nobody has claimed. He looks sleepy and content at all times, which is the most worrying thing about him.",
+      "heightFt": 5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "giant-toad",
+        "name": "Giant Toad",
+        "size": "Large",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 11,
+        "hitPoints": 39,
+        "hitDice": "6d10+6",
+        "speed": {
+          "walk": 20,
+          "swim": 40
+        },
+        "abilities": {
+          "str": 15,
+          "dex": 13,
+          "con": 13,
+          "int": 2,
+          "wis": 10,
+          "cha": 3
+        },
+        "skills": {},
+        "senses": "darkvision 30 ft., passive Perception 10",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/hoss/portrait.png",
+        "web": {
+          "file": "portraits/hoss.png",
+          "width": 578,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/hoss.pixel.png",
+            "width": 128,
+            "height": 142,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/hoss.pixel-fine.png",
+            "width": 255,
+            "height": 282,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "hrok-and-hrok",
+      "name": "Hrök and Hrøk",
+      "epithet": "the Coworkers",
+      "tagline": "Two heads, one body, and a twenty-year argument about whose turn it is to scratch.",
+      "pronouns": {
+        "subject": "they",
+        "object": "them",
+        "possessive": "their"
+      },
+      "story": "Hrök and Hrøk are two heads on one body and have been arguing for twenty years about whose turn it is to scratch. The bald one wears an eyepatch. The ginger one wears a beard. Both of them wear a grudge.\n\nThey are a grey-skinned ettin, thirteen feet tall, and in a fight they hit very hard in two directions. They agree on almost nothing, except that the other one started it.",
+      "heightFt": 13,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "ettin",
+        "name": "Ettin",
+        "size": "Large",
+        "type": "Giant",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "4",
+        "crValue": 4,
+        "armorClass": 12,
+        "hitPoints": 85,
+        "hitDice": "10d10+30",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 21,
+          "dex": 8,
+          "con": 17,
+          "int": 6,
+          "wis": 10,
+          "cha": 8
+        },
+        "skills": {
+          "perception": 4
+        },
+        "senses": "darkvision 60 ft., passive Perception 14",
+        "languages": "Giant, Orc"
+      },
+      "portrait": {
+        "original": "characters/hrok-and-hrok/portrait.png",
+        "web": {
+          "file": "portraits/hrok-and-hrok.png",
+          "width": 449,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/hrok-and-hrok.pixel.png",
+            "width": 257,
+            "height": 366,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/hrok-and-hrok.pixel-fine.png",
+            "width": 513,
+            "height": 730,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "loom",
+          "shownFt": 13,
+          "topFt": 6.5
+        }
+      }
+    },
+    {
+      "id": "hyekh-kaa",
+      "name": "Hyekh!k'ka'a",
+      "epithet": "Laughs First",
+      "tagline": "Has never finished a joke. Starts laughing at the setup.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Hyekh!k'ka'a has never finished telling a joke. He starts laughing at the setup, howls through the middle and is on the floor before the punchline, which nobody has ever heard. People suspect there isn't one.\n\nHe wears a loud striped vest and a gold canine tooth that catches the light when he laughs, which is always. A notched ear is the only souvenir of an audience that wanted the ending.",
+      "heightFt": 7,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "gnoll",
+        "name": "Gnoll",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "gnoll",
+        "alignment": "chaotic evil",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 15,
+        "hitPoints": 22,
+        "hitDice": "5d8",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 14,
+          "dex": 12,
+          "con": 11,
+          "int": 6,
+          "wis": 10,
+          "cha": 7
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": "Gnoll"
+      },
+      "portrait": {
+        "original": "characters/hyekh-kaa/portrait.png",
+        "web": {
+          "file": "portraits/hyekh-kaa.png",
+          "width": 350,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/hyekh-kaa.pixel.png",
+            "width": 109,
+            "height": 198,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/hyekh-kaa.pixel-fine.png",
+            "width": 216,
+            "height": 394,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 7,
+          "topFt": 3.5
+        }
+      }
+    },
+    {
+      "id": "jenkins",
+      "name": "Jenkins",
+      "epithet": "Directions",
+      "tagline": "Gives directions to everyone, unprompted. Has never once been right.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Jenkins gives directions to everyone, unprompted. He has never once been right. He is a glowing pale-blue orb with a smug little face, and he floats ahead of people in the dark, confidently, toward bogs.\n\nHe is helpful, he says. He knows a shortcut, he says. Several search parties have now been lost while looking for people he helped.",
+      "heightFt": 1,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "will-o-wisp",
+        "name": "Will-o'-Wisp",
+        "size": "Tiny",
+        "type": "Undead",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 19,
+        "hitPoints": 22,
+        "hitDice": "9d4",
+        "speed": {
+          "hover": true,
+          "walk": 0,
+          "fly": 50
+        },
+        "abilities": {
+          "str": 1,
+          "dex": 28,
+          "con": 10,
+          "int": 13,
+          "wis": 14,
+          "cha": 11
+        },
+        "skills": {},
+        "senses": "darkvision 120 ft., passive Perception 12",
+        "languages": "the languages it knew in life"
+      },
+      "portrait": {
+        "original": "characters/jenkins/portrait.png",
+        "web": {
+          "file": "portraits/jenkins.png",
+          "width": 449,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/jenkins.pixel.png",
+            "width": 22,
+            "height": 30,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/jenkins.pixel-fine.png",
+            "width": 41,
+            "height": 58,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 1,
+          "topFt": 1
+        }
+      }
+    },
+    {
+      "id": "kevin",
+      "name": "Kevin",
+      "epithet": "Weekends Only",
+      "tagline": "Only turns when the full moon falls on a Saturday. Plans his whole life around it.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Kevin only turns when the full moon falls on a Saturday. He plans his whole life around it. The rest of the time he is a shaggy grey werewolf in reading glasses, a patched wool nightshirt and a nightcap, holding a clay mug of mead.\n\nHe is tired. He is always tired. When the right Saturday comes he is spectacular, briefly, and then he needs a lie-down.",
+      "heightFt": 6.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "werewolf",
+        "name": "Werewolf",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "human",
+        "alignment": "chaotic evil",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 11,
+        "hitPoints": 58,
+        "hitDice": "9d8+18",
+        "speed": {
+          "notes": "40 ft. in wolf form",
+          "walk": 30
+        },
+        "abilities": {
+          "str": 15,
+          "dex": 13,
+          "con": 14,
+          "int": 10,
+          "wis": 11,
+          "cha": 10
+        },
+        "skills": {
+          "perception": 4
+        },
+        "senses": "passive Perception 14",
+        "languages": "Common (can't speak in wolf form)"
+      },
+      "portrait": {
+        "original": "characters/kevin/portrait.png",
+        "web": {
+          "file": "portraits/kevin.png",
+          "width": 438,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/kevin.pixel.png",
+            "width": 127,
+            "height": 184,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/kevin.pixel-fine.png",
+            "width": 251,
+            "height": 366,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6.5,
+          "topFt": 3
+        }
+      }
+    },
+    {
+      "id": "kluu",
+      "name": "Ḱʟʟuu'ʘ",
+      "epithet": "Ill Repute",
+      "tagline": "Runs a dice game under every bridge in the league. Wins by holding the dice.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Ḱʟʟuu'ʘ runs a dice game under every bridge in the league. He wins by holding the dice, in a claw, permanently. Nobody has ever proved this was against the rules, because the rules are also in the claw.\n\nHe is a dark green chuul with face tentacles, a gold tooth and one cracked claw from a player who wanted the dice back. His grin is that of a dealmaker who has never had to deal.",
+      "heightFt": 8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "chuul",
+        "name": "Chuul",
+        "size": "Large",
+        "type": "Aberration",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "4",
+        "crValue": 4,
+        "armorClass": 16,
+        "hitPoints": 93,
+        "hitDice": "11d10+33",
+        "speed": {
+          "walk": 30,
+          "swim": 30
+        },
+        "abilities": {
+          "str": 19,
+          "dex": 10,
+          "con": 16,
+          "int": 5,
+          "wis": 11,
+          "cha": 5
+        },
+        "skills": {
+          "perception": 4
+        },
+        "senses": "darkvision 60 ft., passive Perception 14",
+        "languages": "understands Deep Speech but can't speak"
+      },
+      "portrait": {
+        "original": "characters/kluu/portrait.png",
+        "web": {
+          "file": "portraits/kluu.png",
+          "width": 600,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/kluu.pixel.png",
+            "width": 212,
+            "height": 226,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/kluu.pixel-fine.png",
+            "width": 422,
+            "height": 450,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 8,
+          "topFt": 4.5
+        }
+      }
+    },
+    {
+      "id": "krrth",
+      "name": "Kʀʀṭh",
+      "epithet": "Never Convicted",
+      "tagline": "Suspect in forty-one break-ins. Every witness describes a statue.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Kʀʀṭh is a suspect in forty-one break-ins. Every witness describes a statue. He is grey stone with moss on his shoulders, one chipped horn and folded wings, and he stands very still whenever anyone looks at him.\n\nHe has a sly, guilty grin carved in permanently. The guards have arrested him twice. Both times he stood in the cell until they let him go.",
+      "heightFt": 6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "gargoyle",
+        "name": "Gargoyle",
+        "size": "Medium",
+        "type": "Elemental",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 15,
+        "hitPoints": 52,
+        "hitDice": "7d8+21",
+        "speed": {
+          "walk": 30,
+          "fly": 60
+        },
+        "abilities": {
+          "str": 15,
+          "dex": 11,
+          "con": 16,
+          "int": 6,
+          "wis": 11,
+          "cha": 7
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": "Terran"
+      },
+      "portrait": {
+        "original": "characters/krrth/portrait.png",
+        "web": {
+          "file": "portraits/krrth.png",
+          "width": 640,
+          "height": 516
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/krrth.pixel.png",
+            "width": 210,
+            "height": 170,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/krrth.pixel-fine.png",
+            "width": 419,
+            "height": 338,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "lady-constance-fopsworth",
+      "name": "Lady Constance Fopsworth",
+      "epithet": "the Expense Account",
+      "tagline": "Invoices the tavern after every fight. Line items include \"emotional armour\".",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Lady Constance invoices the tavern after every fight. The line items include lace, powder, \"emotional armour\" and a recurring charge for having been made to look at the opposition. Every invoice has been paid, because nobody can find the person who would refuse it.\n\nShe inspects the world through a lorgnette and finds it lacking at every magnification. The beauty mark is painted on fresh each morning, slightly higher than the day before.",
+      "heightFt": 5.4,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "noble",
+        "name": "Noble",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "any race",
+        "alignment": "any alignment",
+        "cr": "1/8",
+        "crValue": 0.125,
+        "armorClass": 15,
+        "hitPoints": 9,
+        "hitDice": "2d8",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 11,
+          "dex": 12,
+          "con": 11,
+          "int": 12,
+          "wis": 14,
+          "cha": 16
+        },
+        "skills": {
+          "deception": 5,
+          "insight": 4,
+          "persuasion": 5
+        },
+        "senses": "passive Perception 12",
+        "languages": "any two languages"
+      },
+      "portrait": {
+        "original": "characters/lady-constance-fopsworth/portrait.png",
+        "web": {
+          "file": "portraits/lady-constance-fopsworth.png",
+          "width": 344,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/lady-constance-fopsworth.pixel.png",
+            "width": 83,
+            "height": 153,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/lady-constance-fopsworth.pixel-fine.png",
+            "width": 164,
+            "height": 304,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.4,
+          "topFt": 1.9000000000000004
+        }
+      }
+    },
+    {
+      "id": "lenore",
+      "name": "Lenore",
+      "epithet": "the Tongue",
+      "tagline": "Has caught flies, coins, a lute and, on two occasions, the bard.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Lenore's tongue has caught flies, coins, a lute and, on two separate occasions, the bard. She returned the lute. The bard was let go eventually, with an apology and a gold hoop earring that she kept.\n\nShe is fat, green, yellow-throated and heavy-lidded, and she sits very still until something interesting moves. She considers almost everything interesting.",
+      "heightFt": 2.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "giant-frog",
+        "name": "Giant Frog",
+        "size": "Medium",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 11,
+        "hitPoints": 18,
+        "hitDice": "4d8",
+        "speed": {
+          "walk": 30,
+          "swim": 30
+        },
+        "abilities": {
+          "str": 12,
+          "dex": 13,
+          "con": 11,
+          "int": 2,
+          "wis": 10,
+          "cha": 3
+        },
+        "skills": {
+          "perception": 2,
+          "stealth": 3
+        },
+        "senses": "darkvision 30 ft., passive Perception 12",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/lenore/portrait.png",
+        "web": {
+          "file": "portraits/lenore.png",
+          "width": 640,
+          "height": 607
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/lenore.pixel.png",
+            "width": 76,
+            "height": 72,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/lenore.pixel-fine.png",
+            "width": 150,
+            "height": 142,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 2.5,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "lou-varga",
+      "name": "Lou Varga",
+      "epithet": "Banned",
+      "tagline": "Banned from every all-you-can-eat in the realm for taking the phrase literally.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Lou is banned from every all-you-can-eat in the realm for taking the phrase literally. The last one is now a stable. He is gaunt, pale grey and has long yellow nails he keeps clean for no clear reason.\n\nHe wears a stained linen bib at all times, in case. There is gravy on his chin at all times, also in case. He grins at the buffet the way other people grin at old friends.",
+      "heightFt": 5.8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "ghoul",
+        "name": "Ghoul",
+        "size": "Medium",
+        "type": "Undead",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 12,
+        "hitPoints": 22,
+        "hitDice": "5d8",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 13,
+          "dex": 15,
+          "con": 10,
+          "int": 7,
+          "wis": 10,
+          "cha": 6
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": "Common"
+      },
+      "portrait": {
+        "original": "characters/lou-varga/portrait.png",
+        "web": {
+          "file": "portraits/lou-varga.png",
+          "width": 386,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/lou-varga.pixel.png",
+            "width": 100,
+            "height": 164,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/lou-varga.pixel-fine.png",
+            "width": 198,
+            "height": 327,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.8,
+          "topFt": 2.3
+        }
+      }
+    },
+    {
+      "id": "maude",
+      "name": "Maude",
+      "epithet": "the Hugger",
+      "tagline": "Hugs everyone. The healers have asked her, formally, to stop.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Maude hugs everyone. The healers have asked her, formally and in writing, to stop. She has the letter framed. She is a brown-feathered owlbear with huge amber eyes and a cracked beak tip, and she is always overjoyed to see you.\n\nThe heart tattoo on her arm was a gift from someone she hugged. She is still looking for them to say thank you. Several people are keeping very still in the hope that she won't find them.",
+      "heightFt": 8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "owlbear",
+        "name": "Owlbear",
+        "size": "Large",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 13,
+        "hitPoints": 59,
+        "hitDice": "7d10+21",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 20,
+          "dex": 12,
+          "con": 17,
+          "int": 3,
+          "wis": 12,
+          "cha": 7
+        },
+        "skills": {
+          "perception": 3
+        },
+        "senses": "darkvision 60 ft., passive Perception 13",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/maude/portrait.png",
+        "web": {
+          "file": "portraits/maude.png",
+          "width": 454,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/maude.pixel.png",
+            "width": 161,
+            "height": 226,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/maude.pixel-fine.png",
+            "width": 320,
+            "height": 450,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 8,
+          "topFt": 4.5
+        }
+      }
+    },
+    {
+      "id": "mavis",
+      "name": "Mavis",
+      "epithet": "Salon Owner",
+      "tagline": "Gives the worst haircuts in the realm. No client has complained, or moved, since.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Mavis gives the worst haircuts in the realm. No client has complained, or moved, since. Her salon is very quiet and full of statues with interesting fringes.\n\nShe is a green-skinned medusa with her snakes tied up in ribbons and round smoked-glass spectacles she slides down her nose when she wants to make a point. She chews gum. She has been asked to take the glasses off exactly once.",
+      "heightFt": 5.8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "medusa",
+        "name": "Medusa",
+        "size": "Medium",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "lawful evil",
+        "cr": "6",
+        "crValue": 6,
+        "armorClass": 15,
+        "hitPoints": 127,
+        "hitDice": "17d8+51",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 10,
+          "dex": 15,
+          "con": 16,
+          "int": 12,
+          "wis": 13,
+          "cha": 15
+        },
+        "skills": {
+          "deception": 5,
+          "insight": 4,
+          "perception": 4,
+          "stealth": 5
+        },
+        "senses": "darkvision 60 ft., passive Perception 14",
+        "languages": "Common"
+      },
+      "portrait": {
+        "original": "characters/mavis/portrait.png",
+        "web": {
+          "file": "portraits/mavis.png",
+          "width": 363,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/mavis.pixel.png",
+            "width": 94,
+            "height": 164,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/mavis.pixel-fine.png",
+            "width": 186,
+            "height": 327,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.8,
+          "topFt": 2.3
+        }
+      }
+    },
+    {
+      "id": "mhruugh",
+      "name": "Mhʀ'ūūgh",
+      "epithet": "Maze Specialist",
+      "tagline": "The league's leading expert on labyrinths. Gets lost in hallways.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Mhʀ'ūūgh is the league's leading expert on labyrinths. He gets lost in hallways. He has written the definitive guide to mazes, and could not find the printer's to deliver it.\n\nHe is a hulking brown minotaur with a gold nose ring and one sawn-off horn, and he squints at doors as though they owe him money. He has never once been outsmarted by a maze. Corridors are another matter.",
+      "heightFt": 8.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "minotaur",
+        "name": "Minotaur",
+        "size": "Large",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 14,
+        "hitPoints": 76,
+        "hitDice": "9d10+27",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 18,
+          "dex": 11,
+          "con": 16,
+          "int": 6,
+          "wis": 16,
+          "cha": 9
+        },
+        "skills": {
+          "perception": 7
+        },
+        "senses": "darkvision 60 ft., passive Perception 17",
+        "languages": "Abyssal"
+      },
+      "portrait": {
+        "original": "characters/mhruugh/portrait.png",
+        "web": {
+          "file": "portraits/mhruugh.png",
+          "width": 395,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/mhruugh.pixel.png",
+            "width": 149,
+            "height": 240,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/mhruugh.pixel-fine.png",
+            "width": 296,
+            "height": 478,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 8.5,
+          "topFt": 5
+        }
+      }
+    },
+    {
+      "id": "mike",
+      "name": "Mike",
+      "epithet": "the Life of the Party",
+      "tagline": "Nobody remembers anything after he arrives. Everyone wakes up purple.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Nobody remembers anything after Mike arrives. Everyone wakes up purple. Mike is a large violet mushroom with drooping tendrils and small round spectacles of smoked glass, and he is always, somehow, already there.\n\nHe smiles through all of it, blissed out and unhurried. Hosts invite him anyway, because the parties are reportedly excellent. Nobody can say why.",
+      "heightFt": 5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "violet-fungus",
+        "name": "Violet Fungus",
+        "size": "Medium",
+        "type": "Plant",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 5,
+        "hitPoints": 18,
+        "hitDice": "4d8",
+        "speed": {
+          "walk": 5
+        },
+        "abilities": {
+          "str": 3,
+          "dex": 1,
+          "con": 10,
+          "int": 1,
+          "wis": 3,
+          "cha": 1
+        },
+        "skills": {},
+        "senses": "blindsight 30 ft. (blind beyond this radius), passive Perception 6",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/mike/portrait.png",
+        "web": {
+          "file": "portraits/mike.png",
+          "width": 418,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/mike.pixel.png",
+            "width": 94,
+            "height": 142,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/mike.pixel-fine.png",
+            "width": 185,
+            "height": 282,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "morga-thane",
+      "name": "Morga Thane",
+      "epithet": "the Poet",
+      "tagline": "Writes tender sonnets about the moon. Every one rhymes with \"smash\".",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Morga writes tender sonnets about the moon, its silver light and its quiet distance. Every one of them rhymes with \"smash\". She has written two hundred of them and is still finding new ways.\n\nShe keeps a quill behind her ear and small round reading glasses balanced above a broken left tusk. When she reads aloud the room goes quiet, partly from feeling and partly from proximity.",
+      "heightFt": 6.2,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "orc",
+        "name": "Orc",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "orc",
+        "alignment": "chaotic evil",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 13,
+        "hitPoints": 15,
+        "hitDice": "2d8+6",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 12,
+          "con": 16,
+          "int": 7,
+          "wis": 11,
+          "cha": 10
+        },
+        "skills": {
+          "intimidation": 2
+        },
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": "Common, Orc"
+      },
+      "portrait": {
+        "original": "characters/morga-thane/portrait.png",
+        "web": {
+          "file": "portraits/morga-thane.png",
+          "width": 424,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/morga-thane.pixel.png",
+            "width": 117,
+            "height": 176,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/morga-thane.pixel-fine.png",
+            "width": 232,
+            "height": 349,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6.2,
+          "topFt": 2.7
+        }
+      }
+    },
+    {
+      "id": "mortimer",
+      "name": "Mortimer",
+      "epithet": "Notary",
+      "tagline": "Requires a signed form before he will pass the salt.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Mortimer requires a signed form before he will pass the salt. The form is four pages. He has the forms with him at all times, along with a quill and a wax seal stamp in brass to match his capped horn.\n\nHe is a small red imp with bat wings and a glare reserved for unsigned requests. He has never once been rushed. He has been thrown across rooms, and filed a complaint on landing.",
+      "heightFt": 2,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "imp",
+        "name": "Imp",
+        "size": "Tiny",
+        "type": "Fiend",
+        "subtype": "devil",
+        "alignment": "lawful evil",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 13,
+        "hitPoints": 10,
+        "hitDice": "3d4+3",
+        "speed": {
+          "walk": 20,
+          "fly": 40
+        },
+        "abilities": {
+          "str": 6,
+          "dex": 17,
+          "con": 13,
+          "int": 11,
+          "wis": 12,
+          "cha": 14
+        },
+        "skills": {
+          "deception": 4,
+          "insight": 3,
+          "persuasion": 4,
+          "stealth": 5
+        },
+        "senses": "darkvision 120 ft., passive Perception 11",
+        "languages": "Infernal, Common"
+      },
+      "portrait": {
+        "original": "characters/mortimer/portrait.png",
+        "web": {
+          "file": "portraits/mortimer.png",
+          "width": 640,
+          "height": 567
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/mortimer.pixel.png",
+            "width": 65,
+            "height": 58,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/mortimer.pixel-fine.png",
+            "width": 129,
+            "height": 114,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 2,
+          "topFt": 2
+        }
+      }
+    },
+    {
+      "id": "mott",
+      "name": "Mott",
+      "epithet": "Patient Zero",
+      "tagline": "The first recorded case of four separate illnesses. Maintains he feels fine.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Mott has been the first recorded case of four separate illnesses, and was asked to sit for a portrait by the healers' guild for each. He has a torn left ear, several bald patches and a nose that has not stopped running in living memory.\n\nHe feels fine. He says so calmly, often, and at close range. Nobody has ever been able to prove otherwise, and several have tried from across the room.",
+      "heightFt": 1.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "giant-rat-diseased",
+        "name": "Giant Rat (Diseased)",
+        "size": "Small",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/8",
+        "crValue": 0.125,
+        "armorClass": 12,
+        "hitPoints": 7,
+        "hitDice": "2d6",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 7,
+          "dex": 15,
+          "con": 11,
+          "int": 2,
+          "wis": 10,
+          "cha": 4
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/mott/portrait.png",
+        "web": {
+          "file": "portraits/mott.png",
+          "width": 640,
+          "height": 531
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/mott.pixel.png",
+            "width": 53,
+            "height": 44,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/mott.pixel-fine.png",
+            "width": 103,
+            "height": 86,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 1.5,
+          "topFt": 1.5
+        }
+      }
+    },
+    {
+      "id": "nell-malone",
+      "name": "Nell Malone",
+      "epithet": "the Lightweight",
+      "tagline": "Cannot hold her drink. It passes straight through. Orders another.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Nell cannot hold her drink. It passes straight through her, beer foam and all, and puddles politely under her stool. She orders another. She has never once been drunk, and has never once been refused service.\n\nA copper plate patches a crack in her skull from an argument with a door. She is the most cheerful skeleton anyone has met, though she admits the competition is thin.",
+      "heightFt": 5.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "skeleton",
+        "name": "Skeleton",
+        "size": "Medium",
+        "type": "Undead",
+        "subtype": "",
+        "alignment": "lawful evil",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 13,
+        "hitPoints": 13,
+        "hitDice": "2d8+4",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 10,
+          "dex": 14,
+          "con": 15,
+          "int": 6,
+          "wis": 8,
+          "cha": 5
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 9",
+        "languages": "understands the languages it knew in life but can't speak"
+      },
+      "portrait": {
+        "original": "characters/nell-malone/portrait.png",
+        "web": {
+          "file": "portraits/nell-malone.png",
+          "width": 375,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/nell-malone.pixel.png",
+            "width": 92,
+            "height": 156,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/nell-malone.pixel-fine.png",
+            "width": 183,
+            "height": 310,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.5,
+          "topFt": 2
+        }
+      }
+    },
+    {
+      "id": "nobody-special",
+      "name": "Nobody Special",
+      "epithet": "Literally Anyone",
+      "tagline": "Appears in every team portrait as a different person. Denies being in any of them.",
+      "pronouns": {
+        "subject": "they",
+        "object": "them",
+        "possessive": "their"
+      },
+      "story": "Nobody Special appears in every team portrait as a different person and denies being in any of them. They are grey, smooth and featureless, and wear an obviously fake black mustache, slightly crooked, as a disguise.\n\nThey have been a guard, a bard and, briefly, the mayor. Nobody noticed. They stand stiffly and look innocent, and you are certain you have met them before.",
+      "heightFt": 5.8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "doppelganger",
+        "name": "Doppelganger",
+        "size": "Medium",
+        "type": "Monstrosity",
+        "subtype": "shapechanger",
+        "alignment": "unaligned",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 14,
+        "hitPoints": 52,
+        "hitDice": "8d8+16",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 11,
+          "dex": 18,
+          "con": 14,
+          "int": 11,
+          "wis": 12,
+          "cha": 14
+        },
+        "skills": {
+          "deception": 6,
+          "insight": 3
+        },
+        "senses": "darkvision 60 ft., passive Perception 11",
+        "languages": "Common"
+      },
+      "portrait": {
+        "original": "characters/nobody-special/portrait.png",
+        "web": {
+          "file": "portraits/nobody-special.png",
+          "width": 281,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/nobody-special.pixel.png",
+            "width": 73,
+            "height": 164,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/nobody-special.pixel-fine.png",
+            "width": 145,
+            "height": 327,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.8,
+          "topFt": 2.3
+        }
+      }
+    },
+    {
+      "id": "oakley",
+      "name": "Oakley",
+      "epithet": "the Rookie",
+      "tagline": "Three hundred years old and still the newest member of the team. Sensitive about it.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Oakley is three hundred years old and still the newest member of the team. He is sensitive about it. He has a bark face, a bird's nest on his head and a carved heart on his trunk with initials nobody will explain.\n\nHe moves slowly and smiles shyly and has opinions he will share in about a decade. The birds have been with him longer than anyone. He considers them senior.",
+      "heightFt": 18,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "awakened-tree",
+        "name": "Awakened Tree",
+        "size": "Huge",
+        "type": "Plant",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 13,
+        "hitPoints": 59,
+        "hitDice": "7d12+14",
+        "speed": {
+          "walk": 20
+        },
+        "abilities": {
+          "str": 19,
+          "dex": 6,
+          "con": 15,
+          "int": 10,
+          "wis": 10,
+          "cha": 7
+        },
+        "skills": {},
+        "senses": "passive Perception 10",
+        "languages": "one language known by its creator"
+      },
+      "portrait": {
+        "original": "characters/oakley/portrait.png",
+        "web": {
+          "file": "portraits/oakley.png",
+          "width": 418,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/oakley.pixel.png",
+            "width": 240,
+            "height": 366,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/oakley.pixel-fine.png",
+            "width": 477,
+            "height": 730,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "loom",
+          "shownFt": 13,
+          "topFt": 6.5
+        }
+      }
+    },
+    {
+      "id": "otgh",
+      "name": "Ö'tʰǧh",
+      "epithet": "Sanitation",
+      "tagline": "Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.",
+      "pronouns": {
+        "subject": "they",
+        "object": "them",
+        "possessive": "their"
+      },
+      "story": "Ö'tʰǧh lives in garbage and eats garbage and is, accurately, the cleanest member of the team. They have three legs, a single eyestalk and a rotten cabbage leaf draped on their head like a hat they are proud of.\n\nThey are the league's best sanitation department, unpaid and unasked. Their grin is gap-toothed and sincere, and it is best enjoyed from upwind.",
+      "heightFt": 6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "otyugh",
+        "name": "Otyugh",
+        "size": "Large",
+        "type": "Aberration",
+        "subtype": "",
+        "alignment": "neutral",
+        "cr": "5",
+        "crValue": 5,
+        "armorClass": 14,
+        "hitPoints": 114,
+        "hitDice": "12d10+48",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 11,
+          "con": 19,
+          "int": 6,
+          "wis": 13,
+          "cha": 6
+        },
+        "skills": {},
+        "senses": "darkvision 120 ft., passive Perception 11",
+        "languages": "Otyugh"
+      },
+      "portrait": {
+        "original": "characters/otgh/portrait.png",
+        "web": {
+          "file": "portraits/otgh.png",
+          "width": 574,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/otgh.pixel.png",
+            "width": 153,
+            "height": 170,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/otgh.pixel-fine.png",
+            "width": 303,
+            "height": 338,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "patsy",
+      "name": "Patsy",
+      "epithet": "the Laugher",
+      "tagline": "Laughs at funerals, apologies and her own injuries. Mostly her own injuries.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Patsy laughs at funerals, apologies and her own injuries, mostly her own injuries. She is a big spotted hyena with a torn left ear and tears of laughter permanently tracked down her face.\n\nShe is not cruel. She just finds everything, and especially pain, hilarious. Healers find her easy to work with and impossible to be in the room with.",
+      "heightFt": 4,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "giant-hyena",
+        "name": "Giant Hyena",
+        "size": "Large",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 12,
+        "hitPoints": 45,
+        "hitDice": "6d10+12",
+        "speed": {
+          "walk": 50
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 14,
+          "con": 14,
+          "int": 2,
+          "wis": 12,
+          "cha": 7
+        },
+        "skills": {
+          "perception": 3
+        },
+        "senses": "passive Perception 13",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/patsy/portrait.png",
+        "web": {
+          "file": "portraits/patsy.png",
+          "width": 599,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/patsy.pixel.png",
+            "width": 107,
+            "height": 114,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/patsy.pixel-fine.png",
+            "width": 212,
+            "height": 226,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 4,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "peanut",
+      "name": "Peanut",
+      "epithet": "Remembers Everything",
+      "tagline": "Keeps a written list of everyone who has ever wronged her. The list has a second volume.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Peanut remembers everything. She keeps a written list of everyone who has ever wronged her, in a tiny leather-bound journal tucked behind one ear. The list has a second volume. The third is on order.\n\nShe is a huge grey elephant with one broken tusk and a long memory for who broke it. She is patient. She is very patient. She will get to you.",
+      "heightFt": 11,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "elephant",
+        "name": "Elephant",
+        "size": "Huge",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "4",
+        "crValue": 4,
+        "armorClass": 12,
+        "hitPoints": 76,
+        "hitDice": "8d12+24",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 22,
+          "dex": 9,
+          "con": 17,
+          "int": 3,
+          "wis": 11,
+          "cha": 6
+        },
+        "skills": {},
+        "senses": "passive Perception 10",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/peanut/portrait.png",
+        "web": {
+          "file": "portraits/peanut.png",
+          "width": 640,
+          "height": 592
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/peanut.pixel.png",
+            "width": 335,
+            "height": 310,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/peanut.pixel-fine.png",
+            "width": 667,
+            "height": 618,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "loom",
+          "shownFt": 11,
+          "topFt": 6.5
+        }
+      }
+    },
+    {
+      "id": "pete",
+      "name": "Pete",
+      "epithet": "Some Assembly Required",
+      "tagline": "Built from eleven people. Four were left-handed, and it shows.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Pete was built from eleven people. Four were left-handed, and it shows. His arms do not match, his eyes do not match (one blue, one brown), and there is a bolt in his neck that nobody can find the other end of.\n\nHe smiles a bewildered, lopsided smile and does his best. Some assembly was required. Some was skipped. He is still finding out which.",
+      "heightFt": 8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "flesh-golem",
+        "name": "Flesh Golem",
+        "size": "Medium",
+        "type": "Construct",
+        "subtype": "",
+        "alignment": "neutral",
+        "cr": "5",
+        "crValue": 5,
+        "armorClass": 9,
+        "hitPoints": 93,
+        "hitDice": "11d8+44",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 19,
+          "dex": 9,
+          "con": 18,
+          "int": 6,
+          "wis": 10,
+          "cha": 5
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": "understands the languages of its creator but can't speak"
+      },
+      "portrait": {
+        "original": "characters/pete/portrait.png",
+        "web": {
+          "file": "portraits/pete.png",
+          "width": 362,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/pete.pixel.png",
+            "width": 129,
+            "height": 226,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/pete.pixel-fine.png",
+            "width": 255,
+            "height": 450,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 8,
+          "topFt": 4.5
+        }
+      }
+    },
+    {
+      "id": "pierre",
+      "name": "Pierre",
+      "epithet": "Probably a Hat",
+      "tagline": "Hangs on hat racks. Is hurt when nobody tries him on.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Pierre is probably a hat. He hangs on hat racks, black and floppy, with one tentacle tip curled, and waits to be tried on. When nobody does, he takes it personally.\n\nHe watches the coat room with shifty eyes from under his own brim. Guests who do try him on discover several things about him at once. He has never had a return customer.",
+      "heightFt": 1.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "darkmantle",
+        "name": "Darkmantle",
+        "size": "Small",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 11,
+        "hitPoints": 22,
+        "hitDice": "5d6+5",
+        "speed": {
+          "walk": 10,
+          "fly": 30
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 12,
+          "con": 13,
+          "int": 2,
+          "wis": 10,
+          "cha": 5
+        },
+        "skills": {
+          "stealth": 3
+        },
+        "senses": "blindsight 60 ft., passive Perception 10",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/pierre/portrait.png",
+        "web": {
+          "file": "portraits/pierre.png",
+          "width": 474,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/pierre.pixel.png",
+            "width": 33,
+            "height": 44,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/pierre.pixel-fine.png",
+            "width": 64,
+            "height": 86,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 1.5,
+          "topFt": 1.5
+        }
+      }
+    },
+    {
+      "id": "professor-albright",
+      "name": "Professor Albright",
+      "epithet": "Tenured",
+      "tagline": "Lectures on decorum. Throws dung at anyone who asks a question.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Professor Albright lectures on decorum in a moth-eaten black academic gown, a monocle swinging on its chain. He has held his chair for thirty years and the chair is now mostly him.\n\nHe throws dung at anyone who asks a question. He considers this part of the lecture. Attendance is low, posture is excellent and nobody has ever raised a hand twice.",
+      "heightFt": 5.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "ape",
+        "name": "Ape",
+        "size": "Medium",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 12,
+        "hitPoints": 19,
+        "hitDice": "3d8+6",
+        "speed": {
+          "walk": 30,
+          "climb": 30
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 14,
+          "con": 14,
+          "int": 6,
+          "wis": 12,
+          "cha": 7
+        },
+        "skills": {
+          "athletics": 5,
+          "perception": 3
+        },
+        "senses": "passive Perception 13",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/professor-albright/portrait.png",
+        "web": {
+          "file": "portraits/professor-albright.png",
+          "width": 612,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/professor-albright.pixel.png",
+            "width": 149,
+            "height": 156,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/professor-albright.pixel-fine.png",
+            "width": 297,
+            "height": 310,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.5,
+          "topFt": 2
+        }
+      }
+    },
+    {
+      "id": "prudence",
+      "name": "Prudence",
+      "epithet": "the Critic",
+      "tagline": "Rates every suit of armour she eats. Has never given more than two stars.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Prudence rates every suit of armour she eats. She has never given more than two stars. She ties a white napkin around her neck before each meal and sets a bent antenna to the side, so it doesn't get in the sauce.\n\nHer reviews are short and sour. Knights have started to quote her on their shields, which she considers a bribe, and declines.",
+      "heightFt": 5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "rust-monster",
+        "name": "Rust Monster",
+        "size": "Medium",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 14,
+        "hitPoints": 27,
+        "hitDice": "5d8+5",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 13,
+          "dex": 12,
+          "con": 13,
+          "int": 2,
+          "wis": 13,
+          "cha": 6
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 11",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/prudence/portrait.png",
+        "web": {
+          "file": "portraits/prudence.png",
+          "width": 512,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/prudence.pixel.png",
+            "width": 114,
+            "height": 142,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/prudence.pixel-fine.png",
+            "width": 226,
+            "height": 282,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "pudding",
+      "name": "Pudding",
+      "epithet": "Dessert",
+      "tagline": "Looks like dessert. Eats like a siege engine.",
+      "pronouns": {
+        "subject": "it",
+        "object": "it",
+        "possessive": "its"
+      },
+      "story": "Pudding looks like dessert. It eats like a siege engine. It is a glossy black blob with a single red cherry on top, and it grins gleefully at anything that comes near, which is the last thing most of them see.\n\nIt has eaten a portcullis, two rowing boats and a chef who tried to serve it. The cherry has never been explained.",
+      "heightFt": 4,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "black-pudding",
+        "name": "Black Pudding",
+        "size": "Large",
+        "type": "Ooze",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "4",
+        "crValue": 4,
+        "armorClass": 7,
+        "hitPoints": 85,
+        "hitDice": "10d10+30",
+        "speed": {
+          "walk": 20,
+          "climb": 20
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 5,
+          "con": 16,
+          "int": 1,
+          "wis": 6,
+          "cha": 1
+        },
+        "skills": {},
+        "senses": "blindsight 60 ft. (blind beyond this radius), passive Perception 8",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/pudding/portrait.png",
+        "web": {
+          "file": "portraits/pudding.png",
+          "width": 570,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/pudding.pixel.png",
+            "width": 102,
+            "height": 114,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/pudding.pixel-fine.png",
+            "width": 202,
+            "height": 226,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 4,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "randall-pike",
+      "name": "Randall Pike",
+      "epithet": "Wedding Guest",
+      "tagline": "Has attended four hundred weddings. Was invited to none.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Randall has attended four hundred weddings and been invited to none. He arrives with a wreath of wilted flowers, a tin whistle in his mouth and a gift that is always somebody else's.\n\nOne of his horns curls and the other is a stub, broken during the toasts at wedding two hundred and twelve. He winks at the bride. He winks at the groom. He stays for the cake and is usually gone before anyone thinks to ask.",
+      "heightFt": 5.6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "satyr",
+        "name": "Satyr",
+        "size": "Medium",
+        "type": "Fey",
+        "subtype": "",
+        "alignment": "chaotic neutral",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 14,
+        "hitPoints": 31,
+        "hitDice": "7d8",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 12,
+          "dex": 16,
+          "con": 11,
+          "int": 12,
+          "wis": 10,
+          "cha": 14
+        },
+        "skills": {
+          "perception": 2,
+          "performance": 6,
+          "stealth": 5
+        },
+        "senses": "passive Perception 12",
+        "languages": "Common, Elvish, Sylvan"
+      },
+      "portrait": {
+        "original": "characters/randall-pike/portrait.png",
+        "web": {
+          "file": "portraits/randall-pike.png",
+          "width": 360,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/randall-pike.pixel.png",
+            "width": 90,
+            "height": 159,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/randall-pike.pixel-fine.png",
+            "width": 179,
+            "height": 316,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.6,
+          "topFt": 2.0999999999999996
+        }
+      }
+    },
+    {
+      "id": "rhaa-baeh-skraa",
+      "name": "Rhaa-Bǣh-Skʀaa",
+      "epithet": "No Consensus",
+      "tagline": "Three heads. No agreement yet on direction, dinner or a name.",
+      "pronouns": {
+        "subject": "they",
+        "object": "them",
+        "possessive": "their"
+      },
+      "story": "Rhaa-Bǣh-Skʀaa have three heads and no agreement yet on direction, dinner or a name. The lion wants to lead. The goat, with the broken horn, wants to object. The dragon wants to set fire to both proposals.\n\nThey are a chimera, and they move as a committee: slowly, loudly and in several directions. When they agree, they are terrifying. They have agreed twice.",
+      "heightFt": 8,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "chimera",
+        "name": "Chimera",
+        "size": "Large",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "6",
+        "crValue": 6,
+        "armorClass": 14,
+        "hitPoints": 114,
+        "hitDice": "12d10+48",
+        "speed": {
+          "walk": 30,
+          "fly": 60
+        },
+        "abilities": {
+          "str": 19,
+          "dex": 11,
+          "con": 19,
+          "int": 3,
+          "wis": 14,
+          "cha": 10
+        },
+        "skills": {
+          "perception": 8
+        },
+        "senses": "darkvision 60 ft., passive Perception 18",
+        "languages": "understands Draconic but can't speak"
+      },
+      "portrait": {
+        "original": "characters/rhaa-baeh-skraa/portrait.png",
+        "web": {
+          "file": "portraits/rhaa-baeh-skraa.png",
+          "width": 640,
+          "height": 624
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/rhaa-baeh-skraa.pixel.png",
+            "width": 232,
+            "height": 226,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/rhaa-baeh-skraa.pixel-fine.png",
+            "width": 462,
+            "height": 450,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 8,
+          "topFt": 4.5
+        }
+      }
+    },
+    {
+      "id": "rocco",
+      "name": "Rocco",
+      "epithet": "the Collector",
+      "tagline": "Petrifies anything he likes and keeps it in his museum, which is a field.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Rocco petrifies anything he likes and keeps it in his museum, which is a field. The collection includes a cart, three hedges, a tax inspector and a very surprised goose. Admission is free. Leaving is not guaranteed.\n\nHe wears a chunky gold chain over a bald patch on his neck and struts with his wattles out. He would like you to visit. He is already looking at you the way he looks at things he likes.",
+      "heightFt": 2,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "cockatrice",
+        "name": "Cockatrice",
+        "size": "Small",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/2",
+        "crValue": 0.5,
+        "armorClass": 11,
+        "hitPoints": 27,
+        "hitDice": "6d6+6",
+        "speed": {
+          "walk": 20,
+          "fly": 40
+        },
+        "abilities": {
+          "str": 6,
+          "dex": 12,
+          "con": 12,
+          "int": 2,
+          "wis": 13,
+          "cha": 5
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 11",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/rocco/portrait.png",
+        "web": {
+          "file": "portraits/rocco.png",
+          "width": 604,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/rocco.pixel.png",
+            "width": 55,
+            "height": 58,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/rocco.pixel-fine.png",
+            "width": 108,
+            "height": 114,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 2,
+          "topFt": 2
+        }
+      }
+    },
+    {
+      "id": "ronnie-vermicelli",
+      "name": "Ronnie Vermicelli",
+      "epithet": "Lounge Singer",
+      "tagline": "Changes at the full moon. Does a full set every time, stage or no stage.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Ronnie changes at the full moon and does a full set every time, stage or no stage. He has slicked-back black hair, a chipped front incisor and a gaudy maroon shirt open one button further than anyone asked.\n\nAs a rat he croons with his eyes closed. As a man he does the same. Audiences have never been able to say with confidence which one they were watching.",
+      "heightFt": 5.7,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "wererat",
+        "name": "Wererat",
+        "size": "Medium",
+        "type": "Humanoid",
+        "subtype": "human",
+        "alignment": "lawful evil",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 12,
+        "hitPoints": 33,
+        "hitDice": "6d8+6",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 10,
+          "dex": 15,
+          "con": 12,
+          "int": 11,
+          "wis": 10,
+          "cha": 8
+        },
+        "skills": {
+          "perception": 2,
+          "stealth": 4
+        },
+        "senses": "darkvision 60 ft. (rat form only), passive Perception 12",
+        "languages": "Common (can't speak in rat form)"
+      },
+      "portrait": {
+        "original": "characters/ronnie-vermicelli/portrait.png",
+        "web": {
+          "file": "portraits/ronnie-vermicelli.png",
+          "width": 395,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/ronnie-vermicelli.pixel.png",
+            "width": 101,
+            "height": 162,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/ronnie-vermicelli.pixel-fine.png",
+            "width": 199,
+            "height": 321,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.7,
+          "topFt": 2.2
+        }
+      }
+    },
+    {
+      "id": "shag",
+      "name": "Shag",
+      "epithet": "Origin Unknown",
+      "tagline": "Has a stain nobody explains. Nobody asks twice.",
+      "pronouns": {
+        "subject": "it",
+        "object": "it",
+        "possessive": "its"
+      },
+      "story": "Shag's origin is unknown. It is a shaggy burnt-orange rug with tasselled edges, two woven eyes and a large brown stain in the middle that nobody explains. Nobody asks twice.\n\nIt lies very still in front of fireplaces and waits for someone to wipe their feet. It has never been cleaned. It has been stepped on often, and by most people only once.",
+      "heightFt": 6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "rug-of-smothering",
+        "name": "Rug of Smothering",
+        "size": "Large",
+        "type": "Construct",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 12,
+        "hitPoints": 33,
+        "hitDice": "6d10",
+        "speed": {
+          "walk": 10
+        },
+        "abilities": {
+          "str": 17,
+          "dex": 14,
+          "con": 10,
+          "int": 1,
+          "wis": 3,
+          "cha": 1
+        },
+        "skills": {},
+        "senses": "blindsight 60 ft. (blind beyond this radius), passive Perception 6",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/shag/portrait.png",
+        "web": {
+          "file": "portraits/shag.png",
+          "width": 614,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/shag.pixel.png",
+            "width": 163,
+            "height": 170,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/shag.pixel-fine.png",
+            "width": 324,
+            "height": 338,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "sir-nobody",
+      "name": "Sir Nobody",
+      "epithet": "the Empty Suit",
+      "tagline": "There is no one inside. He has never been more sure of anything.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "There is no one inside Sir Nobody. He has never been more sure of anything. His plate armour is dented, silver and spotless, with one deep dent in the breastplate that he describes as a medal.\n\nHe stands with his chest out and his visor open on perfect darkness, a blue plume drooping over the top. He gives speeches about courage. Nobody knows where the voice comes from, and he would rather they didn't ask.",
+      "heightFt": 6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "animated-armor",
+        "name": "Animated Armor",
+        "size": "Medium",
+        "type": "Construct",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 18,
+        "hitPoints": 33,
+        "hitDice": "6d8+6",
+        "speed": {
+          "walk": 25
+        },
+        "abilities": {
+          "str": 14,
+          "dex": 11,
+          "con": 13,
+          "int": 1,
+          "wis": 3,
+          "cha": 1
+        },
+        "skills": {},
+        "senses": "blindsight 60 ft. (blind beyond this radius), passive Perception 6",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/sir-nobody/portrait.png",
+        "web": {
+          "file": "portraits/sir-nobody.png",
+          "width": 379,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/sir-nobody.pixel.png",
+            "width": 101,
+            "height": 170,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/sir-nobody.pixel-fine.png",
+            "width": 201,
+            "height": 338,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "stanley",
+      "name": "Stanley",
+      "epithet": "Undefeated",
+      "tagline": "Has never lost a staring contest. His opponents are now garden ornaments.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Stanley has never lost a staring contest. His opponents are now garden ornaments, which he considers a fair result. He is a green, eight-legged lizard with a scar along his jaw and smoked-glass spectacles pushed up on his head.\n\nHe puts the spectacles on to be polite. He takes them off to win. His stare is unblinking and intense, and he has started to run out of challengers.",
+      "heightFt": 3,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "basilisk",
+        "name": "Basilisk",
+        "size": "Medium",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 12,
+        "hitPoints": 52,
+        "hitDice": "8d8+16",
+        "speed": {
+          "walk": 20
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 8,
+          "con": 15,
+          "int": 2,
+          "wis": 8,
+          "cha": 7
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 9",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/stanley/portrait.png",
+        "web": {
+          "file": "portraits/stanley.png",
+          "width": 640,
+          "height": 607
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/stanley.pixel.png",
+            "width": 91,
+            "height": 86,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/stanley.pixel-fine.png",
+            "width": 179,
+            "height": 170,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 3,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "the-ratsby-collective",
+      "name": "The Ratsby Collective",
+      "tagline": "Holds a binding referendum before every step. Turnout is excellent.",
+      "pronouns": {
+        "subject": "they",
+        "object": "them",
+        "possessive": "their"
+      },
+      "story": "The Ratsby Collective holds a binding referendum before every step it takes. Turnout is excellent. Results are announced by the white rat on top, who does not vote and has never explained why that is his job.\n\nCrossing a room can take an afternoon. Crossing it in the wrong direction is unconstitutional. Opponents who wait them out tend to find that the Collective has voted, at some length, to bite them.",
+      "heightFt": 3,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "swarm-of-rats",
+        "name": "Swarm of Rats",
+        "size": "Medium",
+        "type": "Beast",
+        "subtype": "Swarm",
+        "alignment": "unaligned",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 10,
+        "hitPoints": 24,
+        "hitDice": "7d8-7",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 9,
+          "dex": 11,
+          "con": 9,
+          "int": 2,
+          "wis": 10,
+          "cha": 3
+        },
+        "skills": {},
+        "senses": "darkvision 30 ft., passive Perception 10",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/the-ratsby-collective/portrait.png",
+        "web": {
+          "file": "portraits/the-ratsby-collective.png",
+          "width": 453,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/the-ratsby-collective.pixel.png",
+            "width": 61,
+            "height": 86,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/the-ratsby-collective.pixel-fine.png",
+            "width": 121,
+            "height": 170,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 3,
+          "topFt": 1.75
+        }
+      }
+    },
+    {
+      "id": "thungk",
+      "name": "Thüŋk",
+      "epithet": "Eats for Two",
+      "tagline": "Ate the opposing team's mascot, then their snacks, then their bench.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Thüŋk ate the opposing team's mascot, then their snacks, then their bench. He is a fat, ruddy hill giant with a cauliflower ear and gravy down his tunic, and he is always holding a turkey leg from somewhere.\n\nHe eats for two and fights for one. He grins with his mouth full. Teams now schedule their games against him after lunch, in the hope that it helps.",
+      "heightFt": 16,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "hill-giant",
+        "name": "Hill Giant",
+        "size": "Huge",
+        "type": "Giant",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "5",
+        "crValue": 5,
+        "armorClass": 13,
+        "hitPoints": 105,
+        "hitDice": "10d12+40",
+        "speed": {
+          "walk": 40
+        },
+        "abilities": {
+          "str": 21,
+          "dex": 8,
+          "con": 19,
+          "int": 5,
+          "wis": 9,
+          "cha": 6
+        },
+        "skills": {
+          "perception": 2
+        },
+        "senses": "passive Perception 12",
+        "languages": "Giant"
+      },
+      "portrait": {
+        "original": "characters/thungk/portrait.png",
+        "web": {
+          "file": "portraits/thungk.png",
+          "width": 437,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/thungk.pixel.png",
+            "width": 250,
+            "height": 366,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/thungk.pixel-fine.png",
+            "width": 499,
+            "height": 730,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "loom",
+          "shownFt": 13,
+          "topFt": 6.5
+        }
+      }
+    },
+    {
+      "id": "tiffany",
+      "name": "Tiffany",
+      "epithet": "the Regular",
+      "tagline": "Drinks from the same three people every week. They have stopped complaining.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Tiffany drinks from the same three people every week, at the same time, in the same order. She is a creature of habit and a stirge, which amounts to the same thing.\n\nThe three have stopped complaining and started bringing snacks to keep their strength up. She wears a single pearl stud in one ear, a gift from the second of them, and watches the room through one milky eye with the patience of something that knows it will be fed.",
+      "heightFt": 1,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "stirge",
+        "name": "Stirge",
+        "size": "Tiny",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "1/8",
+        "crValue": 0.125,
+        "armorClass": 14,
+        "hitPoints": 2,
+        "hitDice": "1d4",
+        "speed": {
+          "walk": 10,
+          "fly": 40
+        },
+        "abilities": {
+          "str": 4,
+          "dex": 16,
+          "con": 11,
+          "int": 2,
+          "wis": 8,
+          "cha": 6
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 9",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/tiffany/portrait.png",
+        "web": {
+          "file": "portraits/tiffany.png",
+          "width": 640,
+          "height": 591
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/tiffany.pixel.png",
+            "width": 32,
+            "height": 30,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/tiffany.pixel-fine.png",
+            "width": 63,
+            "height": 58,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 1,
+          "topFt": 1
+        }
+      }
+    },
+    {
+      "id": "tony",
+      "name": "Tony",
+      "epithet": "Can't Clap",
+      "tagline": "The most dangerous thing in the league. Defeated daily by doorknobs, high-fives and shirts.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Tony is the most dangerous thing in the league. He is defeated daily by doorknobs, high-fives and shirts. He is a huge green tyrannosaurus with a scarred snout and arms that strain toward anything above his chest.\n\nSomeone balances a wooden tankard on his head before every match. He has never reached it. He has never stopped trying. His teammates have learned not to applaud.",
+      "heightFt": 20,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "tyrannosaurus-rex",
+        "name": "Tyrannosaurus Rex",
+        "size": "Huge",
+        "type": "Beast",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "8",
+        "crValue": 8,
+        "armorClass": 13,
+        "hitPoints": 136,
+        "hitDice": "13d12+52",
+        "speed": {
+          "walk": 50
+        },
+        "abilities": {
+          "str": 25,
+          "dex": 10,
+          "con": 19,
+          "int": 2,
+          "wis": 12,
+          "cha": 9
+        },
+        "skills": {
+          "perception": 4
+        },
+        "senses": "passive Perception 14",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/tony/portrait.png",
+        "web": {
+          "file": "portraits/tony.png",
+          "width": 640,
+          "height": 537
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/tony.pixel.png",
+            "width": 436,
+            "height": 366,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/tony.pixel-fine.png",
+            "width": 870,
+            "height": 730,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "loom",
+          "shownFt": 13,
+          "topFt": 6.5
+        }
+      }
+    },
+    {
+      "id": "uncle-amon",
+      "name": "Uncle Amon",
+      "epithet": "Unravelling",
+      "tagline": "Four thousand years old. Still trailing linen behind him everywhere he goes.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Uncle Amon is four thousand years old and still trailing linen behind him everywhere he goes. He has one glowing green eye, a sheepish grin and bandages that come loose on stairs.\n\nHe was a king once, or the brother of one, or the king's accountant. The details have unravelled. He is everyone's uncle now and turns up at family dinners nobody remembers inviting him to.",
+      "heightFt": 5.9,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "mummy",
+        "name": "Mummy",
+        "size": "Medium",
+        "type": "Undead",
+        "subtype": "",
+        "alignment": "lawful evil",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 11,
+        "hitPoints": 58,
+        "hitDice": "9d8+18",
+        "speed": {
+          "walk": 20
+        },
+        "abilities": {
+          "str": 16,
+          "dex": 8,
+          "con": 15,
+          "int": 6,
+          "wis": 10,
+          "cha": 12
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": "the languages it knew in life"
+      },
+      "portrait": {
+        "original": "characters/uncle-amon/portrait.png",
+        "web": {
+          "file": "portraits/uncle-amon.png",
+          "width": 295,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/uncle-amon.pixel.png",
+            "width": 78,
+            "height": 167,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/uncle-amon.pixel-fine.png",
+            "width": 154,
+            "height": 332,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.9,
+          "topFt": 2.4000000000000004
+        }
+      }
+    },
+    {
+      "id": "vera-shrike",
+      "name": "Vera Shrike",
+      "epithet": "Karaoke",
+      "tagline": "Has won every singing contest she has entered. The judges left early each time.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Vera has won every singing contest she has entered. The judges left early each time, and the prizes were left on the table with a note. She has a display case of them.\n\nShe has wild teal feathers for hair, a chipped beak and a battered brass speaking trumpet she sings through because it makes her louder. It does. She is always mid-song. Nobody has heard the start of one.",
+      "heightFt": 5.6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "harpy",
+        "name": "Harpy",
+        "size": "Medium",
+        "type": "Monstrosity",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 11,
+        "hitPoints": 38,
+        "hitDice": "7d8+7",
+        "speed": {
+          "walk": 20,
+          "fly": 40
+        },
+        "abilities": {
+          "str": 12,
+          "dex": 13,
+          "con": 12,
+          "int": 7,
+          "wis": 10,
+          "cha": 13
+        },
+        "skills": {},
+        "senses": "passive Perception 10",
+        "languages": "Common"
+      },
+      "portrait": {
+        "original": "characters/vera-shrike/portrait.png",
+        "web": {
+          "file": "portraits/vera-shrike.png",
+          "width": 600,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/vera-shrike.pixel.png",
+            "width": 149,
+            "height": 159,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/vera-shrike.pixel-fine.png",
+            "width": 296,
+            "height": 316,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 5.6,
+          "topFt": 2.0999999999999996
+        }
+      }
+    },
+    {
+      "id": "vincent",
+      "name": "Vincent",
+      "epithet": "Your Ex",
+      "tagline": "Shows up uninvited at three in the morning, through the wall. Cannot speak. Stays anyway.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Vincent shows up uninvited at three in the morning, through the wall. He cannot speak. He stays anyway. He brings a wilted flower and holds it out, and looks at you with mournful eyes over a droopy pale-blue mustache.\n\nHe is a ghost and he is your ex, and he is not entirely sure which came first. He has never once taken the hint. He has never once knocked.",
+      "heightFt": 6,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "specter",
+        "name": "Specter",
+        "size": "Medium",
+        "type": "Undead",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "1",
+        "crValue": 1,
+        "armorClass": 12,
+        "hitPoints": 22,
+        "hitDice": "5d8",
+        "speed": {
+          "hover": true,
+          "walk": 0,
+          "fly": 50
+        },
+        "abilities": {
+          "str": 1,
+          "dex": 14,
+          "con": 11,
+          "int": 10,
+          "wis": 10,
+          "cha": 11
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 10",
+        "languages": "understands all languages it knew in life but can't speak"
+      },
+      "portrait": {
+        "original": "characters/vincent/portrait.png",
+        "web": {
+          "file": "portraits/vincent.png",
+          "width": 259,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/vincent.pixel.png",
+            "width": 70,
+            "height": 170,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/vincent.pixel-fine.png",
+            "width": 138,
+            "height": 338,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 6,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "vix-dunmore",
+      "name": "Vix Dunmore",
+      "epithet": "the Landlord",
+      "tagline": "Has declared ownership of eleven caves. Collects rent from the bats.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Vix owns eleven caves, by her own paperwork. The paperwork is a ledger she carries under one arm and has never let anyone read. The bats pay in guano, which she accepts, files and resells.\n\nShe lost the tip of her left horn in a boundary dispute with a cave that did not, strictly, have an owner. She considers the matter settled. She still sends it an invoice every spring.",
+      "heightFt": 2.5,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "kobold",
+        "name": "Kobold",
+        "size": "Small",
+        "type": "Humanoid",
+        "subtype": "kobold",
+        "alignment": "lawful evil",
+        "cr": "1/8",
+        "crValue": 0.125,
+        "armorClass": 12,
+        "hitPoints": 5,
+        "hitDice": "2d6-2",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 7,
+          "dex": 15,
+          "con": 9,
+          "int": 8,
+          "wis": 7,
+          "cha": 8
+        },
+        "skills": {},
+        "senses": "darkvision 60 ft., passive Perception 8",
+        "languages": "Common, Draconic"
+      },
+      "portrait": {
+        "original": "characters/vix-dunmore/portrait.png",
+        "web": {
+          "file": "portraits/vix-dunmore.png",
+          "width": 405,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/vix-dunmore.pixel.png",
+            "width": 46,
+            "height": 72,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/vix-dunmore.pixel-fine.png",
+            "width": 91,
+            "height": 142,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 2.5,
+          "topFt": 2.5
+        }
+      }
+    },
+    {
+      "id": "vrraal",
+      "name": "Vʁʁaał",
+      "epithet": "Can't Stay Down",
+      "tagline": "Has died nine times this season. Attended every post-match party.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Vʁʁaał has died nine times this season. He attended every post-match party. He is a lanky mossy-green troll with a long hooked nose, bandages in several places and one arm that is noticeably smaller than the other, because it is still growing back.\n\nHe grins through all of it. He considers dying a scheduling issue. He has never been late to a party.",
+      "heightFt": 9,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "troll",
+        "name": "Troll",
+        "size": "Large",
+        "type": "Giant",
+        "subtype": "",
+        "alignment": "chaotic evil",
+        "cr": "5",
+        "crValue": 5,
+        "armorClass": 15,
+        "hitPoints": 84,
+        "hitDice": "8d10+40",
+        "speed": {
+          "walk": 30
+        },
+        "abilities": {
+          "str": 18,
+          "dex": 13,
+          "con": 20,
+          "int": 7,
+          "wis": 9,
+          "cha": 7
+        },
+        "skills": {
+          "perception": 2
+        },
+        "senses": "darkvision 60 ft., passive Perception 12",
+        "languages": "Giant"
+      },
+      "portrait": {
+        "original": "characters/vrraal/portrait.png",
+        "web": {
+          "file": "portraits/vrraal.png",
+          "width": 428,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/vrraal.pixel.png",
+            "width": 171,
+            "height": 254,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/vrraal.pixel-fine.png",
+            "width": 339,
+            "height": 506,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 9,
+          "topFt": 5.5
+        }
+      }
+    },
+    {
+      "id": "wendell",
+      "name": "Wendell",
+      "epithet": "Lost and Found",
+      "tagline": "Contains three hundred items, sixty coins and a man named Phil, who says he's fine.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Wendell is the lost and found. He contains three hundred items, sixty coins, one leather boot and a man named Phil, who says he's fine. Phil has been saying so for some years.\n\nWendell is a perfectly clear, faintly green cube with very sharp edges. He returns property on request, eventually. He has never returned Phil, because Phil has never asked.",
+      "heightFt": 10,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "gelatinous-cube",
+        "name": "Gelatinous Cube",
+        "size": "Large",
+        "type": "Ooze",
+        "subtype": "",
+        "alignment": "unaligned",
+        "cr": "2",
+        "crValue": 2,
+        "armorClass": 6,
+        "hitPoints": 84,
+        "hitDice": "8d10+40",
+        "speed": {
+          "walk": 15
+        },
+        "abilities": {
+          "str": 14,
+          "dex": 3,
+          "con": 20,
+          "int": 1,
+          "wis": 6,
+          "cha": 1
+        },
+        "skills": {},
+        "senses": "blindsight 60 ft. (blind beyond this radius), passive Perception 8",
+        "languages": ""
+      },
+      "portrait": {
+        "original": "characters/wendell/portrait.png",
+        "web": {
+          "file": "portraits/wendell.png",
+          "width": 626,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/wendell.pixel.png",
+            "width": 276,
+            "height": 282,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/wendell.pixel-fine.png",
+            "width": 550,
+            "height": 562,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": true,
+        "stage": {
+          "where": "floor",
+          "shownFt": 10,
+          "topFt": 6.5
+        }
+      }
+    },
+    {
+      "id": "wren-ashby",
+      "name": "Wren Ashby",
+      "epithet": "the Lifter",
+      "tagline": "Four inches tall. Bench-presses acorns in sets of fifty and keeps a log.",
+      "pronouns": {
+        "subject": "she",
+        "object": "her",
+        "possessive": "her"
+      },
+      "story": "Wren is four inches tall and bench-presses acorns in sets of fifty. She logs every set in a notebook the size of a postage stamp. Her arms are, by any measure and at any scale, absurd.\n\nShe wears plain brown linen because sparkles slow her down. She folds her dragonfly wings flat when she lifts so they don't count as assistance. She has never lost an arm-wrestle with anything her own size, and is working up.",
+      "heightFt": 0.4,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "sprite",
+        "name": "Sprite",
+        "size": "Tiny",
+        "type": "Fey",
+        "subtype": "",
+        "alignment": "neutral good",
+        "cr": "1/4",
+        "crValue": 0.25,
+        "armorClass": 15,
+        "hitPoints": 2,
+        "hitDice": "1d4",
+        "speed": {
+          "walk": 10,
+          "fly": 40
+        },
+        "abilities": {
+          "str": 3,
+          "dex": 18,
+          "con": 10,
+          "int": 14,
+          "wis": 13,
+          "cha": 11
+        },
+        "skills": {
+          "perception": 3,
+          "stealth": 8
+        },
+        "senses": "passive Perception 13",
+        "languages": "Common, Elvish, Sylvan"
+      },
+      "portrait": {
+        "original": "characters/wren-ashby/portrait.png",
+        "web": {
+          "file": "portraits/wren-ashby.png",
+          "width": 610,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/wren-ashby.pixel.png",
+            "width": 23,
+            "height": 24,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/wren-ashby.pixel-fine.png",
+            "width": 45,
+            "height": 47,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "bar",
+          "shownFt": 0.8,
+          "topFt": 0.8
+        }
+      }
+    },
+    {
+      "id": "zhaal",
+      "name": "Zh'aaʔl",
+      "epithet": "Good Boy (Allegedly)",
+      "tagline": "Fetches anything you throw. Sets it on fire first. Brings back the ashes.",
+      "pronouns": {
+        "subject": "he",
+        "object": "him",
+        "possessive": "his"
+      },
+      "story": "Zh'aaʔl fetches anything you throw. He sets it on fire first. He brings back the ashes, wagging, and drops them at your feet, very pleased.\n\nHe is a black hell-hound with a white patch over one eye and a spiked red collar, and flames curl from his mouth when he pants, which is always. He is a good boy, allegedly. The allegations are well documented.",
+      "heightFt": 4,
+      "pooled": false,
+      "modifiers": [],
+      "base": {
+        "slug": "hell-hound",
+        "name": "Hell Hound",
+        "size": "Medium",
+        "type": "Fiend",
+        "subtype": "",
+        "alignment": "lawful evil",
+        "cr": "3",
+        "crValue": 3,
+        "armorClass": 15,
+        "hitPoints": 45,
+        "hitDice": "7d8+14",
+        "speed": {
+          "walk": 50
+        },
+        "abilities": {
+          "str": 17,
+          "dex": 12,
+          "con": 14,
+          "int": 6,
+          "wis": 13,
+          "cha": 6
+        },
+        "skills": {
+          "perception": 5
+        },
+        "senses": "darkvision 60 ft., passive Perception 15",
+        "languages": "understands Infernal but can't speak it"
+      },
+      "portrait": {
+        "original": "characters/zhaal/portrait.png",
+        "web": {
+          "file": "portraits/zhaal.png",
+          "width": 591,
+          "height": 640
+        },
+        "views": {
+          "pixel": {
+            "file": "portraits/zhaal.pixel.png",
+            "width": 105,
+            "height": 114,
+            "pxPerFt": 28
+          },
+          "pixel-fine": {
+            "file": "portraits/zhaal.pixel-fine.png",
+            "width": 209,
+            "height": 226,
+            "pxPerFt": 56
+          }
+        },
+        "translucent": false,
+        "stage": {
+          "where": "floor",
+          "shownFt": 4,
+          "topFt": 1.75
+        }
+      }
+    }
+  ]
+}

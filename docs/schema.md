@@ -369,9 +369,11 @@ artifact and is never committed [D-19]. `explorer/` reads only this.
 
 ## Recruiting bundle
 
-`pnpm package-characters --season <id>` → `dist/recruiting/<season>/`, for a
-recruiting page built elsewhere. Like published JSON it is derived and never
-committed. Code: `scripts/src/lib/recruiting.ts` (types `RecruitingBundle`,
+`pnpm package-characters --season <id>` → `seasons/<season>/recruiting/`, for
+a recruiting page built elsewhere. It is derived from `characters/` and the
+season's pool and snapshot, but committed, so the page can read it from the
+repo: rerun it after changing a character and commit the result. Code:
+`scripts/src/lib/recruiting.ts` (types `RecruitingBundle`,
 `RecruitingCharacter`).
 
 A season's recruits are the characters whose `debut` is the season, plus

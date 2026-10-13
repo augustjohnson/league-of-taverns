@@ -1,7 +1,9 @@
 /**
  * The recruiting bundle: everything a recruiting page needs about a season's
- * characters, packaged as plain files for a UI built elsewhere. Like publish
- * output it is derived and never committed (docs/decisions.md D-19).
+ * characters, packaged as plain files for a UI built elsewhere. It is
+ * derived from committed files but committed itself, at
+ * seasons/<season>/recruiting/, so the UI can read it from the repo; rerun
+ * package-characters after changing a character.
  *
  *   <out>/characters.json          the manifest (RecruitingBundle below)
  *   <out>/portraits/<id>.png       web-sized painted portrait (docs/images.md § Post-processing)
