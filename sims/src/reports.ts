@@ -31,6 +31,7 @@
 import { botManager, legalSubsets, lineupFrom, projectionLineup } from '@league-of-taverns/bots';
 import type { LineupStrategy, PublicView, Subset } from '@league-of-taverns/bots';
 import {
+  DEFAULT_RETREAT,
   applyEvent,
   checkOdds,
   homeTavern,
@@ -43,7 +44,7 @@ import {
   seasonStandings,
   weekResults,
 } from '@league-of-taverns/engine';
-import type { CheckNode, LeagueEvent, LeagueState, Lineup, Mission, Party, Projection, Rng, SeasonConfig } from '@league-of-taverns/engine';
+import type { CheckNode, LeagueEvent, LeagueState, Lineup, Mission, Party, Projection, RetreatOrder, Rng, SeasonConfig } from '@league-of-taverns/engine';
 import type { RunSummary, SeasonInput, Seat } from './season-runner';
 
 // ── shared ─────────────────────────────────────────────────────────────────
@@ -84,12 +85,16 @@ export class ReportContext {
     }
   }
 
-  /** The exact projection of these starters on `mission`. Cached by the set of starters, since lineup order never changes a pass chance. */
-  project(mission: Mission, starters: ReadonlyArray<string>): Projection {
-    const key = `${mission.id}\u0000${[...starters].sort().join('\u0000')}`;
+  /**
+   * The exact projection of these starters on `mission` under `retreat`.
+   * Cached by the set of starters and the order, since lineup order never
+   * changes a pass chance.
+   */
+  project(mission: Mission, starters: ReadonlyArray<string>, retreat: RetreatOrder = DEFAULT_RETREAT): Projection {
+    const key = `${mission.id}\u0000${[...starters].sort().join('\u0000')}\u0000${JSON.stringify(retreat)}`;
     let p = this.projections.get(key);
     if (p === undefined) {
-      p = projectMission(this.party(starters), mission, this.input.baseOf, this.input.battleModel);
+      p = projectMission(this.party(starters), mission, this.input.baseOf, this.input.battleModel, { retreat });
       this.projections.set(key, p);
     }
     return p;
@@ -221,7 +226,7 @@ export function luckReport(ctx: ReportContext): ReadonlyArray<LuckRow> {
       let percentile: number | null = null;
       if (res !== undefined) {
         const starters = startersOf(res.lineup);
-        percentile = midPercentile(ctx.points(ctx.project(mission, starters), home), r.points);
+        percentile = midPercentile(ctx.points(ctx.project(mission, starters, res.lineup.retreat), home), r.points);
         const party = ctx.party(starters);
         for (const rec of res.run.nodes) {
           if (rec.kind === 'check') checksAbove += (rec.outcome === 'pass' ? 1 : 0) - checkOdds(party, (nodes.get(rec.node) as CheckNode).check).pPass;
@@ -305,7 +310,7 @@ export function titleOdds(ctx: ReportContext, options: TitleOddsOptions): Readon
       for (const t of taverns) {
         const best = ctx.strategy(t).best(ctx.view(at, t), at.taverns.get(t)?.roster ?? [], week);
         const home = ctx.home(t, week);
-        const projection = best === null ? null : ctx.project(mission, startersOf(best.lineup));
+        const projection = best === null ? null : ctx.project(mission, startersOf(best.lineup), best.lineup.retreat);
         const dist: PointsDistribution = projection === null ? [[0, 1]] : ctx.points(projection, home);
         if (projection !== null) mean.set(t, mean.get(t)! + ctx.expected(projection, home));
         let c = 0;
@@ -412,13 +417,15 @@ export function benchReport(ctx: ReportContext): ReadonlyArray<BenchRow> {
       const played = lineup === null ? null : startersOf(lineup);
       const view = ctx.view(lockState, tavern);
       const seed = res?.seed ?? null;
+      // The bench is about who starts, so every option keeps the played retreat order.
+      const retreat = lineup?.retreat ?? DEFAULT_RETREAT;
       const rerun = (ids: ReadonlyArray<string>) =>
-        runMission(ctx.party(ids), mission, (node) => rngFor(seed!, `roll:${node}`), ctx.input.baseOf, ctx.input.battleModel);
+        runMission(ctx.party(ids), mission, (node) => rngFor(seed!, `roll:${node}`), ctx.input.baseOf, ctx.input.battleModel, { retreat });
       // Same dice only if the seed reproduces what was recorded (a live week's real dice would not).
       const sameDice = res !== undefined && seed !== null && JSON.stringify(rerun(startersOf(res.lineup)).nodes) === JSON.stringify(res.run.nodes);
       const option = (ids: ReadonlyArray<string>): BenchOption => ({
         starters: ids,
-        projected: ctx.expected(ctx.project(mission, ids), home),
+        projected: ctx.expected(ctx.project(mission, ids, retreat), home),
         points: sameDice ? runPoints(rerun(ids).score, config.scoring, home) : null,
       });
       const subsets: ReadonlyArray<Subset> = legalSubsets(view, roster);

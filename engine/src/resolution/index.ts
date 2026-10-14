@@ -11,9 +11,11 @@
  * - Battle odds: a black-box `p(win)` from party vs encounter, using an
  *   expected-value model (docs/specs/05). Swappable behind `BattleModel`.
  * - The weekly run: walk the DAG once with per-node dice. Each passed check
- *   banks its loot. Losing a battle ends the run (DNF) and keeps the loot
- *   banked so far. Score = loot banked ÷ the mission's haul (docs/decisions.md
- *   D-45, D-46).
+ *   banks its loot, and so does each battle won (D-50). Losing a battle ends
+ *   the run (DNF) and keeps the loot banked so far. Just before each battle
+ *   the lineup's retreat order may turn the party back, keeping its loot
+ *   without a DNF (D-49). Score = loot banked ÷ the mission's haul
+ *   (docs/decisions.md D-45, D-46).
  *
  * Projection (exact expectation) lives in ../projection. Both must use these
  * same odds functions so they agree by construction.
@@ -22,6 +24,7 @@ import type { BaseStats } from '../adapters/open5e';
 import { checkTargetKey, type EffectiveStats } from '../characters';
 import { missionHaul, type CheckSpec, type Encounter, type Mission, type MissionNode, type Requirement } from '../missions';
 import { rollD20, type Rng } from '../rng';
+import { DEFAULT_RETREAT, retreatsBeforeBattle, type RetreatOrder } from '../roster';
 
 /**
  * The four starters for a week, in lineup order: the order the manager listed
@@ -128,12 +131,24 @@ export interface RunResult {
   readonly path: ReadonlyArray<string>;
   readonly nodes: ReadonlyArray<NodeRecord>;
   readonly dnf: boolean;
+  /**
+   * The battle the party turned back before, by its retreat order (D-49), or
+   * null if it never turned back. The battle is not on `path`. A retreat is
+   * not a DNF.
+   */
+  readonly retreatedBefore: string | null;
   readonly checksPassed: number;
   readonly checksAttempted: number;
-  /** Loot banked: the sum of `loot` over passed checks, DNF or not (D-45, D-46). */
+  /** Loot banked: the `loot` of every passed check and won battle, DNF or not (D-45, D-46, D-50). */
   readonly loot: number;
   /** `lootScore(loot, missionHaul(mission))`: in [0, 1], and 1 on the best path. */
   readonly score: number;
+}
+
+/** The lineup's orders for one run. */
+export interface RunOptions {
+  /** When the party turns back instead of fighting (D-49). Defaults to `never`. */
+  readonly retreat?: RetreatOrder;
 }
 
 /**
@@ -146,11 +161,18 @@ export interface RunResult {
  * `d20 + modifier ≥ dc`. There is no natural-20 rule, matching `passChance`.
  * An auto-failed (ineligible) check still draws and records its die. At a
  * battle, `roll = rngForNode(node.id)()` and the party wins iff
- * `roll < pWin` from `battleOdds`. Losing ends the run as a DNF.
+ * `roll < pWin` from `battleOdds`. Losing ends the run as a DNF, and winning
+ * banks the battle's `loot`, if any (D-50).
+ *
+ * Before a battle, `options.retreat` is checked against the loot banked so
+ * far (`retreatsBeforeBattle`). If it says to turn back, the run ends there:
+ * `retreatedBefore` names the battle, no die is drawn for it, and it is not a
+ * DNF (D-49).
  *
  * `path` lists every visited node, start and end included (on a DNF it ends at
- * the lost battle). Each passed check banks its `loot`, and a DNF keeps what
- * was banked. Score is `lootScore(loot, missionHaul(mission))`.
+ * the lost battle; on a retreat, at the node before the battle). Each passed
+ * check banks its `loot`, and a DNF keeps what was banked. Score is
+ * `lootScore(loot, missionHaul(mission))`.
  *
  * `rngForNode` is a factory so each node's dice depend only on its id, never
  * on path order. Sims, tests and the difficulty report pass
@@ -168,7 +190,9 @@ export function runMission(
   rngForNode: (nodeId: string) => Rng,
   baseOf: (slug: string) => BaseStats,
   model: BattleModel,
+  options: RunOptions = {},
 ): RunResult {
+  const retreat = options.retreat ?? DEFAULT_RETREAT;
   const graph = missionGraph(mission, 'runMission');
   const path: string[] = [];
   const nodes: NodeRecord[] = [];
@@ -177,8 +201,20 @@ export function runMission(
   let loot = 0;
   const haul = missionHaul(mission);
 
+  const result = (dnf: boolean, retreatedBefore: string | null): RunResult => ({
+    path,
+    nodes,
+    dnf,
+    retreatedBefore,
+    checksPassed,
+    checksAttempted,
+    loot,
+    score: lootScore(loot, haul),
+  });
+
   let node: MissionNode | undefined = graph.start;
   while (node !== undefined) {
+    if (node.kind === 'battle' && retreatsBeforeBattle(retreat, loot)) return result(false, node.id);
     path.push(node.id);
     switch (node.kind) {
       case 'start':
@@ -213,7 +249,8 @@ export function runMission(
         const roll = rngForNode(node.id)();
         const won = roll < pWin;
         nodes.push({ node: node.id, kind: 'battle', pWin, roll, outcome: won ? 'win' : 'lose' });
-        if (!won) return { path, nodes, dnf: true, checksPassed, checksAttempted, loot, score: lootScore(loot, haul) };
+        if (!won) return result(true, null);
+        loot += node.loot ?? 0;
         node = graph.next(node, 'win');
         break;
       }
@@ -222,7 +259,7 @@ export function runMission(
         break;
     }
   }
-  return { path, nodes, dnf: false, checksPassed, checksAttempted, loot, score: lootScore(loot, haul) };
+  return result(false, null);
 }
 
 /**

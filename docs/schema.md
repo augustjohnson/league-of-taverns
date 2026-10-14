@@ -141,7 +141,7 @@ nodes:
       skill: survival        # for type: skill
       # ability: con         # for type: save | ability
       dc: 12
-      # requires: { speed: fly } | { sense: darkvision }   # OPEN D-39
+      # requires: { speed: fly } | { sense: darkvision }   # a shortcut, never a wall (D-39, the gates rule)
     loot: 20                 # banked on a pass (D-45); whole number ≥ 0
   - id: bog-ambush
     rank: 2
@@ -149,7 +149,7 @@ nodes:
     encounter:
       creatures:             # Open5e slugs in the pinned snapshot; the first is the "lead" ({battle_creature})
         - { ref: crocodile, count: 3 }
-    # loot: 30               # planned (D-50): banked on a win, counted by the haul rule
+    loot: 30                 # optional bounty, banked on a win and counted by the haul rule (D-50)
   - { id: crossed-dry, rank: 5, kind: end }
 edges:
   - { from: start, to: find-path, on: always }   # always | pass | fail | win
@@ -168,8 +168,8 @@ edges:
 | `edges.battle` | a battle has exactly one `win`. `lose` edges don't exist: losing is a DNF |
 | `edges.start` | start has exactly one `always` |
 | `scored` | every start→end path attempts ≥ 1 check |
-| `haul` | the most loot any start→end path can bank equals `missions.haul` (D-45). A check's loot counts when the path leaves it by `pass` or `always`. Planned (D-50): a battle's loot counts when the path leaves it by `win` |
-| `gates` | planned (D-39): a party with no special speeds or senses can still bank the full haul, so a `requires` gate only opens a better or safer route |
+| `haul` | the most loot any start→end path can bank equals `missions.haul` (D-45). A check's loot counts when the path leaves it by `pass` or `always`, and a battle's when the path leaves it by `win` (D-50) |
+| `gates` | a party with no special speeds or senses can bank as much as any party: with every gated check failed, the best path still pays the most (D-39). A `requires` gate only opens a better or safer route |
 | `dc` | `dcBand.min ≤ dc ≤ dcBand.max` |
 | `encounter.ref` | every creature ref exists in the pinned snapshot |
 | `encounter.budget` | Σ count × CR ≤ `encounterCrRatio × B` per battle |
@@ -320,10 +320,11 @@ it moves out of the per-season schedule into a league-level file.
 `mission.resolved.run` holds the full `RunResult`: `path`, and for each node
 `{node, kind, actor, d20, modifier, dc, advantage, outcome}` (checks) or
 `{node, kind, pWin, roll, outcome}` (battles), plus `dnf`, `checksPassed`,
-`checksAttempted`, `loot` (banked by passed checks, kept on a DNF) and `score`
-(loot ÷ the mission's haul, D-45, D-46). Planned: a `retreated` marker for a
-party that turned back (D-49), and on a DNF the `injured` starter with the
-roll that picked it (D-51).
+`checksAttempted`, `loot` (banked by passed checks and won battles, kept on a
+DNF or a retreat) and `score` (loot ÷ the mission's haul, D-45, D-46, D-50).
+`retreatedBefore` names the battle a party turned back before by its retreat
+order, or is null (D-49); the battle is not on `path`. Planned: on a DNF the
+`injured` starter with the roll that picked it (D-51).
 
 ### What's recorded vs derived [D-20]
 

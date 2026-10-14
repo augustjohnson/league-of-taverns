@@ -75,7 +75,7 @@
   B = 12. Fractional CRs count exactly (four CR 1/2 characters total 2).
 - An **injured** character (§6) can't start the week after its injury
   **[D-51, not built yet]**.
-- **Retreat order** **[D-49, not built yet]:** each lineup also says when the
+- **Retreat order** **[D-49]:** each lineup also says when the
   party turns back instead of fighting: `never` (the default),
   `avoid_battles`, or `bank: N` (turn back before a battle once at least N
   loot is banked). Turning back keeps the banked loot and is not a DNF (§6).
@@ -113,7 +113,7 @@
 - **Battles:** the party's odds of winning come from its combined strength
   against the encounter. **Losing any battle ends the mission (DNF).** The
   party keeps the loot banked so far **[D-46]**. A battle may carry loot,
-  banked when the party wins **[D-50, not built yet]**.
+  banked when the party wins **[D-50]**.
 - **Injuries** **[D-51, not built yet]:** when a party loses a battle, one
   of its four starters, picked by a recorded random roll, is injured and
   can't start next week. Injuries last one week.
@@ -124,7 +124,7 @@
   advantage. A hex is declared with an issue form any time before that
   week's lock, so it is public and the target can adjust. At most one hex
   per target per week (the first declared counts), and it can't be withdrawn.
-- **Turning back** **[D-49, not built yet]:** just before a battle, the
+- **Turning back** **[D-49]:** just before a battle, the
   party's retreat order (§5) is checked. If it says to turn back, the mission
   ends there, the party keeps its banked loot, and it is not a DNF.
 - Passing or failing a check decides which way the mission branches. Failing
@@ -136,7 +136,7 @@
 
 - **Loot:** each check carries a loot value. Passing a check banks it, and
   failing banks nothing **[D-45]**. Battles may carry loot too, banked on a
-  win **[D-50, not built yet]**.
+  win **[D-50]**.
 - **Score** for a week = loot banked. **Points** = loot.
 - **Fixed haul:** every mission's best path pays the same total loot, so every
   week counts equally **[D-45]**.

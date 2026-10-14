@@ -626,8 +626,9 @@ export class SeasonSession {
       if (lineup === null) continue;
       const party = partyOf(lineup, input.statsOf);
       const seed = weekSeed({ season, week, tavern, salt: this.seed });
-      const result = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel);
-      const projection = projectMission(party, mission, input.baseOf, input.battleModel);
+      const orders = { retreat: lineup.retreat };
+      const result = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel, orders);
+      const projection = projectMission(party, mission, input.baseOf, input.battleModel, orders);
       this.append(
         'mission.resolved',
         {

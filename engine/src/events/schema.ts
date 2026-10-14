@@ -87,6 +87,7 @@ export const runResultSchema = z.strictObject({
   path: z.array(kebabIdSchema),
   nodes: z.array(nodeRecordSchema),
   dnf: z.boolean(),
+  retreatedBefore: kebabIdSchema.nullable(),
   checksPassed: z.number().int().nonnegative(),
   checksAttempted: z.number().int().nonnegative(),
   loot: z.number().int().nonnegative(),

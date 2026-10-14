@@ -21,6 +21,7 @@ import { runPoints, sponsoredTavern } from '../league';
 import { missionHaul, type Mission, type MissionNode } from '../missions';
 import { formatIssuePath } from '../missions/schema';
 import { lootScore, missionGraph } from '../resolution';
+import { retreatsBeforeBattle } from '../roster';
 import { InvalidEventError, applyEvent, initialState } from './reducers';
 import { eventSchema } from './schema';
 import type { LeagueState } from './state';
@@ -205,9 +206,13 @@ export interface ResolutionMismatch {
  *   (`requires`) may fail on a high roll, since nobody may have met the gate
  *   (D-39), and that needs stats this audit doesn't have.
  * - Each battle's outcome is `roll < pWin`, and a lost battle ends the path.
- * - `dnf`, `checksPassed`, `checksAttempted`, `loot` (the `loot` of each
- *   passed check) and `score` (`lootScore(loot, missionHaul(mission))`, DNF
- *   or not) match the walk.
+ * - At each battle the walk reaches, the lineup's retreat order and the loot
+ *   banked so far decide whether the party turns back (D-49): the run must
+ *   name that battle in `retreatedBefore` and stop there exactly when
+ *   `retreatsBeforeBattle` says so.
+ * - `dnf`, `retreatedBefore`, `checksPassed`, `checksAttempted`, `loot` (the
+ *   `loot` of each passed check and won battle) and `score`
+ *   (`lootScore(loot, missionHaul(mission))`, DNF or not) match the walk.
  * - `points` = `runPoints(score, scoring, home)` from `season.created`'s
  *   scoring, where home means the tavern's sponsor set this week's mission
  *   (D-47).
@@ -255,11 +260,16 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
     let attempted = 0;
     let loot = 0;
     let dnf = false;
+    let retreatedBefore: string | null = null;
     let walked = true;
     try {
       const graph = missionGraph(mission, 'verifyResolutions');
       let node: MissionNode | undefined = graph.start;
       while (node !== undefined) {
+        if (node.kind === 'battle' && retreatsBeforeBattle(lineup.retreat, loot)) {
+          retreatedBefore = node.id;
+          break;
+        }
         path.push(node.id);
         if (node.kind === 'start') {
           node = graph.next(node, 'always');
@@ -300,6 +310,7 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
             dnf = true;
             break;
           }
+          if (node.kind === 'battle') loot += node.loot ?? 0;
           node = graph.next(node, 'win');
         }
       }
@@ -313,10 +324,17 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
     if (path.length !== run.path.length || path.some((id, i) => id !== run.path[i])) {
       report('run.path', `the walk visits ${path.join(' → ')}, but the run records ${run.path.join(' → ')}`);
     }
+    if (run.retreatedBefore !== retreatedBefore) {
+      report(
+        'run.retreatedBefore',
+        `retreatedBefore is ${JSON.stringify(run.retreatedBefore)}, but the retreat order ${JSON.stringify(lineup.retreat)} ` +
+          (retreatedBefore === null ? 'never turns back on this walk' : `turns back before "${retreatedBefore}"`),
+      );
+    }
     if (run.dnf !== dnf) report('run.dnf', `dnf is ${run.dnf}, but the walk ${dnf ? 'loses a battle' : 'reaches an end'}`);
     if (run.checksPassed !== passed) report('run.checksPassed', `${run.checksPassed}, but ${passed} check(s) passed`);
     if (run.checksAttempted !== attempted) report('run.checksAttempted', `${run.checksAttempted}, but ${attempted} check(s) attempted`);
-    if (run.loot !== loot) report('run.loot', `${run.loot}, but the passed checks bank ${loot}`);
+    if (run.loot !== loot) report('run.loot', `${run.loot}, but the passed checks and won battles bank ${loot}`);
     const score = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - score) > 1e-9) report('run.score', `score ${run.score} should be ${score}`);
   }

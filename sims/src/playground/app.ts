@@ -303,22 +303,32 @@ function rollLog(mission: Mission, run: RunResult, home = false): string {
     }
     const what = node?.kind === 'battle' ? node.encounter.creatures.map((c) => `${c.count}× ${c.ref}`).join(', ') : '';
     const won = r.roll < r.pWin;
+    const bounty = node?.kind === 'battle' && won && (node.loot ?? 0) > 0 ? ` <span class="tag brass">+${node.loot} loot</span>` : '';
     return (
       `<tr><td class="n">${i + 1}</td><td>${esc(r.node)}<div class="muted small">${esc(what)}</div></td><td class="muted">party</td>` +
       `<td><span class="die">${r.roll.toFixed(3)}</span></td>` +
-      `<td class="sum">roll ${won ? '<' : '≥'} win chance ${r.pWin.toFixed(3)}</td><td class="${r.outcome === 'win' ? 'pass' : 'fail'}">${r.outcome}</td></tr>`
+      `<td class="sum">roll ${won ? '<' : '≥'} win chance ${r.pWin.toFixed(3)}</td><td class="${r.outcome === 'win' ? 'pass' : 'fail'}">${r.outcome}${bounty}</td></tr>`
     );
   });
+  if (run.retreatedBefore !== null) {
+    rows.push(
+      `<tr><td class="n">${rows.length + 1}</td><td>${esc(run.retreatedBefore)}</td><td class="muted">party</td><td></td>` +
+        `<td class="sum">the retreat order says turn back with ${run.loot} loot banked</td><td class="muted">turned back</td></tr>`,
+    );
+  }
+  const checks = `${run.checksPassed} of ${run.checksAttempted} checks passed`;
   const score = run.dnf
-    ? `DNF after ${run.checksPassed} of ${run.checksAttempted} checks passed: score 0`
-    : `${run.checksPassed} of ${run.checksAttempted} checks passed: score ${scoreFraction(run.score)}`;
+    ? `DNF after ${checks}, keeping ${run.loot} loot: score ${scoreFraction(run.score)}`
+    : run.retreatedBefore !== null
+      ? `Turned back before ${run.retreatedBefore} after ${checks}, keeping ${run.loot} loot: score ${scoreFraction(run.score)}`
+      : `${checks}: score ${scoreFraction(run.score)}`;
   return (
     `<div class="scroll"><table><thead><tr><th class="n">#</th><th>node</th><th>actor</th><th>die</th><th>sum</th><th>outcome</th></tr></thead>` +
     `<tbody>${rows.join('') || '<tr><td colspan="6" class="muted">No checks or battles.</td></tr>'}</tbody></table></div>` +
     `<p class="small"><b>${esc(score)}</b> → ${num(Math.round(run.score * SCALE))} points` +
     (home ? ` × ${config.scoring.homeBonus} home bonus = <b>${num(runPoints(run.score, config.scoring, true))}</b> points` : '') +
     `</p>` +
-    `<p class="hint">Checks pass when d20 + modifier ≥ DC (no natural-20 rule; with advantage the higher of two d20s is shown). Battles are won when the roll is below the party's win chance.</p>`
+    `<p class="hint">Checks pass when d20 + modifier ≥ DC (no natural-20 rule; with advantage the higher of two d20s is shown). Battles are won when the roll is below the party's win chance, and a win banks the battle's bounty. Just before a battle, the retreat order may turn the party back with what it has: not a DNF.</p>`
   );
 }
 
@@ -807,7 +817,7 @@ function renderWeeks(r: Run): string {
     let projection: Projection | null = null;
     if (entry.lineup !== null) {
       const party = partyFrom(entry.lineup.starters, input.statsOf);
-      projection = projectMission(party, mission, input.baseOf, input.battleModel);
+      projection = projectMission(party, mission, input.baseOf, input.battleModel, { retreat: entry.lineup.retreat });
     }
     const overlay: Overlay = {
       ...(res === undefined ? {} : { path: res.run.path, outcomes: outcomesOf(res.run) }),
@@ -876,6 +886,26 @@ function labRosterIds(events: ReadonlyArray<LeagueEvent>): { ids: ReadonlyArray<
 function labParty(): Party | null {
   if (lab.picks.length === 0) return null;
   return partyFrom(lab.picks, input.statsOf);
+}
+
+/**
+ * Expected points, chance of DNF and chance of turning back for every retreat
+ * order on offer, the current one marked: the projection informs the choice
+ * without making it (D-49).
+ */
+function retreatTable(party: Party, mission: Mission, current: RetreatOrder, home: boolean): string {
+  const rows = retreatChoices(config.missions.haul).map((order) => {
+    const p = projectMission(party, mission, input.baseOf, input.battleModel, { retreat: order });
+    const on = retreatValue(order) === retreatValue(current);
+    return (
+      `<tr class="${on ? 'sel' : ''}"><td>${esc(retreatLabel(order))}${on ? ' <span class="tag">yours</span>' : ''}</td>` +
+      `<td class="n">${projectedPoints(p.expectedScore, config.scoring, home).toFixed(1)}</td><td class="n">${pct(p.pDnf)}</td><td class="n">${pct(p.pRetreat)}</td></tr>`
+    );
+  });
+  return (
+    `<details><summary>Expected points by retreat order</summary><div class="scroll"><table class="small"><thead><tr><th>retreat order</th><th class="n">exp. pts</th><th class="n">DNF</th><th class="n">turn back</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>` +
+    `<p class="hint">The highest expected points is not always the right call: a tavern that is behind may need the big fight.</p></details>`
+  );
 }
 
 /** A `<select>` of retreat orders (D-49). */
@@ -1000,7 +1030,7 @@ function renderLabAnalysis(r: Run): string {
   const { ids: rosterIds } = labRosterIds(r.result.events);
   const rosterView = { tavern: lab.roster === 'pool' ? 'the pool' : lab.roster, characters: rosterIds };
   const violations = validateLineup(lineup, rosterView, crOf, config);
-  const projection = projectMission(party, mission, input.baseOf, input.battleModel);
+  const projection = projectMission(party, mission, input.baseOf, input.battleModel, { retreat: lab.retreat });
 
   const nodes = [...mission.nodes].sort((a, b) => a.rank - b.rank);
   const checkRows = nodes
@@ -1056,8 +1086,10 @@ function renderLabAnalysis(r: Run): string {
       ? `<p class="okline">Legal lineup${lab.roster === 'pool' ? ' (ownership not checked)' : ''}</p>`
       : violationList(violations)) +
     `<div class="kv"><div><span class="label">expected points</span><span class="v">${(projection.expectedScore * SCALE).toFixed(1)}</span></div>` +
-    `<div><span class="label">chance of DNF</span><span class="v">${pct(projection.pDnf)}</span></div></div>` +
+    `<div><span class="label">chance of DNF</span><span class="v">${pct(projection.pDnf)}</span></div>` +
+    `<div><span class="label">chance to turn back</span><span class="v">${pct(projection.pRetreat)}</span></div></div>` +
     `<p class="hint">Points before any home bonus.</p>` +
+    retreatTable(party, mission, lab.retreat, false) +
     graphSvg(layout, rollOverlay) +
     graphLegend(rollOverlay) +
     `</section>` +
@@ -1081,7 +1113,7 @@ function labRoll(): void {
   const party = labParty();
   if (party === null) return;
   const seed = cryptoSeed('lab');
-  const result = runMission(party, missionOf(lab.week), (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel);
+  const result = runMission(party, missionOf(lab.week), (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel, { retreat: lab.retreat });
   lab.roll = { seed, result };
   refreshLab({ analysis: true });
   reveal('lab-roll-result');
@@ -1099,7 +1131,7 @@ function labSample(): void {
   if (party === null) return;
   const seed = cryptoSeed('lab');
   const started = performance.now();
-  const result = sampleMission(party, missionOf(lab.week), input.baseOf, input.battleModel, 1000, seed);
+  const result = sampleMission(party, missionOf(lab.week), input.baseOf, input.battleModel, 1000, seed, { retreat: lab.retreat });
   lab.sample = { seed, result, ms: performance.now() - started };
   refreshLab({ analysis: true });
   reveal('lab-dist');
@@ -1638,7 +1670,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   const roster = myRoster(s);
   const lineup = builderLineup();
   const violations = lineup === null ? [] : validateLineup(lineup, { tavern: me, characters: roster }, crOf, config);
-  const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.starters, input.statsOf), mission, input.baseOf, input.battleModel);
+  const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.starters, input.statsOf), mission, input.baseOf, input.battleModel, { retreat: lineup.retreat });
   const home = homeTavern(s.state, week) === me;
   const total = play.picks.reduce((t, id) => t + crOf(id), 0);
   const legal = lineup !== null && violations.length === 0;
@@ -1673,8 +1705,10 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     (projection === null
       ? ''
       : `<div class="kv"><div><span class="label">expected points</span><span class="v">${projectedPoints(projection.expectedScore, config.scoring, home).toFixed(1)}</span></div>` +
-        `<div><span class="label">chance of DNF</span><span class="v">${pct(projection.pDnf)}</span></div></div>` +
-        (home ? `<p class="hint">Includes your home bonus (× ${config.scoring.homeBonus}).</p>` : '')) +
+        `<div><span class="label">chance of DNF</span><span class="v">${pct(projection.pDnf)}</span></div>` +
+        `<div><span class="label">chance to turn back</span><span class="v">${pct(projection.pRetreat)}</span></div></div>` +
+        (home ? `<p class="hint">Includes your home bonus (× ${config.scoring.homeBonus}).</p>` : '') +
+        retreatTable(partyFrom(lineup!.starters, input.statsOf), mission, play.retreat, home)) +
     `<div class="row"><button type="button" data-action="play-lu-advice">Use the advisor's lineup</button></div>` +
     (projection === null ? '' : graphSvg(layouts.get(week)!, { reach: projection.reach }) + graphLegend({ reach: projection.reach })) +
     `</section>`;

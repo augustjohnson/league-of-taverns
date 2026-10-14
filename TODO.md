@@ -43,7 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
-- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6.
 
 ## Phase 1 starting set (historical)
 
@@ -388,7 +388,7 @@ Owns `engine/src/missions/`, `scripts/src/validate.ts`,
   flags misses; a generated mock season runs end to end.
 - **Depends:** T5.8.
 
-#### T5.8 Battle loot, gate rule, loot shape · M
+#### T5.8 Battle loot, gate rule, loot shape · M (done 2026-10-13)
 - **Goal:** optional `loot` on battle nodes, counted by the `haul` rule when
   the path leaves by `win` (D-50); a `gates` validator rule that the full haul
   is reachable without speeds or senses (D-39); mock missions rewritten to
@@ -440,7 +440,7 @@ Owns `engine/src/resolution/`, `engine/src/projection/`.
   fast enough for CI (< 10 s).
 - **Depends:** T6.3, T6.4.
 
-#### T6.6 Retreat orders + battle loot in the run and projection · M
+#### T6.6 Retreat orders + battle loot in the run and projection · M (done 2026-10-13)
 - **Goal:** `runMission` and `projectMission` stop before a battle when the
   retreat order says so (D-49), keeping banked loot without a DNF, and bank a
   battle's loot on a win (D-50).

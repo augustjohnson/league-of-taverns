@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { missionHaul, topologicalOrder, validateMission } from '../src/missions';
+import { lootShape, missionHaul, topologicalOrder, validateMission } from '../src/missions';
 import type { BattleNode, CheckNode, Mission, MissionEdge, MissionIssue, MissionNode, MissionRules } from '../src/missions';
 import type { CrEighths } from '../src/vocabulary';
 // The engine has no YAML parser (it does no I/O), so the example file is read
@@ -336,18 +336,86 @@ describe('mission validator', () => {
   });
 
   it('rejects more than one gated check (gated)', () => {
+    // Loot-free gated checks, so the gates rule has nothing to say.
     const mission = tiny({
       nodes: [
         start(),
-        check('look', 1, 12, { requires: { sense: 'darkvision' } }),
-        check('climb', 2, 12, { requires: { speed: 'climb' } }),
-        end('done', 3),
+        check('warm-up', 1),
+        check('look', 2, 12, { requires: { sense: 'darkvision' } }, 0),
+        check('climb', 3, 12, { requires: { speed: 'climb' } }, 0),
+        end('done', 4),
       ],
-      edges: [edge('start', 'look', 'always'), edge('look', 'climb', 'always'), edge('climb', 'done', 'always')],
+      edges: [edge('start', 'warm-up', 'always'), edge('warm-up', 'look', 'always'), edge('look', 'climb', 'always'), edge('climb', 'done', 'always')],
     });
     expect(codes(validate(mission))).toEqual(['gated@climb']);
-    const one = tiny({ nodes: [start(), check('look', 1, 12, { requires: { speed: 'fly' } }), battle('fight', 2), end('done', 3)] });
-    expect(validate(one)).toEqual([]);
+  });
+
+  it('counts a battle\'s loot on a win toward the haul (haul, D-50)', () => {
+    // start → a (30) ─pass→ fight (bounty 70) ─win→ done; a ─fail→ done
+    const mission = tiny({
+      nodes: [start(), check('a', 1, 12, {}, 30), { ...battle('fight', 2), loot: 70 }, end('done', 3)],
+      edges: [edge('start', 'a', 'always'), edge('a', 'fight', 'pass'), edge('a', 'done', 'fail'), edge('fight', 'done', 'win')],
+    });
+    expect(missionHaul(mission)).toBe(100);
+    expect(validate(mission, { ...RULES, haul: 100 })).toEqual([]);
+    expect(missionHaul(tiny())).toBe(1);
+  });
+
+  it('keeps the full haul open to a party that meets no gate (gates, D-39)', () => {
+    // start → look (fly gate, 60) ─pass→ done; look ─fail→ climb (40) → done.
+    // Without a flyer, look always fails: the best ungated path banks 40, not 100.
+    const wall = tiny({
+      nodes: [start(), check('look', 1, 12, { requires: { speed: 'fly' } }, 60), check('climb', 2, 12, {}, 40), end('done', 3)],
+      edges: [edge('start', 'look', 'always'), edge('look', 'done', 'pass'), edge('look', 'climb', 'fail'), edge('climb', 'done', 'always')],
+    });
+    const issues = validate(wall);
+    expect(codes(issues)).toEqual(['gates@done']);
+    expect(issues[0]?.message).toContain('at most 40 loot, on start → look → climb → done, but the best path banks 60');
+
+    // A shortcut: the gated route pays 60 at once, the long way 30 + 30 with a fight. Both reach 60.
+    const shortcut = tiny({
+      nodes: [
+        start(),
+        check('look', 1, 12, { requires: { speed: 'fly' } }, 60),
+        check('climb', 2, 12, {}, 30),
+        { ...battle('fight', 3), loot: 30 },
+        end('done', 4),
+      ],
+      edges: [
+        edge('start', 'look', 'always'),
+        edge('look', 'done', 'pass'),
+        edge('look', 'climb', 'fail'),
+        edge('climb', 'fight', 'always'),
+        edge('fight', 'done', 'win'),
+      ],
+    });
+    expect(validate(shortcut)).toEqual([]);
+
+    // An `always` edge out of a gated check banks nothing for a party that fails the gate.
+    const alwaysEdge = tiny({
+      nodes: [start(), check('look', 1, 12, { requires: { speed: 'fly' } }, 10), end('done', 2)],
+      edges: [edge('start', 'look', 'always'), edge('look', 'done', 'always')],
+    });
+    expect(codes(validate(alwaysEdge))).toEqual(['gates@done']);
+  });
+
+  it('lootShape reports the D-45 shape: late loot and a late last battle', () => {
+    // start → a (10) → b (20) → fight (bounty 30) → c (40) → done. Length 5; the last third is ranks 4 and 5.
+    const rising = tiny({
+      nodes: [start(), check('a', 1, 12, {}, 10), check('b', 2, 12, {}, 20), { ...battle('fight', 3), loot: 30 }, check('c', 4, 12, {}, 40), end('done', 5)],
+      edges: [edge('start', 'a', 'always'), edge('a', 'b', 'always'), edge('b', 'fight', 'always'), edge('fight', 'c', 'win'), edge('c', 'done', 'always')],
+    });
+    const shape = lootShape(rising);
+    expect(shape.bestPath).toEqual(['start', 'a', 'b', 'fight', 'c', 'done']);
+    expect(shape.lootByNode).toEqual([['start', 0], ['a', 10], ['b', 20], ['fight', 30], ['c', 40]]);
+    expect([shape.length, shape.lateShare, shape.lastBattleRank]).toEqual([5, 0.4, 3]);
+    expect(shape.ok).toBe(false); // 40% late, and the battle at rank 3 is not past ⅔ × 5
+    const late = tiny({
+      nodes: [start(), check('a', 1, 12, {}, 10), check('b', 2, 12, {}, 20), check('c', 3, 12, {}, 30), { ...battle('fight', 4), loot: 40 }, end('done', 5)],
+      edges: [edge('start', 'a', 'always'), edge('a', 'b', 'always'), edge('b', 'c', 'always'), edge('c', 'fight', 'always'), edge('fight', 'done', 'win')],
+    });
+    expect(lootShape(late)).toMatchObject({ lateShare: 0.4, lastBattleRank: 4, ok: false });
+    expect(lootShape({ ...late, nodes: late.nodes.map((n) => (n.id === 'fight' ? { ...n, loot: 60 } : n)) })).toMatchObject({ lateShare: 0.5, ok: true });
   });
 
   it('checks environment only when an expected one is given (environment)', () => {

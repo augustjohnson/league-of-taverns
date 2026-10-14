@@ -1,12 +1,13 @@
 # Mock season, week 3 (mountain). One gated check (D-39): soaring the gap
-# needs a flyer. Without one it auto-fails and the party falls back to the climb.
+# needs a flyer. It is a shortcut, not a wall: it pays what the climb pays and
+# trades the eyrie's guards for a high ledge, so a party without wings can
+# still bank the full haul, by fighting for it (D-45, D-50).
 #
-#  rank 0     1              2                3              4              5             6
-#  start ─▶ read-weather ─pass─▶ soar-gap ─pass──────────────────────────▶ plant-banner ─pass/fail─▶ summit
-#                │           (requires fly)                                                          ▲
-#                │                └─fail─▶ climb-face ─pass─▶ ledge-watch ─pass──────────────────────┤
-#                fail─▶ brace-storm ─always─▶ │        │              └─fail─▶ ambush ─win─▶ hard-won
-#                                             └────────┴─fail────────────────▶ (rank 5)
+#  rank 0     1              2              3             4             5              6              7
+#  start ─▶ read-weather ─pass─▶ soar-gap ─pass───────────────────────▶ high-ledge ─▶ plant-banner ─pass─▶ summit
+#                │          (requires fly)                                               ▲          └─fail─▶ windswept
+#                │                └─fail─▶ climb-face ─▶ ledge-watch ─▶ eyrie-guard ─win─┘
+#                fail─▶ brace-storm ─always─▶ ▲
 
 schemaVersion: 1
 id: mock-eyrie-pass
@@ -19,7 +20,7 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: survival, dc: 12 }
-    loot: 20
+    loot: 10
   - id: soar-gap
     rank: 2
     kind: check
@@ -29,44 +30,52 @@ nodes:
     rank: 2
     kind: check
     check: { type: save, ability: con, dc: 12 }
-    loot: 10
+    loot: 5
   - id: climb-face
     rank: 3
     kind: check
     check: { type: skill, skill: athletics, dc: 13 }
-    loot: 30
+    loot: 15
   - id: ledge-watch
     rank: 4
     kind: check
     check: { type: skill, skill: perception, dc: 12 }
-    loot: 40
-  - id: plant-banner
+    loot: 15
+  - id: high-ledge
     rank: 5
     kind: check
-    check: { type: skill, skill: intimidation, dc: 12 }
-    loot: 50
-  - id: ambush
+    check: { type: skill, skill: perception, dc: 13 }
+    loot: 30
+  - id: eyrie-guard
     rank: 5
     kind: battle
+    loot: 30
     encounter:
       creatures:
         - { ref: ogre, count: 1 }
         - { ref: orc, count: 4 }
         - { ref: worg, count: 2 }
-  - { id: summit, rank: 6, kind: end }
-  - { id: hard-won, rank: 6, kind: end }
+  - id: plant-banner
+    rank: 6
+    kind: check
+    check: { type: skill, skill: intimidation, dc: 12 }
+    loot: 30
+  - { id: summit, rank: 7, kind: end }
+  - { id: windswept, rank: 7, kind: end }
 
 edges:
   - { from: start,        to: read-weather, on: always }
   - { from: read-weather, to: soar-gap,     on: pass }
   - { from: read-weather, to: brace-storm,  on: fail }
-  - { from: soar-gap,     to: plant-banner, on: pass }
+  - { from: soar-gap,     to: high-ledge,   on: pass }
   - { from: soar-gap,     to: climb-face,   on: fail }
   - { from: brace-storm,  to: climb-face,   on: always }
   - { from: climb-face,   to: ledge-watch,  on: pass }
-  - { from: climb-face,   to: ambush,       on: fail }
-  - { from: ledge-watch,  to: summit,       on: pass }
-  - { from: ledge-watch,  to: ambush,       on: fail }
+  - { from: climb-face,   to: ledge-watch,  on: fail }
+  - { from: ledge-watch,  to: eyrie-guard,  on: pass }
+  - { from: ledge-watch,  to: eyrie-guard,  on: fail }
+  - { from: high-ledge,   to: plant-banner, on: pass }
+  - { from: high-ledge,   to: plant-banner, on: fail }
+  - { from: eyrie-guard,  to: plant-banner, on: win }
   - { from: plant-banner, to: summit,       on: pass }
-  - { from: plant-banner, to: summit,       on: fail }
-  - { from: ambush,       to: hard-won,     on: win }
+  - { from: plant-banner, to: windswept,    on: fail }

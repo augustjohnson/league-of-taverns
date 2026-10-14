@@ -1,9 +1,10 @@
-# Mock season, week 4 (swamp). A wade, a ford and a toll; slipping in the mire
-# drops the party into the bog ambush.
+# Mock season, week 4 (swamp). A wade, a ford, a haggle, and then the
+# toll-keeper's crew, the climax with the biggest bounty (D-45, D-50).
+# Slipping in the mire drops the party into a small bog ambush first.
 #
-#  rank 0     1             2              3              4            5
-#  start ─▶ wade-mire ─pass──────────────▶ find-ford ─pass/fail─▶ pay-toll ─pass─▶ crossed
-#               └─fail─▶ bog-ambush ─win──▶ ▲                         └─fail─▶ fleeced
+#  rank 0     1             2             3            4           5             6            7
+#  start ─▶ wade-mire ─pass──────────────▶ find-ford ─▶ haggle ─▶ toll-fight ─win─▶ strongbox ─pass─▶ crossed
+#               └─fail─▶ bog-ambush ─win─▶ ▲                                              └─fail─▶ fleeced
 
 schemaVersion: 1
 id: mock-fenmoor-toll
@@ -16,34 +17,50 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: athletics, dc: 12 }
-    loot: 20
+    loot: 10
   - id: bog-ambush
     rank: 2
     kind: battle
+    loot: 5
+    encounter:
+      creatures:
+        - { ref: giant-frog, count: 3 }
+  - id: find-ford
+    rank: 3
+    kind: check
+    check: { type: skill, skill: survival, dc: 12 }
+    loot: 15
+  - id: haggle
+    rank: 4
+    kind: check
+    check: { type: skill, skill: persuasion, dc: 13 }
+    loot: 15
+  - id: toll-fight
+    rank: 5
+    kind: battle
+    loot: 30
     encounter:
       creatures:
         - { ref: lizardfolk, count: 3 }
         - { ref: crocodile, count: 2 }
         - { ref: giant-frog, count: 4 }
-  - id: find-ford
-    rank: 3
+  - id: strongbox
+    rank: 6
     kind: check
-    check: { type: skill, skill: survival, dc: 12 }
+    check: { type: skill, skill: sleight_of_hand, dc: 12 }
     loot: 30
-  - id: pay-toll
-    rank: 4
-    kind: check
-    check: { type: skill, skill: persuasion, dc: 13 }
-    loot: 50
-  - { id: crossed, rank: 5, kind: end }
-  - { id: fleeced, rank: 5, kind: end }
+  - { id: crossed, rank: 7, kind: end }
+  - { id: fleeced, rank: 7, kind: end }
 
 edges:
   - { from: start,      to: wade-mire,  on: always }
   - { from: wade-mire,  to: find-ford,  on: pass }
   - { from: wade-mire,  to: bog-ambush, on: fail }
   - { from: bog-ambush, to: find-ford,  on: win }
-  - { from: find-ford,  to: pay-toll,   on: pass }
-  - { from: find-ford,  to: pay-toll,   on: fail }
-  - { from: pay-toll,   to: crossed,    on: pass }
-  - { from: pay-toll,   to: fleeced,    on: fail }
+  - { from: find-ford,  to: haggle,     on: pass }
+  - { from: find-ford,  to: haggle,     on: fail }
+  - { from: haggle,     to: toll-fight, on: pass }
+  - { from: haggle,     to: toll-fight, on: fail }
+  - { from: toll-fight, to: strongbox,  on: win }
+  - { from: strongbox,  to: crossed,    on: pass }
+  - { from: strongbox,  to: fleeced,    on: fail }

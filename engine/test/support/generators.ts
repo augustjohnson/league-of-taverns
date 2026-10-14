@@ -7,7 +7,9 @@
  * ends. Checks get `pass` + `fail` edges, or one `always`; battles get one
  * `win`. Edges may skip layers. Unreachable nodes are pruned, and a candidate
  * is kept only if `validateMission` accepts it under `PROPERTY_RULES` (so
- * every path attempts a check and at most one check is gated).
+ * every path attempts a check and at most one check is gated). The `gates`
+ * rule (D-39) is an authoring rule, not a walkability one, so it is ignored:
+ * gated walls are exactly what the projection must get right.
  *
  * Check targets and advantages come from a small shared pool, so advantage
  * and `requires` gates actually come into play.
@@ -15,6 +17,7 @@
 import { TRAITS, effectiveStats, type CheckTarget, type EffectiveStats, type Modifier } from '../../src/characters';
 import { validateMission, type CheckSpec, type Mission, type MissionEdge, type MissionNode, type MissionRules, type Requirement } from '../../src/missions';
 import type { Party } from '../../src/resolution';
+import type { RetreatOrder } from '../../src/roster';
 import type { Rng } from '../../src/rng';
 import { SENSES, SPEEDS, type CrEighths } from '../../src/vocabulary';
 import { FIXTURE_SLUGS } from '../fixtures/open5e';
@@ -65,7 +68,7 @@ export function pick<T>(rng: Rng, items: ReadonlyArray<T>): T {
 export function randomMission(rng: Rng, id: string): Mission {
   for (let attempt = 0; attempt < 200; attempt++) {
     const mission = candidate(rng, id);
-    if (validateMission(mission, PROPERTY_RULES, crOf).length === 0) return mission;
+    if (validateMission(mission, PROPERTY_RULES, crOf).every((issue) => issue.code === 'gates')) return mission;
   }
   throw new Error(`randomMission: no legal mission after 200 attempts (${id})`);
 }
@@ -83,7 +86,11 @@ function candidate(rng: Rng, id: string): Mission {
       const roll = rng();
       if (rank > 1 && roll < 0.08) layer.push({ id: nodeId, rank, kind: 'end' });
       else if (roll < 0.68) layer.push({ id: nodeId, rank, kind: 'check', check: randomCheck(rng), loot: int(rng, 0, 5) });
-      else layer.push({ id: nodeId, rank, kind: 'battle', encounter: { creatures: randomEncounter(rng) } });
+      else {
+        const loot = int(rng, 0, 6);
+        // About half the battles carry a bounty (D-50).
+        layer.push({ id: nodeId, rank, kind: 'battle', encounter: { creatures: randomEncounter(rng) }, ...(loot > 3 ? { loot: loot - 3 } : {}) });
+      }
     }
     byRank.push(layer);
   }
@@ -141,6 +148,12 @@ function candidate(rng: Rng, id: string): Mission {
     nodes,
     edges: edges.filter((edge) => reached.has(edge.from)),
   };
+}
+
+/** A random retreat order (D-49): never, avoid_battles, or bank 0 to 8. */
+export function randomRetreat(rng: Rng): RetreatOrder {
+  const roll = int(rng, 0, 4);
+  return roll === 0 ? 'never' : roll === 1 ? 'avoid_battles' : { bank: int(rng, 0, 8) };
 }
 
 function randomCheck(rng: Rng): CheckSpec {

@@ -15,7 +15,8 @@
  * | `edges.battle`     | a battle has exactly one `win` |
  * | `edges.start`      | start has exactly one `always` |
  * | `scored`           | every start→end path attempts ≥ 1 check |
- * | `haul`             | the most loot any start→end path can bank equals the season's fixed `haul` (D-45) |
+ * | `haul`             | the most loot any start→end path can bank equals the season's fixed `haul` (D-45). Check loot counts on `pass`/`always`, battle loot on `win` (D-50) |
+ * | `gates`            | a party with no special speeds or senses can bank as much as any party: a `requires` gate only opens a better or safer route (D-39) |
  * | `dc`               | `dcBand.min ≤ dc ≤ dcBand.max` |
  * | `encounter.ref`    | every creature ref exists in the pinned snapshot |
  * | `encounter.budget` | Σ count × CR ≤ `floor(encounterCrRatio × B)` per battle, in eighths |
@@ -33,7 +34,7 @@
  * path analysis, and with a rank violation (a possible cycle) there is no path
  * analysis, but DC, encounter and size checks always run.
  *
- * Path rules (`scored`, `haul`, battles per path) are computed by dynamic programming
+ * Path rules (`scored`, `haul`, `gates`, battles per path) are computed by dynamic programming
  * over the layered DAG, not by enumerating paths, so they stay linear in the
  * number of edges. Each issue names one offending end node and an example path.
  */
@@ -73,6 +74,7 @@ export type MissionIssueCode =
   | 'edges.start'
   | 'scored'
   | 'haul'
+  | 'gates'
   | 'dc'
   | 'encounter.ref'
   | 'encounter.budget'
@@ -93,7 +95,8 @@ export function topologicalOrder(mission: Mission): ReadonlyArray<string> {
 /**
  * The haul: the most loot any start→end path can bank (D-45). A check banks
  * its loot when the path leaves it by `pass` or `always`, and nothing when it
- * leaves by `fail`. Only nodes reached from the start through edges that go
+ * leaves by `fail`. A battle banks its loot, if any, when the path leaves it
+ * by `win` (D-50). Only nodes reached from the start through edges that go
  * up in rank count, so it never throws; it is 0 when no end is reached.
  * Scores are loot ÷ haul, so a mission that passed the `haul` rule scores
  * loot ÷ the season's fixed haul.
@@ -105,6 +108,65 @@ export function missionHaul(mission: Mission): number {
     haulCache.set(mission, haul);
   }
   return haul;
+}
+
+/** The D-45 loot shape of a mission: how late its loot and its battles come. */
+export interface LootShape {
+  /** One best path, start to end: a path that banks the haul. Empty when no end is reached. */
+  readonly bestPath: ReadonlyArray<string>;
+  /** The loot each node on `bestPath` banks on the way, in path order. */
+  readonly lootByNode: ReadonlyArray<readonly [string, number]>;
+  /** The highest rank of any end node, the mission's length. */
+  readonly length: number;
+  /** Share of the best path's loot banked by nodes in the last third of the ranks (rank > ⅔ × length). */
+  readonly lateShare: number;
+  /** The highest rank of any battle reached from start, or null with no battles. */
+  readonly lastBattleRank: number | null;
+  /**
+   * The default D-45 check (docs/decisions.md): at least half the best path's
+   * loot in the last third, and the last battle (if any) in the last third.
+   * An authoring guide for the difficulty report, not a validator rule.
+   */
+  readonly ok: boolean;
+}
+
+/**
+ * The loot shape of `mission` (D-45: rising loot, a late climax). Never
+ * throws; a mission with no reachable end has an empty best path.
+ */
+export function lootShape(mission: Mission): LootShape {
+  const start = mission.nodes.find((node) => node.kind === 'start');
+  const byId = new Map<string, MissionNode>();
+  for (const node of mission.nodes) if (!byId.has(node.id)) byId.set(node.id, node);
+  const ordered = sortByRankThenId([...byId.values()]);
+  const edges = mission.edges.filter((edge) => {
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    return from !== undefined && to !== undefined && to.rank > from.rank;
+  });
+  const length = Math.max(0, ...ordered.filter((node) => node.kind === 'end').map((node) => node.rank));
+  const late = (rank: number): boolean => rank > (2 * length) / 3;
+  const loot = start === undefined ? new Map<string, PathStat>() : maxLoot(start, ordered, edges);
+  const best = bestEnd(ordered, loot);
+  const bestPath = best === undefined ? [] : tracePath(loot, best.id).split(' → ');
+  const lootByNode = bestPath.slice(0, -1).map((id, i): readonly [string, number] => {
+    const next = bestPath[i + 1];
+    const banked = edges.filter((edge) => edge.from === id && edge.to === next).map((edge) => edgeLoot(byId.get(id), edge));
+    return [id, Math.max(0, ...banked)];
+  });
+  const total = lootByNode.reduce((sum, [, n]) => sum + n, 0);
+  const lateLoot = lootByNode.reduce((sum, [id, n]) => sum + (late(byId.get(id)?.rank ?? 0) ? n : 0), 0);
+  const lateShare = total === 0 ? 0 : lateLoot / total;
+  const battles = ordered.filter((node) => node.kind === 'battle' && loot.has(node.id)).map((node) => node.rank);
+  const lastBattleRank = battles.length === 0 ? null : Math.max(...battles);
+  return {
+    bestPath,
+    lootByNode,
+    length,
+    lateShare,
+    lastBattleRank,
+    ok: lateShare >= 0.5 && (lastBattleRank === null || late(lastBattleRank)),
+  };
 }
 
 /** Missions are immutable values, so a mission object's haul never changes. Runs and replays call `missionHaul` per run. */
@@ -287,7 +349,7 @@ export function validateMission(
     }
   }
 
-  // scored, haul and size (battles per path): only on a DAG with a single start.
+  // scored, haul, gates and size (battles per path): only on a DAG with a single start.
   if (start && !rankBroken) {
     for (const issue of pathIssues(start, ordered, liveEdges, rules)) report(issue.code, issue.message, issue.nodeId);
   }
@@ -386,13 +448,18 @@ interface PathStat {
 /**
  * For each node reached from start, the most loot banked on any path from
  * start up to it, with the predecessor that achieved it. Loot is added on the
- * edge out of a check that passed (`pass` or `always`). `edges` must all go up
- * in rank, so (rank, id) order is topological.
+ * edge out of a check that passed (`pass` or `always`) and out of a battle
+ * that was won (`win`). `edges` must all go up in rank, so (rank, id) order is
+ * topological.
+ *
+ * With `ungated`, the party meets no `requires` gate: a gated check always
+ * fails, so its `pass` edge is never taken and it banks nothing (D-39).
  */
 function maxLoot(
   start: MissionNode,
   ordered: ReadonlyArray<MissionNode>,
   edges: ReadonlyArray<MissionEdge>,
+  ungated = false,
 ): ReadonlyMap<string, PathStat> {
   const byId = new Map(ordered.map((node) => [node.id, node] as const));
   const incoming = new Map<string, MissionEdge[]>();
@@ -409,9 +476,27 @@ function maxLoot(
     }
     for (const edge of incoming.get(node.id) ?? []) {
       const from = byId.get(edge.from);
-      const banked = from?.kind === 'check' && edge.on !== 'fail' ? from.loot : 0;
-      relax(best, node.id, edge.from, banked, (a, b) => a > b);
+      const gated = ungated && from?.kind === 'check' && from.check.requires !== undefined;
+      if (gated && edge.on === 'pass') continue;
+      relax(best, node.id, edge.from, gated ? 0 : edgeLoot(from, edge), (a, b) => a > b);
     }
+  }
+  return best;
+}
+
+/** Loot banked by leaving `from` along `edge`: a check's on `pass` or `always`, a battle's on `win`. */
+function edgeLoot(from: MissionNode | undefined, edge: MissionEdge): number {
+  if (from?.kind === 'check') return edge.on === 'fail' ? 0 : from.loot;
+  if (from?.kind === 'battle') return edge.on === 'win' ? (from.loot ?? 0) : 0;
+  return 0;
+}
+
+/** The end node with the most loot in `loot`, ties to the first in (rank, id) order. */
+function bestEnd(ordered: ReadonlyArray<MissionNode>, loot: ReadonlyMap<string, PathStat>): { readonly id: string; readonly value: number } | undefined {
+  let best: { readonly id: string; readonly value: number } | undefined;
+  for (const end of ordered) {
+    const stat = end.kind === 'end' ? loot.get(end.id) : undefined;
+    if (stat !== undefined && (best === undefined || stat.value > best.value)) best = { id: end.id, value: stat.value };
   }
   return best;
 }
@@ -457,20 +542,29 @@ function pathIssues(
   const issues: Array<{ code: MissionIssueCode; nodeId: string; message: string }> = [];
   const { min, max } = rules.battlesPerPath;
 
-  if (rules.haul !== undefined) {
-    const loot = maxLoot(start, ordered, liveEdges);
-    let bestEnd: { readonly id: string; readonly value: number } | undefined;
-    for (const end of ordered) {
-      const stat = end.kind === 'end' ? loot.get(end.id) : undefined;
-      if (stat !== undefined && (bestEnd === undefined || stat.value > bestEnd.value)) bestEnd = { id: end.id, value: stat.value };
-    }
-    if (bestEnd !== undefined && bestEnd.value !== rules.haul) {
+  const loot = maxLoot(start, ordered, liveEdges);
+  const best = bestEnd(ordered, loot);
+  if (rules.haul !== undefined && best !== undefined && best.value !== rules.haul) {
+    issues.push({
+      code: 'haul',
+      nodeId: best.id,
+      message:
+        `The best path ${tracePath(loot, best.id)} banks ${best.value} loot, but every mission this season must pay a ` +
+        `fixed haul of ${rules.haul} on its best path. Adjust the checks' and battles' \`loot\` so the best path sums to ${rules.haul}.`,
+    });
+  }
+  const gates = ordered.filter((node) => node.kind === 'check' && node.check.requires !== undefined).map((node) => node.id);
+  if (gates.length > 0 && best !== undefined) {
+    const plainLoot = maxLoot(start, ordered, liveEdges, true);
+    const plain = bestEnd(ordered, plainLoot);
+    if (plain === undefined || plain.value < best.value) {
       issues.push({
-        code: 'haul',
-        nodeId: bestEnd.id,
+        code: 'gates',
+        nodeId: plain?.id ?? best.id,
         message:
-          `The best path ${tracePath(loot, bestEnd.id)} banks ${bestEnd.value} loot, but every mission this season must pay a ` +
-          `fixed haul of ${rules.haul} on its best path. Adjust the checks' \`loot\` so the best path sums to ${rules.haul}.`,
+          `A party that meets no gate (${gates.map((id) => `"${id}"`).join(', ')}) can bank at most ${plain?.value ?? 0} loot` +
+          `${plain === undefined ? '' : `, on ${tracePath(plainLoot, plain.id)}`}, but the best path banks ${best.value}. ` +
+          'A gate may only open a better or safer route (D-39): give the ungated route the full haul too.',
       });
     }
   }

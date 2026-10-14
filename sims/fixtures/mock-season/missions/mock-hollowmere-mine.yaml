@@ -1,9 +1,11 @@
 # Mock season, week 5 (underground). A dark mine: shore the tunnel or dodge the
-# cave-in, then find the vein. Missing it wakes the crawlers.
+# cave-in, find the vein, work it, and then the crawlers come for the cart:
+# the climax, with the biggest bounty (D-45, D-50). Missing the vein brings
+# them on sooner.
 #
-#  rank 0     1              2                3              4             5            6
-#  start ─▶ light-way ─pass─▶ shore-tunnel ─always─▶ deep-vein ─pass─────────────▶ haul-ore ─pass─▶ struck-silver
-#               └─fail─▶ dodge-cave-in ─always─▶ ▲       └─fail─▶ crawlers ─win─▶ ▲      └─fail─▶ dropped-cart
+#  rank 0     1              2                3              4             5            6           7
+#  start ─▶ light-way ─pass─▶ shore-tunnel ─always─▶ deep-vein ─pass─▶ vein-face ─▶ crawlers ─win─▶ cart-out ─pass─▶ struck-silver
+#               └─fail─▶ dodge-cave-in ─always─▶ ▲        └─fail────────────────▶ ▲                  └─fail─▶ dropped-cart
 
 schemaVersion: 1
 id: mock-hollowmere-mine
@@ -16,37 +18,43 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: perception, dc: 12 }
-    loot: 15
+    loot: 10
   - id: shore-tunnel
     rank: 2
     kind: check
     check: { type: skill, skill: athletics, dc: 13 }
-    loot: 25
+    loot: 10
   - id: dodge-cave-in
     rank: 2
     kind: check
     check: { type: save, ability: dex, dc: 12 }
-    loot: 10
+    loot: 5
   - id: deep-vein
     rank: 3
     kind: check
     check: { type: skill, skill: investigation, dc: 13 }
-    loot: 30
-  - id: crawlers
+    loot: 15
+  - id: vein-face
     rank: 4
+    kind: check
+    check: { type: save, ability: str, dc: 12 }
+    loot: 15
+  - id: crawlers
+    rank: 5
     kind: battle
+    loot: 25
     encounter:
       creatures:
         - { ref: giant-spider, count: 2 }
         - { ref: giant-centipede, count: 4 }
         - { ref: swarm-of-bats, count: 2 }
-  - id: haul-ore
-    rank: 5
+  - id: cart-out
+    rank: 6
     kind: check
-    check: { type: save, ability: str, dc: 12 }
-    loot: 30
-  - { id: struck-silver, rank: 6, kind: end }
-  - { id: dropped-cart, rank: 6, kind: end }
+    check: { type: ability, ability: dex, dc: 12 }
+    loot: 25
+  - { id: struck-silver, rank: 7, kind: end }
+  - { id: dropped-cart, rank: 7, kind: end }
 
 edges:
   - { from: start,         to: light-way,     on: always }
@@ -54,8 +62,10 @@ edges:
   - { from: light-way,     to: dodge-cave-in, on: fail }
   - { from: shore-tunnel,  to: deep-vein,     on: always }
   - { from: dodge-cave-in, to: deep-vein,     on: always }
-  - { from: deep-vein,     to: haul-ore,      on: pass }
+  - { from: deep-vein,     to: vein-face,     on: pass }
   - { from: deep-vein,     to: crawlers,      on: fail }
-  - { from: crawlers,      to: haul-ore,      on: win }
-  - { from: haul-ore,      to: struck-silver, on: pass }
-  - { from: haul-ore,      to: dropped-cart,  on: fail }
+  - { from: vein-face,     to: crawlers,      on: pass }
+  - { from: vein-face,     to: crawlers,      on: fail }
+  - { from: crawlers,      to: cart-out,      on: win }
+  - { from: cart-out,      to: struck-silver, on: pass }
+  - { from: cart-out,      to: dropped-cart,  on: fail }

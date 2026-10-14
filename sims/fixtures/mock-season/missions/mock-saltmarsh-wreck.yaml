@@ -1,11 +1,10 @@
-# Mock season, week 2 (coast). Two battles; failing a check drops the party into one.
+# Mock season, week 2 (coast). Two battles: the wreckers if the party misses
+# the false lights, and the hold's guardians near the end, the climax with the
+# biggest bounty (D-45, D-50).
 #
-#  rank 0     1             2             3              4              5           6          7
-#  start ─▶ spot-lights ─pass─▶ row-out ─always─▶ board-wreck ─pass─▶ search-hold ─pass───────────────────────▶ salvaged
-#                │                              ▲      │                  │                                     ▲
-#                fail─▶ wreckers ─win───────────┘      fail─▶ guardians ◀─fail                                  │
-#                                                              (rank 5) ─win─▶ haul-out ─pass───────────────────┘
-#                                                                                  └─fail─▶ battered
+#  rank 0     1              2             3              4              5             6          7
+#  start ─▶ spot-lights ─pass─▶ row-out ─always─▶ board-wreck ─▶ search-hold ─▶ guardians ─win─▶ haul-out ─pass─▶ salvaged
+#                └─fail─▶ wreckers ─win─────────▶ ▲                                                 └─fail─▶ battered
 
 schemaVersion: 1
 id: mock-saltmarsh-wreck
@@ -18,33 +17,34 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: perception, dc: 13 }
-    loot: 15
+    loot: 10
   - id: row-out
     rank: 2
     kind: check
     check: { type: skill, skill: athletics, dc: 12 }
-    loot: 15
+    loot: 10
   - id: wreckers
     rank: 2
     kind: battle
+    loot: 10
     encounter:
       creatures:
         - { ref: bandit-captain, count: 1 }
-        - { ref: thug, count: 2 }
         - { ref: bandit, count: 4 }
   - id: board-wreck
     rank: 3
     kind: check
     check: { type: skill, skill: acrobatics, dc: 12 }
-    loot: 30
+    loot: 15
   - id: search-hold
     rank: 4
     kind: check
     check: { type: skill, skill: investigation, dc: 12 }
-    loot: 40
+    loot: 15
   - id: guardians
     rank: 5
     kind: battle
+    loot: 25
     encounter:
       creatures:
         - { ref: sahuagin, count: 4 }
@@ -54,7 +54,7 @@ nodes:
     rank: 6
     kind: check
     check: { type: save, ability: str, dc: 12 }
-    loot: 30
+    loot: 25
   - { id: salvaged, rank: 7, kind: end }
   - { id: battered, rank: 7, kind: end }
 
@@ -65,8 +65,8 @@ edges:
   - { from: row-out,     to: board-wreck, on: always }
   - { from: wreckers,    to: board-wreck, on: win }
   - { from: board-wreck, to: search-hold, on: pass }
-  - { from: board-wreck, to: guardians,   on: fail }
-  - { from: search-hold, to: salvaged,    on: pass }
+  - { from: board-wreck, to: search-hold, on: fail }
+  - { from: search-hold, to: guardians,   on: pass }
   - { from: search-hold, to: guardians,   on: fail }
   - { from: guardians,   to: haul-out,    on: win }
   - { from: haul-out,    to: salvaged,    on: pass }

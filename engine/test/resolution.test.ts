@@ -256,6 +256,7 @@ describe('runMission', () => {
         { node: 'b', kind: 'check', actor: 'ally', d20: 6, modifier: 3, dc: 10, advantage: false, outcome: 'fail' },
       ],
       dnf: false,
+      retreatedBefore: null,
       checksPassed: 1,
       checksAttempted: 2,
       loot: 40,
@@ -283,6 +284,7 @@ describe('runMission', () => {
         { node: 'fight', kind: 'battle', pWin: 0.2, roll: 0.3, outcome: 'lose' },
       ],
       dnf: true,
+      retreatedBefore: null,
       checksPassed: 0,
       checksAttempted: 1,
       loot: 0,
@@ -300,6 +302,64 @@ describe('runMission', () => {
     );
     const run = runMission(party, late, scripted({ a: [0.45], fight: [0.9] }), baseOf, constantModel(0.5));
     expect(run).toMatchObject({ path: ['start', 'a', 'fight'], dnf: true, checksPassed: 1, loot: 30, score: 0.3 });
+  });
+
+  it('banks a battle\'s loot on a win, and nothing on a loss (D-50)', () => {
+    // start → a (30) → fight (bounty 50) → b (20) → done: haul 100.
+    const bounty = missionOf(
+      [start(), skillCheck('a', 1, 'stealth', 12, 30), { ...battle('fight', 2), loot: 50 }, skillCheck('b', 3, 'athletics', 10, 20), end('done', 4)],
+      [edge('start', 'a', 'always'), edge('a', 'fight', 'always'), edge('fight', 'b', 'win'), edge('b', 'done', 'always')],
+    );
+    const won = runMission(party, bounty, scripted({ a: [0.45], fight: [0.1], b: [0.9] }), baseOf, constantModel(0.5));
+    expect(won).toMatchObject({ dnf: false, retreatedBefore: null, checksPassed: 2, loot: 100, score: 1 });
+    const lost = runMission(party, bounty, scripted({ a: [0.45], fight: [0.9] }), baseOf, constantModel(0.5));
+    expect(lost).toMatchObject({ dnf: true, loot: 30, score: 0.3 });
+  });
+
+  describe('retreat orders (D-49)', () => {
+    // start → a (30) → fight (bounty 50) → b (20) → done, and a ─fail→ fight too.
+    const late = missionOf(
+      [start(), skillCheck('a', 1, 'stealth', 12, 30), { ...battle('fight', 2), loot: 50 }, skillCheck('b', 3, 'athletics', 10, 20), end('done', 4)],
+      [edge('start', 'a', 'always'), edge('a', 'fight', 'always'), edge('fight', 'b', 'win'), edge('b', 'done', 'always')],
+    );
+    const dice = scripted({ a: [0.45], fight: [0.9], b: [0.9] });
+
+    it('never: fights every battle (the default)', () => {
+      expect(runMission(party, late, dice, baseOf, constantModel(0.5))).toEqual(
+        runMission(party, late, dice, baseOf, constantModel(0.5), { retreat: 'never' }),
+      );
+      expect(runMission(party, late, dice, baseOf, constantModel(0.5)).dnf).toBe(true);
+    });
+
+    it('avoid_battles: turns back before the first battle, keeping its loot, with no DNF and no die drawn', () => {
+      let drawn = false;
+      const watch = (id: string): Rng => {
+        if (id === 'fight') drawn = true;
+        return dice(id);
+      };
+      const run = runMission(party, late, watch, baseOf, constantModel(0.5), { retreat: 'avoid_battles' });
+      expect(run).toEqual({
+        path: ['start', 'a'],
+        nodes: [{ node: 'a', kind: 'check', actor: 'cap', d20: 10, modifier: 2, dc: 12, advantage: false, outcome: 'pass' }],
+        dnf: false,
+        retreatedBefore: 'fight',
+        checksPassed: 1,
+        checksAttempted: 1,
+        loot: 30,
+        score: 0.3,
+      });
+      expect(drawn).toBe(false);
+    });
+
+    it('bank: N turns back only once N loot is banked', () => {
+      // Passing a banks 30: bank 30 turns back, bank 31 fights.
+      expect(runMission(party, late, dice, baseOf, constantModel(0.5), { retreat: { bank: 30 } }).retreatedBefore).toBe('fight');
+      expect(runMission(party, late, dice, baseOf, constantModel(0.5), { retreat: { bank: 31 } })).toMatchObject({ retreatedBefore: null, dnf: true });
+      // Failing a banks nothing, so even bank 1 fights; bank 0 is avoid_battles.
+      const failA = scripted({ a: [0], fight: [0.1], b: [0.9] });
+      expect(runMission(party, late, failA, baseOf, constantModel(0.5), { retreat: { bank: 1 } })).toMatchObject({ retreatedBefore: null, loot: 70 });
+      expect(runMission(party, late, failA, baseOf, constantModel(0.5), { retreat: { bank: 0 } }).retreatedBefore).toBe('fight');
+    });
   });
 
   it('with advantage, draws a second d20 from the same stream and keeps the higher', () => {
@@ -365,6 +425,7 @@ describe('runMission', () => {
         { node: 'haul-chain', kind: 'check', actor: 'bruno-the-bruiser', d20: 14, modifier: 4, dc: 13, advantage: false, outcome: 'pass' },
       ],
       dnf: false,
+      retreatedBefore: null,
       checksPassed: 1,
       checksAttempted: 2,
       loot: 50,

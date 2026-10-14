@@ -171,6 +171,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
         { node: 'bog-ambush', kind: 'battle', pWin: 0.62, roll: 0.41, outcome: 'win' },
       ],
       dnf: false,
+      retreatedBefore: null,
       checksPassed: 0,
       checksAttempted: 1,
       loot: 0,
@@ -302,6 +303,7 @@ describe('replay and verification', () => {
         { node: 'bog', kind: 'battle', pWin: 0.6, roll: battle.roll, outcome: battle.outcome },
       ],
       dnf: lost,
+      retreatedBefore: null,
       checksPassed: 0,
       checksAttempted: 1,
       loot: 0,
@@ -398,6 +400,21 @@ describe('replay and verification', () => {
     expect(fields({ run: { ...won, nodes: won.nodes.slice(0, 1) }, points: 0 })).toEqual(['run.nodes[1]']);
     expect(fields({ run: { ...won, nodes: [{ ...won.nodes[0]!, actor: 'stranger' } as (typeof won.nodes)[0], won.nodes[1]!] }, points: 0 })).toEqual(['run.nodes[0].actor']);
     expect(fields({ mission: 'another-mission' })).toEqual(['mission']);
+  });
+
+  it('verifyResolutions audits a retreat against the lineup\'s retreat order (D-49)', () => {
+    const fields = (patch: Partial<EventOf<'mission.resolved'>['payload']>) => verifyResolutions(withResolution(patch)).map((m) => m.field);
+    const won = battleRun({ roll: 0.3, outcome: 'win' });
+    const turnedBack = { ...won, path: ['start', 'find-path'], nodes: won.nodes.slice(0, 1), retreatedBefore: 'bog' };
+    const avoid = { ...resolved.payload.lineup, retreat: 'avoid_battles' as const };
+    // The order said to turn back, and the party did.
+    expect(fields({ lineup: avoid, run: turnedBack, points: 0 })).toEqual([]);
+    // The order said to fight, but the record turns back.
+    expect(fields({ run: turnedBack, points: 0 })).toEqual(['run.nodes[1]']);
+    // The order said to turn back, but the record fights on.
+    expect(fields({ lineup: avoid, run: won, points: 0 })).toEqual(['run.nodes', 'run.path', 'run.retreatedBefore']);
+    // A bank threshold the party never reached: it fights.
+    expect(fields({ lineup: { ...avoid, retreat: { bank: 1 } }, run: won, points: 0 })).toEqual([]);
   });
 
   it('verifyResolutions lets a gated check fail on a high roll (nobody may have met the gate)', () => {

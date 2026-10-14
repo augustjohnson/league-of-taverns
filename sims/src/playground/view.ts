@@ -16,6 +16,7 @@ import type {
   Modifier,
   Party,
   RetreatOrder,
+  RunOptions,
   Skill,
 } from '@league-of-taverns/engine';
 import type { Aggregate } from '../season-runner';
@@ -186,12 +187,13 @@ export function sampleMission(
   model: BattleModel,
   n: number,
   seed: string,
+  options: RunOptions = {},
 ): SampleResult {
   const scores: number[] = [];
   let dnfs = 0;
   let total = 0;
   for (let i = 0; i < n; i++) {
-    const run = runMission(party, mission, (node) => rngFor(seed, `${i}:roll:${node}`), baseOf, model);
+    const run = runMission(party, mission, (node) => rngFor(seed, `${i}:roll:${node}`), baseOf, model, options);
     scores.push(run.score);
     total += run.score;
     if (run.dnf) dnfs++;

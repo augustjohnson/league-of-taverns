@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { projectMission, type Projection } from '../src/projection';
 import { checkOdds, runMission } from '../src/resolution';
 import { rngFor } from '../src/rng';
-import { randomMission, randomParty } from './support/generators';
+import { randomMission, randomParty, randomRetreat } from './support/generators';
 // The engine has no YAML parser, so the example mission is read through the
 // scripts loader, as in missions.test.ts.
 import { loadMission } from '../../scripts/src/lib/repo';
@@ -155,6 +155,42 @@ describe('projection', () => {
     expect(projection.distribution).toEqual([[0.5, 1]]);
   });
 
+  it('banks a battle\'s loot on a win, and turns back by the retreat order (D-49, D-50)', () => {
+    // A certain check (1), a battle at p(win) = 0.4 with bounty 2, then a certain check (1). Haul 4.
+    const mission = missionOf(
+      [start(), skillCheck('c', 1, 'stealth', 1), { ...battle('fight', 2), loot: 2 }, skillCheck('d', 3, 'stealth', 1), end('done', 4)],
+      [edge('start', 'c', 'always'), edge('c', 'fight', 'always'), edge('fight', 'd', 'win'), edge('d', 'done', 'always')],
+    );
+    const fight = projectMission(zero, mission, baseOf, constantModel(0.4));
+    expect(fight.expectedScore).toBeCloseTo(0.6 * 0.25 + 0.4 * 1, 12);
+    expect([fight.pDnf, fight.pRetreat]).toEqual([0.6, 0]);
+    expect(fight.reach).toEqual({ start: 1, c: 1, fight: 1, d: 0.4, done: 0.4 });
+
+    // Turning back keeps the 1 banked, with no DNF, and the party never visits the battle.
+    for (const retreat of ['avoid_battles', { bank: 1 }] as const) {
+      const back = projectMission(zero, mission, baseOf, constantModel(0.4), { retreat });
+      expect(back.expectedScore).toBeCloseTo(0.25, 12);
+      expect([back.pDnf, back.pRetreat]).toEqual([0, 1]);
+      expect(back.reach).toEqual({ start: 1, c: 1, fight: 0, d: 0, done: 0 });
+      expect(back.distribution).toEqual([[0.25, 1]]);
+    }
+    expect(projectMission(zero, mission, baseOf, constantModel(0.4), { retreat: { bank: 2 } })).toEqual(fight);
+  });
+
+  it('applies a bank threshold per loot state, so one battle can split', () => {
+    // a (p 0.5, loot 1) then a battle at p 0.5: bank 1 turns back only the parties that passed a.
+    const mission = missionOf(
+      [start(), skillCheck('a', 1, 'stealth', 11), battle('fight', 2), skillCheck('d', 3, 'stealth', 1, 2), end('done', 4)],
+      [edge('start', 'a', 'always'), edge('a', 'fight', 'always'), edge('fight', 'd', 'win'), edge('d', 'done', 'always')],
+    );
+    const p = projectMission(zero, mission, baseOf, constantModel(0.5), { retreat: { bank: 1 } });
+    expect(p.pRetreat).toBeCloseTo(0.5, 12);
+    expect(p.pDnf).toBeCloseTo(0.25, 12);
+    expect(p.reach.fight).toBeCloseTo(0.5, 12);
+    // Retreat with 1 (0.5), lose with 0 (0.25), win and bank d's 2 (0.25). Haul 3.
+    expect(p.expectedScore).toBeCloseTo((0.5 * 1 + 0.25 * 2) / 3, 12);
+  });
+
   it('lists unreachable branches with reach 0', () => {
     const mission = missionOf(
       [start(), skillCheck('c', 1, 'stealth', 1), battle('fight', 2), end('done', 3)],
@@ -178,26 +214,32 @@ describe('projection property', () => {
     let gated = 0;
     let withAdvantage = 0;
     let withDnf = 0;
+    let partRetreat = 0;
+    let withBounty = 0;
     for (let c = 0; c < CASES; c++) {
       const gen = rngFor('projection-property', 'case:' + c);
       const mission = randomMission(gen, `prop-${c}`);
       const party = randomParty(gen);
-      const projection = projectMission(party, mission, baseOf, crModel);
+      const orders = { retreat: randomRetreat(gen) };
+      const projection = projectMission(party, mission, baseOf, crModel, orders);
 
       // Internal consistency.
       const ends = mission.nodes.filter((n) => n.kind === 'end').reduce((sum, n) => sum + (projection.reach[n.id] ?? 0), 0);
       const fromDistribution = projection.distribution.reduce((sum, [score, p]) => sum + score * p, 0);
-      if (Math.abs(ends + projection.pDnf - 1) > 1e-9) failures.push(`case ${c}: end reach + pDnf = ${ends + projection.pDnf}`);
+      const exits = ends + projection.pDnf + projection.pRetreat;
+      if (Math.abs(exits - 1) > 1e-9) failures.push(`case ${c}: end reach + pDnf + pRetreat = ${exits}`);
       if (Math.abs(total(projection) - 1) > 1e-9) failures.push(`case ${c}: distribution sums to ${total(projection)}`);
       if (Math.abs(fromDistribution - projection.expectedScore) > 1e-9) failures.push(`case ${c}: distribution mean ${fromDistribution}`);
 
       // Sampled mean vs the exact mean, with the standard error from the exact distribution.
       let sum = 0;
       let dnfs = 0;
+      let retreats = 0;
       for (let k = 0; k < N; k++) {
-        const run = runMission(party, mission, (id) => rngFor(`prop-${c}-${k}`, 'roll:' + id), baseOf, crModel);
+        const run = runMission(party, mission, (id) => rngFor(`prop-${c}-${k}`, 'roll:' + id), baseOf, crModel, orders);
         sum += run.score;
         if (run.dnf) dnfs++;
+        if (run.retreatedBefore !== null) retreats++;
       }
       const mean = sum / N;
       const variance = projection.distribution.reduce((v, [score, p]) => v + p * (score - projection.expectedScore) ** 2, 0);
@@ -209,15 +251,23 @@ describe('projection property', () => {
       if (Math.abs(dnfs / N - projection.pDnf) > 4 * dnfSe + 1e-12) {
         failures.push(`case ${c}: sampled DNF ${dnfs / N} vs projected ${projection.pDnf} (4 SE = ${4 * dnfSe})`);
       }
+      const retreatSe = Math.sqrt((projection.pRetreat * (1 - projection.pRetreat)) / N);
+      if (Math.abs(retreats / N - projection.pRetreat) > 4 * retreatSe + 1e-12) {
+        failures.push(`case ${c}: sampled retreat ${retreats / N} vs projected ${projection.pRetreat} (4 SE = ${4 * retreatSe})`);
+      }
 
       if (mission.nodes.some((n) => n.kind === 'check' && n.check.requires !== undefined)) gated++;
       if (mission.nodes.some((n) => n.kind === 'check' && checkOdds(party, n.check).advantage)) withAdvantage++;
       if (projection.pDnf > 0) withDnf++;
+      if (projection.pRetreat > 0 && projection.pRetreat < 1) partRetreat++;
+      if (mission.nodes.some((n) => n.kind === 'battle' && (n.loot ?? 0) > 0)) withBounty++;
     }
     expect(failures).toEqual([]);
     // The generator covers the interesting cases.
     expect(gated).toBeGreaterThan(CASES / 10);
     expect(withAdvantage).toBeGreaterThan(CASES / 10);
     expect(withDnf).toBeGreaterThan(CASES / 4);
+    expect(partRetreat).toBeGreaterThan(CASES / 10);
+    expect(withBounty).toBeGreaterThan(CASES / 4);
   }, 30_000); // about 3 s alone; the 5 s default is too tight when the whole suite runs in parallel
 });

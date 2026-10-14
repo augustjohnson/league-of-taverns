@@ -229,6 +229,13 @@ engine.
   validator rule. *Default (confirm):* the difficulty report (T7.2) flags a
   mission whose best path doesn't pay at least half its loot in its last
   third, or whose last battle isn't in the last third of its ranks.
+  *Built (2026-10-13):* `lootShape` in `engine/src/missions` computes both,
+  and the mock missions were rewritten to pass it (T5.8). Measured over 200
+  mock seasons (seed `review`, bots always fight): DNFs rose from 15% to 30%
+  of runs, since every path now meets a climax battle, and `cr-greedy`
+  overtook `skill-coverage` for titles (0.33 against 0.20 per seat, from
+  0.23 against 0.36). Bots that pick a retreat order (T9.5) should pull DNFs
+  back down.
 
 **D-46 DNF keeps banked loot: DECIDED (2026-10-11).** Replaces "a DNF scores
 0". Losing a battle ends the mission, and the party keeps the loot banked
@@ -292,7 +299,10 @@ mostly solved by the projection, the mission run free of player choices, and
 the captain and home bonus unable to change a decision. D-12 and D-42 above
 come from the same review.
 
-**D-49 Retreat orders: DECIDED (2026-10-13).** Not built yet.
+**D-49 Retreat orders: DECIDED (2026-10-13).** Built in the engine
+(2026-10-13, T4.7, T6.6): `Lineup.retreat`, `retreatsBeforeBattle`,
+`RunResult.retreatedBefore`, `Projection.pRetreat`, and the
+`verifyResolutions` audit. Bots still always say `never` (T9.5).
 - Each locked lineup carries a **retreat order**, which says when the party
   turns back instead of fighting:
   - `never`: always fight (the default, and today's behaviour).
@@ -311,8 +321,8 @@ come from the same review.
   lineup carries its order over (D-07), and the D-27 fallback uses `never`.
 - *Blocks:* T4.7, T6.6.
 
-**D-50 Battles pay loot: DECIDED (2026-10-13): a bounty on a win.** Not
-built yet. Today a battle banks nothing, and the usual way into one is a
+**D-50 Battles pay loot: DECIDED (2026-10-13): a bounty on a win.** Built
+(2026-10-13, T5.8, T6.6). Before, a battle banks nothing, and the usual way into one is a
 failed check, so one bad roll is punished twice: the check's loot is lost,
 and the party risks a DNF for no reward. Now a battle node may carry `loot`,
 banked on a win. The `haul` validator rule counts it like check loot.
@@ -514,7 +524,9 @@ theme real teeth. *Default:* the schema supports `requires`, the validator
 allows at most one gated check per mission, and the difficulty report flags it.
 *Defaulted (2026-10-13): gates are shortcuts, not walls.* A party with no
 special speeds or senses must still be able to reach the full haul. A gate
-may only open a better or safer route. A validator rule enforces it (T5.8).
+may only open a better or safer route. The `gates` validator rule enforces
+it (built 2026-10-13, T5.8): with every gated check failed, the best path
+must still pay the most.
 
 **D-28 Battle model v0: OPEN.** Spec 05 sketches DPR/eHP time-to-kill,
 logistic-squashed. Questions: party DPR as a sum of members; how to model

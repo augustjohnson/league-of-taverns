@@ -118,7 +118,7 @@
  *   snapshot-dependent checks (`encounter.ref`, `encounter.budget`) are the
  *   reveal script's.
  * - `mission.resolved`: the counts and the loot (the `loot` of each passed
- *   check node) are recomputed from the recorded nodes, and the score must
+ *   check node and won battle node) are recomputed from the recorded nodes, and the score must
  *   equal `lootScore(loot, missionHaul(mission))`, DNF or not, to within
  *   1e-9. Everything else (path, d20s, points) is audited by
  *   `verifyResolutions`, which reports instead of throwing.
@@ -529,7 +529,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
         `nodes record ${passed}/${checks.length} checks, run says ${run.checksPassed}/${run.checksAttempted}`,
       );
     }
-    const loot = lootOf(mission, checks);
+    const loot = lootOf(mission, run.nodes);
     if (loot !== run.loot) fail(event, 'resolve.score_mismatch', `nodes bank ${loot} loot, run says ${run.loot}`);
     const expected = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - expected) > 1e-9) fail(event, 'resolve.score_mismatch', `score ${run.score} should be ${expected}`);
@@ -707,13 +707,14 @@ function release(state: Pick<LeagueState, 'owner' | 'taverns'>, tavern: string, 
   };
 }
 
-/** Loot banked by the passed checks among `records`: each one's node `loot` in `mission`. */
+/** Loot banked by the passed checks and won battles among `records`: each one's node `loot` in `mission` (D-45, D-50). */
 function lootOf(mission: Mission, records: ReadonlyArray<{ readonly node: string; readonly outcome: string }>): number {
   let loot = 0;
   for (const record of records) {
-    if (record.outcome !== 'pass') continue;
+    if (record.outcome !== 'pass' && record.outcome !== 'win') continue;
     const node = mission.nodes.find((n) => n.id === record.node);
-    if (node?.kind === 'check') loot += node.loot;
+    if (node?.kind === 'check' && record.outcome === 'pass') loot += node.loot;
+    if (node?.kind === 'battle' && record.outcome === 'win') loot += node.loot ?? 0;
   }
   return loot;
 }
