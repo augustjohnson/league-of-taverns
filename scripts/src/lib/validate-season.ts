@@ -18,6 +18,9 @@
  *   against the mission actually selected for each week.
  * - Images (D-10): pooled characters' portraits and the season's mission
  *   covers are the style's size and palette (./images/check.ts).
+ * - Gods (D-52): every tavern's god has a gods/<id>/god.yaml beside the
+ *   season's characters/, and no two gods in the season share a banner
+ *   `mark`, so every tavern keeps its own colour.
  *
  * Not yet: chrome coverage and lints (T8.x).
  */
@@ -27,9 +30,9 @@ import type { Mission, MissionRules } from '@league-of-taverns/engine';
 import { checkSeasonImages } from './images/check';
 import { creatureSize } from './images/style';
 import { ValidationFailure } from './main';
-import { REPO_ROOT, displayPath, loadMission } from './repo';
+import { REPO_ROOT, displayPath, loadGodChrome, loadMission } from './repo';
 import type { RepoRoot } from './repo';
-import { isSpellcaster, loadSeason, missionFiles, snapshotCrIndex } from './season';
+import { charactersRootDir, isSpellcaster, loadSeason, missionFiles, snapshotCrIndex } from './season';
 import type { LoadedSeason, MissionStatus, SeasonSource } from './season';
 
 export interface SeasonReport {
@@ -130,6 +133,20 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
     return { id: ref.id, size: record === undefined ? undefined : creatureSize(record.size) };
   });
   issues.push(...checkSeasonImages(season, portraits, root));
+
+  const godsRoot = charactersRootDir(season, root);
+  const markOwner = new Map<string, string>();
+  for (const { god } of schedule.taverns) {
+    try {
+      const { mark } = loadGodChrome(god, godsRoot).banner;
+      const other = markOwner.get(mark);
+      if (other === undefined) markOwner.set(mark, god);
+      else issues.push(`${scheduleLabel}: gods "${other}" and "${god}" share the banner mark ${mark}: give each tavern its own colour`);
+    } catch (error) {
+      if (!(error instanceof ValidationFailure)) throw error;
+      issues.push(...error.message.split('\n'));
+    }
+  }
 
   return {
     issues,

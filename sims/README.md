@@ -121,8 +121,9 @@ open. The tabs:
 How it is built: `src/build-playground.ts` loads the season with the scripts
 loaders (`loadMockSeasonParts`), serializes it with `serializeSeason`
 (`src/playground/data.ts`: the config, schedule, taverns, pool, missions,
-only the snapshot records used, and each pooled character's chrome name for
-display; names never reach the engine), bundles `src/playground/app.ts` with esbuild
+only the snapshot records used, each pooled character's chrome name, and each
+sponsoring god's chrome (name, call and banner) for display; chrome never
+reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI
 uses, so a seed gives the same season, byte for byte: the engine avoids

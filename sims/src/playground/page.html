@@ -25,6 +25,9 @@
   --radius: 4px;
   /* Series colours, one per tavern in managers-file order (validated for CVD separation in both themes). */
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  /* Banner theme dials (see Banners below): how much of a god's pale field and charge show, and the OKLCH lightness
+     range for its mark as a line and as text. Light: fields at full strength, text dark enough to read on them. */
+  --bn-fill: 100%; --bn-tex: 100%; --bn-shade: 14%; --bn-line-lo: 0; --bn-ink-lo: 0; --bn-ink-hi: 0.42;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -43,6 +46,7 @@
     --bad-soft: #3c1f1a;
     --node: #1e2a25;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --bn-fill: 14%; --bn-tex: 34%; --bn-shade: 0%; --bn-line-lo: 0.66; --bn-ink-lo: 0.84; --bn-ink-hi: 1;
     color-scheme: dark;
   }
 }
@@ -62,6 +66,7 @@
   --bad-soft: #3c1f1a;
   --node: #1e2a25;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --bn-fill: 14%; --bn-tex: 34%; --bn-shade: 0%; --bn-line-lo: 0.66; --bn-ink-lo: 0.84; --bn-ink-hi: 1;
   color-scheme: dark;
 }
 
@@ -262,6 +267,45 @@ td.flow { white-space: normal; }
 .kv .v.muted { color: var(--muted); }
 #run-error.off-tab { display: none; }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+
+/* Banners: each tavern fights under its god's colours (gods/<id>/god.yaml). The page adds one generated rule per god
+   (view.ts bannerCss) setting --banner-field, --banner-charge, --banner-mark and --banner-pattern on
+   [data-banner="<god>"]; everything below is shared, so no god has CSS of its own. Field and charge are pale fills and
+   never carry text; the mark is the strong colour, clamped by the --bn-* dials into a line colour and a text colour.
+   Banners never stand in for pass, fail or brass. */
+[data-banner] {
+  --banner-bg: color-mix(in oklch, var(--banner-field) var(--bn-fill), var(--surface));
+  /* The ground a texture sits on: in the light theme the field a shade darker, so a pale charge still shows on a pale field
+     whatever its hue. */
+  --banner-ground: color-mix(in oklch, var(--banner-bg), var(--ink) var(--bn-shade));
+  --banner-tex: color-mix(in oklch, var(--banner-charge) var(--bn-tex), var(--surface));
+  --banner-line: oklch(from var(--banner-mark) clamp(var(--bn-line-lo), l, 1) c h);
+  --banner-ink: oklch(from var(--banner-mark) clamp(var(--bn-ink-lo), l, var(--bn-ink-hi)) c h);
+  /* The texture vocabulary (BANNER_TEXTURES in scripts/src/lib/god-schema.ts), drawn in --banner-tex. Large surfaces only, never behind numbers. */
+  --tex-rain: repeating-linear-gradient(112deg, var(--banner-tex) 0 2.5px, transparent 2.5px 11px);
+  --tex-waves: radial-gradient(circle at 50% 100%, transparent 4.5px, var(--banner-tex) 5px 7px, transparent 7.5px) 0 0 / 16px 9px,
+    radial-gradient(circle at 50% 100%, transparent 4.5px, var(--banner-tex) 5px 7px, transparent 7.5px) 8px 4.5px / 16px 9px;
+  --tex-thorns: linear-gradient(135deg, var(--banner-tex) 25%, transparent 25%) -6px 0 / 12px 12px,
+    linear-gradient(225deg, var(--banner-tex) 25%, transparent 25%) -6px 0 / 12px 12px;
+  --tex-stipple: radial-gradient(var(--banner-tex) 1.6px, transparent 2.1px) 0 0 / 9px 9px,
+    radial-gradient(var(--banner-tex) 1.2px, transparent 1.7px) 4.5px 4.5px / 9px 9px;
+  --tex-crosshatch: repeating-linear-gradient(45deg, var(--banner-tex) 0 1.5px, transparent 1.5px 9px),
+    repeating-linear-gradient(-45deg, var(--banner-tex) 0 1.5px, transparent 1.5px 9px);
+  --tex-rays: repeating-conic-gradient(from -90deg at 50% 120%, var(--banner-tex) 0 4deg, transparent 4deg 13deg);
+}
+/* Your tavern's card: the god's field, a textured pennant along the top, and its call. */
+.card.banner-card { background: var(--banner-bg); border-color: color-mix(in oklch, var(--banner-line) 40%, var(--line)); padding-top: 0; }
+.banner-card .pennant { height: 22px; margin-inline: -14px; background: var(--banner-pattern), var(--banner-ground); border-bottom: 2px solid var(--banner-line); }
+.banner-card h2 { color: var(--banner-ink); }
+.banner-call { font-family: var(--font-display); font-size: 1.05rem; color: var(--banner-ink); }
+.banner-call .label { font-family: var(--font-ui); color: var(--banner-ink); margin-right: 6px; }
+.tag.banner { border-color: var(--banner-line); color: var(--banner-ink); background: var(--banner-bg); }
+/* A small flag: the banner at swatch size, for any tavern. */
+.flag { display: inline-block; width: 28px; height: 18px; border-radius: 2px; vertical-align: middle; background: var(--banner-pattern), var(--banner-ground); border-left: 5px solid var(--banner-line); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--banner-line) 35%, transparent); }
+.god-name { color: var(--banner-ink); font-weight: 600; }
+/* Your tavern's row in any table. */
+tr.mine[data-banner] td { background: var(--banner-bg); }
+tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-line); }
 </style>
 
 <div class="wrap">

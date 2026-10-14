@@ -9,6 +9,8 @@ import { loadMockSeason, loadMockSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
 import {
+  bannerCss,
+  bannerGods,
   draftBoard,
   formatCr,
   formatCrTotal,
@@ -167,13 +169,37 @@ describe('view helpers', () => {
   });
 });
 
+describe('banner stylesheet', () => {
+  const crow = { name: 'The Storm Crow', banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: 'rain' as const } };
+
+  it('sets each god\'s colours and texture as custom properties, and its mark on :root', () => {
+    expect(bannerCss({ 'the-storm-crow': crow }).split('\n')).toEqual([
+      ':root{--mark-the-storm-crow:#2a78d6}',
+      '[data-banner="the-storm-crow"]{--banner-field:#d4e6f7;--banner-charge:#f5e9a8;--banner-mark:#2a78d6;--banner-pattern:var(--tex-rain)}',
+    ]);
+  });
+
+  it('skips a god whose id or colours could break out of the stylesheet', () => {
+    const gods = {
+      'the-storm-crow': crow,
+      'bad"]{x:y}': crow,
+      'the-red-one': { ...crow, banner: { ...crow.banner, mark: 'red;}body{display:none' } },
+    };
+    expect([...bannerGods(gods)]).toEqual(['the-storm-crow']);
+    expect(bannerCss(gods)).not.toMatch(/bad|red|display/);
+  });
+});
+
 describe('playground build', () => {
   const dir = mkdtempSync(join(tmpdir(), 'lot-playground-'));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   it('writes one self-contained Artifact body', async () => {
     const out = join(dir, 'index.html');
-    const { bytes } = await writePlayground(out);
+    const { bytes, data: built } = await writePlayground(out);
+    // Every sponsoring god's chrome rides along for the banners.
+    expect(Object.keys(built.gods).sort()).toEqual(parts.sponsors.map((sp) => sp.id).sort());
+    expect(bannerGods(built.gods).size).toBe(parts.sponsors.length);
     const html = readFileSync(out, 'utf8');
     expect(html.startsWith('<title>League of Taverns Playground</title>')).toBe(true);
     expect(html).not.toMatch(/<(html|head|body)\b|<!doctype/i);

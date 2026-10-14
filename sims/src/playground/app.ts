@@ -63,6 +63,8 @@ import { seasonInputFromData, type PlaygroundData } from './data';
 import {
   actorLabel,
   aggregateRows,
+  bannerCss,
+  bannerGods,
   checkLabel,
   draftBoard,
   eventSummary,
@@ -114,6 +116,26 @@ const tavernName = (id: string): string => tavernById.get(id)?.name ?? id;
 const botOf = (id: string): string => run?.result.summary.taverns.find((t) => t.tavern === id)?.bot ?? '?';
 const managerBot = (id: string): string => input.managers.find((m) => m.id === id)?.bot ?? '?';
 const layouts = new Map<number, GraphLayout>(WEEKS.map((w) => [w, layoutMission(missionOf(w))]));
+
+// Banners: each tavern fights under its god's colours (chrome from gods/<id>/god.yaml). One generated rule per god sets
+// its colours as custom properties; page.html § Banners does the rest.
+const godOf = new Map(input.sponsors.map((s) => [s.tavern, s.id]));
+const BANNERED = bannerGods(data.gods);
+const bannerStyle = document.createElement('style');
+bannerStyle.textContent = bannerCss(data.gods);
+document.head.append(bannerStyle);
+/** The god whose banner a tavern fights under, if its god has one. */
+const bannerOf = (tavern: string): string | null => {
+  const god = godOf.get(tavern);
+  return god !== undefined && BANNERED.has(god) ? god : null;
+};
+/** ` data-banner="<god>"` for a tavern with a banner, else nothing. */
+const bannerAttr = (tavern: string): string => {
+  const god = bannerOf(tavern);
+  return god === null ? '' : ` data-banner="${esc(god)}"`;
+};
+/** A god's display name (chrome), else its id. */
+const godName = (god: string): string => data.gods[god]?.name ?? god;
 
 function missionOf(week: number): Mission {
   const m = input.missions.get(week);
@@ -480,7 +502,7 @@ function renderStandings(r: Run): string {
   const rows = summary.standings
     .map(
       (s) =>
-        `<tr class="${s.rank === 1 ? 'champ' : ''}"><td class="n">${s.rank}</td><td><b>${esc(tavernName(s.tavern))}</b></td>` +
+        `<tr class="${s.rank === 1 ? 'champ' : ''}${s.bot === 'human' ? ' mine' : ''}"${s.bot === 'human' ? bannerAttr(s.tavern) : ''}><td class="n">${s.rank}</td><td><b>${esc(tavernName(s.tavern))}</b></td>` +
         `<td><span class="tag">${esc(s.bot)}</span></td><td class="n"><b>${s.points}</b></td>${weekly(s.tavern)}</tr>`,
     )
     .join('');
@@ -548,8 +570,14 @@ function reportsOf(r: Run): Reports {
   return rep;
 }
 
-/** Each tavern's series colour (`--s1`…`--s8`), fixed by package order so it never follows rank. */
+/**
+ * Each tavern's series colour: its god's banner mark, lightened in the dark theme as banner lines are, so a tavern is
+ * the same colour in every table and chart. A tavern without a banner falls back to `--s1`…`--s8` by package order.
+ * Never follows rank.
+ */
 function seriesVar(tavern: string): string {
+  const god = bannerOf(tavern);
+  if (god !== null) return `oklch(from var(--mark-${god}) clamp(var(--bn-line-lo), l, 1) c h)`;
   const i = input.taverns.findIndex((t) => t.id === tavern);
   return `var(--s${(i < 0 ? 0 : i % 8) + 1})`;
 }
@@ -1648,9 +1676,17 @@ function playHeader(s: SeasonSession): string {
     ? `<span class="small" role="alert">Abandon this season? Your draft and results will be lost.</span>` +
       `<button type="button" class="small" data-action="play-reset-confirm">Abandon season</button><button type="button" class="primary small" data-action="play-reset-cancel">Keep playing</button>`
     : `<button type="button" data-action="play-reset">New season</button>`;
+  // Once you hold a tavern, the card flies its god's banner and carries the god's call.
+  const god = me === null ? null : bannerOf(me);
+  const chrome = god === null ? undefined : data.gods[god];
+  const call =
+    chrome === undefined
+      ? ''
+      : `<p class="banner-call"><span class="label">${esc(chrome.name)}</span> ${esc(chrome.call ?? `You fight under the banner of ${chrome.name}.`)}</p>`;
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><div class="row"><h2>${me === null ? 'No tavern yet' : esc(tavernName(me))}</h2><span class="tag brass">you</span>` +
-    `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}${reset}</div></div></section>`
+    `<section class="card${chrome === undefined ? '' : ' banner-card'}"${me === null ? '' : bannerAttr(me)}>${chrome === undefined ? '' : '<div class="pennant" aria-hidden="true"></div>'}` +
+    `<div class="row" style="justify-content:space-between"><div class="row"><h2>${me === null ? 'No tavern yet' : esc(tavernName(me))}</h2><span class="tag ${chrome === undefined ? 'brass' : 'banner'}">you</span>` +
+    `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}${reset}</div></div>${call}</section>`
   );
 }
 
@@ -1670,18 +1706,23 @@ function renderPlayTavernPick(s: SeasonSession): string {
   const rows = input.taverns
     .map((t) => {
       const owner = s.state.taverns.get(t.id)?.managerId;
-      const god = s.state.sponsors.find((sp) => sp.tavern === t.id)?.id ?? '—';
+      const god = s.state.sponsors.find((sp) => sp.tavern === t.id)?.id;
       const week = weekOf(t.id);
       const action = open.has(t.id)
         ? `<button type="button" class="${t.id === advice ? 'primary ' : ''}small" data-action="play-tavern-pick" data-id="${esc(t.id)}">Choose</button>`
         : `<span class="muted small">${esc(owner ?? '')}</span>`;
-      return `<tr class="${open.has(t.id) ? '' : 'muted'}"><td>${action}</td><td><b>${esc(t.name)}</b></td><td class="small">${esc(god)}</td><td class="n small">${week ?? '—'}</td></tr>`;
+      const banner = bannerOf(t.id);
+      const flag = banner === null ? '' : `<i class="flag" aria-hidden="true"></i> `;
+      return (
+        `<tr class="${open.has(t.id) ? '' : 'muted'}"${bannerAttr(t.id)}><td>${action}</td><td>${flag}<b>${esc(t.name)}</b></td>` +
+        `<td class="small"><span class="${banner === null ? '' : 'god-name'}">${god === undefined ? '—' : esc(godName(god))}</span></td><td class="n small">${week ?? '—'}</td></tr>`
+      );
     })
     .join('');
   const order = [...s.state.draft.managerOrder];
   return (
     `<section class="card"><div class="row" style="justify-content:space-between"><h2>Choose your tavern</h2><span class="muted small">reverse draft order: whoever drafts last chooses first</span></div>` +
-    `<p class="small">Every tavern is already blessed by one god, who sets one week's mission. Boons and hexes come later (D-52); for now the taverns differ only in their god's week.</p>` +
+    `<p class="small">Every tavern is already blessed by one god, who sets one week's mission, and fights under that god's banner. Boons and hexes come later (D-52); for now the taverns differ only in their god's week.</p>` +
     `<div class="scroll"><table><thead><tr><th></th><th>tavern</th><th>god</th><th class="n">god's week</th></tr></thead><tbody>${rows}</tbody></table></div>` +
     (order.length === 0 ? '' : `<p class="hint">Draft order: ${order.map((m) => esc(m === s.human?.manager ? 'you' : m)).join(' → ')}.</p>`) +
     `</section>`
@@ -1879,7 +1920,7 @@ function renderPlayResult(s: SeasonSession, week: number): string {
   const others = table
     .map(
       (r) =>
-        `<tr class="${r.tavern === me ? 'sel' : ''}"><td class="n">${r.rank}</td><td><span class="${r.rank === 1 ? 'win' : ''}">${esc(tavernName(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
+        `<tr class="${r.tavern === me ? 'sel mine' : ''}"${r.tavern === me ? bannerAttr(me) : ''}><td class="n">${r.rank}</td><td><span class="${r.rank === 1 ? 'win' : ''}">${esc(tavernName(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
   const claimed = new Map(s.events.flatMap((e) => (e.type === 'waiver.claimed' ? [[e.payload.claim, e.payload] as const] : [])));
@@ -1914,8 +1955,8 @@ function renderPlayStandings(s: SeasonSession): string {
   const body = rows
     .map(
       (r) =>
-        `<tr class="${r.tavern === me ? 'sel' : ''} ${done && r.rank === 1 ? 'champ' : ''}"><td class="n">${r.rank}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
-        `<td><span class="tag ${r.tavern === me ? 'brass' : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
+        `<tr class="${r.tavern === me ? 'sel mine' : ''} ${done && r.rank === 1 ? 'champ' : ''}"${r.tavern === me ? bannerAttr(me) : ''}><td class="n">${r.rank}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
+        `<td><span class="tag ${r.tavern === me ? (bannerOf(me) === null ? 'brass' : 'banner') : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
   const champs = rows.filter((r) => r.rank === 1).map((r) => r.tavern);

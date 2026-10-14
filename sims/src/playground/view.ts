@@ -1,7 +1,7 @@
 /**
  * Pure view-model helpers for the playground: mission graph layout, score
- * histograms, Monte Carlo sampling, the draft board, and
- * the small formatters the page uses. No DOM, so tests run them in Node.
+ * histograms, Monte Carlo sampling, the draft board, the banner stylesheet,
+ * and the small formatters the page uses. No DOM, so tests run them in Node.
  */
 import { SKILLS, replay, retreatOptions, runMission, rngFor } from '@league-of-taverns/engine';
 import type {
@@ -20,6 +20,7 @@ import type {
   RunOptions,
   Skill,
 } from '@league-of-taverns/engine';
+import type { GodChrome } from '@league-of-taverns/scripts/lib/god-schema';
 import type { Aggregate } from '../season-runner';
 
 // ── mission graph layout ───────────────────────────────────────────────────
@@ -430,4 +431,40 @@ const SEED_NOUNS = ['ale', 'anvil', 'barrel', 'candle', 'flagon', 'goblet', 'hea
 export function seedWords(rand: () => number): string {
   const pick = <T>(list: ReadonlyArray<T>): T => list[Math.floor(rand() * list.length)]!;
   return `${pick(SEED_ADJECTIVES)}-${pick(SEED_NOUNS)}-${Math.floor(rand() * 100)}`;
+}
+
+// ── banners ────────────────────────────────────────────────────────────────
+
+const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const HEX = /^#[0-9a-f]{6}$/;
+
+/**
+ * The gods that get a banner: those whose id, colours and texture name are
+ * well formed. The build validates every god file; this keeps a bad value
+ * out of a selector or a style attribute all the same.
+ */
+export function bannerGods(gods: Readonly<Record<string, GodChrome>>): ReadonlySet<string> {
+  return new Set(
+    Object.entries(gods)
+      .filter(([god, { banner: b }]) => KEBAB.test(god) && HEX.test(b.field) && HEX.test(b.charge) && HEX.test(b.mark) && KEBAB.test(b.texture))
+      .map(([god]) => god),
+  );
+}
+
+/**
+ * The banner stylesheet: per god, its mark as `--mark-<god>` on :root (for
+ * swatches and chart lines anywhere) and, on `[data-banner="<god>"]`, its
+ * colours and texture as custom properties. page.html § Banners turns those
+ * into every banner surface, so no god has CSS of its own. Only `bannerGods`.
+ */
+export function bannerCss(gods: Readonly<Record<string, GodChrome>>): string {
+  return [...bannerGods(gods)]
+    .map((god) => {
+      const b = gods[god]!.banner;
+      return (
+        `:root{--mark-${god}:${b.mark}}\n` +
+        `[data-banner="${god}"]{--banner-field:${b.field};--banner-charge:${b.charge};--banner-mark:${b.mark};--banner-pattern:var(--tex-${b.texture})}`
+      );
+    })
+    .join('\n');
 }
