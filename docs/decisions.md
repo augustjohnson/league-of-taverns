@@ -17,19 +17,29 @@ but confirm it), **DECIDED**.
 
 ### League format
 
-**D-01 Ownership: OPEN.** Exclusive (one tavern per character) or shared
-(several taverns may roster the same character, as in salary-cap fantasy).
-*Default:* exclusive. *Note:* with exclusive ownership, a pool of 64 and a
+**D-01 Ownership: DEFAULTED (2026-10-13): exclusive.** Exclusive (one tavern
+per character) or shared (several taverns may roster the same character, as
+in salary-cap fantasy). *Default:* exclusive. *Hard cap (decided
+2026-10-13):* a league has at most **6 taverns**. With rosters of 7 the
+draft takes 42 characters, which leaves about 22 free agents from a pool of
+64 for waivers and injury cover (D-51). With 6 gods (D-48, D-52) the season
+is always 6 weeks. *Note:* with exclusive ownership, a pool of 64 and a
 roster of 7, at most 9 taverns fit (63 characters), and waivers only work if
 some characters go undrafted. Size the pool to about taverns × 7 + 10.
 *Blocks:* nothing (T4.1 implements exclusive).
 
 **D-02 Draft format: DEFAULTED.** Snake vs auction (CR as salary suggests an
-auction could work) vs linear. *Default:* snake, seeded order.
+auction could work) vs linear. *Default:* snake, seeded order. Reconfirmed
+for Season 1 (2026-10-13): an auction run through public issue forms would be
+slow, and every bid would be visible.
 
 **D-03 Roster and bench size: DEFAULTED.** Roster of 7, 4 starters, 3 bench.
 With 6 weeks and no injuries, the bench matters only through environment fit
 and the budget. Confirm with sims (T9.3: how often is the bench used?).
+*Measured (2026-10-13, 300 mock seasons, seed `review`):* the bench is used.
+Lineups swap about 1.15 of 4 starters a week, and most taverns field 6 to 8
+different starters over a season (waiver pickups included). Injuries (D-51)
+will lean on the bench more.
 
 **D-04 Matchups and playoffs: DECIDED (2026-10-11): a league table.** No
 matchups. Standings rank taverns by total loot over the season, and there
@@ -40,9 +50,18 @@ earlier default and is removed from the engine, config and sims.
 - Placement points per week (capping one blowout week) were considered and
   not chosen.
 
-**D-05 Waivers: DEFAULTED.** Rolling priority (winner moves to the back),
-initial order reverse draft. Alternatives: a fixed reverse-standings order, or
-a FAAB budget in CR units.
+**D-05 Waivers: DECIDED (2026-10-13): reverse standings.** Not built yet
+(`waivers.priority` only accepts `rolling` today).
+- Each waiver window, claims are tried in reverse order of the current
+  standings: the lowest tavern on the table goes first. Ties on the table go
+  to reverse draft order. Winning a claim doesn't move a tavern; the order is
+  rebuilt from the standings every week.
+- Why: a catch-up lever, and it pairs with injuries (D-51). A trailing, hurt
+  tavern gets first look at replacements.
+- *Not chosen:* rolling priority (the old default: initial order reverse
+  draft, and a tavern that wins a claim moves to the back); blind bidding
+  from a season budget, because issue forms are public (D-24), so bids would
+  need sealed commitments.
 
 **D-06 Trades: DEFAULTED.** Proposal by form, `/accept` by the counterparty,
 24 h commissioner veto window, deadline after week 4. *Sub-question:* are
@@ -55,20 +74,36 @@ slot, which leaves the giver one short until it claims a free agent.
 **D-07 Missed lineup: DEFAULTED.** Last week's lineup carries over. See D-27
 for the fallback.
 
-**D-12 Captain's mechanical role: OPEN.** The brief requires a captain but
-gives it no effect. Options:
-(a) cosmetic only, plus first in the best-fit tiebreak (*default*);
-(b) the captain's checks get advantage, or +2;
-(c) the captain must make every check of one chosen type;
-(d) points ×1.5 when the captain is the actor on a passed check;
-(e) the captain's CR counts double against B (a star tax).
-This changes lineup strategy a lot, so decide before T9 balance work.
-*Blocks:* T6.1 final form, T9.3.
+**D-12 Captain's mechanical role: DECIDED (2026-10-13): no captain.** Not
+built yet (lineups still carry an inert `captain` field).
+- A party is four starters. There is no captain: no control, no tiebreak
+  role, no story token.
+- Why: a 2026-10-13 game-flow review found the inert captain to be a red
+  herring (a "Make captain" control that changes nothing). Giving captains a
+  strength and a weakness was decided earlier the same day and then
+  withdrawn: with boons and hexes (D-52) and a home bonus, the game was
+  layering three custom concepts that all meant "a bonus or penalty on some
+  checks." D-52 keeps one, at the tavern level.
+- What captains were also meant to do, giving taverns different draft
+  shapes against the dominant `skill-coverage` strategy, now falls to boons.
+  The sims have to show it (T9.4).
+- This departs from the original brief, which required a captain.
+- *Earlier options, kept for reference:* (a) cosmetic only, plus first in the
+  best-fit tiebreak (the scaffold default); (b) the captain's checks get
+  advantage, or +2; (c) the captain must make every check of one chosen type;
+  (d) points ×1.5 when the captain is the actor on a passed check; (e) the
+  captain's CR counts double against B; (f) about 8 captain-eligible
+  characters, each with a strength and a weakness (decided and withdrawn
+  2026-10-13).
+- *Blocks:* T4.7, T9.3.
 
 **D-14 Points scale and ties: SUPERSEDED by D-45 and D-04 (2026-10-11).**
 Score is now loot, not a ratio, and with no matchups there are no weekly
 ties to break. `scoring.tiebreakers` is removed: equal season totals share a
-rank, and a tie for first gives co-champions. *Still open:* whether to add
+rank, and a tie for first gives co-champions. *Defaulted (2026-10-13):* a
+tie for first at season end goes to the tavern with fewer DNFs over the
+season, and co-champions only if that is tied too. Ties for first are rare
+(5 in 300 mock seasons). *Earlier open question:* whether to add
 a tiebreak at season end only (for example a seeded coin) so there is always
 one champion. The original text follows. Score is a fraction with small
 denominators (about 3–6 checks), so many taverns land on the same values
@@ -86,14 +121,17 @@ then the allies in lineup order. Ties are common because many monsters share
 ability modifiers. The rule decides who appears as `{actor}` in the story, and
 which advantage applies if only one of the tied starters has it. *Note:* with
 advantage in play, prefer the tied starter who has advantage, since that's
-strictly better for the party. T6.1 implements this.
+strictly better for the party. T6.1 implements this. With no captain
+(D-12), ties go to lineup order alone.
 
 **D-26 Draft pick timeout: DEFAULTED.** 24 h, then autopick with the `value`
 bot. Alternatives: skip (pick later), or wait indefinitely.
 
 **D-27 Fallback when the carried lineup is illegal: DEFAULTED.** Use the legal
 lineup with the highest total CR, ties broken by roster draft order, with the
-first-drafted as captain. If none is legal: no lineup, 0 points.
+first-drafted as captain. If none is legal: no lineup, 0 points. With no
+captain (D-12) the fallback names none, and its retreat order is `never`
+(D-49).
 
 **D-36 Bot seats in a live league: OPEN.** Can a bot manager fill an empty
 tavern? *Default:* sims only. Allowing it is cheap: bots already emit the same
@@ -114,14 +152,36 @@ to 8, plenty for a pool of about 64. *Defaults (confirm):* no spellcasters in
 encounters, at most 4 in the pool. Both are per-season config limits. Tasks:
 T1.5, T3.7, T5.6.
 
-**D-42 Public missions and pre-lock projections: OPEN (new, 2026-10-10).**
-With missions open (D-08), managers can read each week's structure, and anyone
-with the engine can compute exact projected points for every lineup before the
-lock. Lineup choice becomes an optimization problem, and only the real roll
-(D-13) adds variance. Options: (a) embrace it and publish a projection tool;
-(b) publish each mission only at its week's lock; (c) publish structure but
-hide DCs until the run. *Default:* (a), pending sims (T9.3) on how much skill
-vs luck decides weeks.
+**D-42 Public missions and pre-lock projections: DECIDED (2026-10-13): open,
+plus keywords.** Missions stay open (D-08 unchanged), and anyone can still
+compute exact projected points for every lineup before the lock. Each
+schedule entry gains a **keyword description** next to its title,
+environment and theme: a short list of what the mission tests (skills, saves,
+gates, the lead creature of each battle), for example
+`[survival, stealth, athletics, con save, crocodile fight, lizardfolk fight]`.
+Not built yet.
+- Why keywords: they are the readable summary for managers who won't open
+  mission YAML, and the vocabulary a hex (D-52) and environment fit are
+  judged against.
+- *Defaults (confirm):* keywords are authored in `schedule.yaml` by the GM.
+  `lock-check` (T8.4) rejects a keyword that names nothing in the mission (no
+  red herrings). The GM may leave things out.
+- *Accepted cost:* the weekly lineup stays largely solvable. A 2026-10-13
+  measurement (300 mock seasons, seed `review`) put optimizing the lineup at
+  +4.7 points a week (the `value` bot at 59.4 against `projection-off` at
+  54.7, same draft), against a week-to-week dice swing of about ±32 points
+  (standard deviation of points minus projection). Depth is expected to come
+  from boons and hexes (D-52), retreat orders (D-49) and the draft.
+- *Conflict to settle:* the boon candidate "see the mission before setting a
+  lineup" (D-52) only means something if missions are hidden until the lock.
+  If that boon survives playtesting, this decision and D-08 reopen: missions
+  revealed to everyone at the lock, and the boon holder may change its lineup
+  after the reveal. Sims and the playground can test it with no secrecy.
+- *Options not chosen:* (b) publish each mission only at its week's lock
+  (needs D-08 secrecy back); (c) publish structure but hide DCs until the run
+  (knowing which skills are tested is most of the information); rumors only,
+  with the full mission encrypted until the lock.
+- *Blocks:* T5.7.
 
 **D-40 Roster-level CR cap: DEFAULTED.** None. B applies only to starters.
 Without a roster cap, drafting all high-CR characters is legal, but you can
@@ -135,7 +195,8 @@ engine.
 
 **D-44 Story frame: DECIDED (2026-10-11).**
 - Managers play barkeeps, each pushed around by a different god.
-- Each god sponsors one tavern and sets one mission.
+- Each god sponsors one tavern and sets one mission. The god chose the
+  tavern; managers pick a tavern that is already blessed (D-52).
 - The draft is recruitment night.
 - Story-shaped rules are allowed if they treat every tavern the same over a
   season.
@@ -156,8 +217,14 @@ engine.
   the `haul` validator rule, and `missionHaul`. Score = loot ÷ haul in
   `resolution/` and `projection/`, and the reducers and `verifyResolutions`
   check `run.loot`.
-- *Open:* the haul amount, and how loot is spread across a path. Rising loot
-  late in the path is an idea (lore.md).
+- *Open:* the haul amount.
+- *Loot shape, decided (2026-10-13): rising loot, late climax.* Missions are
+  authored so loot grows along each path and the biggest battle sits near the
+  end. A DNF then costs about half the haul, retreat orders (D-49) matter, and
+  the reveal builds to a peak. This is an authoring rule, not a hard
+  validator rule. *Default (confirm):* the difficulty report (T7.2) flags a
+  mission whose best path doesn't pay at least half its loot in its last
+  third, or whose last battle isn't in the last third of its ranks.
 
 **D-46 DNF keeps banked loot: DECIDED (2026-10-11).** Replaces "a DNF scores
 0". Losing a battle ends the mission, and the party keeps the loot banked
@@ -170,7 +237,9 @@ Re-run on the mock missions (same seed): DNFs stay at 20%, and runs scoring
 missions' battles come early, so a DNF has banked little. Late battles and
 rising loot (lore.md) are the levers for cutting it further.
 
-**D-47 Home bonus ×1.25: DECIDED (2026-10-11).** On its sponsor's mission, a
+**D-47 Home bonus: DROPPED (2026-10-13), was ×1.25.** Season 1 sets
+`scoring.homeBonus: 1` (off). The engine support stays, so it can come back
+by config. The original entry follows. On its sponsor's mission, a
 tavern's loot is multiplied by 1.25.
 - Mock sims, old scoring: the home tavern beat a given rival about 61% of the
   time (NFL home teams win about 57%) and topped its week about 34% of the
@@ -191,6 +260,11 @@ tavern's loot is multiplied by 1.25.
   `config.yaml` sets `scoring.homeBonus` (1 turns it off). The engine only
   applies it: `runPoints` and `projectedPoints` multiply at home, and
   `verifyResolutions` audits it.
+- *Dropped (2026-10-13).* A multiplier on every lineup never changes which
+  lineup is best, so the bonus added standings noise without adding a
+  decision. A "home blessing" (name a skill, get advantage on the home week)
+  was decided and withdrawn the same day, to keep custom concepts to boons
+  and hexes (D-52). Each god still sets one week's mission (D-48), as story.
 
 **D-48 One mission per sponsor: DECIDED (2026-10-11).** The season has as many
 weeks as taverns, and each week is one sponsor's mission.
@@ -204,6 +278,130 @@ weeks as taverns, and each week is one sponsor's mission.
   `sponsor: null` is allowed (room for the mystery mission). That every
   tavern gets exactly one week is not enforced yet; lock-check (T8.4) is
   the place for it.
+
+### Game flow (2026-10-13)
+
+From a review of the weekly loop against Lostgarden's "game mechanics as
+learning loops" framing: a mechanic should give the player an action, legible
+feedback and something left to learn. The review found the weekly lineup
+mostly solved by the projection, the mission run free of player choices, and
+the captain and home bonus unable to change a decision. D-12 and D-42 above
+come from the same review.
+
+**D-49 Retreat orders: DECIDED (2026-10-13).** Not built yet.
+- Each locked lineup carries a **retreat order**, which says when the party
+  turns back instead of fighting:
+  - `never`: always fight (the default, and today's behaviour).
+  - `avoid_battles`: turn back before any battle.
+  - `bank: N`: turn back before a battle once at least N loot is banked.
+- The order is checked only when the party is about to enter a battle node.
+  Checks carry no DNF risk, so turning back before one can never help.
+- Turning back ends the mission and keeps the banked loot. It is not a DNF.
+- Why: the run had no player choices. Push-your-luck gives a risk decision
+  whose right answer depends on the standings as well as the expectation. A
+  tavern that is behind late in the season has a reason to say `never`.
+- The projection stays exact: propagation state becomes (node, loot banked),
+  which is finite. The projection reports the expectation for every order,
+  so the choice is informed, not solved.
+- *Defaults (confirm):* `N` is a multiple of 10, up to the haul. A missed
+  lineup carries its order over (D-07), and the D-27 fallback uses `never`.
+- *Blocks:* T4.7, T6.6.
+
+**D-50 Battles pay loot: DECIDED (2026-10-13): a bounty on a win.** Not
+built yet. Today a battle banks nothing, and the usual way into one is a
+failed check, so one bad roll is punished twice: the check's loot is lost,
+and the party risks a DNF for no reward. Now a battle node may carry `loot`,
+banked on a win. The `haul` validator rule counts it like check loot.
+Combined with D-49 this makes a fight a real choice: turn back with what you
+have, or fight for the bounty. *Not chosen:* a failed check costs some banked
+loot instead, which is harsher and closer to a DNF. *Blocks:* T5.8, T6.6.
+
+**D-51 Injuries: DECIDED (2026-10-13): a random starter is hurt on a DNF.**
+Not built yet.
+- When a party loses a battle, one of its four starters, picked by a
+  recorded random roll, is **injured**. An injured character can't start the
+  next week's lineup. It can still be benched, traded or dropped.
+- Why: nothing carried from one week to the next, so a week's result never
+  fed the next week's decision. An injury ties battle risk to bench depth and
+  gives retreat orders (D-49) more weight, since turning back avoids it.
+- The week's projection is unaffected (an injury only touches later weeks),
+  so it stays exact. The roll is part of `mission.resolved`, like the
+  check and battle rolls (D-13).
+- A carried lineup (D-07) that includes an injured starter is illegal, so
+  the D-27 fallback applies.
+- *Defaults (confirm):* injuries last one week and don't stack; an injury
+  from the last week of a season expires at season end.
+- *Not chosen:* form (+1 next week after a passed check: strong taverns get
+  stronger), fatigue (a cap on consecutive starts: a chore), injuring the
+  captain or the most expensive starter, or letting the manager choose.
+- *Blocks:* T6.7.
+
+**D-52 Taverns, gods, boons and hexes: DECIDED (2026-10-13).** Not built yet.
+The only custom concepts on top of draft, monsters and missions. Each one
+sits at its own level of play and borrows from D&D.
+- **The god chooses the tavern.** Each tavern is already blessed by one god,
+  and tavern and god are one identity (the pairing never changes). Managers
+  don't pick gods; they pick taverns.
+- **Tavern pick:** before the monster draft, managers pick taverns in
+  **reverse** monster-draft order (the draft order is still the seeded
+  shuffle, D-02). The manager who drafts monsters last gets first choice of
+  tavern. It's public, like everything else.
+- **Boon (season level):** each tavern's god grants it one boon, written on
+  the tavern. Boons bend a rule rather than add a bonus. Inspired by the
+  DMG's blessings, supernatural gifts from a deity, but not copied from it.
+  *Playtest candidates:*
+
+  | Candidate | Level | Inspiration | Notes |
+  |---|---|---|---|
+  | Jump ahead in the draft | draft | initiative | Works against the reverse-order compensation; size it (one slot? an extra early pick?) |
+  | A DNF doesn't injure | mission | *Death Ward* | Passive, or N uses a season? Makes battles safer for that tavern (D-51) |
+  | Anti-hex | week | *Remove Curse* | Ignore the first hex, or every hex? Most valuable to the leader |
+  | CR budget increase | week | | +N to B. Once for one chosen mission, or a smaller +1 all season? |
+  | See the mission before the lineup | week | *Augury* | Needs missions hidden until the lock: reopens D-42 and D-08 (see D-42) |
+  | A recruit joins the party | week | a familiar, a hireling | A random undrafted monster of CR 1/2 or less joins as a fifth member. Outside B? Same recruit all season, or a new one each week? |
+  | Advantage on checks | week | *Bless*, *Guidance* | Needs a scope: one ability score all season, or every check for one chosen mission |
+
+  The list is open: these are candidates, and more can be added. A season
+  uses six, one per tavern. Whether each boon is passive or has limited uses,
+  and how strong it is, comes from playtests and sims. Rule-bending boons
+  (draft order, injuries, hexes, information) and stat boons (advantage, a
+  recruit, budget) should be compared separately: stat boons are easier to
+  balance, and rule-bending ones are more distinctive.
+- **Hex (week level):** once per season, a tavern names a rival, one
+  **ability score** and one **week**. That week, the rival's party has
+  disadvantage on every check and save that uses that ability. Modeled on
+  *Bestow Curse* (SRD 5.1), which picks an ability score the same way.
+  Battles are unaffected (the battle model has no ability checks).
+  Disadvantage cancels advantage, as in 5e, and the projection stays exact.
+  - *Defaults (confirm):* declared with an issue form any time before that
+    week's lock, so it is public and the target can adjust its lineup; at
+    most one hex per target per week (first declared wins); it can't be
+    withdrawn; an unused hex expires at season end.
+- **Carryover:** a manager's tavern, and so its god, boon and hex, is meant
+  to stay with them from season to season. The details wait for Season 2.
+  The one-character keeper (D-11) is unchanged.
+- *Not chosen:* captains with strengths and weaknesses (D-12) and a home
+  blessing (D-47), both withdrawn to keep the concept count down; managers
+  choosing gods; a god "domain" of skills driving the boon, the hex and its
+  mission's lean.
+- *Blocks:* T4.10, T6.9, T6.10, T9.5.
+
+**D-53 Longer, generated missions: DECIDED (2026-10-13).** Not built yet.
+- Missions will come from a generator (the GM's own work, replacing most
+  hand-authoring) and be about **twice as long**, with more branches.
+- A 2026-10-13 experiment (300 mock seasons, seed `review`, each mock mission
+  chained to the next) found that doubling the checks cut the weekly dice
+  swing among finishers from about ±30 to ±24 points, and weeks with a tied
+  top from 27% to 9%. Doubling the battles too nearly doubled DNFs (16% → 29%),
+  which then caused about half of the remaining luck. The best projected
+  season won the title 48% of the time, against 40%.
+- *Defaults (confirm), as generator targets:* about twice today's checks per
+  path; still 1–3 battles per path; about twice today's branching (more
+  width doesn't cut luck, since a party walks one path, but it lets
+  different rosters succeed by different routes); the D-45 shape (rising
+  loot, late climax battle); D-39 gates as shortcuts only. The config limits
+  (`maxNodes` 14, `maxRank` 8) rise to fit, about 28 and 14.
+- *Blocks:* T5.9.
 
 ### Missions and secrecy
 
@@ -237,7 +435,7 @@ difficulty report is git-ignored for the same reason. *Default:* candidates
 are git-ignored in real seasons. Only the hand-written example is committed.
 *Blocks:* T5.4 output location, T7.2.
 
-**D-09 GM integrity: OPEN.** The GM knows every mission (and, with D-13
+**D-09 GM integrity: DECIDED (2026-10-13).** The GM knows every mission (and, with D-13
 unsalted, can compute every tavern's exact outcome for any lineup). Options:
 (a) the GM is the commissioner and doesn't manage a tavern;
 (b) co-GMs split missions, and each is blind to some weeks;
@@ -246,6 +444,11 @@ accepted. That works best with salted seeds (D-13), so the GM knows the odds
 but not the dice.
 *Default:* (c) with salt, and the GM is listed in `managers.yaml`.
 *Blocks:* T11.2 (whether the GM may hold a tavern).
+*Decided (2026-10-13): (c), the GM may manage a tavern, edge accepted.*
+Missions are locked and public before the draft (D-08, D-42), and the weekly
+roll is a real random roll (D-13), so the GM knows neither more about
+missions nor the dice than anyone else. The remaining edge is having written
+the missions. The salt is moot.
 
 **D-13 Seed salt: SUPERSEDED, DIRECTION SET (2026-10-10).** Each week's
 result is an actual single random roll, **not** deterministic from a seed.
@@ -254,6 +457,14 @@ record of truth, since its rolls can't be recomputed. `verifyResolutions`
 shrinks to consistency checks (the path follows the recorded outcomes, and
 the score matches). `rngFor` stays for sims, tests and the difficulty report.
 The text below is the earlier analysis.
+
+*Dice per tavern, confirmed (2026-10-13).* Each tavern rolls its own dice.
+Shared dice per week (the alternative below) was measured and declined. In
+300 mock seasons (seed `review`, the tavern id in `weekSeed` replaced by a
+constant), shared dice raised how often the best-projected lineup topped its
+week from 38% to 67%, and the `skill-coverage` bot's title share from 36% to
+50%. Per-tavern dice keep upsets and a week-to-week swing of about ±32
+points. How `run-week` draws and records the real roll is still T10.2.
 
 Earlier: **D-13 Seed salt.** Seeds from (season, week, tavern) alone are public, so
 anyone who knows a mission early (the GM, anyone with the decryption key) can
@@ -267,11 +478,14 @@ bridge, so weekly results reflect lineup choice more than luck. The brief says
 (season, week, tavern), so that's the default, but sims could compare both
 (T9.3).
 
-**D-39 Capability gates on checks: OPEN.** Should a check be able to require a
+**D-39 Capability gates on checks: DEFAULTED.** Should a check be able to require a
 fly speed, darkvision, and so on? Gates create archetype dependency, the very
 thing the difficulty report warns about, but they also give environment and
 theme real teeth. *Default:* the schema supports `requires`, the validator
 allows at most one gated check per mission, and the difficulty report flags it.
+*Defaulted (2026-10-13): gates are shortcuts, not walls.* A party with no
+special speeds or senses must still be able to reach the full haul. A gate
+may only open a better or safer route. A validator rule enforces it (T5.8).
 
 **D-28 Battle model v0: OPEN.** Spec 05 sketches DPR/eHP time-to-kill,
 logistic-squashed. Questions: party DPR as a sum of members; how to model
@@ -282,11 +496,15 @@ calibrate in T9.3. *Blocks:* nothing on the critical path.
 
 ### Characters, modifiers, carryover
 
-**D-11 Carryover rules: OPEN.** Who keeps whom: 1 keeper per tavern, plus 1
-for the champion. Keeper cost: the round the character was drafted last season.
-Modifier drift on keepers: ≤ 1 point. Alternatives: no keepers (clean
-redraft), champion-only reward, auction-style keeper salary (its CR counts
-+1 against B). *Blocks:* T3.6, T10.3.
+**D-11 Carryover rules: DECIDED (2026-10-13): 1 keeper, no champion bonus.**
+Every tavern may keep 1 character. A keeper costs the pick in the round it was
+drafted last season (undrafted pickups cost the last round). Modifier drift on
+keepers is at most 1 point. The champion gets no extra keeper
+(`carryover.championBonusKeepers: 0`): a keeper gives every tavern a
+long-term reason to care, without rewarding last season's winner twice.
+*Not chosen:* the champion bonus keeper (the old default), no keepers (a
+clean redraft), keeper salary (its CR counts +1 against B).
+*Blocks:* T3.6, T10.3.
 
 **D-31 Modifier budget and costs: OPEN.** 3 points per character, with
 placeholder costs in `engine/src/characters/registry.ts`. Real costs need
@@ -418,8 +636,8 @@ story never decides a mechanical fact (00, 04).
 | Δ-04 | Lean, reshaped snapshot schema | Verbatim Open5e records + a thin adapter (`engine/src/adapters/open5e`) | 02 |
 | Δ-05 | Procedural personal names from a derived `culture`; team-name grammar | Removed. Names are authored chrome and the engine never reads them | 01, 02, 04 |
 | Δ-06 | Integer `dataVersion` in snapshot filename and permalinks | Named snapshot ids in `manifest.json`, pinned per season | 02, 03 |
-| Δ-07 | Seeded procedural mission generator | No generator. The LLM proposes, the engine validates, the GM curates | 04 |
-| Δ-08 | `[flavor]` grammar seeded per node; `{skill}`, `{dc}` tokens | Authored per-outcome chrome. Data-bound tokens kept (`{actor}`, `{captain}`, `{battle_creature}`, plus `{allies}`, `{tavern}`). `{skill}`, `{dc}` dropped as mechanical facts | 04 |
+| Δ-07 | Seeded procedural mission generator | A generator again (D-53, 2026-10-13), built by the GM. Before that: no generator; the LLM proposed, the engine validated, the GM curated. The engine still validates and the GM still curates | 04 |
+| Δ-08 | `[flavor]` grammar seeded per node; `{skill}`, `{dc}` tokens | Authored per-outcome chrome. Data-bound tokens kept (`{actor}`, `{battle_creature}`, plus `{allies}`, `{tavern}`; `{captain}` goes with D-12). `{skill}`, `{dc}` dropped as mechanical facts | 04 |
 | Δ-09 | `runSeed = missionSeed:team:k`, many runs per pair | One run per week per tavern, seeded (season, week, tavern[, salt]). Sampling remains for tests and validation | 03, 05 |
 | Δ-10 | Efficiency (score / B) and power columns | League scoring is points (score × 100). Efficiency may appear in the balance report | 05, 06 |
 | Δ-11 | Static Jekyll site, no backend, permalinks for every view | GitHub issues + Actions + event log. Published JSON is a build artifact. The explorer and permalinks are out of scope | 00, 03, 06 |

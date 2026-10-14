@@ -2,10 +2,10 @@
 # lineups from this. Part of the GM's season package, copied into season.created.
 # `commitment` is the sha256 of the sealed mission, filled in by scripts/seal (D-08).
 #
-# Sponsors (D-44, D-47, D-48): each god backs one tavern and sets at most one
-# week's mission. On its sponsor's week a tavern's loot is × scoring.homeBonus
-# (config.yaml). `sponsor: null` is an unsponsored week. A god's name and voice
-# are chrome; only the id and tavern are mechanical.
+# Sponsors (D-44, D-48, D-52): each god backs one tavern and sets at most one
+# week's mission. There is no home bonus in Season 1 (D-47: scoring.homeBonus
+# is 1). `sponsor: null` is an unsponsored week. A god's name and voice are
+# chrome; only the id and tavern are mechanical. Boons and hexes are D-52.
 
 season: season-01
 sponsors:

@@ -283,6 +283,38 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   tiebreakers (D-14).
 - **Depends:** T0.1.
 
+#### T4.7 Lineup shape: no captain + retreat order · S
+- **Goal:** lineups become `{ starters[4], retreat }` (D-12, D-49): the
+  captain field, its tiebreak role and the `{captain}` story token go.
+  Carry-over and the D-27 fallback follow the D-49 default.
+- **Acceptance:** event schema, reducers and replay accept the new shape;
+  old-shape fixtures migrate; the playground's "Make captain" control is
+  gone.
+- **Depends:** T4.2, T4.4.
+
+#### T4.10 Tavern pick + 6-tavern cap · S
+- **Goal:** `tavern.chosen` before the first `draft.pick`, in reverse draft
+  order (D-52); `managers.yaml` lists managers apart from taverns; at most 6
+  taverns (D-01).
+- **Acceptance:** reducers reject an out-of-turn or duplicate tavern choice
+  and a 7th tavern; the first `draft.pick` requires every manager to have a
+  tavern; bots pick taverns in sims.
+- **Depends:** T4.3, T2.4.
+
+#### T4.8 Reverse-standings waivers · S
+- **Goal:** `waivers.priority: reverse_standings` (D-05): each window's order
+  is the current standings reversed, ties to reverse draft order, and winning
+  a claim doesn't move a tavern.
+- **Acceptance:** config schema accepts the new value; `resolveWaivers`
+  table tests for ties and for a week-1 window; the mock season switches to it.
+- **Depends:** T4.5, T4.6.
+
+#### T4.9 Season-end tiebreak · S
+- **Goal:** a tie for first at season end goes to fewer DNFs, then
+  co-champions (D-14).
+- **Acceptance:** standings tests for a DNF-broken tie and a true tie.
+- **Depends:** T4.6.
+
 ---
 
 ## W5: Mission schema + validator + candidate drafting
@@ -339,6 +371,31 @@ Owns `engine/src/missions/`, `scripts/src/validate.ts`,
 - **Acceptance:** all 3 missions pass T5.2; the pool passes T3.2 budgets.
 - **Depends:** T5.1, T5.2, T3.2.
 
+#### T5.7 Schedule keywords · S
+- **Goal:** `keywords` on schedule entries (D-42), carried into
+  `season.created`, plus a `lock-check` rule that every keyword names a skill,
+  save, gate or battle lead in the selected mission.
+- **Acceptance:** a keyword naming nothing in the mission fails lock-check
+  with the week and keyword; the mock season fixtures gain keywords.
+- **Depends:** T5.2, T8.4.
+
+#### T5.9 Mission generator targets · M
+- **Goal:** checks the GM's generator (D-53) must pass: about twice today's
+  checks per path, 1–3 battles per path, about twice the branching, the D-45
+  loot shape, D-39 gates; `maxNodes` and `maxRank` raised to fit.
+- **Acceptance:** the difficulty report (T7.2) runs on generated batches and
+  flags misses; a generated mock season runs end to end.
+- **Depends:** T5.8.
+
+#### T5.8 Battle loot, gate rule, loot shape · M
+- **Goal:** optional `loot` on battle nodes, counted by the `haul` rule when
+  the path leaves by `win` (D-50); a `gates` validator rule that the full haul
+  is reachable without speeds or senses (D-39); mock missions rewritten to
+  rising loot with a late climax battle (D-45).
+- **Acceptance:** validator tests for each rule; the mock season still runs;
+  the difficulty report (T7.2) shows each mission's loot shape.
+- **Depends:** T5.2.
+
 ---
 
 ## W6: Resolution + projection
@@ -349,7 +406,7 @@ Owns `engine/src/resolution/`, `engine/src/projection/`.
 - **Goal:** `checkOdds`: formula, advantage, `requires` gate, best-fit actor
   with deterministic tiebreak (captain first, then lineup order, D-15).
 - **Acceptance:** table tests over DC − mod from −20 to +20 (clamps); advantage
-  math; ties resolved as documented; captain role behind a switch (D-12).
+  math; ties resolved as documented; no captain once T4.7 lands (D-12).
 - **Depends:** T3.3 (fixtures acceptable before it lands).
 
 #### T6.2 ★ Battle model v0 · M
@@ -381,6 +438,43 @@ Owns `engine/src/resolution/`, `engine/src/projection/`.
 - **Acceptance:** agreement within 4 standard errors across ≥ 200 random cases;
   fast enough for CI (< 10 s).
 - **Depends:** T6.3, T6.4.
+
+#### T6.6 Retreat orders + battle loot in the run and projection · M
+- **Goal:** `runMission` and `projectMission` stop before a battle when the
+  retreat order says so (D-49), keeping banked loot without a DNF, and bank a
+  battle's loot on a win (D-50).
+- **Acceptance:** projection is still exact (propagation state = node + loot
+  banked); T6.5's property test covers retreat orders; the run record notes
+  a retreat; `verifyResolutions` audits it.
+- **Depends:** T4.7, T5.8, T6.4.
+
+#### T6.7 Injuries · M
+- **Goal:** on a DNF, `runMission` picks one starter by a recorded roll and
+  records it as `injured` (D-51); the reducers mark it unavailable for the
+  next week's lineup; lineup validation and the D-27 fallback respect it.
+- **Acceptance:** replay reproduces injuries from the record;
+  `verifyResolutions` checks the injured starter was in the party; a carried
+  lineup with an injured starter falls back; injuries expire after one week.
+- **Depends:** T6.3, T4.4, T2.4.
+
+#### T6.9 Hexes · M
+- **Goal:** `hex.declared` (D-52): once per season, a rival, an ability score
+  and a week; that week the rival has disadvantage on checks and saves with
+  that ability (cancelling advantage). Battles are unaffected.
+- **Acceptance:** reducers enforce one hex per tavern per season and one per
+  target per week, and reject locked weeks; `checkOdds` and the projection
+  apply it exactly; the run record shows which checks were hexed.
+- **Depends:** T6.1, T6.4, T2.4.
+
+#### T6.10 Boons (playtest set) · M
+- **Goal:** a closed boon registry and the engine hooks for the playtest
+  candidates in D-52 (draft jump, no injury on a DNF, anti-hex, +B, early
+  mission view, a recruit, advantage on checks), each switchable by config so
+  sims can compare them.
+- **Acceptance:** each boon has tests; projection stays exact for the ones
+  that touch a mission; the balance report (T9.3) shows each boon's value in
+  points per season.
+- **Depends:** T4.10, T6.6, T6.7, T6.9.
 
 ---
 
@@ -498,12 +592,24 @@ Owns `bots/`, `sims/`.
 - **Depends:** T9.2.
 
 #### T9.4 Experiments · M
-- **Goal:** use sims to inform open decisions: captain variants (D-12),
-  per-tavern vs shared dice (D-13), points and ties (D-14), roster size (D-03),
+- **Goal:** use sims to inform open decisions: boon value and whether boons
+  spread draft strategies (D-52), hex timing and targets (D-52), bounty sizes
+  (D-50), injury impact on bench use (D-51, D-03),
+  roster size (D-03),
   roster CR cap (D-40), keeper rules (D-11).
 - **Acceptance:** a short write-up per decision appended to docs/decisions.md
   with the commands and seeds used.
 - **Depends:** T9.3.
+
+#### T9.5 Bots and playground for retreat orders, hexes and boons · M
+- **Goal:** bots choose a retreat order (the projection scores each), when
+  and whom to hex, and a tavern in the tavern pick; the playground's Play tab
+  shows each tavern's god, boon and hex, the keywords, declared hexes, and
+  the expected loot per retreat order.
+- **Acceptance:** the balance report shows how often each retreat order is
+  chosen, who gets hexed (the leader?), and each boon's value; a boon that
+  is never worth having is flagged.
+- **Depends:** T6.6, T6.9, T6.10, T9.3.
 
 ---
 
@@ -549,7 +655,8 @@ Owns `.github/`, `scripts/src/apply-command.ts`, `scripts/src/lib/issue-forms.ts
   event → commit → reply and close.
 - **Outputs:** `.github/workflows/command.yml`, `scripts/src/apply-command.ts`.
 - **Acceptance:** author resolved by numeric GitHub id from `managers.yaml`
-  (allowlist); rejections reply with every reason and write nothing;
+  (allowlist; the GM may hold a tavern, D-09); rejections reply with every
+  reason and write nothing;
   `concurrency: events-<season>` with `cancel-in-progress: false`; minimal
   `permissions`.
 - **Depends:** T11.1, T2.4, T4.2, T4.5.
@@ -595,10 +702,8 @@ Each task here can be specified but not finished until its decision in
 | Task | Blocked on | What's blocked |
 |---|---|---|
 | **T10.2 Live roll + week start** · S | D-13 details | Missions are open (D-08), so there is no sealing. What's left: how `run-week` draws and records a real random roll, and whether `mission.revealed` stays. `seal` and `reveal` scripts can be deleted. |
-| **T10.3 Offseason carryover** · M | D-11 carryover | `offseason`: keeper eligibility, `character.retained`, keeper cost in draft order (T4.3 hook), modifier drift cap. |
-| **T6.1 captain effect** · S | D-12 | The captain's mechanical role. Ship behind a config switch. |
+| **T10.3 Offseason carryover** · M | Unblocked: D-11 decided 2026-10-13 (1 keeper, no champion bonus) | `offseason`: keeper eligibility, `character.retained`, keeper cost in draft order (T4.3 hook), modifier drift cap. |
 | **T5.4 / T8.5 live provider** · S | D-32 | The real `LlmClient`. Everything else in those tasks uses the fake. |
-| **T11.2 GM-as-manager rule** · S | D-09 | Whether the allowlist lets the GM hold a tavern. |
 | **T1.1 document scope** · S | D-17 | Adding non-SRD documents (license text and notices). SRD-only is unblocked. |
 | **Registry costs** · S | D-31 | Final modifier costs. The mechanism (T3.2) is unblocked. |
 | **Live bot seats** · S | D-36 | Letting bot managers act in a real season via Actions. |

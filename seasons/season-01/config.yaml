@@ -13,12 +13,12 @@ pool: pool.yaml
 managers: managers.yaml
 
 budget:
-  partyCr: 12                       # B: captain + 3 allies, total CR ≤ B. Fractions allowed ("1/2").
+  partyCr: 12                       # B: four starters, total CR ≤ B. Fractions allowed ("1/2").
   modifierPointsPerCharacter: 3     # per-season modifier budget per pooled character (D-31)
 
 roster:
   size: 7                           # OPEN D-03
-  starters: 4                       # 1 captain + 3 allies
+  starters: 4                       # no captain (D-12); the engine still takes 1 captain + 3 allies until T4.7
   ownership: exclusive              # OPEN D-01
 
 draft:
@@ -30,10 +30,10 @@ draft:
 
 scoring:
   pointsScale: 100                  # points = round(score × 100 × home multiplier)
-  homeBonus: 1.25                   # D-47: loot × this on a tavern's sponsor's week (1 = off). Sponsors: schedule.yaml
+  homeBonus: 1                      # D-47: dropped 2026-10-13 (was 1.25). 1 = off
 
 waivers:
-  priority: rolling                 # OPEN D-05: successful claim moves you to the back
+  priority: rolling                 # D-05 decided: reverse standings. Not built yet; the engine accepts only rolling
   initialOrder: reverse_draft
 
 trades:
@@ -64,9 +64,9 @@ missions:
   haul: 100                         # fixed haul: loot on every mission's best path (D-45)
   battleModel: ev-ttk-v0            # engine/src/resolution BattleModel id (T6.2)
 
-carryover:                          # OPEN D-11. Applies when season-02 is created.
+carryover:                          # D-11 (decided): 1 keeper, no champion bonus. Applies when season-02 is created.
   mode: keeper
   keepersPerTavern: 1
   keeperCost: round_of_last_season_pick   # or: none | fixed_round
-  championBonusKeepers: 1
+  championBonusKeepers: 0
   maxModifierChangePoints: 1        # a kept character's modifiers may shift by at most this many points

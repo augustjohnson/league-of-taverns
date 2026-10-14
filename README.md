@@ -4,9 +4,9 @@ A fantasy-sports league where the players are 5th-edition monsters.
 
 Each manager runs a **tavern** and drafts **characters** (named monsters, like
 Bruno the Bruiser, an ogre) from a curated pool of about 64. Each week the
-tavern fields a **party** of one captain and three allies under a CR budget.
-The party attempts that week's hidden **mission**: a branching run of skill
-checks and battles, resolved once with seeded dice. Every tavern runs the same
+tavern fields a **party** of four under a CR budget.
+The party attempts that week's public **mission**: a branching run of skill
+checks and battles, resolved once with real dice. Every tavern runs the same
 mission, and the season table ranks taverns by total loot.
 
 > **Status: scaffold.** Types, stubs, draft rules and schemas only. No game
