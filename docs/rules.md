@@ -98,8 +98,10 @@
   a **keyword description** of what the mission tests (skills, saves, gates,
   the lead creature of each battle) **[D-42, keywords not built yet]**.
 - The **mission itself** is a branching path of **skill checks** and
-  **battles** that the GM locked before the draft. Missions are public too
-  (§11), so a manager may read the full mission before the lock.
+  **battles** that the GM locked before the draft. For now missions are
+  public (§11), so a manager may read the full mission before the lock.
+  *Planned* **[D-08]**: each mission stays hidden until its week's lock, and
+  managers plan from the schedule entry and its keywords.
 - **Checks:** a d20 plus the party's best modifier for that check, against a
   DC. Pass chance = `clamp((21 − (DC − mod)) / 20, 0, 1)`. Each check is made
   by the starter with the best modifier for it (**best fit**). Some modifiers
@@ -150,8 +152,8 @@
   result is final and auditable, though not re-derivable from a seed.
 - **Projected points** are the exact expected points for the lineup on that
   mission (no dice). They are published next to actual points after the run.
-  Missions are public (§11), so managers can also work them out before the
-  lock **[D-42]**.
+  While missions are public (§11), managers can also work them out before
+  the lock **[D-42]**. Once missions are hidden **[D-08]**, they can't.
 
 ## 8. Standings
 
@@ -200,10 +202,10 @@
 | When | Public |
 |---|---|
 | Season announced | Config, schedule (title, environment, theme and keywords per week), pool with bases and modifiers, every tavern's god, boon and hex, character chrome |
-| Once selected | Every mission's full structure. The repo is public and missions aren't secret **[D-08]** |
+| Once selected | Every mission's full structure, for now. *Planned* **[D-08]**: hidden until its week's lock, with only a sha256 commitment public before then |
 | Before the draft | Which manager chose which tavern **[D-52]** |
 | During the season | All rosters, transactions, lineup submissions and declared hexes (issues are public) **[D-24]** |
-| Weekly lock | Every tavern's lineup |
+| Weekly lock | Every tavern's lineup. *Planned* **[D-08]**: that week's mission |
 | Weekly run | Every tavern's per-node rolls and path, actual and projected points, and the story |
 
 Candidate missions can be committed in plaintext too **[D-18, moot]**.
@@ -232,5 +234,6 @@ Candidate missions can be committed in plaintext too **[D-18, moot]**.
 - Missions are locked before the draft. Changing a selected mission after
   `season.created` is a rules violation that CI flags.
 - The GM knows every mission and may still manage a tavern **[D-09]**.
-  Missions are locked and public before the draft, and the weekly roll is
-  real, so the GM's only edge is having written them.
+  For now missions are locked and public before the draft, and the weekly
+  roll is real, so the GM's only edge is having written them. This is
+  revisited when missions become hidden **[D-08]**.

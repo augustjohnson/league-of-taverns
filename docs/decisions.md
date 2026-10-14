@@ -152,9 +152,11 @@ to 8, plenty for a pool of about 64. *Defaults (confirm):* no spellcasters in
 encounters, at most 4 in the pool. Both are per-season config limits. Tasks:
 T1.5, T3.7, T5.6.
 
-**D-42 Public missions and pre-lock projections: DECIDED (2026-10-13): open,
-plus keywords.** Missions stay open (D-08 unchanged), and anyone can still
-compute exact projected points for every lineup before the lock. Each
+**D-42 Public missions and pre-lock projections: DECIDED (2026-10-13): open
+for now, plus keywords.** Missions are open today, and anyone can compute
+exact projected points for every lineup before the lock. They will become
+hidden until the lock (D-08's direction), and then the keywords below are
+what managers plan from. Each
 schedule entry gains a **keyword description** next to its title,
 environment and theme: a short list of what the mission tests (skills, saves,
 gates, the lead creature of each battle), for example
@@ -172,11 +174,13 @@ Not built yet.
   54.7, same draft), against a week-to-week dice swing of about ±32 points
   (standard deviation of points minus projection). Depth is expected to come
   from boons and hexes (D-52), retreat orders (D-49) and the draft.
-- *Conflict to settle:* the boon candidate "see the mission before setting a
-  lineup" (D-52) only means something if missions are hidden until the lock.
-  If that boon survives playtesting, this decision and D-08 reopen: missions
-  revealed to everyone at the lock, and the boon holder may change its lineup
-  after the reveal. Sims and the playground can test it with no secrecy.
+- *Once missions are hidden (D-08):* the "accepted cost" above goes away.
+  Lineups, retreat orders and hexes are then chosen from the schedule and its
+  keywords, and the projection is published after the run as feedback. The
+  boon candidate "see the mission before the lineup" (D-52) becomes
+  meaningful: everyone sees the mission at the lock, and the boon holder may
+  change its lineup after the reveal. Keywords then carry real weight, so
+  their honesty rule (no keyword that names nothing) matters more.
 - *Options not chosen:* (b) publish each mission only at its week's lock
   (needs D-08 secrecy back); (c) publish structure but hide DCs until the run
   (knowing which skills are tested is most of the information); rumors only,
@@ -357,7 +361,7 @@ sits at its own level of play and borrows from D&D.
   | A DNF doesn't injure | mission | *Death Ward* | Passive, or N uses a season? Makes battles safer for that tavern (D-51) |
   | Anti-hex | week | *Remove Curse* | Ignore the first hex, or every hex? Most valuable to the leader |
   | CR budget increase | week | | +N to B. Once for one chosen mission, or a smaller +1 all season? |
-  | See the mission before the lineup | week | *Augury* | Needs missions hidden until the lock: reopens D-42 and D-08 (see D-42) |
+  | See the mission before the lineup | week | *Augury* | Works once missions are hidden until the lock (D-08's direction): the holder may change its lineup after the reveal |
   | A recruit joins the party | week | a familiar, a hireling | A random undrafted monster of CR 1/2 or less joins as a fifth member. Outside B? Same recruit all season, or a new one each week? |
   | Advantage on checks | week | *Bless*, *Guidance* | Needs a scope: one ability score all season, or every check for one chosen mission |
   | Shared blessing | week | *Bless* (several targets) | Each mission, you and one other tavern of your choice get advantage on a named check. The first reason to cooperate; watch for two taverns trading it all season (kingmaking). "Named check": one check node in that week's mission, or a skill? |
@@ -409,9 +413,25 @@ sits at its own level of play and borrows from D&D.
 
 ### Missions and secrecy
 
-**D-08 Mission secrecy: DECIDED (2026-10-10): open.** The repo is not secret
-and missions are open for each season. No sealing, encryption or commitments
-for now. The options considered are kept below for reference.
+**D-08 Mission secrecy: DECIDED (2026-10-10): open for now. DIRECTION SET
+(2026-10-13): hidden later.** Missions are open today: no sealing, encryption
+or commitments. **They will become hidden until the lock**, which is still to
+be implemented.
+- Why: with open missions the weekly lineup is mostly solved by the
+  projection (D-42), and the "see the mission" boon (D-52) can't work.
+- *Defaults (confirm):* every mission is revealed to everyone at its week's
+  lock, not just at the run. That leaves a window for the "see the mission"
+  boon, and the reveal opens the week's drama. The mechanism is option (c)
+  below, encrypted in the repo with sha256 commitments in `season.created`,
+  so the weekly run stays automatic and every reveal is checkable.
+- *Knock-on decisions:* D-09 (the GM again knows what managers don't), D-18
+  (candidates and generator output must stay out of the public repo, or be
+  encrypted too), D-42 (planning from keywords), and bots: `PublicView` may
+  only show a mission after its lock, so sims need a lineup strategy that
+  works from keywords.
+- *Blocks:* T10.2, T10.6, T11.4 (reveal step).
+
+The options considered are kept below for reference.
 
 Original question: how selected missions stay hidden until their
 week:
@@ -428,9 +448,11 @@ week:
 Whatever is chosen, commitments go in `season.created` so a reveal is
 checkable. *Blocks:* T10.2, T11.4 (reveal step).
 
-**D-18 Candidate missions are as secret as selected ones: MOOT (2026-10-10).**
-Missions are open (D-08), so candidates can be committed in plaintext. The
-reasoning below only matters if secrecy comes back. The brief puts
+**D-18 Candidate missions are as secret as selected ones: MOOT for now
+(2026-10-10), returns with hidden missions.** Missions are open today (D-08),
+so candidates can be committed in plaintext. Once missions are hidden (D-08's
+direction), the reasoning below applies again, and to the mission
+generator's output (D-53) too. The brief puts
 `missions/candidates/` in the repo, but the selected missions are a subset of
 the candidates, so plaintext candidates in a public repo reveal the season.
 Options: keep candidates out of the repo (local or a private companion repo),
@@ -452,7 +474,10 @@ but not the dice.
 Missions are locked and public before the draft (D-08, D-42), and the weekly
 roll is a real random roll (D-13), so the GM knows neither more about
 missions nor the dice than anyone else. The remaining edge is having written
-the missions. The salt is moot.
+the missions. The salt is moot. *Revisit when missions become hidden
+(D-08):* the GM will then know every mission while managers see only
+keywords, a real edge. Options then: (a) the GM doesn't manage a tavern, or
+the generator (D-53) picks missions without the GM reading them in full.
 
 **D-13 Seed salt: SUPERSEDED, DIRECTION SET (2026-10-10).** Each week's
 result is an actual single random roll, **not** deterministic from a seed.

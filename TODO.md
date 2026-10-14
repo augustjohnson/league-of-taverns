@@ -324,8 +324,8 @@ Owns `engine/src/missions/`, `scripts/src/validate.ts`,
 `content/prompts/mission-candidates.md`.
 
 #### T5.1 ★ Mission schema · S
-- **Goal:** zod schema for mission YAML. Missions are open (D-08), so no
-  commitment hash is needed.
+- **Goal:** zod schema for mission YAML. Missions are open for now (D-08),
+  so no commitment hash is needed yet.
 - **Outputs:** schema in `engine/src/missions/`; YAML loader in scripts.
 - **Acceptance:** the example mission parses; malformed nodes give errors naming the field.
 - **Depends:** T0.2.
@@ -569,7 +569,7 @@ Owns `bots/`, `sims/`.
   cr-greedy, skill-coverage, value), lineup (max-cr, environment-fit), waivers
   (best-available).
 - **Acceptance:** `bots/test` todos replaced; every decision is legal per W4;
-  deterministic given the view and rng; `PublicView` exposes only public knowledge, which includes open missions (D-08, D-42).
+  deterministic given the view and rng; `PublicView` exposes only public knowledge, which includes open missions for now (D-08, D-42). Once missions are hidden, a mission is visible only after its week's lock.
 - **Depends:** T4.2, T3.3 (can start against types).
 
 #### T9.2 ★ Mock season runner · L
@@ -701,7 +701,8 @@ Each task here can be specified but not finished until its decision in
 
 | Task | Blocked on | What's blocked |
 |---|---|---|
-| **T10.2 Live roll + week start** · S | D-13 details | Missions are open (D-08), so there is no sealing. What's left: how `run-week` draws and records a real random roll, and whether `mission.revealed` stays. `seal` and `reveal` scripts can be deleted. |
+| **T10.2 Live roll + week start** · S | D-13 details | How `run-week` draws and records a real random roll. Keep `seal` and `reveal`: hidden missions (D-08, T10.6) need them. |
+| **T10.6 Hidden missions** · M | D-08 defaults | Encrypt selected missions in the repo, commitments in `season.created`, reveal at the lock (`mission.revealed` moves to `run-week --lock`), candidates and generator output out of the public repo (D-18). Bots: `PublicView` shows a mission only after its lock, plus a keyword-based lineup strategy. Playground: a "hidden missions" mode for the Play tab. |
 | **T10.3 Offseason carryover** · M | Unblocked: D-11 decided 2026-10-13 (1 keeper, no champion bonus) | `offseason`: keeper eligibility, `character.retained`, keeper cost in draft order (T4.3 hook), modifier drift cap. |
 | **T5.4 / T8.5 live provider** · S | D-32 | The real `LlmClient`. Everything else in those tasks uses the fake. |
 | **T1.1 document scope** · S | D-17 | Adding non-SRD documents (license text and notices). SRD-only is unblocked. |

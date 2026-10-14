@@ -176,9 +176,11 @@ edges:
 | `size` | node count ≤ `maxNodes`, max rank ≤ `maxRank`, battles on any path within `battlesPerPath` |
 | `environment` | when selected, matches the schedule entry |
 
-**Commitments:** none. Missions are open (D-08). The `commitment` and `sha256`
-fields on `season.created` and `mission.revealed` stay in the event schema,
-nullable or unused, until D-13's details settle.
+**Commitments:** none yet. Missions are open for now (D-08). The `commitment`
+and `sha256` fields on `season.created` and `mission.revealed` stay in the
+event schema, nullable or unused. They come back into use when missions
+become hidden until the lock (D-08's direction): a sha256 commitment per
+mission in `season.created`, checked by `mission.revealed` at the lock.
 
 ## Mission chrome
 

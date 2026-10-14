@@ -48,7 +48,7 @@ schedules:                          # Actions cron, UTC
   weeklyRun: "15 18 * * 4"          # then reveal + run + finalize
   waivers: "0 12 * * 5"             # Fridays 12:00: waiver.resolved
 
-secrecy: open                       # D-08 decided: missions are public. (private_repo | commit_reveal | encrypted kept for later)
+secrecy: open                       # D-08: public for now; hidden until the lock later (not built). (private_repo | commit_reveal | encrypted kept for later)
 seedSalt: none                      # D-13: live weeks will use a real random roll. Seeds remain for sims
 
 spellcasters:                       # D-43: battle model can't see spells yet

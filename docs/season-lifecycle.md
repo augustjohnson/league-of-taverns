@@ -46,7 +46,8 @@ offseason ─▶ candidates ─▶ validate + report ─▶ select ─▶ chrome
   full issue list. Only valid candidates are written to
   `missions/candidates/`.
 - Hand-written candidates are equally welcome.
-- Candidates are committed in plaintext. Missions are open (D-08), so D-18 is moot.
+- Candidates are committed in plaintext while missions are open (D-08). Once
+  missions are hidden, candidates stay out of the public repo (D-18).
 
 ## 2. Validation and difficulty report
 
@@ -99,8 +100,9 @@ possibly for reuse later.
    (config + schedule), `character.pooled` × about 64, `tavern.joined` × N,
    and `character.retained` for keepers.
 
-**From here on, missions are frozen.** Missions are open (D-08), so there's
-no sealing step. CI flags any change to a selected mission after
+**From here on, missions are frozen.** Missions are open for now (D-08), so
+there's no sealing step yet. Once they are hidden, this is where selected
+missions are encrypted and their commitments recorded. CI flags any change to a selected mission after
 `season.created`.
 
 ## 6. Draft
@@ -120,7 +122,7 @@ no sealing step. CI flags any change to a selected mission after
 |---|---|---|---|
 | Any time before the lock | Managers submit lineups, claims and trades | `lineup.set`, `waiver.claimed`, `trade.*` | `apply-command` |
 | Thu 18:00 | **Lock.** Freeze every lineup (submitted, carried, or fallback) | `lineup.locked` | `run-week --lock` |
-| Thu 18:15 | **Start the week.** Record which mission runs | `mission.revealed` (kept for the record. Missions are already public) | `run-week` |
+| Thu 18:15 | **Start the week.** Record which mission runs | `mission.revealed` (for the record while missions are public; once hidden, D-08, the reveal moves to the lock) | `run-week` |
 | Thu 18:15 | **Run.** For each tavern: one real random run (D-13) plus projection | `mission.resolved` × N | `run-week` |
 | Thu 18:15 | **Finalize.** Close the week, then rebuild and deploy published JSON | `week.finalized` | `run-week`, `publish` |
 | Fri 12:00 | **Waivers.** Resolve all pending claims in rolling priority | `waiver.resolved` | `run-week --waivers` |
