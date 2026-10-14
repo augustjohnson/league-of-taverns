@@ -43,7 +43,12 @@ export interface SeasonConfig {
     /** Loot multiplier for a tavern on its sponsor's mission (D-47). 1 turns the bonus off. */
     readonly homeBonus: number;
   };
-  readonly waivers: { readonly priority: 'rolling'; readonly initialOrder: 'reverse_draft' };
+  /**
+   * `reverse_standings` (D-05): each window's order is the standings reversed,
+   * and winning a claim doesn't move a tavern. `rolling`: a winner moves to
+   * the back. Both start from reverse draft order.
+   */
+  readonly waivers: { readonly priority: 'rolling' | 'reverse_standings'; readonly initialOrder: 'reverse_draft' };
   readonly trades: {
     readonly vetoWindowHours: number;
     readonly vetoBy: 'commissioner';
@@ -144,41 +149,80 @@ export interface WeekResult {
   readonly points: number;
   readonly projected: number;
   readonly checksPassed: number;
+  /** True when the party lost a battle. A tavern with no lineup did not DNF. */
+  readonly dnf: boolean;
 }
 
 export interface StandingRow {
-  /** 1-based. Taverns on equal points share a rank (1, 1, 3). */
+  /** 1-based. Taverns on equal points share a rank (1, 1, 3), except as the first-place tiebreak decides. */
   readonly rank: number;
   readonly tavern: string;
   /** Total loot over the given weeks. */
   readonly points: number;
+  /** DNFs over the given weeks: the season-end tiebreak for first (D-14). */
+  readonly dnfs: number;
+}
+
+export interface StandingsOptions {
+  /**
+   * Break a tie for first by fewer DNFs (D-14): the season-end rule. The
+   * taverns tied on points with the fewest DNFs keep rank 1 (co-champions
+   * only if that is tied too), and the rest of that tie share rank 2. Ties
+   * below first always share a rank.
+   */
+  readonly breakFirstTie?: boolean;
 }
 
 /**
  * A league table: every tavern ranked by total points over `results`, with
- * no head-to-head and no tiebreakers (docs/decisions.md D-04, D-14).
+ * no head-to-head (docs/decisions.md D-04).
  *
  * - Every tavern in `taverns` or `results` gets a row, even with no results.
- * - Equal totals share a rank. A tie for first means co-champions.
- * - Rows sort by points desc, then tavern id, for a stable display order only.
+ * - Equal totals share a rank, unless `options.breakFirstTie` breaks a tie
+ *   for first by DNFs (D-14).
+ * - Rows sort by rank, then points desc, then tavern id, for a stable
+ *   display order only.
  *
  * Pass one week's results for that week's table.
  */
-export function standings(taverns: ReadonlyArray<string>, results: ReadonlyArray<WeekResult>): ReadonlyArray<StandingRow> {
+export function standings(
+  taverns: ReadonlyArray<string>,
+  results: ReadonlyArray<WeekResult>,
+  options: StandingsOptions = {},
+): ReadonlyArray<StandingRow> {
   const seen = new Set<string>();
-  const totals = new Map<string, number>(taverns.map((t) => [t, 0]));
+  const totals = new Map<string, { points: number; dnfs: number }>(taverns.map((t) => [t, { points: 0, dnfs: 0 }]));
   for (const r of results) {
     const k = `${r.week}\u0000${r.tavern}`;
     if (seen.has(k)) throw new Error(`standings: duplicate result for tavern "${r.tavern}" in week ${r.week}`);
     seen.add(k);
-    totals.set(r.tavern, (totals.get(r.tavern) ?? 0) + r.points);
+    const total = totals.get(r.tavern) ?? { points: 0, dnfs: 0 };
+    totals.set(r.tavern, { points: total.points + r.points, dnfs: total.dnfs + (r.dnf ? 1 : 0) });
   }
-  const sorted = [...totals].sort(([a, x], [b, y]) => y - x || cmp(a, b));
-  return sorted.map(([tavern, points]) => ({
-    rank: sorted.findIndex(([, p]) => p === points) + 1,
+  const sorted = [...totals].sort(([a, x], [b, y]) => y.points - x.points || cmp(a, b));
+  const rows = sorted.map(([tavern, { points, dnfs }]) => ({
+    rank: sorted.findIndex(([, t]) => t.points === points) + 1,
     tavern,
     points,
+    dnfs,
   }));
+  const first = rows.filter((row) => row.rank === 1);
+  if (options.breakFirstTie !== true || first.length < 2) return rows;
+  const fewest = Math.min(...first.map((row) => row.dnfs));
+  const ranked = rows.map((row) => (row.rank === 1 && row.dnfs > fewest ? { ...row, rank: 2 } : row));
+  return ranked.sort((a, b) => a.rank - b.rank || b.points - a.points || cmp(a.tavern, b.tavern));
+}
+
+/**
+ * Reverse-standings waiver priority (D-05): lowest total first. Ties go to
+ * reverse draft order, so the tavern that drafted later claims first, as in
+ * week 1. `rows` are the standings (ranks are ignored, points decide).
+ * Taverns in `draftOrder` with no row count as 0 points.
+ */
+export function reverseStandingsPriority(rows: ReadonlyArray<StandingRow>, draftOrder: ReadonlyArray<string>): ReadonlyArray<string> {
+  const points = new Map(rows.map((row) => [row.tavern, row.points]));
+  const reverse = [...draftOrder].reverse();
+  return [...reverse].sort((a, b) => (points.get(a) ?? 0) - (points.get(b) ?? 0) || reverse.indexOf(a) - reverse.indexOf(b));
 }
 
 /** Code-unit string order, independent of locale. */

@@ -22,6 +22,7 @@ import {
   runMission,
   runPoints,
   seasonStandings,
+  waiverPriority,
   standings,
   weekResults,
   weekSeed,
@@ -1720,7 +1721,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     const advice = s.suggestClaims();
     waivers =
       `<section class="card"><h2>Waivers</h2>` +
-      `<p class="small muted">Claims resolve after week ${week}'s run, in waiver priority order (yours: ${s.state.waivers.priority.indexOf(me) + 1} of ${s.state.waivers.priority.length}). A claim cannot be withdrawn.</p>` +
+      `<p class="small muted">Claims resolve after week ${week}'s run, in waiver priority order (yours: ${waiverPriority(s.state).indexOf(me) + 1} of ${waiverPriority(s.state).length}${config.waivers.priority === 'reverse_standings' ? ', lowest on the table first' : ''}). A claim cannot be withdrawn.</p>` +
       `<div class="row"><label class="label" for="play-add">Add</label><select id="play-add" data-action="play-add"><option value="">choose a free agent</option>${fa
         .map((id) => `<option value="${esc(id)}" ${id === play.add ? 'selected' : ''}>${esc(charName(id))} (CR ${formatCr(crOf(id))})</option>`)
         .join('')}</select>` +

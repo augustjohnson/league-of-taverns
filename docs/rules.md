@@ -171,14 +171,13 @@
   agent and drops one rostered character if the roster is full.
 - Claims resolve **once a week, after the run** (Friday 12:00 UTC), all
   together.
-- **Reverse-standings priority** **[D-05, not built yet]:** each window, the
+- **Reverse-standings priority** **[D-05]:** each window, the
   lowest tavern on the table claims first. Ties on the table go to reverse
   draft order. Each claim, in priority order, is awarded if the character is
   still available and the drop is still legal. Winning a claim doesn't move a
   tavern: the order is rebuilt from the standings every week. A tavern's own
-  claims are tried in submission order. *(Until this is built: rolling
-  priority, initial order reverse draft, and a tavern that wins a claim moves
-  to the back.)*
+  claims are tried in submission order. (A season can instead set rolling
+  priority, where a tavern that wins a claim moves to the back.)
 - Dropped characters become free agents at once and can be claimed in the
   next window.
 - A character claimed or dropped after the lock still played this week for its

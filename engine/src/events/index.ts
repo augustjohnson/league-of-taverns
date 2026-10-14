@@ -6,7 +6,7 @@ export type * from './types';
 export type * from './state';
 export { InvalidEventError, applyEvent, initialState } from './reducers';
 export { LogParseError, ReplayError, lineHash, parseLog, replay, replayLog, serializeEvent, verifyResolutions } from './replay';
-export { freeAgents, homeTavern, onTheClock, seasonStandings, weekResults } from './selectors';
+export { freeAgents, homeTavern, onTheClock, seasonStandings, waiverPriority, weekResults } from './selectors';
 export {
   crEighthsSchema,
   eventSchema,

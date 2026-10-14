@@ -259,9 +259,11 @@ export interface WaiverAward {
  *   still on the tavern's roster, and the resulting roster is at most
  *   `config.roster.size`. Otherwise it fails with the first `WaiverReason`
  *   that applies. A `drop` is allowed even when the roster has room.
- * - A tavern that wins moves to the back of the priority order at once. This
- *   doesn't change the rest of the round, since each tavern gets one turn per
- *   round either way.
+ * - Under `rolling` priority, a tavern that wins moves to the back of the
+ *   priority order at once. This doesn't change the rest of the round, since
+ *   each tavern gets one turn per round either way. Under
+ *   `reverse_standings` (D-05) nobody moves: the caller passes this window's
+ *   order (`reverseStandingsPriority`) and gets it back unchanged.
  * - An awarded `drop` becomes a free agent immediately but is **not**
  *   claimable in this run. Rules §9 says dropped characters can be claimed in
  *   the next window, so the caller adds it to the next run's free agents.
@@ -320,7 +322,7 @@ export function resolveWaivers(
       claimable.delete(claim.add);
       if (claim.drop !== null) roster.delete(claim.drop);
       roster.add(claim.add);
-      order = [...order.filter((t) => t !== tavern), tavern];
+      if (config.waivers.priority === 'rolling') order = [...order.filter((t) => t !== tavern), tavern];
       awards.push({ claim, awarded: true, reason: 'awarded' });
     }
   }

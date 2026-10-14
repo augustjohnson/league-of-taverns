@@ -242,7 +242,7 @@ The annotated example in the file is the reference. Key groups:
 | `roster` | `size`, `starters` (4), `ownership` |
 | `draft` | `format`, `rounds`, `order`, `pickWindowHours`, `onTimeout` |
 | `scoring` | `pointsScale`, `homeBonus` (D-47; 1 = off, and Season 1 is off) |
-| `waivers` | `priority`, `initialOrder`. Planned (D-05): `priority: reverse_standings` |
+| `waivers` | `priority` (`reverse_standings`, D-05, or `rolling`), `initialOrder` (`reverse_draft`) |
 | `trades` | `vetoWindowHours`, `vetoBy`, `deadlineWeek` |
 | `missedLineup` | `carry_over` |
 | `schedules` | cron for `lineupLock`, `weeklyRun`, `waivers` |

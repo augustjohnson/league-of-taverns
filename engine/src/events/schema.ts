@@ -125,7 +125,7 @@ export const seasonConfigSchema = z.strictObject({
     pointsScale: z.number().positive(),
     homeBonus: z.number().positive(),
   }),
-  waivers: z.strictObject({ priority: z.literal('rolling'), initialOrder: z.literal('reverse_draft') }),
+  waivers: z.strictObject({ priority: z.enum(['rolling', 'reverse_standings']), initialOrder: z.literal('reverse_draft') }),
   trades: z.strictObject({
     vetoWindowHours: z.number().nonnegative(),
     vetoBy: z.literal('commissioner'),

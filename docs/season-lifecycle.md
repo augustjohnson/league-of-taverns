@@ -125,7 +125,7 @@ missions are encrypted and their commitments recorded. CI flags any change to a 
 | Thu 18:15 | **Start the week.** Record which mission runs | `mission.revealed` (for the record while missions are public; once hidden, D-08, the reveal moves to the lock) | `run-week` |
 | Thu 18:15 | **Run.** For each tavern: one real random run (D-13) plus projection | `mission.resolved` × N | `run-week` |
 | Thu 18:15 | **Finalize.** Close the week, then rebuild and deploy published JSON | `week.finalized` | `run-week`, `publish` |
-| Fri 12:00 | **Waivers.** Resolve all pending claims in rolling priority | `waiver.resolved` | `run-week --waivers` |
+| Fri 12:00 | **Waivers.** Resolve all pending claims, lowest on the table first (D-05) | `waiver.resolved` | `run-week --waivers` |
 | Hourly | **Trades.** Complete accepted trades whose veto window has passed | `trade.completed` / `trade.cancelled` | `apply-command --sweep` |
 
 Every week runs **once**. `run-week` refuses a week that is already finalized.

@@ -43,7 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
-- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9.
 
 ## Phase 1 starting set (historical)
 
@@ -302,7 +302,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   tavern; bots pick taverns in sims.
 - **Depends:** T4.3, T2.4.
 
-#### T4.8 Reverse-standings waivers · S
+#### T4.8 Reverse-standings waivers · S (done 2026-10-13)
 - **Goal:** `waivers.priority: reverse_standings` (D-05): each window's order
   is the current standings reversed, ties to reverse draft order, and winning
   a claim doesn't move a tavern.
@@ -310,7 +310,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   table tests for ties and for a week-1 window; the mock season switches to it.
 - **Depends:** T4.5, T4.6.
 
-#### T4.9 Season-end tiebreak · S
+#### T4.9 Season-end tiebreak · S (done 2026-10-13)
 - **Goal:** a tie for first at season end goes to fewer DNFs, then
   co-champions (D-14).
 - **Acceptance:** standings tests for a DNF-broken tie and a true tie.

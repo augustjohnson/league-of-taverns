@@ -2,7 +2,7 @@
  * Selectors: derived views over `LeagueState`. Pure, never stored
  * (docs/schema.md § Reducers, "Derived views").
  */
-import { sponsoredTavern, standings, type StandingRow, type WeekResult } from '../league';
+import { reverseStandingsPriority, sponsoredTavern, standings, type StandingRow, type WeekResult } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
 import type { LeagueState } from './state';
@@ -61,17 +61,34 @@ export function weekResults(state: LeagueState, week: number): ReadonlyArray<Wee
     .map(({ tavern }) => {
       const r = results?.get(tavern);
       return r === undefined
-        ? { week, tavern, points: 0, projected: 0, checksPassed: 0 }
-        : { week, tavern, points: r.points, projected: r.projectedPoints, checksPassed: r.run.checksPassed };
+        ? { week, tavern, points: 0, projected: 0, checksPassed: 0, dnf: false }
+        : { week, tavern, points: r.points, projected: r.projectedPoints, checksPassed: r.run.checksPassed, dnf: r.run.dnf };
     });
 }
 
 /**
- * Season standings over every finalized week: total loot, taverns in join
- * order, equal totals sharing a rank (rules §8). No playoffs.
+ * Season standings over every finalized week: total loot, equal totals
+ * sharing a rank (rules §8). No playoffs. Once the season is complete, a tie
+ * for first goes to fewer DNFs, and co-champions only if that is tied too
+ * (D-14).
  */
 export function seasonStandings(state: LeagueState): ReadonlyArray<StandingRow> {
   if (state.config === null) return [];
   const weeks = [...state.finalizedWeeks].sort((a, b) => a - b);
-  return standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)));
+  return standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)), {
+    breakFirstTie: state.phase === 'complete',
+  });
+}
+
+/**
+ * The waiver priority the next `waiver.resolved` uses, first = highest.
+ * `rolling`: the stored order (reverse draft order, then winners move to the
+ * back). `reverse_standings` (D-05): the standings over the finalized weeks,
+ * reversed, ties to reverse draft order. Empty before the draft completes.
+ */
+export function waiverPriority(state: LeagueState): ReadonlyArray<string> {
+  if (state.config?.waivers.priority !== 'reverse_standings' || !state.draft.complete) return state.waivers.priority;
+  const weeks = [...state.finalizedWeeks];
+  const rows = standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)));
+  return reverseStandingsPriority(rows, state.draft.order);
 }

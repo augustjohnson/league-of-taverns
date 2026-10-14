@@ -46,6 +46,7 @@ import {
   runMission,
   runPoints,
   seasonStandings,
+  waiverPriority,
   standings,
   serializeEvent,
   toBaseStats,
@@ -669,7 +670,7 @@ export class SeasonSession {
         return { tavern: p.tavern, add: p.add, drop: p.drop, seq };
       });
       const rosters = [...now.taverns.values()].map((t) => ({ tavern: t.id, characters: t.roster }));
-      const resolved = resolveWaivers(pending, now.waivers.priority, rosters, new Set(freeAgents(now)), config);
+      const resolved = resolveWaivers(pending, waiverPriority(now), rosters, new Set(freeAgents(now)), config);
       const outcomes = resolved.awards.map(({ claim, awarded, reason }) => ({ claim: claimAt.get(claim.seq)!, awarded, reason }));
       const claimed = new Map(now.waivers.pending.map((p) => [p.claim, p]));
       this.append('waiver.resolved', { week, outcomes, priorityAfter: resolved.priority }, system('waivers'), base + DAY + 12 * HOUR);

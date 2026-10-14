@@ -31,10 +31,10 @@ draft:
 
 scoring:
   pointsScale: 100
-  homeBonus: 1.25
+  homeBonus: 1                      # D-47: no home bonus
 
 waivers:
-  priority: rolling
+  priority: reverse_standings       # D-05
   initialOrder: reverse_draft
 
 trades:

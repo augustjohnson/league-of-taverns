@@ -119,14 +119,14 @@ describe('snakePickOwner', () => {
 });
 
 describe('standings', () => {
-  const result = (week: number, tavern: string, points: number): WeekResult => ({ week, tavern, points, projected: 0, checksPassed: 0 });
+  const result = (week: number, tavern: string, points: number, dnf = false): WeekResult => ({ week, tavern, points, projected: 0, checksPassed: 0, dnf });
 
   it('ranks by total points over all weeks', () => {
     const rows = standings(['a', 'b', 'c'], [result(1, 'a', 50), result(1, 'b', 70), result(1, 'c', 10), result(2, 'a', 40), result(2, 'b', 5), result(2, 'c', 90)]);
     expect(rows).toEqual([
-      { rank: 1, tavern: 'c', points: 100 },
-      { rank: 2, tavern: 'a', points: 90 },
-      { rank: 3, tavern: 'b', points: 75 },
+      { rank: 1, tavern: 'c', points: 100, dnfs: 0 },
+      { rank: 2, tavern: 'a', points: 90, dnfs: 0 },
+      { rank: 3, tavern: 'b', points: 75, dnfs: 0 },
     ]);
   });
 
@@ -143,11 +143,45 @@ describe('standings', () => {
   it('includes taverns with no results, and taverns only seen in results', () => {
     const rows = standings(['a', 'z'], [result(1, 'a', 10), result(1, 'q', 20)]);
     expect(rows).toEqual([
-      { rank: 1, tavern: 'q', points: 20 },
-      { rank: 2, tavern: 'a', points: 10 },
-      { rank: 3, tavern: 'z', points: 0 },
+      { rank: 1, tavern: 'q', points: 20, dnfs: 0 },
+      { rank: 2, tavern: 'a', points: 10, dnfs: 0 },
+      { rank: 3, tavern: 'z', points: 0, dnfs: 0 },
     ]);
     expect(standings([], [])).toEqual([]);
+  });
+
+  it('breaks a tie for first by fewer DNFs, only when asked (the season-end rule, D-14)', () => {
+    // a and b tie on 100; a has 1 DNF and b 2. c and d tie on 40 below.
+    const results = [
+      result(1, 'a', 30, true),
+      result(2, 'a', 70),
+      result(1, 'b', 50, true),
+      result(2, 'b', 50, true),
+      result(1, 'c', 40),
+      result(1, 'd', 40, true),
+    ];
+    expect(standings(['a', 'b', 'c', 'd'], results).map((r) => [r.rank, r.tavern, r.dnfs])).toEqual([
+      [1, 'a', 1],
+      [1, 'b', 2],
+      [3, 'c', 0],
+      [3, 'd', 1],
+    ]);
+    // Only first place is broken: c and d still share third.
+    expect(standings(['a', 'b', 'c', 'd'], results, { breakFirstTie: true }).map((r) => [r.rank, r.tavern])).toEqual([
+      [1, 'a'],
+      [2, 'b'],
+      [3, 'c'],
+      [3, 'd'],
+    ]);
+  });
+
+  it('keeps co-champions when the DNFs are tied too, and leaves the rest of a three-way tie on rank 2', () => {
+    const results = [result(1, 'a', 60, true), result(1, 'b', 60, true), result(1, 'c', 60, true), result(2, 'c', 0, true)];
+    expect(standings(['a', 'b', 'c'], results, { breakFirstTie: true }).map((r) => [r.rank, r.tavern])).toEqual([
+      [1, 'a'],
+      [1, 'b'],
+      [2, 'c'],
+    ]);
   });
 
   it('rejects duplicate results for one tavern-week', () => {

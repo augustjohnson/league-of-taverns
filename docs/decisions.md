@@ -50,8 +50,10 @@ earlier default and is removed from the engine, config and sims.
 - Placement points per week (capping one blowout week) were considered and
   not chosen.
 
-**D-05 Waivers: DECIDED (2026-10-13): reverse standings.** Not built yet
-(`waivers.priority` only accepts `rolling` today).
+**D-05 Waivers: DECIDED (2026-10-13): reverse standings.** Built
+(2026-10-13, T4.8): `waivers.priority: reverse_standings`,
+`reverseStandingsPriority` and the `waiverPriority` selector. Season 1 and
+the mock season use it; `rolling` stays available.
 - Each waiver window, claims are tried in reverse order of the current
   standings: the lowest tavern on the table goes first. Ties on the table go
   to reverse draft order. Winning a claim doesn't move a tavern; the order is
@@ -103,7 +105,8 @@ ties to break. `scoring.tiebreakers` is removed: equal season totals share a
 rank, and a tie for first gives co-champions. *Defaulted (2026-10-13):* a
 tie for first at season end goes to the tavern with fewer DNFs over the
 season, and co-champions only if that is tied too. Ties for first are rare
-(5 in 300 mock seasons). *Earlier open question:* whether to add
+(5 in 300 mock seasons). *Built (2026-10-13, T4.9):* `standings(…, {
+breakFirstTie })`, applied by `seasonStandings` once the season is complete. *Earlier open question:* whether to add
 a tiebreak at season end only (for example a seeded coin) so there is always
 one champion. The original text follows. Score is a fraction with small
 denominators (about 3–6 checks), so many taverns land on the same values

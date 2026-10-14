@@ -97,7 +97,8 @@
  *   instead.
  * - `waiver.resolved` must be exactly what `resolveWaivers` decides from the
  *   state: the pending claims (in log order, which ranks them as their seqs
- *   would), `waivers.priority`, every roster, and `freeAgents`. `outcomes`
+ *   would), `waiverPriority(state)` (the stored rolling order, or the
+ *   reverse standings, D-05), every roster, and `freeAgents`. `outcomes`
  *   must list the same claims, `awarded` flags and reasons (a `WaiverReason`)
  *   in the same order (decision order: round by round, priority order within
  *   a round), and `priorityAfter` must equal the computed priority. Otherwise
@@ -142,7 +143,7 @@ import {
   type WaiverClaim,
 } from '../roster';
 import type { CrEighths } from '../vocabulary';
-import { freeAgents } from './selectors';
+import { freeAgents, waiverPriority } from './selectors';
 import type { LeagueState, TavernState, TradeState } from './state';
 import type { EventOf, EventType, LeagueEvent, PayloadByType } from './types';
 
@@ -649,7 +650,7 @@ function computeWaivers(state: LeagueState, config: SeasonConfig): { readonly ou
     return claim;
   });
   const rosters = [...state.taverns.values()].map(rosterView);
-  const result = resolveWaivers(claims, state.waivers.priority, rosters, new Set(freeAgents(state)), config);
+  const result = resolveWaivers(claims, waiverPriority(state), rosters, new Set(freeAgents(state)), config);
   return {
     outcomes: result.awards.map((a) => ({ claim: ids.get(a.claim)!, awarded: a.awarded, reason: a.reason })),
     priority: result.priority,

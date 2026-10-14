@@ -175,9 +175,9 @@ describe('mini-season replay', () => {
     expect(at.final.finalizedWeeks).toEqual(new Set([1, 2]));
     const week2 = weekResults(at.final, 2);
     expect(week2.map((r) => r.tavern)).toEqual(TAVERNS);
-    expect(week2.find((r) => r.tavern === D)).toEqual({ week: 2, tavern: D, points: 0, projected: 0, checksPassed: 0 });
+    expect(week2.find((r) => r.tavern === D)).toEqual({ week: 2, tavern: D, points: 0, projected: 0, checksPassed: 0, dnf: false });
     const recorded = at.final.results.get(2)!.get(A)!;
-    expect(week2[0]).toEqual({ week: 2, tavern: A, points: recorded.points, projected: recorded.projectedPoints, checksPassed: recorded.run.checksPassed });
+    expect(week2[0]).toEqual({ week: 2, tavern: A, points: recorded.points, projected: recorded.projectedPoints, checksPassed: recorded.run.checksPassed, dnf: recorded.run.dnf });
   });
 
   it('weekResults is empty until the week is finalized', () => {
