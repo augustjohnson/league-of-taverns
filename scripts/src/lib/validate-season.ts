@@ -12,13 +12,17 @@
  *   `spellcasters.maxPerEncounter` (D-43; moves into the engine with T5.6).
  *   A selected mission's environment must be one the schedule uses. Which
  *   week it runs is lock-check's business (T8.4).
+ * - Keywords (D-42): where exactly one selected mission has a week's
+ *   environment, every keyword of that week must name something in it
+ *   (`dishonestKeywords`). lock-check (T8.4) will make the same check
+ *   against the mission actually selected for each week.
  * - Images (D-10): pooled characters' portraits and the season's mission
  *   covers are the style's size and palette (./images/check.ts).
  *
  * Not yet: chrome coverage and lints (T8.x).
  */
 import { basename, extname } from 'node:path';
-import { indexSnapshot, validateMission } from '@league-of-taverns/engine';
+import { dishonestKeywords, indexSnapshot, validateMission } from '@league-of-taverns/engine';
 import type { Mission, MissionRules } from '@league-of-taverns/engine';
 import { checkSeasonImages } from './images/check';
 import { creatureSize } from './images/style';
@@ -55,6 +59,7 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
 
   const issues: string[] = [];
   const missions: Array<{ file: string; id: string; status: MissionStatus }> = [];
+  const selected: Mission[] = [];
   const { config, spellcasters, schedule } = loaded;
   const { battleModel: _battleModel, ...missionRules } = config.missions;
   const rules: MissionRules = { ...missionRules, partyCr: config.budget.partyCr };
@@ -73,6 +78,7 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
       continue;
     }
     missions.push({ file: label, id: mission.id, status });
+    if (status === 'selected') selected.push(mission);
     const report = (message: string, nodeId?: string): void => {
       issues.push(`${label}: ${nodeId === undefined ? '' : `${nodeId}: `}${message}`);
     };
@@ -108,6 +114,16 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
       }
     }
   }
+
+  const scheduleLabel = `${displayPath(loaded.dir, root)}/${loaded.files.schedule}`;
+  schedule.weeks.forEach((week, i) => {
+    const matching = selected.filter((m) => m.environment === week.environment);
+    if (matching.length !== 1) return;
+    const mission = matching[0]!;
+    for (const keyword of dishonestKeywords(mission, week.keywords)) {
+      issues.push(`${scheduleLabel}: weeks[${i}].keywords: ${JSON.stringify(keyword)} names nothing in mission "${mission.id}" (D-42)`);
+    }
+  });
 
   const portraits = loaded.pool.characters.map(({ ref }) => {
     const record = bySlug.get(ref.base);

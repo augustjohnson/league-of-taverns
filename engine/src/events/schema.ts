@@ -170,6 +170,7 @@ export const payloadSchemas = {
         title: text,
         environment: text,
         theme: z.string(),
+        keywords: z.array(text),
         commitment: sha256HexSchema.nullable(),
         sponsor: kebabIdSchema.nullable(),
       }),

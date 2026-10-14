@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { lootShape, missionHaul, topologicalOrder, validateMission } from '../src/missions';
+import { dishonestKeywords, lootShape, missionHaul, missionKeywords, topologicalOrder, validateMission } from '../src/missions';
 import type { BattleNode, CheckNode, Mission, MissionEdge, MissionIssue, MissionNode, MissionRules } from '../src/missions';
 import type { CrEighths } from '../src/vocabulary';
 // The engine has no YAML parser (it does no I/O), so the example file is read
@@ -416,6 +416,32 @@ describe('mission validator', () => {
     });
     expect(lootShape(late)).toMatchObject({ lateShare: 0.4, lastBattleRank: 4, ok: false });
     expect(lootShape({ ...late, nodes: late.nodes.map((n) => (n.id === 'fight' ? { ...n, loot: 60 } : n)) })).toMatchObject({ lateShare: 0.5, ok: true });
+  });
+
+  it('lists the D-42 keywords a mission supports, and flags keywords that name nothing', () => {
+    const mission = tiny({
+      nodes: [
+        start(),
+        check('look', 1, 12, { requires: { sense: 'darkvision' } }, 0),
+        { id: 'swim', rank: 2, kind: 'check', check: { type: 'save', ability: 'con', dc: 12 }, loot: 1 },
+        { id: 'grip', rank: 3, kind: 'check', check: { type: 'ability', ability: 'str', dc: 12 }, loot: 1 },
+        { id: 'pick', rank: 4, kind: 'check', check: { type: 'skill', skill: 'sleight_of_hand', dc: 12 }, loot: 1 },
+        battle('fight', 5, [{ ref: 'giant-frog', count: 2 }, { ref: 'goblin', count: 1 }]),
+        end('done', 6),
+      ],
+      edges: [
+        edge('start', 'look', 'always'),
+        edge('look', 'swim', 'always'),
+        edge('swim', 'grip', 'always'),
+        edge('grip', 'pick', 'always'),
+        edge('pick', 'fight', 'always'),
+        edge('fight', 'done', 'win'),
+      ],
+    });
+    expect(missionKeywords(mission)).toEqual(['perception', 'darkvision', 'con save', 'str check', 'sleight of hand', 'giant frog fight']);
+    expect(dishonestKeywords(mission, ['perception', 'con save', 'giant frog fight'])).toEqual([]);
+    // The second creature is not the lead, and nothing here swims.
+    expect(dishonestKeywords(mission, ['goblin fight', 'swim', 'perception'])).toEqual(['goblin fight', 'swim']);
   });
 
   it('checks environment only when an expected one is given (environment)', () => {

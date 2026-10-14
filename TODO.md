@@ -43,7 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
-- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7, T4.10, T6.9.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7, T4.10, T6.9, T5.7.
 
 ## Phase 1 starting set (historical)
 
@@ -372,7 +372,7 @@ Owns `engine/src/missions/`, `scripts/src/validate.ts`,
 - **Acceptance:** all 3 missions pass T5.2; the pool passes T3.2 budgets.
 - **Depends:** T5.1, T5.2, T3.2.
 
-#### T5.7 Schedule keywords · S
+#### T5.7 Schedule keywords · S (done 2026-10-13; lock-check will reuse `dishonestKeywords` when T8.4 lands)
 - **Goal:** `keywords` on schedule entries (D-42), carried into
   `season.created`, plus a `lock-check` rule that every keyword names a skill,
   save, gate or battle lead in the selected mission.

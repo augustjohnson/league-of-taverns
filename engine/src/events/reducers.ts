@@ -43,7 +43,7 @@
  * | `waiver.claimed` | `waiver.draft_incomplete`, `waiver.unknown_tavern`, `waiver.duplicate_claim`, `waiver.not_pooled`, `waiver.not_free_agent`, `waiver.drop_not_owned` |
  * | `waiver.resolved` | `waiver.bad_week`, `waiver.week_not_finalized`, `waiver.already_resolved`, `waiver.unknown_claim`, `waiver.duplicate_outcome`, `waiver.missing_outcome`, `waiver.bad_priority`, `waiver.outcome_mismatch` |
  * | `trade.*` | `trade.draft_incomplete`, `trade.duplicate_id`, `trade.unknown_tavern`, `trade.unknown`, `trade.not_proposed`, `trade.not_accepted`, `trade.not_open`, `trade.past_deadline` (at acceptance), and the `validateTrade` codes below |
- * | `mission.revealed` | `reveal.bad_week`, `reveal.week_not_locked`, `reveal.already_revealed`, `reveal.wrong_season`, `reveal.commitment_mismatch`, `reveal.invalid_mission` |
+ * | `mission.revealed` | `reveal.bad_week`, `reveal.week_not_locked`, `reveal.already_revealed`, `reveal.wrong_season`, `reveal.commitment_mismatch`, `reveal.invalid_mission`, `reveal.dishonest_keywords` |
  * | `mission.resolved` | `resolve.bad_week`, `resolve.week_not_locked`, `resolve.not_revealed`, `resolve.wrong_mission`, `resolve.week_finalized`, `resolve.unknown_tavern`, `resolve.duplicate`, `resolve.no_lineup`, `resolve.lineup_mismatch`, `resolve.counts_mismatch`, `resolve.score_mismatch`, `resolve.bad_injury` |
  * | `week.finalized` | `finalize.bad_week`, `finalize.already_finalized`, `finalize.week_not_locked`, `finalize.missing_result` |
  *
@@ -128,7 +128,9 @@
  *   mission is validated against the season's mission rules and the
  *   schedule's environment. The reducer has no creature snapshot, so the
  *   snapshot-dependent checks (`encounter.ref`, `encounter.budget`) are the
- *   reveal script's.
+ *   reveal script's. Every keyword in the week's schedule entry must name
+ *   something in the mission (`dishonestKeywords`, D-42), so once missions
+ *   are hidden, the reveal proves the keywords were honest.
  * - `mission.resolved`: the counts and the loot (the `loot` of each passed
  *   check node and won battle node) are recomputed from the recorded nodes, and the score must
  *   equal `lootScore(loot, missionHaul(mission))`, DNF or not, to within
@@ -147,7 +149,7 @@
  */
 import { REGISTRY_VERSION, TRAITS, validateModifiers } from '../characters';
 import { MAX_TAVERNS, validateSponsors, type SeasonConfig } from '../league';
-import { missionHaul, validateMission, type Mission } from '../missions';
+import { dishonestKeywords, missionHaul, validateMission, type Mission } from '../missions';
 import { lootScore } from '../resolution';
 import { draftOrderSeed, rngFor } from '../rng';
 import {
@@ -576,6 +578,10 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     );
     if (issues.length > 0) {
       fail(event, 'reveal.invalid_mission', `mission "${mission.id}": ${issues.map((i) => `${i.code}: ${i.message}`).join('; ')}`);
+    }
+    const dishonest = entry === undefined ? [] : dishonestKeywords(mission, entry.keywords);
+    if (dishonest.length > 0) {
+      fail(event, 'reveal.dishonest_keywords', `week ${week}'s keywords name nothing in "${mission.id}": ${dishonest.map((k) => `"${k}"`).join(', ')} (D-42)`);
     }
     return { ...state, revealed: mapSet(state.revealed, week, mission) };
   },

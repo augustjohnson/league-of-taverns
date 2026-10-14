@@ -166,7 +166,9 @@ schedule entry gains a **keyword description** next to its title,
 environment and theme: a short list of what the mission tests (skills, saves,
 gates, the lead creature of each battle), for example
 `[survival, stealth, athletics, con save, crocodile fight, lizardfolk fight]`.
-Not built yet.
+Built (2026-10-13, T5.7): `keywords` in `schedule.yaml` and `season.created`,
+the vocabulary and `dishonestKeywords` in `engine/src/missions/keywords.ts`,
+checked by `validate` and at `mission.revealed`.
 - Why keywords: they are the readable summary for managers who won't open
   mission YAML, and the vocabulary a hex (D-52) and environment fit are
   judged against.

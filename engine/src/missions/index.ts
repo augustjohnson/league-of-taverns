@@ -22,4 +22,5 @@ export type * from './types';
 export { checkTargetSchema, formatIssuePath, kebabIdSchema, missionSchema, parseMission, toSchemaIssues } from './schema';
 export type { AssertTrue, ParseResult, SchemaIssue, SchemaMatches } from './schema';
 export { lootShape, missionHaul, topologicalOrder, validateMission } from './validator';
+export { checkKeyword, dishonestKeywords, missionKeywords } from './keywords';
 export type { LootShape, MissionIssue, MissionIssueCode, MissionRules, ValidateMissionOptions } from './validator';

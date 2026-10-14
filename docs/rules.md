@@ -99,7 +99,8 @@
 
 - Each week has a **public schedule entry**: title, environment, theme, and
   a **keyword description** of what the mission tests (skills, saves, gates,
-  the lead creature of each battle) **[D-42, keywords not built yet]**.
+  the lead creature of each battle) **[D-42]**. A keyword may leave things
+  out, but never names something the mission doesn't test.
 - The **mission itself** is a branching path of **skill checks** and
   **battles** that the GM locked before the draft. For now missions are
   public (§11), so a manager may read the full mission before the lock.

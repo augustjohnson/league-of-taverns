@@ -411,6 +411,7 @@ const cases: ReadonlyArray<Case> = [
   ['lock with a null lineup marked submitted', at.w1Pending, candidate(at.w1Pending, 'lineup.locked', { week: 1, lineups: [{ ...w1Entries[0]!, lineup: null }, ...w1Entries.slice(1)] }), 'lock.source_mismatch'],
   ['lock with an illegal lineup', at.w1Pending, candidate(at.w1Pending, 'lineup.locked', { week: 1, lineups: [{ ...w1Entries[0]!, lineup: foreignLineup }, ...w1Entries.slice(1)] }), 'lock.illegal_lineup'],
 
+  ['a week whose keywords name nothing in its mission', at.w1Locked, candidate(at.w1Locked, 'mission.revealed', { week: 1, mission: { ...missionFor(1), nodes: missionFor(1).nodes.filter((n) => n.kind !== 'check' || n.id !== 'find-path').concat([{ id: 'find-path', rank: 1, kind: 'check', check: { type: 'skill', skill: 'stealth', dc: 11 }, loot: 100 }]) }, sha256: lineHash('mission-w1'), salt: null }), 'reveal.dishonest_keywords'],
   // hex.declared
   ['a hex by an unknown tavern', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: 'nobody', target: B, ability: 'wis', week: 2 }, MANAGER), 'hex.unknown_tavern'],
   ['a hex on itself', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: A, target: A, ability: 'wis', week: 2 }, MANAGER), 'hex.self'],

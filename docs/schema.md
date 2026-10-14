@@ -256,9 +256,13 @@ governs, and CI flags later edits to the file.
 `managers.yaml`: `commissioner`, `gm`, and `managers: [{ id, account: { login, githubId } | { bot } }]`, at most 6 (D-01). Managers have no tavern until the tavern pick.
 
 `schedule.yaml`: `season`, `taverns: [{ id, name, god }]` (at most 6, D-01; each tavern already blessed by its god, D-52), `weeks: [{ week, title, environment, theme, keywords, commitment, sponsor }]`. The loader derives `sponsors: [{ id: god, tavern }]` from `taverns`.
-`keywords` (planned, D-42) is a list of short strings naming what the mission
-tests, such as `survival`, `con save` or `lizardfolk fight`. `lock-check`
-rejects a keyword that names nothing in the selected mission.
+`keywords` (D-42) is a list of short strings naming what the mission tests,
+in a fixed vocabulary (`engine/src/missions/keywords.ts`): a skill with spaces
+(`sleight of hand`), `<ability> save`, `<ability> check`, a gate's speed or
+sense (`fly`, `darkvision`), or a battle's lead creature (`lizardfolk
+fight`). The GM may leave things out, never add: `validate` (and later
+`lock-check`) rejects a keyword that names nothing in the week's mission, and
+so does the reducer at `mission.revealed` (`reveal.dishonest_keywords`).
 `sponsor` is a god's id or null. Each god blesses one tavern and sets at most
 one week (D-48). On that week the tavern's points are × `scoring.homeBonus`
 (D-47; Season 1 sets 1, so nothing). A god's name and voice are chrome.

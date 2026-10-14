@@ -66,6 +66,8 @@ interface SeasonFixture {
   readonly weeks?: ReadonlyArray<number>;
   /** The season's taverns and their gods (D-52). Default: The Inn, blessed by the-sea. */
   readonly taverns?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly god: string }>;
+  /** Week → schedule keywords (D-42). Unlisted weeks have none. */
+  readonly keywordsOf?: Readonly<Record<number, ReadonlyArray<string>>>;
   /** Week → sponsor (god) id. Unlisted weeks are unsponsored. */
   readonly sponsorOf?: Readonly<Record<number, string>>;
 }
@@ -97,6 +99,7 @@ function makeSeason(root: string, id: string, fixture: SeasonFixture = {}): void
     title: `Week ${week}`,
     environment: 'forest',
     theme: '',
+    keywords: fixture.keywordsOf?.[week] ?? [],
     commitment: null,
     sponsor: fixture.sponsorOf?.[week] ?? null,
   }));
@@ -388,8 +391,21 @@ describe('validateSeason', () => {
     };
     write(join(root, 'seasons/bad-missions/missions/selected/tower.yaml'), toYaml(mission));
     write(join(root, 'seasons/bad-missions/missions/candidates/broken.yaml'), toYaml({ ...mission, nodes: 'nope' }));
+    // A forest week whose keywords name a stealth check its mission doesn't have (D-42).
+    makeSeason(root, 'fibbing', { keywordsOf: { 1: ['athletics', 'stealth', 'ogre fight'] } });
+    write(
+      join(root, 'seasons/fibbing/missions/selected/climb.yaml'),
+      toYaml({ ...mission, id: 'climb', season: 'fibbing', environment: 'forest', nodes: mission.nodes.map((n) => (n.id === 'duel' ? { ...n, encounter: { creatures: [{ ref: 'ogre', count: 1 }] } } : n)) }),
+    );
   });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('reports schedule keywords that name nothing in the week\'s mission (D-42)', () => {
+    const { issues } = validateSeason('fibbing', root);
+    expect(issues.filter((i) => i.includes('keywords'))).toEqual([
+      'seasons/fibbing/schedule.yaml: weeks[0].keywords: "stealth" names nothing in mission "climb" (D-42)',
+    ]);
+  });
 
   it('reports every mission problem with its file', () => {
     const { issues } = validateSeason('bad-missions', root);

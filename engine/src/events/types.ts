@@ -55,6 +55,8 @@ export interface PayloadByType {
       readonly title: string;
       readonly environment: string;
       readonly theme: string;
+      /** What the mission tests, in the D-42 vocabulary (`missionKeywords`). The GM may leave things out, never add. */
+      readonly keywords: ReadonlyArray<string>;
       readonly commitment: string | null;
       readonly sponsor: string | null;
     }>;

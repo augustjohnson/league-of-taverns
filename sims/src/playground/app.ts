@@ -124,6 +124,12 @@ function environmentOf(week: number): string {
   return input.schedule.find((s) => s.week === week)?.environment ?? '';
 }
 
+/** The week's public keywords (D-42) as a line, or nothing when the GM listed none. */
+function keywordsLine(week: number): string {
+  const keywords = input.schedule.find((s) => s.week === week)?.keywords ?? [];
+  return keywords.length === 0 ? '' : `<p class="small"><span class="label">Tests</span> ${keywords.map((k) => `<span class="tag">${esc(k)}</span>`).join(' ')}</p>`;
+}
+
 // ── page state ─────────────────────────────────────────────────────────────
 
 type Tab = 'play' | 'standings' | 'reports' | 'weeks' | 'lab' | 'draft' | 'pool' | 'events' | 'batch';
@@ -864,6 +870,7 @@ function renderWeeks(r: Run): string {
 
   return (
     `<section class="card"><div class="row"><h2>Week ${week}</h2><span class="muted">${esc(mission.id)} · ${esc(environmentOf(week))}</span></div>` +
+    keywordsLine(week) +
     `<div class="row"><label class="label" for="wk-week">Week</label><select id="wk-week" data-action="wk-week">${weekOptions}</select>` +
     `<label class="label" for="wk-tavern">Tavern</label><select id="wk-tavern" data-action="wk-tavern">${tavernOptions}</select></div>` +
     `<div class="scroll"><table><thead><tr><th>tavern</th><th>bot</th><th>source</th><th>lineup</th><th class="n">checks</th><th class="n">pts</th><th class="n">proj</th><th></th></tr></thead><tbody>${table}</tbody></table></div></section>` +
@@ -1768,6 +1775,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
 
   const lineupCardHtml =
     `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · ${homeLine(s, week)}</span></div>` +
+    keywordsLine(week) +
     `<div class="scroll"><table><thead><tr>${CHAR_HEAD}<th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` +
     `<p class="small">CR total ${num(formatCrTotal(total))} of ${num(formatCrTotal(BUDGET))}</p>${crMeter(total)}` +
     `<div class="row">${retreatSelect('play-retreat', 'play-retreat', play.retreat)}</div>` +

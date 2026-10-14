@@ -86,7 +86,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
     config,
     configSha256: HASH,
     engineVersion: '0.0.0',
-    schedule: [{ week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded toll road.', commitment: null, sponsor: 'the-drowned-saint' }],
+    schedule: [{ week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded toll road.', keywords: ['survival', 'crocodile fight'], commitment: null, sponsor: 'the-drowned-saint' }],
     sponsors: [{ id: 'the-drowned-saint', tavern: 'the-gilded-flagon' }],
     taverns: [{ id: 'the-gilded-flagon', name: 'The Gilded Flagon' }],
   }),

@@ -80,8 +80,8 @@ export const WEEK2_COMMITMENT = lineHash('mission-w2');
 
 export function schedule(): PayloadByType['season.created']['schedule'] {
   return [
-    { week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded road.', commitment: null, sponsor: 'the-drowned-saint' },
-    { week: 2, title: 'The Sunken Bell', environment: 'swamp', theme: 'A bell under the bog.', commitment: WEEK2_COMMITMENT, sponsor: 'the-bog-king' },
+    { week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded road.', keywords: ['survival'], commitment: null, sponsor: 'the-drowned-saint' },
+    { week: 2, title: 'The Sunken Bell', environment: 'swamp', theme: 'A bell under the bog.', keywords: ['survival', 'bat fight'], commitment: WEEK2_COMMITMENT, sponsor: 'the-bog-king' },
   ];
 }
 
