@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { webImage } from '@league-of-taverns/scripts/lib/images/postprocess';
+import { cropImage, faceRect } from '@league-of-taverns/scripts/lib/images/face';
 import { decodePng, encodeIndexedPng } from '@league-of-taverns/scripts/lib/images/png';
 import { build } from 'esbuild';
 import { REPO_ROOT, loadCharacterChrome, loadGodChrome, rootDir } from '@league-of-taverns/scripts/lib/repo';
@@ -25,26 +26,34 @@ import { serializeSeason, type PlaygroundChrome, type PlaygroundData } from './p
 const PLAYGROUND_SRC = join(dirname(fileURLToPath(import.meta.url)), 'playground');
 
 /** Portrait thumbnails: longest side (twice the largest frame the page draws, 80 px) and colour budget. */
-const THUMB = { longSide: 160, colors: 256 } as const;
+/** The portrait chips' thumbnail: 2× the largest chip (44 px). The page must stay under 2 MiB, faces included. */
+const THUMB = { longSide: 88, colors: 160 } as const;
+/** The card's face crop: 1.5× the card's 148 px art window, so it stays sharp on dense screens. */
+const FACE = { longSide: 222, colors: 128 } as const;
 
 /**
  * Chrome for each character in `ids`, read from `<charactersRoot>/characters/<id>/`,
  * with the painted portrait (when it has one) cut down to a thumbnail
- * (docs/images.md § Post-processing).
+ * (docs/images.md § Post-processing) and to the card's face crop
+ * (scripts/src/lib/images/face.ts: the default head-and-shoulders window, or
+ * the character's own `portrait.face`).
  */
 export function playgroundChrome(ids: ReadonlyArray<string>, charactersRoot: string): Record<string, PlaygroundChrome> {
   const out: Record<string, PlaygroundChrome> = {};
+  const uri = (png: Buffer): string => `data:image/png;base64,${png.toString('base64')}`;
   for (const id of ids) {
     const { name, epithet, tagline, portrait } = loadCharacterChrome(id, charactersRoot);
-    const thumb =
-      portrait?.path === undefined
-        ? undefined
-        : encodeIndexedPng(webImage(decodePng(readFileSync(join(charactersRoot, 'characters', id, portrait.path))), THUMB.longSide, THUMB.colors));
+    const original = portrait?.path === undefined ? undefined : decodePng(readFileSync(join(charactersRoot, 'characters', id, portrait.path)));
     out[id] = {
       name,
       ...(epithet === undefined ? {} : { epithet }),
       ...(tagline === undefined ? {} : { tagline }),
-      ...(thumb === undefined ? {} : { portrait: `data:image/png;base64,${thumb.toString('base64')}` }),
+      ...(original === undefined
+        ? {}
+        : {
+            portrait: uri(encodeIndexedPng(webImage(original, THUMB.longSide, THUMB.colors))),
+            face: uri(encodeIndexedPng(webImage(cropImage(original, faceRect(original, portrait?.face)), FACE.longSide, FACE.colors))),
+          }),
     };
   }
   return out;

@@ -16,5 +16,6 @@ chrome:
     prompt: grey rhinoceros with a chipped horn with a dented iron cooking pot stuck on his horn, (determined charging glare:1.3)
     bodyPlan: beast
     path: portrait.png
+    face: { x: 0.42, y: 0.1, width: 0.5 } # card face crop, fractions of the portrait
     seed: 973589175
   height: 6

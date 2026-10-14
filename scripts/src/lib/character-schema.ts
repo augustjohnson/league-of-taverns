@@ -9,6 +9,7 @@ import { kebabIdSchema } from '@league-of-taverns/engine';
 import { z } from 'zod';
 import { BODY_PLANS } from './images/body-plans';
 import type { BodyPlan } from './images/body-plans';
+import type { FaceWindow } from './images/face';
 import type { AssertTrue, SchemaMatches } from '@league-of-taverns/engine';
 
 export type CharacterStatus = 'active' | 'retired';
@@ -38,6 +39,11 @@ export interface CharacterChrome {
     readonly translucent?: boolean;
     /** The outside image an accepted portrait was imported from, instead of a ComfyUI seed. */
     readonly imported?: string;
+    /**
+     * Where the card's face crop sits, as fractions of the portrait: left, top and width (the height follows the
+     * card's aspect). Only for portraits the default head-and-shoulders crop misses (./images/face.ts).
+     */
+    readonly face?: FaceWindow;
   };
   readonly history?: ReadonlyArray<string>;
 }
@@ -55,6 +61,7 @@ export interface CharacterFile {
 }
 
 const text = z.string().min(1);
+const fraction = z.number().min(0).lt(1);
 
 const chromeSchema = z.strictObject({
   name: text,
@@ -72,6 +79,10 @@ const chromeSchema = z.strictObject({
       bodyPlan: z.enum(BODY_PLANS).exactOptional(),
       translucent: z.boolean().exactOptional(),
       imported: text.exactOptional(),
+      face: z
+        .strictObject({ x: fraction, y: fraction, width: z.number().gt(0).max(1) })
+        .refine((f) => f.x + f.width <= 1, { message: 'x + width must be at most 1 (the window must fit in the portrait)' })
+        .exactOptional(),
     })
     .exactOptional(),
   history: z.array(z.string()).exactOptional(),

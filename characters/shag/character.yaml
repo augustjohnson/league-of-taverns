@@ -16,5 +16,6 @@ chrome:
     prompt: shaggy burnt-orange rug with tasselled edges, a large suspicious brown stain and two woven eyes, (sly lurking stare:1.3)
     bodyPlan: object
     path: portrait.png
+    face: { x: 0.28, y: 0.0, width: 0.65 } # card face crop, fractions of the portrait
     imported: shag-gemini-1.webp
   height: 6

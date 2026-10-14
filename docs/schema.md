@@ -58,6 +58,9 @@ chrome:                      # everything below is cosmetic and never reaches th
     prompt: string           # the subject only; content/images/style.yaml adds the style
     path: portrait.png       # set by draft-images accept; required at draft and final
     seed: integer            # ComfyUI seed of the accepted image
+    face: { x, y, width }    # optional: the card's face crop, as fractions of the portrait (left, top, width;
+                             # the height follows the card's aspect). Only where the default head-and-shoulders
+                             # crop misses the face (scripts/src/lib/images/face.ts; docs/images.md § Card faces)
   history: [string]          # optional cosmetic notes
 ```
 

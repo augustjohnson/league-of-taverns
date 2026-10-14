@@ -24,6 +24,8 @@ export interface PlaygroundChrome {
   readonly tagline?: string;
   /** A thumbnail of the painted portrait, as a `data:image/png;base64,` URI. */
   readonly portrait?: string;
+  /** The card's face crop of the painted portrait, as a `data:image/png;base64,` URI. */
+  readonly face?: string;
 }
 
 /** Everything the page needs, JSON-safe. A `SeasonParts` with the snapshot trimmed to the records it uses. */

@@ -16,5 +16,6 @@ chrome:
     prompt: pot-bellied grey demon with one snapped-off horn and a crooked parchment name tag pinned to his chest, (nervous sweaty grin:1.3)
     bodyPlan: humanoid
     path: portrait.png
+    face: { x: 0.19, y: 0.02, width: 0.62 } # card face crop, fractions of the portrait
     seed: 780276509
   height: 4

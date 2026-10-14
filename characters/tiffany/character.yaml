@@ -16,5 +16,6 @@ chrome:
     prompt: brown leathery bat-winged stirge with a long needle proboscis, one milky white eye and a tiny pearl stud in one ear, (patient half-lidded gaze:1.3)
     bodyPlan: winged
     path: portrait.png
+    face: { x: 0.33, y: 0.15, width: 0.4 } # card face crop, fractions of the portrait
     imported: tiffany-s703.png
   height: 1

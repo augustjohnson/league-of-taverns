@@ -9,6 +9,7 @@ import { loadMockSeason, loadMockSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
 import {
+  artCss,
   bannerCss,
   bestWeek,
   bannerGods,
@@ -247,6 +248,21 @@ describe('table moves', () => {
   });
 });
 
+describe('card art stylesheet', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+
+  it("sets each character's face and thumbnail as custom properties, once", () => {
+    expect(artCss({ doug: { face: png, portrait: png }, bruno: { face: png } }).split('\n')).toEqual([
+      `[data-art="doug"]{--art-face:url("${png}");--art-thumb:url("${png}")}`,
+      `[data-art="bruno"]{--art-face:url("${png}")}`,
+    ]);
+  });
+
+  it('skips a character with no face, or an id or image that could break out of the stylesheet', () => {
+    expect(artCss({ plain: { portrait: png }, 'x"]{}': { face: png }, sneaky: { face: 'data:image/png;base64,AA")}body{x:url("' } })).toBe('');
+  });
+});
+
 describe('banner stylesheet', () => {
   const crow = { name: 'The Storm Crow', banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: 'rain' as const } };
 
@@ -282,6 +298,8 @@ describe('playground build', () => {
     // Every sponsoring god's chrome rides along for the banners.
     expect(Object.keys(built.gods).sort()).toEqual(parts.sponsors.map((sp) => sp.id).sort());
     expect(bannerGods(built.gods).size).toBe(parts.sponsors.length);
+    // Every pooled character with a portrait gets the card's face crop.
+    for (const { character } of parts.pool) expect(built.chrome[character.ref.id]?.face, character.ref.id).toMatch(/^data:image\/png;base64,/);
     const html = readFileSync(out, 'utf8');
     expect(html.startsWith('<title>League of Taverns Playground</title>')).toBe(true);
     expect(html).not.toMatch(/<(html|head|body)\b|<!doctype/i);
@@ -305,7 +323,7 @@ describe('playground build', () => {
       const uri = built.chrome[id]!.portrait;
       expect(uri, id).toMatch(/^data:image\/png;base64,/);
       const png = Buffer.from(uri!.slice(uri!.indexOf(',') + 1), 'base64');
-      expect(Math.max(png.readUInt32BE(16), png.readUInt32BE(20)), id).toBe(160);
+      expect(Math.max(png.readUInt32BE(16), png.readUInt32BE(20)), id).toBe(88);
     }
     expect(runMockSeason(seasonInputFromData(built), { seed: 'sim-1' }).ndjson).toBe(sim1.ndjson);
   });

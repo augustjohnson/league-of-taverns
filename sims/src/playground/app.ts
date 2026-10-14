@@ -65,6 +65,7 @@ import { clockBack, crownChampion, hailChampion, layCurse, nodMeter, raiseBanner
 import {
   actorLabel,
   aggregateRows,
+  artCss,
   bannerCss,
   bannerGods,
   checkLabel,
@@ -128,6 +129,10 @@ const BANNERED = bannerGods(data.gods);
 const bannerStyle = document.createElement('style');
 bannerStyle.textContent = bannerCss(data.gods);
 document.head.append(bannerStyle);
+// Card art: each character's face crop and thumbnail as custom properties, once, out of the card markup.
+const artStyle = document.createElement('style');
+artStyle.textContent = artCss(data.chrome);
+document.head.append(artStyle);
 /** The god whose banner a tavern fights under, if its god has one. */
 const bannerOf = (tavern: string): string | null => {
   const god = godOf.get(tavern);
@@ -1673,7 +1678,8 @@ const SILHOUETTE =
   '<svg class="silhouette" viewBox="0 0 100 80" aria-hidden="true"><circle cx="50" cy="30" r="17"/><path d="M14 80c2-20 17-30 36-30s34 10 36 30z"/></svg>';
 
 /**
- * A character card: name and CR across the top, the art (a silhouette until portraits reach the page), the monster
+ * A character card: name, epithet and CR across the top, the art (the portrait's face crop over a blurred copy of the
+ * portrait, or a silhouette for a character without one), the monster
  * line with its size in words ("Ape · Medium beast"), AC, HP and speed, and the best skills. Neutral until a tavern
  * owns the character; then it wears that tavern's banner. `foot` is the card's action or note.
  */
@@ -1683,10 +1689,14 @@ function charCard(id: string, { owner = null, foot = '', advised = false }: { ow
   const speeds = Object.entries(st.speeds).filter(([k]) => k !== 'walk');
   const speed = speeds.length > 0 ? speeds.map(([k, v]) => `${k} ${v}`).join(' · ') : `walk ${st.speeds.walk ?? 0}`;
   const size = st.base.size.charAt(0).toUpperCase() + st.base.size.slice(1);
+  const epithet = chromeOf(id)?.epithet;
+  const face = chromeOf(id)?.face !== undefined;
   return (
     `<article class="lcard ${themed ? 'themed' : 'neutral'}${advised ? ' advised' : ''}" data-card="${esc(id)}"${themed ? bannerAttr(owner) : ''}>` +
-    `<header><div class="who"><b>${esc(charName(id))}</b></div><span class="cr" title="Challenge rating">${formatCr(crOf(id))}</span></header>` +
-    `<div class="art">${SILHOUETTE}</div>` +
+    `<header><div class="who"><b>${esc(charName(id))}</b>${epithet === undefined ? '' : `<span>${esc(epithet)}</span>`}</div><span class="cr" title="Challenge rating">${formatCr(crOf(id))}</span></header>` +
+    (face
+      ? `<div class="art has-face" data-art="${esc(id)}"><span class="face" role="img" aria-label="${esc(charName(id))}"></span></div>`
+      : `<div class="art">${SILHOUETTE}</div>`) +
     `<div class="typeline"><b>${esc(st.base.typeName)}</b><span class="sizeword">${esc(size)} ${esc(st.base.creatureType)}</span></div>` +
     `<div class="stats"><span>AC <b>${st.base.ac}</b></span><span>HP <b>${st.base.hp}</b></span><span>${esc(speed)}</span></div>` +
     `<div class="skills">${topSkills(st, 2)

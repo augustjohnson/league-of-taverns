@@ -217,6 +217,19 @@ subject text ──▶ content/images/style.yaml wraps it ──▶ ComfyUI rend
   Kerrie Lake. It has few muted mid-tones, so browns lean red and greens lean
   olive. That's the price of a shared palette.
 
+## Card faces
+
+The playground's character cards show a face, not the whole figure: a window
+cut from the painted portrait at the card art's aspect (148 × 104), made at
+build time (`scripts/src/lib/images/face.ts`, `sims/src/playground-build.ts`).
+By default the window is head and shoulders: 45% of the figure's width,
+centred on the top band of the figure (where the head is, however the body
+leans) and starting just above it. That suits people and most monsters.
+Where it misses (a rhino's face is low and to one side, a dragon's sits off to
+the right, a wisp's is mid-glow), the character sets `chrome.portrait.face`:
+`{ x, y, width }` as fractions of the portrait, so it survives a re-render at
+another size. Check a new portrait's crop on its card before accepting it.
+
 ## Making images
 
 Start ComfyUI (see Setup), then from the repo root:

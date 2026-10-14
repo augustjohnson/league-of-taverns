@@ -26,6 +26,8 @@ beforeAll(() => {
   fixture('nameless', 'id: nameless\nbase: ogre\nstatus: active\nchrome:\n  epithet: the Unnamed\n');
   fixture('bad-status', 'id: bad-status\nbase: ogre\nstatus: benched\nchrome:\n  name: Benny\n  nickname: B\n');
   fixture('not-yaml', 'id: [unclosed\n');
+  fixture('framed', 'id: framed\nbase: rhinoceros\nstatus: active\nchrome:\n  name: Framed\n  portrait:\n    status: draft\n    path: portrait.png\n    face: { x: 0.4, y: 0.1, width: 0.5 }\n');
+  fixture('off-frame', 'id: off-frame\nbase: rhinoceros\nstatus: active\nchrome:\n  name: Off\n  portrait:\n    status: draft\n    face: { x: 0.7, y: 0.1, width: 0.5 }\n');
 });
 
 afterAll(() => {
@@ -53,6 +55,11 @@ describe('character files', () => {
   it('accepts a file with only the required fields', () => {
     expect(loadCharacterRef('minimal-mimic', root)).toEqual({ id: 'minimal-mimic', base: 'mimic' });
     expect(loadCharacterChrome('minimal-mimic', root)).toEqual({ name: 'Mim' });
+  });
+
+  it("takes a portrait's card face crop, and rejects one that runs off the portrait", () => {
+    expect(loadCharacterChrome('framed', root).portrait?.face).toEqual({ x: 0.4, y: 0.1, width: 0.5 });
+    expect(() => loadCharacterChrome('off-frame', root)).toThrow(/chrome\.portrait\.face: x \+ width must be at most 1/);
   });
 
   it('rejects a folder name that differs from the id', () => {

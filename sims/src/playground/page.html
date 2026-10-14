@@ -334,7 +334,9 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 .lcard.themed { --frame: var(--banner-pattern), var(--banner-ground); --frame-edge: var(--banner-line); --face: var(--banner-bg); --accent: var(--banner-line); --accent-ink: var(--banner-ink); }
 .lcard.advised { outline: 2px solid var(--brass); outline-offset: 2px; }
 .lcard > * { background: var(--face); border-radius: 4px; min-width: 0; }
-.lcard header { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; padding: 4px 6px; height: 46px; }
+.lcard header { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; padding: 4px 6px; height: 54px; }
+.lcard .who { display: grid; min-width: 0; line-height: 1.15; }
+.lcard .who > span { font-size: 10.5px; color: var(--muted); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lcard .who b { font: 400 14.5px/1.1 var(--font-display); color: var(--accent-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .lcard .cr { font: 600 12px var(--font-num); min-width: 26px; height: 26px; padding: 0 4px; border-radius: 13px; display: grid; place-items: center; border: 2px solid var(--accent); color: var(--accent-ink); background: var(--surface); }
 .lcard .art { position: relative; height: 104px; overflow: hidden; display: grid; place-items: end center;
@@ -342,6 +344,9 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 .lcard .art > * { transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); transform-origin: 50% 40%; }
 .lcard:hover .art > * { transform: scale(1.07); }
 .lcard .silhouette { width: 78%; fill: color-mix(in oklch, var(--accent-ink) 22%, transparent); }
+/* The face crop, over a blurred copy of the whole portrait: the character's own colours as the background. */
+.lcard .art.has-face::before { content: ''; position: absolute; inset: -18px; background: var(--art-thumb, none) center 30% / cover no-repeat; filter: blur(10px) saturate(1.25); opacity: 0.6; }
+.lcard .art .face { position: absolute; inset: 0; background: var(--art-face) center / cover no-repeat; }
 .lcard .typeline { display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; padding: 3px 6px; font-size: 12px; border-top: 2px solid var(--accent); }
 .lcard .typeline b { font-weight: 700; }
 .lcard .sizeword { color: var(--muted); font-size: 11px; }

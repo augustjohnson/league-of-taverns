@@ -65,9 +65,10 @@ pnpm --filter @league-of-taverns/sims playground -- [--dir sims/fixtures/mock-se
 ```
 
 Then open `sims/output/playground/index.html` directly in a browser (no server
-needed). The file is git-ignored and about 1.5 MB: half of it is a 160 px
-thumbnail of each pooled character's painted portrait, cut at build time
-(`playgroundChrome`). Names, epithets and portraits are chrome: every tab
+needed). The file is git-ignored and just under 2 MB, the build's limit:
+most of it is each pooled character's painted portrait, cut at build time
+(`playgroundChrome`) to an 88 px thumbnail for the portrait chips and to the
+card's face crop. Names, epithets and portraits are chrome: every tab
 but the event log (which shows ids, as the NDJSON does) shows them, and
 they never reach `seasonInput`. The mock season pools 48 of
 the real cast (`sims/fixtures/mock-season/pool.yaml`, with mock-season
@@ -133,7 +134,8 @@ sponsoring god's chrome (name, call and banner) for display; chrome never
 reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
 In the draft, characters show as cards (`charCard` in `src/playground/app.ts`):
-name and CR, the art (a silhouette until portraits reach the page), the
+name, epithet and CR, the art (the portrait's face crop over a blurred copy
+of the portrait; a silhouette for a character without one), the
 monster line with its size in words, AC, HP, speed and best skills. Free
 agents are neutral; your roster wears your banner, and a drafted card turns
 over into it. A Show control swaps the free agents back to the table. When

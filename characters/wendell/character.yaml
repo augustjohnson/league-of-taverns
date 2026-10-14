@@ -17,5 +17,6 @@ chrome:
     bodyPlan: object
     translucent: true
     path: portrait.png
+    face: { x: 0.58, y: 0.12, width: 0.4 } # card face crop, fractions of the portrait
     imported: wendell-gemini-1.webp
   height: 10
