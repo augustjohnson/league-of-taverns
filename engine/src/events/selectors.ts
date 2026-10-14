@@ -2,10 +2,23 @@
  * Selectors: derived views over `LeagueState`. Pure, never stored
  * (docs/schema.md § Reducers, "Derived views").
  */
-import { sponsoredTavern, standings, type StandingRow, type WeekResult } from '../league';
+import { reverseStandingsPriority, sponsoredTavern, standings, type StandingRow, type WeekResult } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
+import type { Ability } from '../vocabulary';
 import type { LeagueState } from './state';
+
+/** The ability `tavern` is hexed on in `week`, or undefined (D-52). At most one hex per target per week. */
+export function hexOn(state: LeagueState, tavern: string, week: number): Ability | undefined {
+  return state.hexes.find((h) => h.target === tavern && h.week === week)?.ability;
+}
+
+/** Characters who can't start in `week`: hurt in a DNF the week before (D-51). */
+export function injuredFor(state: LeagueState, week: number): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const [character, out_] of state.injuries) if (out_ === week) out.add(character);
+  return out;
+}
 
 /** Pooled characters nobody owns, in pooling order. */
 export function freeAgents(state: LeagueState): ReadonlyArray<string> {
@@ -13,14 +26,37 @@ export function freeAgents(state: LeagueState): ReadonlyArray<string> {
 }
 
 /**
- * The tavern whose draft pick is next, or null when no pick is possible
- * (no season, no taverns, or the draft is over).
+ * The manager whose turn it is to choose a tavern, or null when no choice is
+ * possible (no season, no managers, every manager has chosen, or the draft
+ * has started). Taverns are chosen in reverse draft order (D-52).
  *
- * Before the first pick the order isn't frozen yet, so this returns the
- * tavern that would pick first if the draft started now, from the same
- * `draftOrder` call the first `draft.pick` makes. It can change while
- * taverns are still joining. Null if that order can't be built (a manual
- * order that doesn't match the joined taverns).
+ * Before the first choice the order isn't frozen yet, so this returns the
+ * manager who would choose first if the pick started now, from the same
+ * `draftOrder` call the first `tavern.chosen` makes. It can change while
+ * managers are still joining. Null if that order can't be built (a manual
+ * order that doesn't match the joined managers).
+ */
+export function tavernPickOnTheClock(state: LeagueState): string | null {
+  const config = state.config;
+  if (config === null || state.phase !== 'preseason' || state.draft.picks > 0) return null;
+  let order = state.draft.managerOrder;
+  if (order.length === 0) {
+    const joined = [...state.managers.keys()];
+    if (joined.length === 0) return null;
+    try {
+      order = draftOrder(joined, config, rngFor(draftOrderSeed(config.id), 'order'));
+    } catch {
+      return null;
+    }
+  }
+  return [...order].reverse()[state.taverns.size] ?? null;
+}
+
+/**
+ * The tavern whose draft pick is next, or null when no pick is possible (no
+ * season, the tavern pick isn't finished, or the draft is over). Before the
+ * first pick the snake order is the managers' taverns in draft order, as the
+ * first `draft.pick` freezes it.
  */
 export function onTheClock(state: LeagueState): string | null {
   const config = state.config;
@@ -28,13 +64,9 @@ export function onTheClock(state: LeagueState): string | null {
   if (state.phase !== 'preseason' && state.phase !== 'drafting') return null;
   let order = state.draft.order;
   if (state.draft.picks === 0) {
-    const joined = [...state.taverns.keys()];
-    if (joined.length === 0) return null;
-    try {
-      order = draftOrder(joined, config, rngFor(draftOrderSeed(config.id), 'order'));
-    } catch {
-      return null;
-    }
+    const managers = [...state.managers.values()];
+    if (managers.length === 0 || managers.some((m) => m.tavern === null)) return null;
+    order = state.draft.managerOrder.map((id) => state.managers.get(id)!.tavern!);
   }
   return snakePickOwner(order, state.draft.picks);
 }
@@ -61,17 +93,34 @@ export function weekResults(state: LeagueState, week: number): ReadonlyArray<Wee
     .map(({ tavern }) => {
       const r = results?.get(tavern);
       return r === undefined
-        ? { week, tavern, points: 0, projected: 0, checksPassed: 0 }
-        : { week, tavern, points: r.points, projected: r.projectedPoints, checksPassed: r.run.checksPassed };
+        ? { week, tavern, points: 0, projected: 0, checksPassed: 0, dnf: false }
+        : { week, tavern, points: r.points, projected: r.projectedPoints, checksPassed: r.run.checksPassed, dnf: r.run.dnf };
     });
 }
 
 /**
- * Season standings over every finalized week: total loot, taverns in join
- * order, equal totals sharing a rank (rules §8). No playoffs.
+ * Season standings over every finalized week: total loot, equal totals
+ * sharing a rank (rules §8). No playoffs. Once the season is complete, a tie
+ * for first goes to fewer DNFs, and co-champions only if that is tied too
+ * (D-14).
  */
 export function seasonStandings(state: LeagueState): ReadonlyArray<StandingRow> {
   if (state.config === null) return [];
   const weeks = [...state.finalizedWeeks].sort((a, b) => a - b);
-  return standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)));
+  return standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)), {
+    breakFirstTie: state.phase === 'complete',
+  });
+}
+
+/**
+ * The waiver priority the next `waiver.resolved` uses, first = highest.
+ * `rolling`: the stored order (reverse draft order, then winners move to the
+ * back). `reverse_standings` (D-05): the standings over the finalized weeks,
+ * reversed, ties to reverse draft order. Empty before the draft completes.
+ */
+export function waiverPriority(state: LeagueState): ReadonlyArray<string> {
+  if (state.config?.waivers.priority !== 'reverse_standings' || !state.draft.complete) return state.waivers.priority;
+  const weeks = [...state.finalizedWeeks];
+  const rows = standings([...state.taverns.keys()], weeks.flatMap((week) => weekResults(state, week)));
+  return reverseStandingsPriority(rows, state.draft.order);
 }

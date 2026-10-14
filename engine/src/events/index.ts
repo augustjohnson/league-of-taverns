@@ -4,9 +4,9 @@
  */
 export type * from './types';
 export type * from './state';
-export { InvalidEventError, applyEvent, initialState } from './reducers';
+export { HEXES_PER_SEASON, InvalidEventError, applyEvent, initialState } from './reducers';
 export { LogParseError, ReplayError, lineHash, parseLog, replay, replayLog, serializeEvent, verifyResolutions } from './replay';
-export { freeAgents, homeTavern, onTheClock, seasonStandings, weekResults } from './selectors';
+export { freeAgents, hexOn, homeTavern, injuredFor, onTheClock, seasonStandings, tavernPickOnTheClock, waiverPriority, weekResults } from './selectors';
 export {
   crEighthsSchema,
   eventSchema,

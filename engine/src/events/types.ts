@@ -3,7 +3,7 @@ import type { SeasonConfig, Sponsor } from '../league';
 import type { Mission } from '../missions';
 import type { RunResult } from '../resolution';
 import type { Lineup } from '../roster';
-import type { CrEighths } from '../vocabulary';
+import type { Ability, CrEighths } from '../vocabulary';
 
 /**
  * The event log is the only source of truth. Rosters, standings, records and
@@ -34,6 +34,9 @@ export type Actor =
   | { readonly kind: 'system'; readonly workflow: string }
   | { readonly kind: 'bot'; readonly strategy: string };
 
+/** Who a manager is: a GitHub account, or a bot strategy in sims. */
+export type ManagerAccount = { readonly githubId: number; readonly login: string } | { readonly bot: string };
+
 export interface EventSource {
   readonly issue?: number;
   readonly comment?: number;
@@ -52,11 +55,18 @@ export interface PayloadByType {
       readonly title: string;
       readonly environment: string;
       readonly theme: string;
+      /** What the mission tests, in the D-42 vocabulary (`missionKeywords`). The GM may leave things out, never add. */
+      readonly keywords: ReadonlyArray<string>;
       readonly commitment: string | null;
       readonly sponsor: string | null;
     }>;
     /** The gods of the GM's season package and the tavern each sponsors (D-44). */
     readonly sponsors: ReadonlyArray<Sponsor>;
+    /**
+     * The season's taverns, each already blessed by one god (D-52). Managers
+     * choose among them (`tavern.chosen`). At most `MAX_TAVERNS` (D-01).
+     */
+    readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
   };
   'character.pooled': {
     readonly character: string;
@@ -64,10 +74,16 @@ export interface PayloadByType {
     readonly cr: CrEighths;
     readonly modifiers: ReadonlyArray<Modifier>;
   };
-  'tavern.joined': {
+  /** A manager joins the league. They choose a tavern later, in reverse draft order (D-52). */
+  'manager.joined': {
+    /** The manager's id in managers.yaml (kebab-case), stable for the season. */
+    readonly manager: string;
+    readonly account: ManagerAccount;
+  };
+  /** A manager takes one of the season's taverns, with its god, boon and hex (D-52). */
+  'tavern.chosen': {
+    readonly manager: string;
     readonly tavern: string;
-    readonly name: string;
-    readonly manager: { readonly githubId: number; readonly login: string } | { readonly bot: string };
   };
   'character.retained': {
     readonly tavern: string;
@@ -97,6 +113,17 @@ export interface PayloadByType {
       readonly lineup: Lineup | null;
       readonly source: 'submitted' | 'carried' | 'fallback' | 'none';
     }>;
+  };
+  /**
+   * Once a season, a tavern curses a rival for one week: disadvantage on every
+   * check and save using `ability` (D-52, after *Bestow Curse*). Public as
+   * soon as it is declared.
+   */
+  'hex.declared': {
+    readonly tavern: string;
+    readonly target: string;
+    readonly ability: Ability;
+    readonly week: number;
   };
   'waiver.claimed': {
     readonly claim: string;

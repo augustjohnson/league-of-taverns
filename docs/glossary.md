@@ -21,7 +21,7 @@
 | **CR** | Challenge rating from the base stat block. Works as salary against B. Held in eighths internally. |
 | **DAG (layered)** | Mission graph whose edges always point to a higher rank, so every traversal terminates. |
 | **DC** | Difficulty class of a check. |
-| **DNF** | Did not finish: lost a battle. The mission ends and the party keeps the loot banked so far (D-46). |
+| **DNF** | Did not finish: lost a battle. The mission ends and the party loses everything it banked on it (D-54). Missions aim for about 5% of runs. |
 | **Effective stats** | Base stats with season modifiers applied. All the engine ever sees. |
 | **Encounter** | The creatures in a battle node, as Open5e slugs with counts. |
 | **Event** | One append-only record in a season's log. All state is folded from events. |

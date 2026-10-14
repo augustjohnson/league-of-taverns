@@ -31,18 +31,20 @@
  * | Area | Codes |
  * |---|---|
  * | envelope | `envelope.seq`, `envelope.season` |
- * | `season.created` | `season.not_created` (any other event first), `season.already_created`, `season.id_mismatch`, `season.bad_schedule`, `season.bad_sponsors` |
+ * | `season.created` | `season.not_created` (any other event first), `season.already_created`, `season.id_mismatch`, `season.bad_schedule`, `season.bad_sponsors`, `season.bad_taverns` |
  * | `character.pooled` | `pool.wrong_phase`, `pool.duplicate`, `pool.registry_version`, `pool.over_budget`, `pool.invalid_modifiers` |
- * | `tavern.joined` | `tavern.wrong_phase`, `tavern.duplicate`, `tavern.manager_taken` |
+ * | `manager.joined` | `manager.wrong_phase`, `manager.duplicate`, `manager.account_taken`, `manager.league_full` |
+ * | `tavern.chosen` | `choose.wrong_phase`, `choose.unknown_manager`, `choose.already_chose`, `choose.unknown_tavern`, `choose.taken`, `choose.bad_order`, `choose.not_on_clock` |
  * | `character.retained` | `retain.wrong_phase`, `retain.unknown_tavern`, `retain.not_pooled`, `retain.already_owned`, `retain.over_limit`, `retain.roster_full` |
- * | `draft.pick` | `draft.complete`, `draft.no_taverns`, `draft.sponsor_not_joined`, `draft.bad_order`, `draft.wrong_pick`, `draft.not_on_clock`, `draft.not_pooled`, `draft.already_owned`, `draft.roster_full` |
- * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `duplicate`, `not_owned`, `unknown_character`, `over_budget`) |
+ * | `draft.pick` | `draft.complete`, `draft.tavern_pick_incomplete`, `draft.wrong_pick`, `draft.not_on_clock`, `draft.not_pooled`, `draft.already_owned`, `draft.roster_full` |
+ * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `bad_retreat`, `duplicate`, `not_owned`, `injured`, `unknown_character`, `over_budget`) |
  * | `lineup.locked` | `lock.draft_incomplete`, `lock.bad_week`, `lock.already_locked`, `lock.previous_not_finalized`, `lock.unknown_tavern`, `lock.duplicate_tavern`, `lock.missing_tavern`, `lock.source_mismatch`, `lock.illegal_lineup` |
+ * | `hex.declared` | `hex.unknown_tavern`, `hex.self`, `hex.bad_week`, `hex.week_locked`, `hex.used`, `hex.target_taken` |
  * | `waiver.claimed` | `waiver.draft_incomplete`, `waiver.unknown_tavern`, `waiver.duplicate_claim`, `waiver.not_pooled`, `waiver.not_free_agent`, `waiver.drop_not_owned` |
  * | `waiver.resolved` | `waiver.bad_week`, `waiver.week_not_finalized`, `waiver.already_resolved`, `waiver.unknown_claim`, `waiver.duplicate_outcome`, `waiver.missing_outcome`, `waiver.bad_priority`, `waiver.outcome_mismatch` |
  * | `trade.*` | `trade.draft_incomplete`, `trade.duplicate_id`, `trade.unknown_tavern`, `trade.unknown`, `trade.not_proposed`, `trade.not_accepted`, `trade.not_open`, `trade.past_deadline` (at acceptance), and the `validateTrade` codes below |
- * | `mission.revealed` | `reveal.bad_week`, `reveal.week_not_locked`, `reveal.already_revealed`, `reveal.wrong_season`, `reveal.commitment_mismatch`, `reveal.invalid_mission` |
- * | `mission.resolved` | `resolve.bad_week`, `resolve.week_not_locked`, `resolve.not_revealed`, `resolve.wrong_mission`, `resolve.week_finalized`, `resolve.unknown_tavern`, `resolve.duplicate`, `resolve.no_lineup`, `resolve.lineup_mismatch`, `resolve.counts_mismatch`, `resolve.score_mismatch` |
+ * | `mission.revealed` | `reveal.bad_week`, `reveal.week_not_locked`, `reveal.already_revealed`, `reveal.wrong_season`, `reveal.commitment_mismatch`, `reveal.invalid_mission`, `reveal.dishonest_keywords` |
+ * | `mission.resolved` | `resolve.bad_week`, `resolve.week_not_locked`, `resolve.not_revealed`, `resolve.wrong_mission`, `resolve.week_finalized`, `resolve.unknown_tavern`, `resolve.duplicate`, `resolve.no_lineup`, `resolve.lineup_mismatch`, `resolve.counts_mismatch`, `resolve.score_mismatch`, `resolve.bad_injury` |
  * | `week.finalized` | `finalize.bad_week`, `finalize.already_finalized`, `finalize.week_not_locked`, `finalize.missing_result` |
  *
  * `trade.proposed` and `trade.completed` run `validateTrade` and report its
@@ -66,9 +68,16 @@
  * ## Interpretations
  *
  * - Ownership is modelled as exclusive (D-01): one owner per character.
- * - `tavern.joined`: "manager not already in a tavern" compares GitHub ids
- *   (D-35). Bot managers are exempt, since sims seat many taverns with the
- *   same strategy.
+ * - `manager.joined`: "manager not already in the league" compares GitHub ids
+ *   (D-35). Bot managers are exempt, since sims seat many managers with the
+ *   same strategy. A league holds at most `MAX_TAVERNS` managers (D-01), and
+ *   no more than the season has taverns. Joining closes when the tavern pick
+ *   starts.
+ * - The tavern pick (D-52): the first `tavern.chosen` freezes the draft order
+ *   over the joined managers (`draftOrder`), and managers then choose in its
+ *   reverse, one tavern each, from the season's taverns. The first
+ *   `draft.pick` needs every manager to have chosen, and freezes the snake
+ *   order as the managers' taverns in draft order.
  * - `character.retained`: the keeper limit is `keepersPerTavern` for basis
  *   `keeper` and `championBonusKeepers` for `champion_reward`, and both are 0
  *   when `carryover.mode` is `none`. The kept character takes a roster slot.
@@ -97,7 +106,8 @@
  *   instead.
  * - `waiver.resolved` must be exactly what `resolveWaivers` decides from the
  *   state: the pending claims (in log order, which ranks them as their seqs
- *   would), `waivers.priority`, every roster, and `freeAgents`. `outcomes`
+ *   would), `waiverPriority(state)` (the stored rolling order, or the
+ *   reverse standings, D-05), every roster, and `freeAgents`. `outcomes`
  *   must list the same claims, `awarded` flags and reasons (a `WaiverReason`)
  *   in the same order (decision order: round by round, priority order within
  *   a round), and `priorityAfter` must equal the computed priority. Otherwise
@@ -109,26 +119,38 @@
  *   logs stop replaying.
  * - `waiver.resolved` runs once per week (`waiver.already_resolved`).
  * - `season.created`: sponsors must pass `validateSponsors` (unique gods and
- *   taverns, every week's sponsor listed, one week per sponsor). Sponsored
- *   taverns aren't known yet; the first `draft.pick` checks they all joined.
+ *   taverns, every week's sponsor listed, one week per sponsor), and every
+ *   sponsor's tavern must be one of `taverns`: unique ids, at most
+ *   `MAX_TAVERNS` (D-01). A tavern nobody chooses sits the season out, and
+ *   its god's week is still played.
  * - `mission.revealed`: `sha256` must equal the schedule commitment only when
  *   one was made (D-08 made missions open, so commitments are null). The
  *   mission is validated against the season's mission rules and the
  *   schedule's environment. The reducer has no creature snapshot, so the
  *   snapshot-dependent checks (`encounter.ref`, `encounter.budget`) are the
- *   reveal script's.
+ *   reveal script's. Every keyword in the week's schedule entry must name
+ *   something in the mission (`dishonestKeywords`, D-42), so once missions
+ *   are hidden, the reveal proves the keywords were honest.
  * - `mission.resolved`: the counts and the loot (the `loot` of each passed
- *   check node) are recomputed from the recorded nodes, and the score must
+ *   check node and won battle node, or 0 on a DNF, D-54) are recomputed from
+ *   the recorded nodes, and the score must
  *   equal `lootScore(loot, missionHaul(mission))`, DNF or not, to within
- *   1e-9. Everything else (path, d20s, points) is audited by
+ *   1e-9. An `injury` needs a DNF and a starter from the lineup, and that
+ *   starter can't start the next week (D-51; `injuredFor`). Everything else
+ *   (path, d20s, points, which starter the injury roll picks) is audited by
  *   `verifyResolutions`, which reports instead of throwing.
+ * - `lineup.set` and `lineup.locked` reject a starter injured the week
+ *   before (`lineup.injured`, `lock.illegal_lineup`).
+ * - `hex.declared` (D-52): any time after the tavern pick and before the
+ *   named week locks; `HEXES_PER_SEASON` per tavern; at most one hex per
+ *   target per week (the first declared counts); never withdrawn.
  * - `week.finalized` needs a result for every tavern whose locked lineup is
  *   non-null. A tavern locked with no lineup needs none and scores 0 (rules
  *   §5; see `weekResults`). Finalizing week `config.weeks` completes the season.
  */
 import { REGISTRY_VERSION, TRAITS, validateModifiers } from '../characters';
-import { validateSponsors, type SeasonConfig } from '../league';
-import { missionHaul, validateMission, type Mission } from '../missions';
+import { MAX_TAVERNS, validateSponsors, type SeasonConfig } from '../league';
+import { dishonestKeywords, missionHaul, validateMission, type Mission } from '../missions';
 import { lootScore } from '../resolution';
 import { draftOrderSeed, rngFor } from '../rng';
 import {
@@ -142,9 +164,12 @@ import {
   type WaiverClaim,
 } from '../roster';
 import type { CrEighths } from '../vocabulary';
-import { freeAgents } from './selectors';
+import { freeAgents, injuredFor, waiverPriority } from './selectors';
 import type { LeagueState, TavernState, TradeState } from './state';
 import type { EventOf, EventType, LeagueEvent, PayloadByType } from './types';
+
+/** Hexes each tavern may declare in a season (D-52). */
+export const HEXES_PER_SEASON = 1;
 
 export class InvalidEventError extends Error {
   constructor(
@@ -165,10 +190,12 @@ export function initialState(): LeagueState {
     config: null,
     schedule: [],
     sponsors: [],
+    tavernList: [],
+    managers: new Map(),
     pool: new Map(),
     taverns: new Map(),
     owner: new Map(),
-    draft: { order: [], picks: 0, complete: false },
+    draft: { managerOrder: [], order: [], picks: 0, complete: false },
     retained: [],
     pendingLineups: new Map(),
     lockedLineups: new Map(),
@@ -176,6 +203,8 @@ export function initialState(): LeagueState {
     trades: new Map(),
     revealed: new Map(),
     results: new Map(),
+    injuries: new Map(),
+    hexes: [],
     finalizedWeeks: new Set(),
   };
 }
@@ -227,7 +256,13 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     }
     const issues = validateSponsors(sponsors, schedule);
     if (issues.length > 0) fail(event, 'season.bad_sponsors', issues.map((i) => i.message).join('; '));
-    return { ...state, phase: 'preseason', config, schedule, sponsors };
+    const { taverns } = event.payload;
+    const ids = new Set(taverns.map((t) => t.id));
+    if (ids.size !== taverns.length) fail(event, 'season.bad_taverns', 'a tavern is listed twice');
+    if (taverns.length > MAX_TAVERNS) fail(event, 'season.bad_taverns', `${taverns.length} taverns; a league has at most ${MAX_TAVERNS} (D-01)`);
+    const stray = sponsors.filter((s) => !ids.has(s.tavern));
+    if (stray.length > 0) fail(event, 'season.bad_taverns', `sponsored taverns are not in the season: ${stray.map((s) => `"${s.tavern}" (${s.id})`).join(', ')}`);
+    return { ...state, phase: 'preseason', config, schedule, sponsors, tavernList: taverns };
   },
 
   'character.pooled': (state, event) => {
@@ -250,18 +285,53 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     return { ...state, pool: mapSet(state.pool, character, { base, cr, modifiers }) };
   },
 
-  'tavern.joined': (state, event) => {
-    const { tavern, name, manager } = event.payload;
-    if (state.phase !== 'preseason') fail(event, 'tavern.wrong_phase', `taverns join in preseason, not ${state.phase} (no joining after the first pick)`);
-    if (state.taverns.has(tavern)) fail(event, 'tavern.duplicate', `tavern "${tavern}" has already joined`);
-    if ('githubId' in manager) {
-      for (const other of state.taverns.values()) {
-        if ('githubId' in other.manager && other.manager.githubId === manager.githubId) {
-          fail(event, 'tavern.manager_taken', `manager ${manager.login} (${manager.githubId}) already runs "${other.id}"`);
+  'manager.joined': (state, event) => {
+    const { manager, account } = event.payload;
+    if (state.phase !== 'preseason' || state.draft.managerOrder.length > 0) {
+      fail(event, 'manager.wrong_phase', 'managers join in preseason, before the tavern pick starts');
+    }
+    if (state.managers.has(manager)) fail(event, 'manager.duplicate', `manager "${manager}" has already joined`);
+    if ('githubId' in account) {
+      for (const other of state.managers.values()) {
+        if ('githubId' in other.account && other.account.githubId === account.githubId) {
+          fail(event, 'manager.account_taken', `${account.login} (${account.githubId}) already manages as "${other.id}"`);
         }
       }
     }
-    return { ...state, taverns: mapSet(state.taverns, tavern, { id: tavern, name, manager, roster: [] }) };
+    const limit = Math.min(MAX_TAVERNS, state.tavernList.length);
+    if (state.managers.size >= limit) {
+      fail(event, 'manager.league_full', `the league is full: ${limit} manager(s) for ${state.tavernList.length} tavern(s), at most ${MAX_TAVERNS} (D-01)`);
+    }
+    return { ...state, managers: mapSet(state.managers, manager, { id: manager, account, tavern: null }) };
+  },
+
+  'tavern.chosen': (state, event) => {
+    const config = configOf(state);
+    const { manager, tavern } = event.payload;
+    if (state.phase !== 'preseason' || state.draft.picks > 0) fail(event, 'choose.wrong_phase', 'taverns are chosen before the first draft pick');
+    const m = state.managers.get(manager);
+    if (m === undefined) fail(event, 'choose.unknown_manager', `no manager "${manager}"`);
+    if (m.tavern !== null) fail(event, 'choose.already_chose', `"${manager}" already chose "${m.tavern}"`);
+    const entry = state.tavernList.find((t) => t.id === tavern);
+    if (entry === undefined) fail(event, 'choose.unknown_tavern', `"${tavern}" is not one of this season's taverns`);
+    if (state.taverns.has(tavern)) fail(event, 'choose.taken', `"${tavern}" is already ${state.taverns.get(tavern)!.managerId}'s`);
+    let managerOrder = state.draft.managerOrder;
+    if (managerOrder.length === 0) {
+      // The first choice freezes the draft order over the joined managers.
+      try {
+        managerOrder = draftOrder([...state.managers.keys()], config, rngFor(draftOrderSeed(config.id), 'order'));
+      } catch (error) {
+        fail(event, 'choose.bad_order', errorMessage(error));
+      }
+    }
+    const onClock = [...managerOrder].reverse()[state.taverns.size];
+    if (manager !== onClock) fail(event, 'choose.not_on_clock', `tavern pick ${state.taverns.size + 1} belongs to "${onClock}", not "${manager}"`);
+    return {
+      ...state,
+      managers: mapSet(state.managers, manager, { ...m, tavern }),
+      taverns: mapSet(state.taverns, tavern, { id: tavern, name: entry.name, managerId: manager, manager: m.account, roster: [] }),
+      draft: { ...state.draft, managerOrder },
+    };
   },
 
   'character.retained': (state, event) => {
@@ -291,18 +361,12 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     }
     let order = state.draft.order;
     if (state.draft.picks === 0) {
-      // The first pick freezes the tavern list (join order) and the snake order.
-      const joined = [...state.taverns.keys()];
-      if (joined.length === 0) fail(event, 'draft.no_taverns', 'no taverns have joined');
-      const missing = state.sponsors.filter((s) => !state.taverns.has(s.tavern));
-      if (missing.length > 0) {
-        fail(event, 'draft.sponsor_not_joined', `sponsored taverns have not joined: ${missing.map((s) => `"${s.tavern}" (${s.id})`).join(', ')}`);
+      // The first pick needs every manager in a tavern, and freezes the snake order: their taverns, in draft order.
+      const waiting = [...state.managers.values()].filter((m) => m.tavern === null).map((m) => `"${m.id}"`);
+      if (state.managers.size === 0 || waiting.length > 0) {
+        fail(event, 'draft.tavern_pick_incomplete', waiting.length > 0 ? `still to choose a tavern: ${waiting.join(', ')}` : 'no managers have joined');
       }
-      try {
-        order = draftOrder(joined, config, rngFor(draftOrderSeed(config.id), 'order'));
-      } catch (error) {
-        fail(event, 'draft.bad_order', errorMessage(error));
-      }
+      order = state.draft.managerOrder.map((id) => state.managers.get(id)!.tavern!);
     }
     if (pick !== state.draft.picks) fail(event, 'draft.wrong_pick', `pick must be ${state.draft.picks} (picks so far), got ${pick}`);
     const onClock = snakePickOwner(order, pick);
@@ -320,7 +384,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       ...state,
       ...acquire(state, tavern, character),
       phase: complete ? 'regular' : 'drafting',
-      draft: { order, picks, complete },
+      draft: { ...state.draft, order, picks, complete },
       waivers: complete ? { ...state.waivers, priority: [...order].reverse() } : state.waivers,
     };
   },
@@ -332,7 +396,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     const t = tavernOr(state, event, tavern, 'lineup.unknown_tavern');
     weekOr(config, event, week, 'lineup.bad_week');
     if (state.lockedLineups.has(week)) fail(event, 'lineup.week_locked', `week ${week} is already locked`);
-    const violations = validateLineup(lineup, rosterView(t), crOf(state), config);
+    const violations = validateLineup(lineup, rosterView(t), crOf(state), config, { unavailable: injuredFor(state, week) });
     const first = violations[0];
     if (first !== undefined) fail(event, `lineup.${first.code}`, violations.map((v) => v.message).join('; '));
     const week_ = state.pendingLineups.get(week) ?? new Map<string, Lineup>();
@@ -349,6 +413,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       fail(event, 'lock.previous_not_finalized', `week ${week - 1} must be finalized before week ${week} locks`);
     }
     const seen = new Set<string>();
+    const unavailable = injuredFor(state, week);
     for (const entry of lineups) {
       const t = tavernOr(state, event, entry.tavern, 'lock.unknown_tavern');
       if (seen.has(entry.tavern)) fail(event, 'lock.duplicate_tavern', `"${entry.tavern}" is listed twice`);
@@ -357,7 +422,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
         fail(event, 'lock.source_mismatch', `"${entry.tavern}": source "${entry.source}" with ${entry.lineup === null ? 'no' : 'a'} lineup`);
       }
       if (entry.lineup !== null) {
-        const violations = validateLineup(entry.lineup, rosterView(t), crOf(state), config);
+        const violations = validateLineup(entry.lineup, rosterView(t), crOf(state), config, { unavailable });
         if (violations.length > 0) {
           fail(event, 'lock.illegal_lineup', `"${entry.tavern}": ${violations.map((v) => v.message).join('; ')}`);
         }
@@ -370,6 +435,21 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       lockedLineups: mapSet(state.lockedLineups, week, lineups),
       pendingLineups: mapDelete(state.pendingLineups, week),
     };
+  },
+
+  'hex.declared': (state, event) => {
+    const config = configOf(state);
+    const { tavern, target, week } = event.payload;
+    tavernOr(state, event, tavern, 'hex.unknown_tavern');
+    tavernOr(state, event, target, 'hex.unknown_tavern');
+    if (tavern === target) fail(event, 'hex.self', `"${tavern}" cannot hex itself`);
+    weekOr(config, event, week, 'hex.bad_week');
+    if (state.lockedLineups.has(week)) fail(event, 'hex.week_locked', `week ${week} is already locked`);
+    const used = state.hexes.filter((h) => h.tavern === tavern).length;
+    if (used >= HEXES_PER_SEASON) fail(event, 'hex.used', `"${tavern}" has already used its hex this season`);
+    const taken = state.hexes.find((h) => h.target === target && h.week === week);
+    if (taken !== undefined) fail(event, 'hex.target_taken', `"${target}" is already hexed in week ${week} (by "${taken.tavern}")`);
+    return { ...state, hexes: [...state.hexes, event.payload] };
   },
 
   'waiver.claimed': (state, event) => {
@@ -500,6 +580,10 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     if (issues.length > 0) {
       fail(event, 'reveal.invalid_mission', `mission "${mission.id}": ${issues.map((i) => `${i.code}: ${i.message}`).join('; ')}`);
     }
+    const dishonest = entry === undefined ? [] : dishonestKeywords(mission, entry.keywords);
+    if (dishonest.length > 0) {
+      fail(event, 'reveal.dishonest_keywords', `week ${week}'s keywords name nothing in "${mission.id}": ${dishonest.map((k) => `"${k}"`).join(', ')} (D-42)`);
+    }
     return { ...state, revealed: mapSet(state.revealed, week, mission) };
   },
 
@@ -529,12 +613,23 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
         `nodes record ${passed}/${checks.length} checks, run says ${run.checksPassed}/${run.checksAttempted}`,
       );
     }
-    const loot = lootOf(mission, checks);
+    // A DNF carries nothing home (D-54).
+    const loot = run.dnf ? 0 : lootOf(mission, run.nodes);
     if (loot !== run.loot) fail(event, 'resolve.score_mismatch', `nodes bank ${loot} loot, run says ${run.loot}`);
     const expected = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - expected) > 1e-9) fail(event, 'resolve.score_mismatch', `score ${run.score} should be ${expected}`);
+    const { injury } = run;
+    if (injury !== null && !run.dnf) fail(event, 'resolve.bad_injury', `"${injury.character}" is injured, but the run is not a DNF`);
+    if (injury !== null && !result.lineup.starters.includes(injury.character)) {
+      fail(event, 'resolve.bad_injury', `"${injury.character}" is injured, but did not start`);
+    }
     const byTavern = state.results.get(week) ?? new Map<string, typeof result>();
-    return { ...state, results: mapSet(state.results, week, mapSet(byTavern, tavern, result)) };
+    return {
+      ...state,
+      results: mapSet(state.results, week, mapSet(byTavern, tavern, result)),
+      // The injured starter sits out next week; an injury in the last week expires with the season.
+      injuries: injury === null || week >= config.weeks ? state.injuries : mapSet(state.injuries, injury.character, week + 1),
+    };
   },
 
   'week.finalized': (state, event) => {
@@ -649,7 +744,7 @@ function computeWaivers(state: LeagueState, config: SeasonConfig): { readonly ou
     return claim;
   });
   const rosters = [...state.taverns.values()].map(rosterView);
-  const result = resolveWaivers(claims, state.waivers.priority, rosters, new Set(freeAgents(state)), config);
+  const result = resolveWaivers(claims, waiverPriority(state), rosters, new Set(freeAgents(state)), config);
   return {
     outcomes: result.awards.map((a) => ({ claim: ids.get(a.claim)!, awarded: a.awarded, reason: a.reason })),
     priority: result.priority,
@@ -678,7 +773,11 @@ function crOf(state: Pick<LeagueState, 'pool'>): (characterId: string) => CrEigh
 }
 
 function sameLineup(a: Lineup, b: Lineup): boolean {
-  return a.captain === b.captain && a.allies.length === b.allies.length && a.allies.every((ally, i) => ally === b.allies[i]);
+  return a.starters.length === b.starters.length && a.starters.every((id, i) => id === b.starters[i]) && sameRetreat(a.retreat, b.retreat);
+}
+
+function sameRetreat(a: Lineup['retreat'], b: Lineup['retreat']): boolean {
+  return typeof a === 'string' || typeof b === 'string' ? a === b : a.bank === b.bank;
 }
 
 function isPermutation(list: ReadonlyArray<string>, of: ReadonlyArray<string>): boolean {
@@ -703,13 +802,14 @@ function release(state: Pick<LeagueState, 'owner' | 'taverns'>, tavern: string, 
   };
 }
 
-/** Loot banked by the passed checks among `records`: each one's node `loot` in `mission`. */
+/** Loot banked by the passed checks and won battles among `records`: each one's node `loot` in `mission` (D-45, D-50). */
 function lootOf(mission: Mission, records: ReadonlyArray<{ readonly node: string; readonly outcome: string }>): number {
   let loot = 0;
   for (const record of records) {
-    if (record.outcome !== 'pass') continue;
+    if (record.outcome !== 'pass' && record.outcome !== 'win') continue;
     const node = mission.nodes.find((n) => n.id === record.node);
-    if (node?.kind === 'check') loot += node.loot;
+    if (node?.kind === 'check' && record.outcome === 'pass') loot += node.loot;
+    if (node?.kind === 'battle' && record.outcome === 'win') loot += node.loot ?? 0;
   }
   return loot;
 }

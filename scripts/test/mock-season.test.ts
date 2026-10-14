@@ -1,4 +1,4 @@
-import { indexSnapshot, modifierCost, TRAITS, validateMission } from '@league-of-taverns/engine';
+import { indexSnapshot, lootShape, modifierCost, TRAITS, validateMission } from '@league-of-taverns/engine';
 import type { BattleNode, Mission, MissionRules } from '@league-of-taverns/engine';
 import { describe, expect, it } from 'vitest';
 import { loadMission } from '../src/lib/repo';
@@ -32,12 +32,13 @@ describe('mock season config, managers and schedule', () => {
     expect(config.budget.partyCr).toBe(96);
     expect(config.roster.size).toBe(7);
     expect(spellcasters).toEqual({ maxInPool: 0, maxPerEncounter: 0 });
-    expect(managers.taverns).toHaveLength(6);
+    expect(managers.managers).toHaveLength(6);
+    expect(schedule.taverns).toHaveLength(6);
     expect(managers.commissioner.login).toBeTruthy();
   });
 
   it('seats only bots, covering every strategy', () => {
-    const bots = managers.taverns.map((t) => ('bot' in t.manager ? t.manager.bot : null));
+    const bots = managers.managers.map((m) => ('bot' in m.account ? m.account.bot : null));
     expect(bots).not.toContain(null);
     expect(new Set(bots)).toEqual(new Set(['random', 'cr-greedy', 'skill-coverage', 'value']));
   });
@@ -47,16 +48,17 @@ describe('mock season config, managers and schedule', () => {
     expect(new Set(schedule.weeks.map((w) => w.environment)).size).toBe(6);
   });
 
-  it('gives every tavern exactly one home week (D-48)', () => {
+  it('gives every tavern a god, and every god exactly one week (D-48, D-52)', () => {
     const homeOf = new Map(schedule.sponsors.map((s) => [s.id, s.tavern]));
     const homes = schedule.weeks.map((w) => homeOf.get(w.sponsor!));
-    expect(homes.sort()).toEqual(managers.taverns.map((t) => t.id).sort());
+    expect(homes.sort()).toEqual(schedule.taverns.map((t) => t.id).sort());
+    expect(schedule.sponsors).toEqual(schedule.taverns.map((t) => ({ id: t.god, tavern: t.id })));
   });
 });
 
 describe('mock season pool', () => {
   it('has enough characters to fill every roster, with spares', () => {
-    expect(pool.characters.length).toBeGreaterThanOrEqual(managers.taverns.length * config.roster.size + 4);
+    expect(pool.characters.length).toBeGreaterThanOrEqual(managers.managers.length * config.roster.size + 4);
     expect(pool.characters.every((c) => c.ref.id === `mock-${c.ref.base}`)).toBe(true);
   });
 
@@ -102,19 +104,40 @@ describe('mock season missions', () => {
     }
   });
 
-  it('varies the shape: five with one battle, one with two, one with a single gate', () => {
+  it('varies the shape: two with one battle, four with an early fight too, one with a single gate', () => {
     const battleCounts = missions.map((m) => battlesOf(m).length).sort();
-    expect(battleCounts).toEqual([1, 1, 1, 1, 1, 2]);
+    expect(battleCounts).toEqual([1, 1, 2, 2, 2, 2]);
     const gated = missions.map((m) => m.nodes.filter((n) => n.kind === 'check' && n.check.requires !== undefined).length);
     expect(gated.sort()).toEqual([0, 0, 0, 0, 0, 1]);
   });
 
-  it('keeps encounters between 0.25 and 0.75 of B, with no spellcasters', () => {
+  it('has the D-45 shape: rising loot and a late climax battle with the biggest bounty (D-50)', () => {
     for (const mission of missions) {
-      for (const battle of battlesOf(mission)) {
+      const shape = lootShape(mission);
+      expect(shape.ok, `${mission.id}: ${JSON.stringify(shape)}`).toBe(true);
+      // Loot never falls along the best path.
+      const amounts = shape.lootByNode.map(([, n]) => n).filter((n) => n > 0);
+      expect(amounts, mission.id).toEqual([...amounts].sort((a, b) => a - b));
+      // The climax is the last battle, the biggest and the richest.
+      const battles = battlesOf(mission);
+      const climax = battles.reduce((a, b) => (b.rank > a.rank ? b : a));
+      const size = (b: (typeof battles)[number]): number => b.encounter.creatures.reduce((sum, c) => sum + c.count * crOf.get(c.ref)!, 0);
+      for (const other of battles) {
+        expect(size(other), `${mission.id}/${other.id}`).toBeLessThanOrEqual(size(climax));
+        expect(other.loot ?? 0, `${mission.id}/${other.id}`).toBeLessThanOrEqual(climax.loot ?? 0);
+      }
+      expect(climax.loot ?? 0, mission.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps climax encounters between 1/12 and 1/4 of B (tuned to about 5% DNFs, D-54), early ones smaller, with no spellcasters', () => {
+    for (const mission of missions) {
+      const battles = battlesOf(mission);
+      const lastRank = Math.max(...battles.map((b) => b.rank));
+      for (const battle of battles) {
         const total = battle.encounter.creatures.reduce((sum, c) => sum + c.count * crOf.get(c.ref)!, 0);
-        expect(total, `${mission.id}/${battle.id}`).toBeGreaterThanOrEqual(0.25 * config.budget.partyCr);
-        expect(total, `${mission.id}/${battle.id}`).toBeLessThanOrEqual(0.75 * config.budget.partyCr);
+        if (battle.rank === lastRank) expect(total, `${mission.id}/${battle.id}`).toBeGreaterThanOrEqual(config.budget.partyCr / 12);
+        expect(total, `${mission.id}/${battle.id}`).toBeLessThanOrEqual(0.25 * config.budget.partyCr);
         for (const c of battle.encounter.creatures) expect(isSpellcaster(bySlug.get(c.ref)!), c.ref).toBe(false);
       }
     }

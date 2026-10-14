@@ -1,7 +1,7 @@
 /**
  * Small read-only helpers over a `PublicView`, shared by every strategy.
  */
-import { validateLineup, type CrEighths, type Lineup, type SeasonConfig } from '@league-of-taverns/engine';
+import { DEFAULT_RETREAT, injuredFor, validateLineup, type CrEighths, type Lineup, type RetreatOrder, type SeasonConfig } from '@league-of-taverns/engine';
 import type { PublicView } from './types';
 
 /** The season config. Throws before `season.created`, when no decision makes sense. */
@@ -42,6 +42,12 @@ export function nextWeek(view: PublicView): number {
   for (const week of view.state.finalizedWeeks) latest = Math.max(latest, week);
   for (const week of view.state.lockedLineups.keys()) latest = Math.max(latest, week);
   return latest + 1;
+}
+
+/** The characters on `roster` who may start in `week`: everyone but last week's injured (D-51). */
+export function startable(view: PublicView, roster: ReadonlyArray<string>, week: number): ReadonlyArray<string> {
+  const injured = injuredFor(view.state, week);
+  return injured.size === 0 ? roster : roster.filter((id) => !injured.has(id));
 }
 
 /** One legal 4-subset of a roster: its ids in roster order, and their total CR in eighths. */
@@ -87,28 +93,23 @@ export function legalSubsets(view: PublicView, roster: ReadonlyArray<string>): R
 }
 
 /**
- * A lineup from a subset, with a deterministic captain: the highest-CR
- * member, ties to the earliest drafted. The captain has no mechanical role
- * (D-12) beyond breaking best-fit ties, so this only fixes who leads the story.
- * Allies keep roster order.
+ * A lineup from a subset: the starters in roster order, and `retreat`
+ * (`never` unless a strategy picks one, D-49). Lineup order only breaks
+ * best-fit ties (D-15).
  */
-export function lineupFrom(view: PublicView, subset: Subset): Lineup {
-  const crOf = crLookup(view);
-  let captain = subset.ids[0];
-  for (const id of subset.ids) if (crOf(id) > crOf(captain)) captain = id;
-  const allies = subset.ids.filter((id) => id !== captain);
-  return { captain, allies: [allies[0]!, allies[1]!, allies[2]!] };
+export function lineupFrom(subset: Subset, retreat: RetreatOrder = DEFAULT_RETREAT): Lineup {
+  return { starters: subset.ids, retreat };
 }
 
-/** The lineup's starters in lineup order: captain first, then allies. */
+/** The lineup's starters in lineup order. */
 export function startersOf(lineup: Lineup): ReadonlyArray<string> {
-  return [lineup.captain, ...lineup.allies];
+  return lineup.starters;
 }
 
-/** Throws unless `lineup` is legal for the bot's own roster. A guard: strategies should never trip it. */
-export function assertLegal(view: PublicView, lineup: Lineup, strategy: string): Lineup {
+/** Throws unless `lineup` is legal for the bot's own roster in `week`. A guard: strategies should never trip it. */
+export function assertLegal(view: PublicView, lineup: Lineup, strategy: string, week: number): Lineup {
   const roster = { tavern: view.tavern, characters: rosterOf(view) };
-  const violations = validateLineup(lineup, roster, crLookup(view), configOf(view));
+  const violations = validateLineup(lineup, roster, crLookup(view), configOf(view), { unavailable: injuredFor(view.state, week) });
   if (violations.length > 0) {
     throw new Error(`bot ${view.tavern} (${strategy}): illegal lineup: ${violations.map((v) => v.message).join('; ')}`);
   }

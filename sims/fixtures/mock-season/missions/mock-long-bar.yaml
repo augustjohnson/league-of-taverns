@@ -1,9 +1,10 @@
-# Mock season, week 6 (urban). Case the bar, talk your way in, lift the prize.
-# A bad lie brings the bouncers.
+# Mock season, week 6 (urban). Case the bar, talk your way in, lift the prize,
+# then get past the strongroom's guards and out the back: the climax, with the
+# biggest bounty (D-45, D-50). A bad lie brings a quick brawl at the door.
 #
-#  rank 0     1                  2              3              4              5
-#  start ─▶ case-joint ─pass/fail─▶ talk-in ─pass──────────────▶ lift-prize ─pass─▶ away-clean
-#                                     └─fail─▶ bouncers ─win─▶ ▲        └─fail─▶ caught-out
+#  rank 0     1                  2              3             4              5               6           7
+#  start ─▶ case-joint ─pass/fail─▶ talk-in ─pass──────────────▶ lift-prize ─▶ strongroom ─win─▶ slip-out ─pass─▶ away-clean
+#                                     └─fail─▶ door-brawl ─win─▶ ▲                                      └─fail─▶ caught-out
 
 schemaVersion: 1
 id: mock-long-bar
@@ -16,33 +17,50 @@ nodes:
     rank: 1
     kind: check
     check: { type: skill, skill: insight, dc: 12 }
-    loot: 20
+    loot: 10
   - id: talk-in
     rank: 2
     kind: check
     check: { type: skill, skill: deception, dc: 13 }
-    loot: 30
-  - id: bouncers
+    loot: 15
+  - id: door-brawl
     rank: 3
     kind: battle
+    loot: 5
     encounter:
       creatures:
-        - { ref: thug, count: 4 }
-        - { ref: bandit, count: 8 }
+        - { ref: thug, count: 1 }
+        - { ref: bandit, count: 2 }
   - id: lift-prize
     rank: 4
     kind: check
     check: { type: skill, skill: sleight_of_hand, dc: 12 }
-    loot: 50
-  - { id: away-clean, rank: 5, kind: end }
-  - { id: caught-out, rank: 5, kind: end }
+    loot: 15
+  - id: strongroom
+    rank: 5
+    kind: battle
+    loot: 30
+    encounter:
+      creatures:
+        - { ref: thug, count: 2 }
+        - { ref: bandit, count: 1 }
+  - id: slip-out
+    rank: 6
+    kind: check
+    check: { type: skill, skill: stealth, dc: 13 }
+    loot: 30
+  - { id: away-clean, rank: 7, kind: end }
+  - { id: caught-out, rank: 7, kind: end }
 
 edges:
   - { from: start,      to: case-joint, on: always }
   - { from: case-joint, to: talk-in,    on: pass }
   - { from: case-joint, to: talk-in,    on: fail }
   - { from: talk-in,    to: lift-prize, on: pass }
-  - { from: talk-in,    to: bouncers,   on: fail }
-  - { from: bouncers,   to: lift-prize, on: win }
-  - { from: lift-prize, to: away-clean, on: pass }
-  - { from: lift-prize, to: caught-out, on: fail }
+  - { from: talk-in,    to: door-brawl, on: fail }
+  - { from: door-brawl, to: lift-prize, on: win }
+  - { from: lift-prize, to: strongroom, on: pass }
+  - { from: lift-prize, to: strongroom, on: fail }
+  - { from: strongroom, to: slip-out,   on: win }
+  - { from: slip-out,   to: away-clean, on: pass }
+  - { from: slip-out,   to: caught-out, on: fail }

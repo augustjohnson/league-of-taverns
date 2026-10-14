@@ -35,9 +35,12 @@ import {
   effectiveStats,
   freeAgents,
   homeTavern,
+  hexOn,
   initialState,
+  injuredFor,
   lineHash,
   onTheClock,
+  tavernPickOnTheClock,
   projectMission,
   projectedPoints,
   replayLog,
@@ -46,14 +49,17 @@ import {
   runMission,
   runPoints,
   seasonStandings,
+  waiverPriority,
   standings,
   serializeEvent,
   toBaseStats,
+  validateLineup,
   verifyResolutions,
   weekResults,
   weekSeed,
 } from '@league-of-taverns/engine';
 import type {
+  Ability,
   Actor,
   BaseStats,
   BattleModel,
@@ -92,8 +98,10 @@ export interface SeasonInput {
   readonly sponsors: ReadonlyArray<SponsorEntry>;
   /** In pool-file order: the order `character.pooled` events are written. */
   readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
-  /** In managers-file order: the join order. */
-  readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string; readonly bot: BotId }>;
+  /** The season's taverns, in package order (schedule.yaml): managers choose among them (D-52). */
+  readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+  /** In managers-file order. Each is a bot, unless a person takes its seat. */
+  readonly managers: ReadonlyArray<{ readonly id: string; readonly bot: BotId }>;
   /** The commissioner as an actor, or null without a GitHub id (setup events then use the system actor). */
   readonly commissioner: { readonly githubId: number; readonly login: string } | null;
   /** Each week's mission and the sha256 of its canonical JSON. */
@@ -117,13 +125,16 @@ export interface SeasonSource {
   readonly pool: { readonly characters: ReadonlyArray<PooledCharacter>; readonly cr: ReadonlyMap<string, CrEighths> };
   readonly managers: {
     readonly commissioner: { readonly login: string; readonly githubId: number | null };
-    readonly taverns: ReadonlyArray<{
+    readonly managers: ReadonlyArray<{
       readonly id: string;
-      readonly name: string;
-      readonly manager: { readonly bot: BotId } | { readonly login: string; readonly githubId: number | null };
+      readonly account: { readonly bot: BotId } | { readonly login: string; readonly githubId: number | null };
     }>;
   };
-  readonly schedule: { readonly sponsors: ReadonlyArray<SponsorEntry>; readonly weeks: ReadonlyArray<ScheduleEntry> };
+  readonly schedule: {
+    readonly sponsors: ReadonlyArray<SponsorEntry>;
+    readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+    readonly weeks: ReadonlyArray<ScheduleEntry>;
+  };
 }
 
 /**
@@ -142,8 +153,10 @@ export interface SeasonParts {
   readonly sponsors: ReadonlyArray<SponsorEntry>;
   /** In pool-file order. */
   readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
+  /** In package order. */
+  readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
   /** In managers-file order. */
-  readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string; readonly bot: BotId }>;
+  readonly managers: ReadonlyArray<{ readonly id: string; readonly bot: BotId }>;
   readonly commissioner: { readonly githubId: number; readonly login: string } | null;
   /** One mission per schedule week, in week order. */
   readonly missions: ReadonlyArray<{ readonly week: number; readonly mission: Mission; readonly sha256: string }>;
@@ -154,8 +167,8 @@ export interface SeasonParts {
 /**
  * Check a loaded season and reduce it to `SeasonParts`. Each schedule week is
  * matched to the one mission with its environment. Throws if a week has no
- * mission or several, if a tavern is managed by a human (sims seat only
- * bots), or if a pooled character has no CR. Pure: the caller reads the files.
+ * mission or several, if a manager is a person (sims seat only bots), or if
+ * a pooled character has no CR. Pure: the caller reads the files.
  */
 export function seasonParts(
   loaded: SeasonSource,
@@ -169,10 +182,11 @@ export function seasonParts(
     return { character, cr };
   });
 
-  const taverns = loaded.managers.taverns.map((tavern) => {
-    if (!('bot' in tavern.manager)) throw new Error(`tavern "${tavern.id}" has a human manager; mock seasons seat only bots`);
-    return { id: tavern.id, name: tavern.name, bot: tavern.manager.bot };
+  const managers = loaded.managers.managers.map((manager) => {
+    if (!('bot' in manager.account)) throw new Error(`manager "${manager.id}" is a person; mock seasons seat only bots`);
+    return { id: manager.id, bot: manager.account.bot };
   });
+  const taverns = loaded.schedule.taverns.map(({ id, name }) => ({ id, name }));
 
   const byWeek = loaded.schedule.weeks.map((week) => {
     const matching = missions.filter((m) => m.environment === week.environment);
@@ -195,6 +209,7 @@ export function seasonParts(
     sponsors: loaded.schedule.sponsors,
     pool,
     taverns,
+    managers,
     commissioner: githubId === null ? null : { githubId, login },
     missions: byWeek,
     snapshot: loaded.snapshot,
@@ -238,6 +253,7 @@ export function seasonInput(parts: SeasonParts): SeasonInput {
     sponsors: parts.sponsors,
     pool: parts.pool,
     taverns: parts.taverns,
+    managers: parts.managers,
     commissioner: parts.commissioner,
     missions: new Map(parts.missions.map(({ week, mission, sha256 }) => [week, { mission, sha256 }])),
     baseOf,
@@ -297,7 +313,7 @@ export interface TavernResult {
   readonly tavern: string;
   readonly bot: Seat;
   readonly source: 'submitted' | 'carried' | 'fallback' | 'none';
-  /** Captain first. Null when the tavern played nobody. */
+  /** In lineup order. Null when the tavern played nobody. */
   readonly starters: ReadonlyArray<string> | null;
   readonly points: number;
   readonly projectedPoints: number;
@@ -409,21 +425,23 @@ function iso(ms: number): string {
   return `${new Date(ms).toISOString().slice(0, 19)}Z`;
 }
 
-/** A human seat: which tavern a person manages instead of its bot. */
+/** A human seat: which manager a person plays instead of its bot. They choose a tavern in the tavern pick (D-52). */
 export interface HumanSeat {
-  readonly tavern: string;
-  /** The `tavern.joined` manager and the actor on the person's events. */
+  /** A manager id from `SeasonInput.managers`. */
+  readonly manager: string;
+  /** The `manager.joined` account and the actor on the person's events. */
   readonly login: string;
   readonly githubId: number;
 }
 
 export interface SessionOptions extends RunOptions {
-  /** The tavern a person manages, or null/absent for an all-bot season. Its bot stays on as the advisor (`suggest*`). */
+  /** The manager a person plays, or null/absent for an all-bot season. Its bot stays on as the advisor (`suggest*`). */
   readonly human?: HumanSeat | null;
 }
 
 /** Where a session stands: what has to happen next. */
 export type SessionStage =
+  | { readonly kind: 'tavern'; readonly manager: string }
   | { readonly kind: 'draft'; readonly pick: number; readonly tavern: string }
   | { readonly kind: 'week'; readonly week: number }
   | { readonly kind: 'complete' };
@@ -433,8 +451,9 @@ export type SessionStage =
  * person and the rest by bots. `runMockSeason` is a session with no person,
  * driven straight through, so both paths build the same events.
  *
- * - `advanceDraft()` makes bot picks until the person is on the clock or the
- *   draft is done; `draftPick(id)` is the person's pick.
+ * - `advanceDraft()` makes bot tavern choices and picks until the person is
+ *   on the clock or the draft is done; `chooseTavern(id)` is the person's
+ *   tavern (D-52), and `draftPick(id)` their pick.
  * - Between weeks the person may `setLineup` for the next week (again, to
  *   change it) and `claimWaiver`; claims resolve after that week's run.
  * - `playWeek()` runs the next week: bot lineups, the lock, the reveal, every
@@ -464,13 +483,13 @@ export class SeasonSession {
     const simSeed = options.seed;
     if (simSeed.length === 0 || simSeed.includes('/')) throw new Error(`sim seed must be non-empty with no "/", got ${JSON.stringify(simSeed)}`);
     const human = options.human ?? null;
-    if (human !== null && !input.taverns.some((t) => t.id === human.tavern)) throw new Error(`no tavern "${human.tavern}" to seat a person in`);
+    if (human !== null && !input.managers.some((m) => m.id === human.manager)) throw new Error(`no manager "${human.manager}" to seat a person in`);
     this.input = input;
     this.seed = simSeed;
     this.human = human;
     this.log = new LogBuilder(input.config.id);
     this.start = EPOCH + (cyrb128(`${simSeed}::start`)[0] % 520) * WEEK;
-    this.bots = new Map(input.taverns.map((t) => [t.id, { id: t.bot, manager: botManager(t.bot), actor: { kind: 'bot', strategy: t.bot } }]));
+    this.bots = new Map(input.managers.map((m) => [m.id, { id: m.bot, manager: botManager(m.bot), actor: { kind: 'bot', strategy: m.bot } }]));
     this.humanActor = human === null ? null : { kind: 'manager', githubId: human.githubId, login: human.login };
     this.preseason();
   }
@@ -489,6 +508,8 @@ export class SeasonSession {
 
   get stage(): SessionStage {
     const { state } = this.log;
+    const choosing = tavernPickOnTheClock(state);
+    if (choosing !== null) return { kind: 'tavern', manager: choosing };
     if (!state.draft.complete) {
       const tavern = onTheClock(state);
       if (tavern === null) throw new Error(`draft stalled at pick ${state.draft.picks}: nobody is on the clock`);
@@ -498,20 +519,56 @@ export class SeasonSession {
     return { kind: 'week', week: this.week };
   }
 
-  /** True when `tavern` is the person's. */
-  isHuman(tavern: string): boolean {
-    return this.human?.tavern === tavern;
+  /** The taverns in play: the ones chosen, in the order they were chosen. Empty before the tavern pick. */
+  get taverns(): ReadonlyArray<string> {
+    return [...this.log.state.taverns.keys()];
   }
 
-  // ── the draft ────────────────────────────────────────────────────────────
+  /** The person's tavern, or null before they choose one (or with no person). */
+  get humanTavern(): string | null {
+    return this.human === null ? null : (this.log.state.managers.get(this.human.manager)?.tavern ?? null);
+  }
 
-  /** Bot picks, one an hour, until the person is on the clock or the draft is done. */
+  /** True when `tavern` is the person's. */
+  isHuman(tavern: string): boolean {
+    return this.humanTavern === tavern;
+  }
+
+  /** The season's taverns nobody has chosen yet, in package order. */
+  openTaverns(): ReadonlyArray<string> {
+    return this.input.taverns.map((t) => t.id).filter((id) => !this.log.state.taverns.has(id));
+  }
+
+  // ── the tavern pick and the draft ────────────────────────────────────────
+
+  /** Bot tavern choices, then bot picks, one an hour, until the person is on the clock or the draft is done. */
   advanceDraft(): void {
-    for (let stage = this.stage; stage.kind === 'draft' && !this.isHuman(stage.tavern); stage = this.stage) {
-      const bot = this.botOf(stage.tavern);
-      const character = bot.manager.draft.pick(this.viewFor(stage.tavern, `draft:${stage.pick}`), freeAgents(this.log.state));
-      this.append('draft.pick', { pick: stage.pick, tavern: stage.tavern, character, auto: false }, bot.actor, this.draftAt(stage.pick));
+    for (let stage = this.stage; ; stage = this.stage) {
+      if (stage.kind === 'tavern' && stage.manager !== this.human?.manager) {
+        const bot = this.botOfManager(stage.manager);
+        const tavern = bot.manager.tavern.choose(this.openTaverns(), rngFor(this.seed, `bot:${stage.manager}:tavern`));
+        this.append('tavern.chosen', { manager: stage.manager, tavern }, bot.actor, this.tavernPickAt());
+      } else if (stage.kind === 'draft' && !this.isHuman(stage.tavern)) {
+        const bot = this.botOf(stage.tavern);
+        const character = bot.manager.draft.pick(this.viewFor(stage.tavern, `draft:${stage.pick}`), freeAgents(this.log.state));
+        this.append('draft.pick', { pick: stage.pick, tavern: stage.tavern, character, auto: false }, bot.actor, this.draftAt(stage.pick));
+      } else {
+        return;
+      }
     }
+  }
+
+  /** The person's tavern (D-52). Throws unless it is their turn and the tavern is open. */
+  chooseTavern(tavern: string): void {
+    const stage = this.stage;
+    if (stage.kind !== 'tavern' || stage.manager !== this.human?.manager) throw new Error('it is not your turn to choose a tavern');
+    this.append('tavern.chosen', { manager: stage.manager, tavern }, this.humanActor!, this.tavernPickAt());
+  }
+
+  /** What the person's advisor bot would choose now. */
+  suggestTavern(): string {
+    const human = this.requireHuman();
+    return this.botOfManager(human.manager).manager.tavern.choose(this.openTaverns(), rngFor(this.seed, `bot:${human.manager}:advice:tavern`));
   }
 
   /** The person's pick. Throws unless they are on the clock and the pick is legal. */
@@ -530,8 +587,7 @@ export class SeasonSession {
 
   /** The bots' `value` rating (strength and skill breadth per CR) for each id, as the person's view sees the pool. Higher is better. */
   draftValues(ids: ReadonlyArray<string>): ReadonlyMap<string, number> {
-    const human = this.requireHuman();
-    const view = this.viewFor(human.tavern, 'advice:value');
+    const view = this.viewFor(this.requireHumanTavern(), 'advice:value');
     return new Map(ids.map((id) => [id, valueOf(view, id)]));
   }
 
@@ -539,37 +595,42 @@ export class SeasonSession {
 
   /** Set (or replace) the person's lineup for the next week. Throws if it is illegal. */
   setLineup(lineup: Lineup): void {
-    const human = this.requireHuman();
+    const tavern = this.requireHumanTavern();
     const week = this.requireWeek();
-    this.append('lineup.set', { tavern: human.tavern, week, lineup }, this.humanActor!, this.lastAt + MINUTE);
+    this.append('lineup.set', { tavern, week, lineup }, this.humanActor!, this.lastAt + MINUTE);
   }
 
   /** What the person's advisor bot would field next week, or null if no legal lineup exists. */
   suggestLineup(): Lineup | null {
-    const human = this.requireHuman();
+    const tavern = this.requireHumanTavern();
     const week = this.requireWeek();
-    return this.botOf(human.tavern).manager.lineup.lineup(this.viewFor(human.tavern, `advice:lineup:${week}`), week);
+    return this.botOf(tavern).manager.lineup.lineup(this.viewFor(tavern, `advice:lineup:${week}`), week);
   }
 
   /** The person's submitted lineup for the next week, or null if none yet (the lock then carries one over). */
   pendingLineup(): Lineup | null {
-    const human = this.requireHuman();
-    return this.log.state.pendingLineups.get(this.week)?.get(human.tavern) ?? null;
+    return this.log.state.pendingLineups.get(this.week)?.get(this.requireHumanTavern()) ?? null;
   }
 
   /** Claim a free agent for the person, resolved after the next week's run. Not in the last week (no waivers follow it). */
   claimWaiver(add: string, drop: string | null): string {
-    const human = this.requireHuman();
+    const tavern = this.requireHumanTavern();
     const week = this.requireWeek();
     if (week >= this.input.config.weeks) throw new Error('no waivers after the last week');
-    return this.claim(human.tavern, add, drop, this.humanActor!, this.lastAt + MINUTE);
+    return this.claim(tavern, add, drop, this.humanActor!, this.lastAt + MINUTE);
   }
 
   /** The advisor bot's claims for the person right now. */
   suggestClaims(): ReadonlyArray<{ readonly add: string; readonly drop: string | null }> {
-    const human = this.requireHuman();
+    const tavern = this.requireHumanTavern();
     const week = this.requireWeek();
-    return this.botOf(human.tavern).manager.waivers.claims(this.viewFor(human.tavern, `advice:waivers:${week}`), freeAgents(this.log.state));
+    return this.botOf(tavern).manager.waivers.claims(this.viewFor(tavern, `advice:waivers:${week}`), freeAgents(this.log.state));
+  }
+
+  /** Declare the person's hex (D-52) on `target` for `week`, before that week's lock. Throws if it is illegal. */
+  declareHex(target: string, ability: Ability, week: number): void {
+    const tavern = this.requireHumanTavern();
+    this.append('hex.declared', { tavern, target, ability, week }, this.humanActor!, this.lastAt + MINUTE);
   }
 
   /** Claims waiting for the next resolution. */
@@ -590,8 +651,16 @@ export class SeasonSession {
     if (scheduled === undefined) throw new Error(`no mission for week ${week}`);
     const system = (workflow: string): Actor => ({ kind: 'system', workflow });
 
+    // Hexes (D-52): each bot that still holds its hex may declare it for this week, before the lineups.
+    this.taverns.forEach((tavern, i) => {
+      if (this.isHuman(tavern) || this.log.state.hexes.some((h) => h.tavern === tavern)) return;
+      const bot = this.botOf(tavern);
+      const hex = bot.manager.hex.declare(this.viewFor(tavern, `hex:${week}`), week);
+      if (hex !== null) this.append('hex.declared', { tavern, target: hex.target, ability: hex.ability, week }, bot.actor, base + 16 * HOUR + i * MINUTE);
+    });
+
     // Lineups, then the lock.
-    input.taverns.forEach(({ id: tavern }, i) => {
+    this.taverns.forEach((tavern, i) => {
       if (this.isHuman(tavern)) return;
       const bot = this.botOf(tavern);
       const lineup = bot.manager.lineup.lineup(this.viewFor(tavern, `lineup:${week}`), week);
@@ -605,12 +674,14 @@ export class SeasonSession {
       if (entry === undefined) throw new Error(`"${id}" is not pooled`);
       return entry.cr;
     };
-    const lineups = input.taverns.map(({ id: tavern }): PayloadByType['lineup.locked']['lineups'][number] => {
-      const own = submitted?.get(tavern);
-      if (own !== undefined) return { tavern, lineup: own, source: 'submitted' };
-      const last = previous?.find((entry) => entry.tavern === tavern)?.lineup ?? null;
+    // Injured starters (D-51) can't start: a submitted or carried lineup with one falls back (D-27).
+    const unavailable = injuredFor(state, week);
+    const lineups = this.taverns.map((tavern): PayloadByType['lineup.locked']['lineups'][number] => {
       const roster = { tavern, characters: state.taverns.get(tavern)?.roster ?? [] };
-      const lineup = carriedLineup(last, roster, crOf, config);
+      const own = submitted?.get(tavern);
+      if (own !== undefined && validateLineup(own, roster, crOf, config, { unavailable }).length === 0) return { tavern, lineup: own, source: 'submitted' };
+      const last = previous?.find((entry) => entry.tavern === tavern)?.lineup ?? null;
+      const lineup = carriedLineup(last, roster, crOf, config, { unavailable });
       if (lineup === null) return { tavern, lineup: null, source: 'none' };
       return { tavern, lineup, source: lineup === last ? 'carried' : 'fallback' };
     });
@@ -624,10 +695,11 @@ export class SeasonSession {
     this.append('mission.revealed', { week, mission, sha256, salt: null }, system('weekly-run'), run + r++ * SECOND);
     for (const { tavern, lineup } of lineups) {
       if (lineup === null) continue;
-      const party = partyOf(lineup, input.statsOf);
+      const party = partyOf(lineup, input.statsOf, hexOn(this.log.state, tavern, week));
       const seed = weekSeed({ season, week, tavern, salt: this.seed });
-      const result = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel);
-      const projection = projectMission(party, mission, input.baseOf, input.battleModel);
+      const orders = { retreat: lineup.retreat };
+      const result = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel, orders);
+      const projection = projectMission(party, mission, input.baseOf, input.battleModel, orders);
       this.append(
         'mission.resolved',
         {
@@ -652,7 +724,7 @@ export class SeasonSession {
 
     // Waivers between weeks: every bot's claims, then one resolution.
     if (week < config.weeks) {
-      for (const { id: tavern } of input.taverns) {
+      for (const tavern of this.taverns) {
         if (this.isHuman(tavern)) continue;
         const bot = this.botOf(tavern);
         const claims = bot.manager.waivers.claims(this.viewFor(tavern, `waivers:${week}`), freeAgents(this.log.state));
@@ -668,7 +740,7 @@ export class SeasonSession {
         return { tavern: p.tavern, add: p.add, drop: p.drop, seq };
       });
       const rosters = [...now.taverns.values()].map((t) => ({ tavern: t.id, characters: t.roster }));
-      const resolved = resolveWaivers(pending, now.waivers.priority, rosters, new Set(freeAgents(now)), config);
+      const resolved = resolveWaivers(pending, waiverPriority(now), rosters, new Set(freeAgents(now)), config);
       const outcomes = resolved.awards.map(({ claim, awarded, reason }) => ({ claim: claimAt.get(claim.seq)!, awarded, reason }));
       const claimed = new Map(now.waivers.pending.map((p) => [p.claim, p]));
       this.append('waiver.resolved', { week, outcomes, priorityAfter: resolved.priority }, system('waivers'), base + DAY + 12 * HOUR);
@@ -710,7 +782,7 @@ export class SeasonSession {
 
   // ── internals ────────────────────────────────────────────────────────────
 
-  /** 1–3. Preseason: the season, the pool, the taverns. */
+  /** 1–3. Preseason: the season, the pool, the managers. The tavern pick follows in `advanceDraft`. */
   private preseason(): void {
     const { input } = this;
     const setupActor: Actor =
@@ -719,7 +791,14 @@ export class SeasonSession {
     let k = 0;
     this.append(
       'season.created',
-      { config: input.config, configSha256: input.configSha256, engineVersion: input.engineVersion, schedule: input.schedule, sponsors: input.sponsors },
+      {
+        config: input.config,
+        configSha256: input.configSha256,
+        engineVersion: input.engineVersion,
+        schedule: input.schedule,
+        sponsors: input.sponsors,
+        taverns: input.taverns,
+      },
       setupActor,
       preseason + k++ * SECOND,
     );
@@ -734,17 +813,22 @@ export class SeasonSession {
     // Join order feeds the seeded draft-order shuffle, which is keyed by season
     // only. Shuffling join order per sim seed varies each seat's draft slot
     // across runs, so per-bot results aren't confounded with a fixed slot.
-    const joinOrder = [...input.taverns];
+    const joinOrder = [...input.managers];
     const joinRng = rngFor(this.seed, 'join-order');
     for (let i = joinOrder.length - 1; i > 0; i--) {
       const j = Math.floor(joinRng() * (i + 1));
       [joinOrder[i], joinOrder[j]] = [joinOrder[j]!, joinOrder[i]!];
     }
-    for (const tavern of joinOrder) {
-      const human = this.isHuman(tavern.id) ? this.human! : null;
-      const manager = human === null ? { bot: tavern.bot } : { githubId: human.githubId, login: human.login };
-      this.append('tavern.joined', { tavern: tavern.id, name: tavern.name, manager }, setupActor, preseason + k++ * SECOND);
+    for (const manager of joinOrder) {
+      const human = manager.id === this.human?.manager ? this.human : null;
+      const account = human === null ? { bot: manager.bot } : { githubId: human.githubId, login: human.login };
+      this.append('manager.joined', { manager: manager.id, account }, setupActor, preseason + k++ * SECOND);
     }
+  }
+
+  /** 3½. The tavern pick (D-52), one choice an hour, the day before the draft. */
+  private tavernPickAt(): number {
+    return this.start - 11 * DAY + 18 * HOUR + this.log.state.taverns.size * HOUR;
   }
 
   /** 4. The draft, one pick an hour. */
@@ -769,8 +853,14 @@ export class SeasonSession {
   }
 
   private botOf(tavern: string): { id: BotId; manager: BotManager; actor: Actor } {
-    const bot = this.bots.get(tavern);
-    if (bot === undefined) throw new Error(`no bot for tavern "${tavern}"`);
+    const manager = this.log.state.taverns.get(tavern)?.managerId;
+    if (manager === undefined) throw new Error(`nobody has chosen tavern "${tavern}"`);
+    return this.botOfManager(manager);
+  }
+
+  private botOfManager(manager: string): { id: BotId; manager: BotManager; actor: Actor } {
+    const bot = this.bots.get(manager);
+    if (bot === undefined) throw new Error(`no bot for manager "${manager}"`);
     return bot;
   }
 
@@ -793,16 +883,23 @@ export class SeasonSession {
     return this.human;
   }
 
+  private requireHumanTavern(): string {
+    this.requireHuman();
+    const tavern = this.humanTavern;
+    if (tavern === null) throw new Error('you have not chosen a tavern yet');
+    return tavern;
+  }
+
   private requireWeek(): number {
     const stage = this.stage;
-    if (stage.kind !== 'week') throw new Error(stage.kind === 'draft' ? 'the draft is not over' : 'the season is over');
+    if (stage.kind !== 'week') throw new Error(stage.kind === 'complete' ? 'the season is over' : 'the draft is not over');
     return stage.week;
   }
 }
 
 /**
  * Play one season with bots in every seat: `season.created` →
- * `character.pooled` × pool → `tavern.joined` × taverns → the whole snake
+ * `character.pooled` × pool → `manager.joined` × managers → the tavern pick → the whole snake
  * draft → for each week `lineup.set` × bots, `lineup.locked`,
  * `mission.revealed`, `mission.resolved` × taverns with a lineup,
  * `week.finalized`, and (before the last week) `waiver.claimed` × claims and
@@ -819,8 +916,9 @@ export function runMockSeason(input: SeasonInput, options: RunOptions): MockSeas
   return session.finish();
 }
 
-function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats): Party {
-  return { captain: lineup.captain, members: [lineup.captain, ...lineup.allies].map(statsOf) };
+function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats, hex: Ability | undefined): Party {
+  const members = lineup.starters.map(statsOf);
+  return hex === undefined ? { members } : { members, hex };
 }
 
 // ── summary ────────────────────────────────────────────────────────────────
@@ -834,7 +932,10 @@ function summarize(
   human: HumanSeat | null = null,
 ): RunSummary {
   const config = state.config!;
-  const botId = new Map<string, Seat>(input.taverns.map((t) => [t.id, t.id === human?.tavern ? 'human' : t.bot]));
+  const botOfManager = new Map(input.managers.map((m) => [m.id, m.bot]));
+  const botId = new Map<string, Seat>(
+    [...state.taverns.values()].map((t) => [t.id, t.managerId === human?.manager ? 'human' : botOfManager.get(t.managerId)!]),
+  );
   const bot = (tavern: string): Seat => botId.get(tavern)!;
 
   const table = seasonStandings(state).map((row) => ({ ...row, bot: bot(row.tavern) }));
@@ -857,7 +958,7 @@ function summarize(
           tavern,
           bot: bot(tavern),
           source,
-          starters: lineup === null ? null : [lineup.captain, ...lineup.allies],
+          starters: lineup === null ? null : lineup.starters,
           points: r?.points ?? 0,
           projectedPoints: r?.projectedPoints ?? 0,
           checksPassed: r?.run.checksPassed ?? 0,
@@ -880,7 +981,7 @@ function summarize(
     season: config.id,
     events: events.length,
     champions,
-    taverns: input.taverns.map((t) => ({ tavern: t.id, name: t.name, bot: bot(t.id) })),
+    taverns: [...state.taverns.values()].map((t) => ({ tavern: t.id, name: t.name, bot: bot(t.id) })),
     standings: table,
     draft,
     weeks,
@@ -913,7 +1014,7 @@ export interface BotAggregate {
 export interface Aggregate {
   readonly runs: number;
   readonly byBot: Readonly<Record<string, BotAggregate>>;
-  /** Titles by tavern seat. Draft slots vary per run (join order is shuffled per seed). */
+  /** Titles by tavern. Managers choose taverns at random (D-52) and draft slots vary per run (join order is shuffled per seed). */
   readonly titlesByTavern: Readonly<Record<string, number>>;
   /** Weeks with a single highest-projected tavern, and how often it topped the week (alone or shared). */
   readonly bestProjectedTops: { readonly weeks: number; readonly tops: number; readonly share: number };

@@ -25,9 +25,11 @@ describe('one seeded mock season', () => {
     const types = sim1.events.map((e) => e.type);
     const firstOf = (t: string): number => types.indexOf(t as (typeof types)[number]);
     expect(types.filter((t) => t === 'character.pooled')).toHaveLength(input.pool.length);
-    expect(types.filter((t) => t === 'tavern.joined')).toHaveLength(input.taverns.length);
-    expect(firstOf('tavern.joined')).toBeGreaterThan(types.lastIndexOf('character.pooled'));
-    expect(firstOf('draft.pick')).toBeGreaterThan(types.lastIndexOf('tavern.joined'));
+    expect(types.filter((t) => t === 'manager.joined')).toHaveLength(input.managers.length);
+    expect(types.filter((t) => t === 'tavern.chosen')).toHaveLength(input.managers.length);
+    expect(firstOf('manager.joined')).toBeGreaterThan(types.lastIndexOf('character.pooled'));
+    expect(firstOf('tavern.chosen')).toBeGreaterThan(types.lastIndexOf('manager.joined'));
+    expect(firstOf('draft.pick')).toBeGreaterThan(types.lastIndexOf('tavern.chosen'));
     expect(firstOf('lineup.set')).toBeGreaterThan(types.lastIndexOf('draft.pick'));
     expect(types.filter((t) => t === 'week.finalized')).toHaveLength(6);
     expect(types.filter((t) => t === 'waiver.resolved')).toHaveLength(5);
@@ -74,8 +76,65 @@ describe('one seeded mock season', () => {
     }
   });
 
+  it('benches the injured: a DNF hurts one starter, who starts nowhere the next week (D-51)', () => {
+    let injuries = 0;
+    // DNFs are rare (about 5% of runs, D-54), so look across several seasons.
+    for (const seed of ['sim-1', 'sim-2', 'sim-3', 'sim-4', 'sim-5', 'sim-6']) {
+      const { events, state } = seed === 'sim-1' ? sim1 : runMockSeason(input, { seed });
+      for (const event of events) {
+        if (event.type !== 'mission.resolved') continue;
+        const { run, week, lineup } = event.payload;
+        expect(run.injury === null, `${seed} week ${week} ${event.payload.tavern}`).toBe(!run.dnf);
+        if (run.injury === null) continue;
+        injuries++;
+        expect(lineup.starters).toContain(run.injury.character);
+        for (const next of state.lockedLineups.get(week + 1) ?? []) expect(next.lineup?.starters ?? []).not.toContain(run.injury.character);
+      }
+      expect(verifyResolutions(events)).toEqual([]);
+    }
+    expect(injuries).toBeGreaterThan(10);
+  }, 30_000); // several whole seasons
+
+  it('refuses a lineup with last week\'s injured starter', () => {
+    // An injury before the last week whose character is still on a roster after that week's waivers.
+    const found = sim1.events.flatMap((e) => {
+      if (e.type !== 'mission.resolved' || e.payload.run.injury === null || e.payload.week >= 6) return [];
+      const { week, run } = e.payload;
+      // The state just after that week's waivers: the next week's lineups are open.
+      const cut = sim1.events.findIndex((x) => x.type === 'waiver.resolved' && x.payload.week === week);
+      const before = replay(sim1.events.slice(0, cut + 1));
+      const owner = before.owner.get(run.injury!.character);
+      return owner === undefined ? [] : [{ week, character: run.injury!.character, cut, before, owner }];
+    })[0];
+    if (found === undefined) throw new Error('expected a kept injured character before the last week');
+    const { week, character, cut, before, owner } = found;
+    const others = before.taverns.get(owner)!.roster.filter((id) => id !== character).slice(0, 3);
+    const bad = { ...sim1.events[cut]!, seq: cut + 2, type: 'lineup.set', payload: { tavern: owner, week: week + 1, lineup: { starters: [character, ...others], retreat: 'never' } } };
+    expect(() => replay([...sim1.events.slice(0, cut + 1), bad as (typeof sim1.events)[number]])).toThrow(/lineup\.injured/);
+  });
+
+  it('lets bots hex once each, and the hexed rolls at disadvantage on that ability (D-52)', () => {
+    let hexes = 0;
+    let hexedChecks = 0;
+    for (const seed of ['sim-1', 'sim-2', 'sim-3']) {
+      const { events } = seed === 'sim-1' ? sim1 : runMockSeason(input, { seed });
+      const declared = events.flatMap((e) => (e.type === 'hex.declared' ? [e.payload] : []));
+      expect(new Set(declared.map((h) => h.tavern)).size).toBe(declared.length);
+      hexes += declared.length;
+      for (const e of events) {
+        if (e.type !== 'mission.resolved') continue;
+        const hex = declared.find((h) => h.target === e.payload.tavern && h.week === e.payload.week);
+        for (const n of e.payload.run.nodes) if (n.kind === 'check' && n.disadvantage) hexedChecks++;
+        if (hex === undefined) expect(e.payload.run.nodes.every((n) => n.kind !== 'check' || !n.disadvantage)).toBe(true);
+      }
+      expect(verifyResolutions(events)).toEqual([]);
+    }
+    expect(hexes).toBeGreaterThan(6);
+    expect(hexedChecks).toBeGreaterThan(0);
+  }, 30_000); // several whole seasons
+
   it('pins the sim-1 champion', () => {
-    expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'cr-greedy' }]);
+    expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'skill-coverage' }]);
     expect(sim1.summary.standings[0]!.tavern).toBe('the-gilded-flagon');
   });
 });
@@ -104,5 +163,5 @@ describe('many seasons', () => {
     expect(totals.bestProjectedTops.share).toBeGreaterThan(0);
     expect(totals.dnfRate).toBeGreaterThanOrEqual(0);
     expect(totals.dnfRate).toBeLessThan(1);
-  });
+  }, 30_000); // about 5 s on CI, past the 5 s default
 });

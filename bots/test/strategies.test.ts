@@ -126,7 +126,7 @@ function stateOf(
   extra: { readonly locked?: ReadonlyArray<number>; readonly finalized?: ReadonlyArray<number> } = {},
 ): LeagueState {
   const taverns = new Map(
-    Object.entries(rosters).map(([id, roster]) => [id, { id, name: id, manager: { bot: 'test' }, roster }] as const),
+    Object.entries(rosters).map(([id, roster]) => [id, { id, name: id, managerId: `m-${id}`, manager: { bot: 'test' }, roster }] as const),
   );
   const owner = new Map<string, string>();
   for (const [tavern, roster] of Object.entries(rosters)) for (const id of roster) owner.set(id, tavern);
@@ -139,7 +139,7 @@ function stateOf(
     pool: pool.entries,
     taverns,
     owner,
-    draft: { order: Object.keys(rosters), picks: owner.size, complete: false },
+    draft: { managerOrder: Object.keys(rosters).map((id) => `m-${id}`), order: Object.keys(rosters), picks: owner.size, complete: false },
     pendingLineups: new Map(),
     lockedLineups: new Map((extra.locked ?? []).map((w) => [w, []] as const)),
     waivers: { pending: [], priority: Object.keys(rosters), resolvedWeeks: new Set() },
@@ -178,7 +178,7 @@ function isLegal(view: PublicView, lineup: Lineup | null, roster = view.state.ta
   return validateLineup(lineup, { tavern: view.tavern, characters: roster }, crOf, view.state.config!).length === 0;
 }
 
-const starterSet = (lineup: Lineup | null): string[] => (lineup === null ? [] : [lineup.captain, ...lineup.allies].sort());
+const starterSet = (lineup: Lineup | null): string[] => (lineup === null ? [] : [...lineup.starters].sort());
 
 // ── missions ────────────────────────────────────────────────────────────────
 
@@ -250,8 +250,8 @@ const flagonView = (missions: Readonly<Record<number, Mission>> = MISSIONS, seed
 
 /** Exact projection of a lineup, as the weekly run would compute it. */
 function projected(view: PublicView, lineup: Lineup, mission: Mission): number {
-  const members = [lineup.captain, ...lineup.allies].map(view.statsOf);
-  return projectMission({ captain: lineup.captain, members }, mission, view.baseOf, view.battleModel).expectedScore;
+  const members = lineup.starters.map(view.statsOf);
+  return projectMission({ members }, mission, view.baseOf, view.battleModel).expectedScore;
 }
 
 afterEach(() => {
@@ -365,7 +365,9 @@ describe('lineup strategies', () => {
     const lineup = maxCrLineup.lineup(flagonView(), 1);
     // Vampire spawn 5 + werewolf 3 + ogre 2 + bandit captain 2 = 12, the only way to reach B.
     expect(starterSet(lineup)).toEqual(['c-bandit-captain', 'c-ogre', 'c-vampire-spawn', 'c-werewolf']);
-    expect(lineup?.captain).toBe('c-vampire-spawn');
+    // Starters in roster order, and the default retreat order (D-49).
+    expect(lineup?.starters).toEqual(['c-ogre', 'c-werewolf', 'c-bandit-captain', 'c-vampire-spawn']);
+    expect(lineup?.retreat).toBe('never');
   });
 
   it.each([1, 2])('projection beats or equals max-cr on projected score (week %i)', (week) => {
@@ -377,20 +379,33 @@ describe('lineup strategies', () => {
     if (week === 2) expect(mine).toBeGreaterThan(theirs); // the heist rewards the cheap sneaks
   });
 
-  it('projection finds the best of every legal subset × captain choice', () => {
+  it('projection finds the best of every legal subset', () => {
     const view = flagonView();
     for (const week of [1, 2] as const) {
       const mission = MISSIONS[week];
       let best = -1;
       for (const subset of subsetsOf(FLAGON, 4)) {
-        for (const captain of subset) {
-          const lineup = { captain, allies: subset.filter((id) => id !== captain) as unknown as Lineup['allies'] };
-          if (isLegal(view, lineup)) best = Math.max(best, projected(view, lineup, mission));
-        }
+        const lineup = { starters: subset as unknown as Lineup['starters'], retreat: 'never' as const };
+        if (isLegal(view, lineup)) best = Math.max(best, projected(view, lineup, mission));
       }
       expect(projected(view, projectionLineup.lineup(view, week)!, mission)).toBeCloseTo(best, 12);
       expect(projectionLineup.best(view, FLAGON, week)!.score).toBeCloseTo(best, 12);
     }
+  });
+
+  it('projection picks a retreat order only when it beats fighting on (D-49)', () => {
+    const view = flagonView();
+    for (const week of [1, 2] as const) {
+      const mission = MISSIONS[week];
+      const chosen = projectionLineup.best(view, FLAGON, week)!;
+      const members = chosen.lineup.starters.map(view.statsOf);
+      const withOrder = projectMission({ members }, mission, view.baseOf, view.battleModel, { retreat: chosen.lineup.retreat }).expectedScore;
+      expect(withOrder).toBeCloseTo(chosen.score, 12);
+      // Never worse than the best lineup that always fights.
+      expect(chosen.score).toBeGreaterThanOrEqual(projected(view, { ...chosen.lineup, retreat: 'never' }, mission) - 1e-12);
+    }
+    // The heist has no battles, so every order is the same and the bot keeps `never`.
+    expect(projectionLineup.lineup(view, 2)!.retreat).toBe('never');
   });
 
   it('projection falls back to max-cr when the mission is unknown', () => {

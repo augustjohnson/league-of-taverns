@@ -64,8 +64,11 @@ interface SeasonFixture {
   readonly characters?: Readonly<Record<string, string>>;
   readonly managers?: Record<string, unknown>;
   readonly weeks?: ReadonlyArray<number>;
-  readonly sponsors?: ReadonlyArray<{ readonly id: string; readonly tavern: string }>;
-  /** Week → sponsor id. Unlisted weeks are unsponsored. */
+  /** The season's taverns and their gods (D-52). Default: The Inn, blessed by the-sea. */
+  readonly taverns?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly god: string }>;
+  /** Week → schedule keywords (D-42). Unlisted weeks have none. */
+  readonly keywordsOf?: Readonly<Record<number, ReadonlyArray<string>>>;
+  /** Week → sponsor (god) id. Unlisted weeks are unsponsored. */
   readonly sponsorOf?: Readonly<Record<number, string>>;
 }
 
@@ -87,7 +90,7 @@ function makeSeason(root: string, id: string, fixture: SeasonFixture = {}): void
       fixture.managers ?? {
         commissioner: { login: 'boss', githubId: 1 },
         gm: { login: 'boss', githubId: 1 },
-        taverns: [{ id: 'the-inn', name: 'The Inn', manager: { bot: 'value' } }],
+        managers: [{ id: 'innkeeper', account: { bot: 'value' } }],
       },
     ),
   );
@@ -96,10 +99,12 @@ function makeSeason(root: string, id: string, fixture: SeasonFixture = {}): void
     title: `Week ${week}`,
     environment: 'forest',
     theme: '',
+    keywords: fixture.keywordsOf?.[week] ?? [],
     commitment: null,
     sponsor: fixture.sponsorOf?.[week] ?? null,
   }));
-  write(join(dir, 'schedule.yaml'), toYaml({ season: id, sponsors: fixture.sponsors ?? [], weeks }));
+  const taverns = fixture.taverns ?? [{ id: 'the-inn', name: 'The Inn', god: 'the-sea' }];
+  write(join(dir, 'schedule.yaml'), toYaml({ season: id, taverns, weeks }));
 }
 
 describe('season-01', () => {
@@ -125,7 +130,8 @@ describe('season-01', () => {
   });
 
   it('loads managers and a six-week schedule', () => {
-    expect(loadManagers('season-01').taverns.map((t) => t.id)).toEqual(['the-gilded-flagon']);
+    expect(loadManagers('season-01').managers.map((m) => m.id)).toEqual(['example-manager']);
+    expect(loadSchedule('season-01').taverns.map((t) => t.id)).toEqual(['the-gilded-flagon']);
     expect(loadSchedule('season-01').weeks.map((w) => w.week)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
@@ -278,38 +284,38 @@ describe('loadManagers and loadSchedule', () => {
       managers: {
         commissioner: { login: 'boss', githubId: 1 },
         gm: { login: 'boss', githubId: 1 },
-        taverns: [
-          { id: 'the-inn', name: 'The Inn', manager: { login: 'alice', githubId: 10 } },
-          { id: 'the-inn', name: 'The Other Inn', manager: { login: 'bob', githubId: 10 } },
-          { id: 'the-pub', name: 'The Pub', manager: { login: 'Alice', githubId: null } },
-          { id: 'the-bar', name: 'The Bar', manager: { bot: 'value' } },
-          { id: 'the-den', name: 'The Den', manager: { bot: 'value' } },
+        managers: [
+          { id: 'alice', account: { login: 'alice', githubId: 10 } },
+          { id: 'alice', account: { login: 'bob', githubId: 10 } },
+          { id: 'pub', account: { login: 'Alice', githubId: null } },
+          { id: 'bar', account: { bot: 'value' } },
+          { id: 'den', account: { bot: 'value' } },
         ],
       },
       weeks: [1, 3],
     });
     makeSeason(root, 'no-boss', {
-      managers: { gm: { login: 'boss', githubId: null }, taverns: [{ id: 'the-inn', name: 'The Inn', manager: { bot: 'genius' } }] },
+      managers: { gm: { login: 'boss', githubId: null }, managers: [{ id: 'innkeeper', account: { bot: 'genius' } }] },
     });
     makeSeason(root, 'short', { weeks: [1, 2], config: { weeks: 3 } });
     makeSeason(root, 'gods', {
-      sponsors: [
-        { id: 'the-sea', tavern: 'the-inn' },
-        { id: 'the-sky', tavern: 'the-ghost-inn' },
+      taverns: [
+        { id: 'the-inn', name: 'The Inn', god: 'the-sea' },
+        { id: 'the-pub', name: 'The Pub', god: 'the-sky' },
       ],
       sponsorOf: { 1: 'the-sea', 2: 'the-sea' },
     });
     makeSeason(root, 'stranger', { sponsorOf: { 1: 'nobody' } });
-    makeSeason(root, 'home', { sponsors: [{ id: 'the-sea', tavern: 'the-inn' }], sponsorOf: { 2: 'the-sea' } });
+    makeSeason(root, 'home', { sponsorOf: { 2: 'the-sea' } });
   });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-  it('requires unique tavern ids, GitHub ids and logins', () => {
+  it('requires unique manager ids, GitHub ids and logins', () => {
     const label = 'seasons/clash/managers.yaml';
     expect(failureOf(() => loadManagers('clash', root)).split('\n')).toEqual([
-      `${label}: taverns[1].id: duplicate tavern id "the-inn" (also taverns[0])`,
-      `${label}: taverns[1].manager.githubId: GitHub id 10 already manages taverns[0]`,
-      `${label}: taverns[2].manager.login: "Alice" already manages taverns[0]`,
+      `${label}: managers[1].id: duplicate manager id "alice" (also managers[0])`,
+      `${label}: managers[1].account.githubId: GitHub id 10 is already managers[0]`,
+      `${label}: managers[2].account.login: "Alice" is already managers[0]`,
     ]);
   });
 
@@ -318,7 +324,7 @@ describe('loadManagers and loadSchedule', () => {
     expect(lines).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/^seasons\/no-boss\/managers\.yaml: commissioner: /),
-        expect.stringMatching(/^seasons\/no-boss\/managers\.yaml: taverns\[0\]\.manager/),
+        expect.stringMatching(/^seasons\/no-boss\/managers\.yaml: managers\[0\]\.account/),
       ]),
     );
   });
@@ -332,21 +338,26 @@ describe('loadManagers and loadSchedule', () => {
     );
   });
 
-  it('loads sponsors and each week\'s sponsor', () => {
+  it('loads taverns, their gods as sponsors, and each week\'s sponsor', () => {
     const schedule = loadSchedule('home', root);
+    expect(schedule.taverns).toEqual([{ id: 'the-inn', name: 'The Inn', god: 'the-sea' }]);
     expect(schedule.sponsors).toEqual([{ id: 'the-sea', tavern: 'the-inn' }]);
     expect(schedule.weeks.map((w) => w.sponsor)).toEqual([null, 'the-sea']);
   });
 
-  it('requires listed sponsors, one week each, and sponsored taverns that exist', () => {
-    expect(failureOf(() => loadSchedule('gods', root))).toBe('seasons/gods/schedule.yaml: sponsors: sponsor "the-sea" sets both week 1 and week 2');
+  it('requires each week\'s sponsor to be a tavern\'s god, one week each, at most six taverns, and no more managers than taverns', () => {
+    expect(failureOf(() => loadSchedule('gods', root))).toBe('seasons/gods/schedule.yaml: taverns: sponsor "the-sea" sets both week 1 and week 2');
     expect(failureOf(() => loadSchedule('stranger', root))).toBe(
-      'seasons/stranger/schedule.yaml: sponsors: week 1 names sponsor "nobody", which is not listed',
+      'seasons/stranger/schedule.yaml: taverns: week 1 names sponsor "nobody", which is not listed',
     );
-    makeSeason(root, 'ghost', { sponsors: [{ id: 'the-sky', tavern: 'the-ghost-inn' }] });
-    expect(failureOf(() => loadSeason('ghost', root))).toBe(
-      'seasons/ghost/schedule.yaml: sponsors[0].tavern: "the-ghost-inn" is not a tavern in managers.yaml',
+    makeSeason(root, 'crowd', {
+      managers: { commissioner: { login: 'boss', githubId: 1 }, gm: { login: 'boss', githubId: 1 }, managers: ['a', 'b'].map((id) => ({ id, account: { bot: 'value' } })) },
+    });
+    expect(failureOf(() => loadSeason('crowd', root))).toBe(
+      'seasons/crowd/managers.yaml: managers: 2 managers, but schedule.yaml has only 1 tavern(s) to choose from',
     );
+    makeSeason(root, 'seven', { taverns: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((x) => ({ id: `inn-${x}`, name: x, god: `god-${x}` })) });
+    expect(failureOf(() => loadSchedule('seven', root))).toBe('seasons/seven/schedule.yaml: taverns: has 7 taverns; a league has at most 6 (D-01)');
   });
 
   it('loadSeason combines the failures from every file', () => {
@@ -380,8 +391,21 @@ describe('validateSeason', () => {
     };
     write(join(root, 'seasons/bad-missions/missions/selected/tower.yaml'), toYaml(mission));
     write(join(root, 'seasons/bad-missions/missions/candidates/broken.yaml'), toYaml({ ...mission, nodes: 'nope' }));
+    // A forest week whose keywords name a stealth check its mission doesn't have (D-42).
+    makeSeason(root, 'fibbing', { keywordsOf: { 1: ['athletics', 'stealth', 'ogre fight'] } });
+    write(
+      join(root, 'seasons/fibbing/missions/selected/climb.yaml'),
+      toYaml({ ...mission, id: 'climb', season: 'fibbing', environment: 'forest', nodes: mission.nodes.map((n) => (n.id === 'duel' ? { ...n, encounter: { creatures: [{ ref: 'ogre', count: 1 }] } } : n)) }),
+    );
   });
   afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('reports schedule keywords that name nothing in the week\'s mission (D-42)', () => {
+    const { issues } = validateSeason('fibbing', root);
+    expect(issues.filter((i) => i.includes('keywords'))).toEqual([
+      'seasons/fibbing/schedule.yaml: weeks[0].keywords: "stealth" names nothing in mission "climb" (D-42)',
+    ]);
+  });
 
   it('reports every mission problem with its file', () => {
     const { issues } = validateSeason('bad-missions', root);

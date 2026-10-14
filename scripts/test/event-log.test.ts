@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { InvalidEventError, LogParseError, ReplayError, lineHash, replayLog } from '@league-of-taverns/engine';
 import type { Actor, EventOf, EventType, LeagueEvent } from '@league-of-taverns/engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AT, COMMISSIONER, POOL, SEASON, miniConfig, schedule, sponsors } from '../../engine/test/support/league-log';
+import { AT, COMMISSIONER, POOL, SEASON, miniConfig, schedule, sponsors, tavernList } from '../../engine/test/support/league-log';
 import { ValidationFailure } from '../src/lib/main';
 import { appendEvent, eventLogPath, readEventLog, type EventDraft } from '../src/lib/repo';
 
@@ -24,9 +24,9 @@ function draft<T extends EventType>(type: T, payload: EventOf<T>['payload'], act
   return { v: 1, type, season: SEASON, at: AT, actor, payload } as EventDraft;
 }
 
-const created = draft('season.created', { config: miniConfig(), configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors() });
+const created = draft('season.created', { config: miniConfig(), configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors(), taverns: tavernList() });
 const pooled = (i: number) => draft('character.pooled', { character: POOL[i]!.id, base: 'ogre', cr: POOL[i]!.cr, modifiers: [] });
-const joined = (tavern: string, githubId: number) => draft('tavern.joined', { tavern, name: tavern, manager: { githubId, login: `m${githubId}` } });
+const joined = (manager: string, githubId: number) => draft('manager.joined', { manager, account: { githubId, login: `m${githubId}` } });
 
 const logFile = () => eventLogPath(SEASON, root);
 const bytes = () => readFileSync(logFile());
@@ -54,8 +54,8 @@ describe('eventLogPath and readEventLog', () => {
 });
 
 describe('appendEvent', () => {
-  it('appends season.created → character.pooled → tavern.joined, creating the directory, and replays them', () => {
-    const results = [created, pooled(0), joined('the-gilded-flagon', 101)].map((d) => appendEvent(SEASON, d, root));
+  it('appends season.created → character.pooled → manager.joined, creating the directory, and replays them', () => {
+    const results = [created, pooled(0), joined('flagon-manager', 101)].map((d) => appendEvent(SEASON, d, root));
     const text = readEventLog(SEASON, root);
     expect(text).toBe(results.map((r) => `${r.line}\n`).join(''));
 
@@ -63,14 +63,14 @@ describe('appendEvent', () => {
     expect(state.lastSeq).toBe(3);
     expect(state.phase).toBe('preseason');
     expect([...state.pool.keys()]).toEqual([POOL[0]!.id]);
-    expect([...state.taverns.keys()]).toEqual(['the-gilded-flagon']);
+    expect([...state.managers.keys()]).toEqual(['flagon-manager']);
     expect(results.at(-1)!.state).toEqual(state);
     expect(results.map((r) => r.event.seq)).toEqual([1, 2, 3]);
-    expect(results.map((r) => r.event.type)).toEqual(['season.created', 'character.pooled', 'tavern.joined']);
+    expect(results.map((r) => r.event.type)).toEqual(['season.created', 'character.pooled', 'manager.joined']);
   });
 
   it('chains prev through several appends', () => {
-    const results = [created, ...[0, 1, 2, 3].map(pooled), joined('the-rusty-nail', 102)].map((d) => appendEvent(SEASON, d, root));
+    const results = [created, ...[0, 1, 2, 3].map(pooled), joined('nail-manager', 102)].map((d) => appendEvent(SEASON, d, root));
     const written = lines();
     expect(written).toEqual(results.map((r) => r.line));
     const events = written.map((l) => JSON.parse(l) as LeagueEvent);
@@ -84,11 +84,11 @@ describe('appendEvent', () => {
   });
 
   it('writes nothing for an event the reducers reject, and rethrows its InvalidEventError', () => {
-    for (const d of [created, pooled(0), joined('the-gilded-flagon', 101)]) appendEvent(SEASON, d, root);
+    for (const d of [created, pooled(0), joined('flagon-manager', 101)]) appendEvent(SEASON, d, root);
     const before = bytes();
-    const error = thrown(() => appendEvent(SEASON, joined('the-gilded-flagon', 999), root));
+    const error = thrown(() => appendEvent(SEASON, joined('flagon-manager', 999), root));
     expect(error).toBeInstanceOf(InvalidEventError);
-    expect((error as InvalidEventError).code).toBe('tavern.duplicate');
+    expect((error as InvalidEventError).code).toBe('manager.duplicate');
     expect((error as InvalidEventError).seq).toBe(4);
     expect(bytes().equals(before)).toBe(true);
     expect(readdirSync(dirname(logFile()))).toEqual(['events.ndjson']);

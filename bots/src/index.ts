@@ -15,12 +15,15 @@ export {
   LINEUP_STRATEGIES,
   bestAvailable,
   botManager,
+  costliestAbility,
   crGreedyDraft,
   environmentFitLineup,
   keepsLineupPossible,
+  leaderHex,
   maxCrLineup,
   projectionLineup,
   randomDraft,
+  randomTavern,
   skillCoverageDraft,
   valueDraft,
 } from './strategies';
@@ -28,5 +31,5 @@ export type { BotId } from './strategies';
 export { battleStrength, coveredSkills, poolInfo, referenceFoe, valueOf } from './metrics';
 export type { PoolInfo } from './metrics';
 export { checkFit, fitWeights } from './environment';
-export { legalSubsets, lineupFrom } from './view';
+export { legalSubsets, lineupFrom, startable } from './view';
 export type { Subset } from './view';

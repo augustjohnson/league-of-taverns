@@ -40,7 +40,7 @@ Every variant must read naturally whatever path led to it.
 ## Tokens (the only placeholders allowed)
 
 - `{actor}`: the party member who made this check. **Check nodes only.**
-- `{captain}`, `{allies}`, `{tavern}`: allowed anywhere.
+- `{party}` (the four starters, named together), `{tavern}`: allowed anywhere.
 - `{battle_creature}`: the encounter's lead creature type. **Battle nodes only.**
 
 Do not invent names for party members. They come from the tokens.

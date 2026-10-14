@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { SeasonConfig } from '../src/league';
+import { reverseStandingsPriority, type SeasonConfig, type StandingRow } from '../src/league';
 import { resolveWaivers, validateTrade, type RosterView, type TradeTerms, type WaiverClaim } from '../src/roster';
 import type { CrEighths } from '../src/vocabulary';
 
 /** Minimal season config; only `roster.size` and `trades.deadlineWeek` matter here. Shape as in lineup.test.ts. */
-function seasonConfig(opts: { size?: number; deadlineWeek?: number | null } = {}): SeasonConfig {
+function seasonConfig(opts: { size?: number; deadlineWeek?: number | null; priority?: SeasonConfig['waivers']['priority'] } = {}): SeasonConfig {
   return {
     id: 'season-01',
     snapshot: 'open5e-v1-2026-10',
@@ -14,7 +14,7 @@ function seasonConfig(opts: { size?: number; deadlineWeek?: number | null } = {}
     roster: { size: opts.size ?? 7, starters: 4, ownership: 'exclusive' },
     draft: { format: 'snake', rounds: 7, order: { mode: 'seeded' }, pickWindowHours: 24, onTimeout: 'autopick' },
     scoring: { pointsScale: 100, homeBonus: 1.25 },
-    waivers: { priority: 'rolling', initialOrder: 'reverse_draft' },
+    waivers: { priority: opts.priority ?? 'rolling', initialOrder: 'reverse_draft' },
     trades: { vetoWindowHours: 24, vetoBy: 'commissioner', deadlineWeek: opts.deadlineWeek === undefined ? 4 : opts.deadlineWeek },
     missedLineup: 'carry_over',
     schedules: { lineupLock: '0 18 * * 4', weeklyRun: '15 18 * * 4', waivers: '0 12 * * 5' },
@@ -53,6 +53,48 @@ const boar = roster('boar', 'b');
 const wyvern = roster('wyvern', 'w');
 const rosters = [flagon, boar, wyvern];
 const freeAgents: ReadonlySet<string> = new Set(['gnoll', 'harpy', 'kobold', 'ogre']);
+
+describe('resolveWaivers: reverse-standings priority (D-05)', () => {
+  const reverse = seasonConfig({ priority: 'reverse_standings' });
+  const row = (tavern: string, points: number): StandingRow => ({ rank: 0, tavern, points, dnfs: 0 });
+
+  it('orders the window lowest on the table first, ties to reverse draft order', () => {
+    // Draft order flagon, boar, wyvern; reverse is wyvern, boar, flagon.
+    const order = ['flagon', 'boar', 'wyvern'];
+    expect(reverseStandingsPriority([row('flagon', 120), row('boar', 80), row('wyvern', 200)], order)).toEqual(['boar', 'flagon', 'wyvern']);
+    // Week 1 (nobody has points yet): reverse draft order, as with rolling.
+    expect(reverseStandingsPriority([], order)).toEqual(['wyvern', 'boar', 'flagon']);
+    // Flagon and boar tie on 80: boar drafted later, so it claims first.
+    expect(reverseStandingsPriority([row('flagon', 80), row('boar', 80), row('wyvern', 10)], order)).toEqual(['wyvern', 'boar', 'flagon']);
+  });
+
+  it('never moves a winner: a tavern keeps its place for every claim in the window', () => {
+    // Priority boar > flagon > wyvern. Boar wins the gnoll, then still beats flagon to the harpy.
+    const result = resolveWaivers(
+      [claim('flagon', 1, 'gnoll', 'f-1'), claim('boar', 2, 'gnoll', 'b-1'), claim('flagon', 3, 'harpy', 'f-2'), claim('boar', 4, 'harpy', 'b-2')],
+      ['boar', 'flagon', 'wyvern'],
+      rosters,
+      freeAgents,
+      reverse,
+    );
+    expect(outcomes(result)).toEqual([
+      ['boar', 2, 'awarded'],
+      ['flagon', 1, 'add_unavailable'],
+      ['boar', 4, 'awarded'],
+      ['flagon', 3, 'add_unavailable'],
+    ]);
+    expect(result.priority).toEqual(['boar', 'flagon', 'wyvern']);
+    // Rolling sends boar to the back after its first win, so flagon gets the harpy.
+    const rolling = resolveWaivers(
+      [claim('flagon', 1, 'gnoll', 'f-1'), claim('boar', 2, 'gnoll', 'b-1'), claim('flagon', 3, 'harpy', 'f-2'), claim('boar', 4, 'harpy', 'b-2')],
+      ['boar', 'flagon', 'wyvern'],
+      rosters,
+      freeAgents,
+      config,
+    );
+    expect(outcomes(rolling)).toContainEqual(['flagon', 3, 'awarded']);
+  });
+});
 
 describe('resolveWaivers: rolling priority (rules §9)', () => {
   it('gives a contested player to the higher priority, then moves the winner to the back', () => {

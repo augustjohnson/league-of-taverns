@@ -29,10 +29,10 @@ offseason ─▶ candidates ─▶ validate + report ─▶ select ─▶ chrome
    keepers, the commissioner confirms, and kept characters must be in the new
    pool. Modifier changes on a keeper are capped (`carryover.maxModifierChangePoints`).
 5. **Config, managers, schedule.** Write `config.yaml`, `managers.yaml`
-   (GitHub ids), and `schedule.yaml`: week → title, environment, theme,
-   sponsor, plus the `sponsors` list (god → tavern, D-44/D-48), at most 6
-   taverns (D-01). Season 1 has no home bonus (`scoring.homeBonus: 1`, D-47).
-   Each god's boon is listed with its tavern (D-52, planned). **The schedule
+   (managers and their GitHub ids), and `schedule.yaml`: week → title,
+   environment, theme, sponsor, plus the `taverns` list (tavern → name and
+   god, D-44/D-48/D-52), at most 6 taverns and 6 managers (D-01). Season 1 has no home bonus (`scoring.homeBonus: 1`, D-47).
+   Each tavern's boon will be listed with it (D-52, planned). **The schedule
    is public the moment it merges.**
 
 ## 1. Mission candidates
@@ -97,7 +97,8 @@ possibly for reuse later.
    mission validates, and its chrome is `locked` with complete coverage.
    **CI blocks season start otherwise.**
 2. The commissioner creates the season: the Action appends `season.created`
-   (config + schedule), `character.pooled` × about 64, `tavern.joined` × N,
+   (config, schedule and taverns), `character.pooled` × about 64,
+   `manager.joined` × N,
    and `character.retained` for keepers.
 
 **From here on, missions are frozen.** Missions are open for now (D-08), so
@@ -109,8 +110,9 @@ missions are encrypted and their commitments recorded. CI flags any change to a 
 
 **Who:** managers via the *Draft pick* form. **Actions:** `apply-command`.
 
-- **Tavern pick first** (D-52, planned): managers choose taverns, each with
-  its god, boon and hex, in reverse draft order, as `tavern.chosen` events.
+- **Tavern pick first** (D-52): managers choose taverns, each with its god,
+  boon and hex, in reverse draft order, as `tavern.chosen` events. The first
+  choice freezes the draft order over the managers.
 - Snake order, frozen at the first pick. Each pick is validated and appended
   as `draft.pick`. Timeouts autopick [D-26].
 - After the last pick, the phase becomes `regular` and waiver priority is set
@@ -125,7 +127,7 @@ missions are encrypted and their commitments recorded. CI flags any change to a 
 | Thu 18:15 | **Start the week.** Record which mission runs | `mission.revealed` (for the record while missions are public; once hidden, D-08, the reveal moves to the lock) | `run-week` |
 | Thu 18:15 | **Run.** For each tavern: one real random run (D-13) plus projection | `mission.resolved` × N | `run-week` |
 | Thu 18:15 | **Finalize.** Close the week, then rebuild and deploy published JSON | `week.finalized` | `run-week`, `publish` |
-| Fri 12:00 | **Waivers.** Resolve all pending claims in rolling priority | `waiver.resolved` | `run-week --waivers` |
+| Fri 12:00 | **Waivers.** Resolve all pending claims, lowest on the table first (D-05) | `waiver.resolved` | `run-week --waivers` |
 | Hourly | **Trades.** Complete accepted trades whose veto window has passed | `trade.completed` / `trade.cancelled` | `apply-command --sweep` |
 
 Every week runs **once**. `run-week` refuses a week that is already finalized.

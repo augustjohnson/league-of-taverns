@@ -18,7 +18,7 @@ budget:
 
 roster:
   size: 7                           # OPEN D-03
-  starters: 4                       # no captain (D-12); the engine still takes 1 captain + 3 allies until T4.7
+  starters: 4                       # four starters, no captain (D-12)
   ownership: exclusive              # OPEN D-01
 
 draft:
@@ -33,7 +33,7 @@ scoring:
   homeBonus: 1                      # D-47: dropped 2026-10-13 (was 1.25). 1 = off
 
 waivers:
-  priority: rolling                 # D-05 decided: reverse standings. Not built yet; the engine accepts only rolling
+  priority: reverse_standings       # D-05: lowest on the table claims first; winning doesn't move you (or: rolling)
   initialOrder: reverse_draft
 
 trades:

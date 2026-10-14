@@ -39,7 +39,7 @@ titles, mean points, week-top and DNF rates per bot, and how often the
 best-projected tavern topped its week), plus a table on the console.
 
 Each season is built event by event through the engine's `applyEvent`
-(`season.created` → `character.pooled` → `tavern.joined` → draft →
+(`season.created` → `character.pooled` → `manager.joined` → `tavern.chosen` → draft →
 per week `lineup.set` / `lineup.locked` / `mission.revealed` /
 `mission.resolved` / `week.finalized` → waivers between weeks), then replayed
 from its NDJSON with `replayLog` and audited with `verifyResolutions`. Any
@@ -105,8 +105,8 @@ open. The tabs:
   season rank the best same-dice lineups would have reached.
 - **Weeks:** a week's mission as a layered graph; a tavern's locked lineup,
   its path taken and each node's projected reach; the node-by-node roll log.
-- **Lineup lab:** any four characters from the pool or a roster, any captain,
-  any mission: `validateLineup`, CR vs B, `checkOdds` per check, `battleOdds`
+- **Lineup lab:** any four characters from the pool or a roster, any retreat
+  order, any mission: `validateLineup`, CR vs B, `checkOdds` per check, `battleOdds`
   and the `evTtkBreakdown` per battle, the projection and its score
   distribution; Roll once, and Roll 1,000 against the projection.
 - **Draft board, Pool, Event log** (filterable, pretty JSON, Copy

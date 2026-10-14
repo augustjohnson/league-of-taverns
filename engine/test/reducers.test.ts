@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InvalidEventError, applyEvent, initialState } from '../src/events/reducers';
 import { lineHash, replay, replayLog } from '../src/events/replay';
-import { freeAgents, homeTavern, onTheClock, seasonStandings, weekResults } from '../src/events/selectors';
+import { freeAgents, hexOn, homeTavern, onTheClock, seasonStandings, tavernPickOnTheClock, weekResults } from '../src/events/selectors';
 import type { LeagueState } from '../src/events/state';
 import type { LeagueEvent, PayloadByType } from '../src/events/types';
 import { standings, type SeasonConfig } from '../src/league';
@@ -12,6 +12,7 @@ import {
   COMMISSIONER,
   LogBuilder,
   MANAGER,
+  MANAGERS,
   POOL,
   SEASON,
   TAVERNS,
@@ -22,6 +23,7 @@ import {
   resolution,
   schedule,
   sponsors,
+  tavernList,
   waiverResolution,
 } from './support/league-log';
 
@@ -29,7 +31,11 @@ const season = miniSeason();
 const { at, log } = season;
 const config = miniConfig();
 const [A, B, C, D] = TAVERNS;
-const expectedOrder = draftOrder([...TAVERNS], config, rngFor(draftOrderSeed(SEASON), 'order'));
+const expectedManagerOrder = draftOrder([...MANAGERS], config, rngFor(draftOrderSeed(SEASON), 'order'));
+/** The snake order: each manager's tavern (manager-i chose TAVERNS[i]), in draft order. */
+const expectedOrder = expectedManagerOrder.map((m) => TAVERNS[MANAGERS.indexOf(m as (typeof MANAGERS)[number])]!);
+/** Taverns in the order they were chosen: the reverse of the draft order (D-52). */
+const chosenOrder = [...expectedOrder].reverse();
 
 function lockedLineup(state: LeagueState, week: number, tavern: string): Lineup {
   return state.lockedLineups.get(week)!.find((l) => l.tavern === tavern)!.lineup!;
@@ -56,14 +62,21 @@ function rejection(state: LeagueState, event: LeagueEvent): InvalidEventError {
 
 function created(patch: Partial<SeasonConfig>): LeagueState {
   const cfg = miniConfig(patch);
-  return applyEvent(initialState(), candidate(initialState(), 'season.created', { config: cfg, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule().filter((w) => w.week <= cfg.weeks), sponsors: sponsors() }, COMMISSIONER));
+  return applyEvent(initialState(), candidate(initialState(), 'season.created', { config: cfg, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule().filter((w) => w.week <= cfg.weeks), sponsors: sponsors(), taverns: tavernList() }, COMMISSIONER));
 }
+
+/** The manager id that `joined` seats for `tavern`. */
+const managerFor = (tavern: string): string => `m-${tavern}`;
 
 function joined(state: LeagueState, taverns: ReadonlyArray<string>, pool = POOL.slice(0, 8)): LeagueState {
   let s = state;
   for (const { id, cr } of pool) s = applyEvent(s, candidate(s, 'character.pooled', { character: id, base: 'ogre', cr, modifiers: [] }, COMMISSIONER));
   for (const [i, tavern] of taverns.entries()) {
-    s = applyEvent(s, candidate(s, 'tavern.joined', { tavern, name: tavern, manager: { githubId: 500 + i, login: `m${i}` } }, COMMISSIONER));
+    s = applyEvent(s, candidate(s, 'manager.joined', { manager: managerFor(tavern), account: { githubId: 500 + i, login: `m${i}` } }, COMMISSIONER));
+  }
+  // The tavern pick: whoever is on the clock takes the tavern named after them.
+  for (let m = tavernPickOnTheClock(s); m !== null; m = tavernPickOnTheClock(s)) {
+    s = applyEvent(s, candidate(s, 'tavern.chosen', { manager: m, tavern: m.slice(2) }, MANAGER));
   }
   return s;
 }
@@ -80,9 +93,11 @@ describe('mini-season replay', () => {
     expect(at.final.lastSeq).toBe(log.events.length);
   });
 
-  it('pools characters and seats taverns in join order', () => {
+  it('pools characters, seats managers in join order, and taverns in the order chosen', () => {
     expect([...at.preseason.pool.keys()]).toEqual(POOL.map((p) => p.id));
-    expect([...at.preseason.taverns.keys()]).toEqual(TAVERNS);
+    expect([...at.preseason.managers.keys()]).toEqual(MANAGERS);
+    expect([...at.preseason.taverns.keys()]).toEqual(chosenOrder);
+    expect(at.joined.taverns.size).toBe(0);
     expect(roster(at.preseason, A)).toEqual([]);
     expect(at.preseason.schedule).toEqual(schedule());
   });
@@ -90,7 +105,7 @@ describe('mini-season replay', () => {
   it('freezes the seeded order at the first pick and runs the full snake draft', () => {
     expect(at.preseason.draft.order).toEqual([]);
     expect(at.drafting.draft.order).toEqual(expectedOrder);
-    expect(at.drafted.draft).toEqual({ order: expectedOrder, picks: 20, complete: true });
+    expect(at.drafted.draft).toEqual({ managerOrder: expectedManagerOrder, order: expectedOrder, picks: 20, complete: true });
     const picks = log.events.filter((e) => e.type === 'draft.pick');
     expect(picks).toHaveLength(config.draft.rounds * TAVERNS.length);
     for (const pick of picks) expect(pick.payload.tavern).toBe(snakePickOwner(expectedOrder, pick.payload.pick));
@@ -123,8 +138,8 @@ describe('mini-season replay', () => {
 
   it('replaces an earlier lineup.set for the same week', () => {
     const [first, second] = [roster(at.drafted, A), roster(at.drafted, A)].map((r, i) => ({
-      captain: r[i]!,
-      allies: [r[(i + 1) % 5]!, r[(i + 2) % 5]!, r[(i + 3) % 5]!] as const,
+      starters: [r[i]!, r[(i + 1) % 5]!, r[(i + 2) % 5]!, r[(i + 3) % 5]!] as const,
+      retreat: 'never' as const,
     }));
     let s = at.drafted;
     for (const lineup of [first!, second!]) {
@@ -174,10 +189,10 @@ describe('mini-season replay', () => {
     expect(at.final.results.get(2)?.has(D)).toBe(false);
     expect(at.final.finalizedWeeks).toEqual(new Set([1, 2]));
     const week2 = weekResults(at.final, 2);
-    expect(week2.map((r) => r.tavern)).toEqual(TAVERNS);
-    expect(week2.find((r) => r.tavern === D)).toEqual({ week: 2, tavern: D, points: 0, projected: 0, checksPassed: 0 });
+    expect(week2.map((r) => r.tavern)).toEqual(chosenOrder);
+    expect(week2.find((r) => r.tavern === D)).toEqual({ week: 2, tavern: D, points: 0, projected: 0, checksPassed: 0, dnf: false });
     const recorded = at.final.results.get(2)!.get(A)!;
-    expect(week2[0]).toEqual({ week: 2, tavern: A, points: recorded.points, projected: recorded.projectedPoints, checksPassed: recorded.run.checksPassed });
+    expect(week2.find((r) => r.tavern === A)).toEqual({ week: 2, tavern: A, points: recorded.points, projected: recorded.projectedPoints, checksPassed: recorded.run.checksPassed, dnf: recorded.run.dnf });
   });
 
   it('weekResults is empty until the week is finalized', () => {
@@ -248,6 +263,18 @@ const withKeeper = applyEvent(at.preseason, candidate(at.preseason, 'character.r
 const nextPick = (state: LeagueState, patch: Partial<PayloadByType['draft.pick']> = {}) =>
   candidate(state, 'draft.pick', { pick: state.draft.picks, tavern: onTheClock(state)!, character: freeAgents(state)[0]!, auto: false, ...patch }, MANAGER);
 const notOnClock = TAVERNS.find((t) => t !== onTheClock(at.drafting))!;
+/** The tavern pick from `at.joined`: who chooses first and second, and the state after the first choice. */
+const pickOrder = [...draftOrder(MANAGERS, config, rngFor(draftOrderSeed(config.id), 'order'))].reverse();
+const [firstToChoose, secondToChoose] = [pickOrder[0]!, pickOrder[1]!];
+const firstChoice = A;
+const afterFirstChoice = applyEvent(at.joined, candidate(at.joined, 'tavern.chosen', { manager: firstToChoose, tavern: firstChoice }, MANAGER));
+/** A hexes B's wisdom in week 2 (D-52). */
+const hexedOnce = applyEvent(at.drafted, candidate(at.drafted, 'hex.declared', { tavern: A, target: B, ability: 'wis', week: 2 }, MANAGER));
+/** Three managers joined into a fresh season. */
+const joinedThree = [0, 1, 2].reduce(
+  (s, i) => applyEvent(s, candidate(s, 'manager.joined', { manager: `manager-${i}`, account: { githubId: 101 + i, login: `manager-${i}` } }, COMMISSIONER)),
+  at.created,
+);
 
 // A one-slot-roster league: the second round's first pick finds a full roster.
 const tinyDraft = (() => {
@@ -258,7 +285,7 @@ const tinyDraft = (() => {
 
 const lineupA = lockedLineup(at.w1Locked, 1, A);
 const bRoster = roster(at.drafted, B);
-const foreignLineup: Lineup = { captain: bRoster[0]!, allies: [bRoster[1]!, bRoster[2]!, bRoster[3]!] };
+const foreignLineup: Lineup = { starters: [bRoster[0]!, bRoster[1]!, bRoster[2]!, bRoster[3]!], retreat: 'never' };
 const entries = (state: LeagueState, week: number) =>
   TAVERNS.map((tavern) => ({ tavern, lineup: state.pendingLineups.get(week)?.get(tavern) ?? null, source: 'submitted' as const }));
 const w1Entries = entries(at.w1Pending, 1);
@@ -301,15 +328,15 @@ const cases: ReadonlyArray<Case> = [
   // envelope
   ['seq gap', at.created, { ...candidate(at.created, 'week.finalized', { week: 1 }), seq: at.created.lastSeq + 2 }, 'envelope.seq'],
   ['seq replayed', at.created, { ...candidate(at.created, 'week.finalized', { week: 1 }), seq: at.created.lastSeq }, 'envelope.seq'],
-  ['wrong season', at.preseason, { ...candidate(at.preseason, 'tavern.joined', { tavern: 'new-inn', name: 'x', manager: { bot: 'v' } }), season: 'season-02' }, 'envelope.season'],
+  ['wrong season', at.created, { ...candidate(at.created, 'manager.joined', { manager: 'new-manager', account: { bot: 'v' } }), season: 'season-02' }, 'envelope.season'],
 
   // season.created
-  ['event before season.created', initialState(), candidate(initialState(), 'tavern.joined', { tavern: A, name: 'x', manager: { bot: 'v' } }), 'season.not_created'],
+  ['event before season.created', initialState(), candidate(initialState(), 'manager.joined', { manager: 'early', account: { bot: 'v' } }), 'season.not_created'],
   ['season.created twice', at.created, candidate(at.created, 'season.created', log.events[0]!.payload as PayloadByType['season.created'], COMMISSIONER), 'season.already_created'],
-  ['config id differs from envelope season', initialState(), candidate(initialState(), 'season.created', { config: miniConfig({ id: 'season-02' }), configSha256: lineHash('c'), engineVersion: '0', schedule: [], sponsors: [] }), 'season.id_mismatch'],
-  ['schedule lists a week twice', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: [schedule()[0]!, schedule()[0]!], sponsors: sponsors() }), 'season.bad_schedule'],
-  ['a sponsor sets two weeks', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule().map((w) => ({ ...w, sponsor: 'the-bog-king' })), sponsors: sponsors() }), 'season.bad_sponsors'],
-  ['a week names an unlisted sponsor', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: [] }), 'season.bad_sponsors'],
+  ['config id differs from envelope season', initialState(), candidate(initialState(), 'season.created', { config: miniConfig({ id: 'season-02' }), configSha256: lineHash('c'), engineVersion: '0', schedule: [], sponsors: [], taverns: [] }), 'season.id_mismatch'],
+  ['schedule lists a week twice', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: [schedule()[0]!, schedule()[0]!], sponsors: sponsors(), taverns: tavernList() }), 'season.bad_schedule'],
+  ['a sponsor sets two weeks', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule().map((w) => ({ ...w, sponsor: 'the-bog-king' })), sponsors: sponsors(), taverns: tavernList() }), 'season.bad_sponsors'],
+  ['a week names an unlisted sponsor', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: [], taverns: tavernList() }), 'season.bad_sponsors'],
 
   // character.pooled
   ['pooled after the first pick', at.drafting, candidate(at.drafting, 'character.pooled', { character: 'late', base: 'ogre', cr: 8 as CrEighths, modifiers: [] }), 'pool.wrong_phase'],
@@ -328,10 +355,20 @@ const cases: ReadonlyArray<Case> = [
   ['unknown trait', at.preseason, candidate(at.preseason, 'character.pooled', { character: 'odd', base: 'ogre', cr: 8 as CrEighths, modifiers: [{ kind: 'trait', trait: 'no-such-trait' }] }), 'pool.invalid_modifiers'],
   ['registry version the engine cannot price', created({ modifierRegistryVersion: 2 }), candidate(created({ modifierRegistryVersion: 2 }), 'character.pooled', { character: 'odd', base: 'ogre', cr: 8 as CrEighths, modifiers: [] }), 'pool.registry_version'],
 
-  // tavern.joined
-  ['joining after the first pick', at.drafting, candidate(at.drafting, 'tavern.joined', { tavern: 'late-inn', name: 'Late', manager: { githubId: 999, login: 'late' } }), 'tavern.wrong_phase'],
-  ['tavern id taken', at.preseason, candidate(at.preseason, 'tavern.joined', { tavern: A, name: 'Again', manager: { githubId: 999, login: 'x' } }), 'tavern.duplicate'],
-  ['manager already runs a tavern', at.preseason, candidate(at.preseason, 'tavern.joined', { tavern: 'second-inn', name: 'Second', manager: { githubId: 101, login: 'manager-0' } }), 'tavern.manager_taken'],
+  // manager.joined
+  ['joining after the tavern pick starts', at.preseason, candidate(at.preseason, 'manager.joined', { manager: 'late', account: { githubId: 999, login: 'late' } }), 'manager.wrong_phase'],
+  ['joining after the first pick', at.drafting, candidate(at.drafting, 'manager.joined', { manager: 'late', account: { githubId: 999, login: 'late' } }), 'manager.wrong_phase'],
+  ['manager id taken', joinedThree, candidate(joinedThree, 'manager.joined', { manager: 'manager-0', account: { githubId: 999, login: 'x' } }), 'manager.duplicate'],
+  ['account already in the league', joinedThree, candidate(joinedThree, 'manager.joined', { manager: 'second', account: { githubId: 101, login: 'manager-0' } }), 'manager.account_taken'],
+  ['more managers than taverns', at.joined, candidate(at.joined, 'manager.joined', { manager: 'fifth', account: { bot: 'value' } }), 'manager.league_full'],
+  // tavern.chosen
+  ['choosing out of turn', at.joined, candidate(at.joined, 'tavern.chosen', { manager: secondToChoose, tavern: A }), 'choose.not_on_clock'],
+  ['an unknown manager', at.joined, candidate(at.joined, 'tavern.chosen', { manager: 'nobody', tavern: A }), 'choose.unknown_manager'],
+  ['a tavern not in the season', at.joined, candidate(at.joined, 'tavern.chosen', { manager: firstToChoose, tavern: 'the-lost-inn' }), 'choose.unknown_tavern'],
+  ['a tavern already taken', afterFirstChoice, candidate(afterFirstChoice, 'tavern.chosen', { manager: secondToChoose, tavern: firstChoice }), 'choose.taken'],
+  ['choosing twice', afterFirstChoice, candidate(afterFirstChoice, 'tavern.chosen', { manager: firstToChoose, tavern: D }), 'choose.already_chose'],
+  ['choosing after the draft starts', at.drafting, candidate(at.drafting, 'tavern.chosen', { manager: firstToChoose, tavern: D }), 'choose.wrong_phase'],
+  ['a manual order that misses a manager', withConfig(at.joined, { draft: { ...config.draft, order: { mode: 'manual', managers: ['manager-0'] } } }), candidate(at.joined, 'tavern.chosen', { manager: 'manager-0', tavern: A }), 'choose.bad_order'],
 
   // character.retained
   ['keeper after the first pick', at.drafting, candidate(at.drafting, 'character.retained', keeper), 'retain.wrong_phase'],
@@ -343,9 +380,10 @@ const cases: ReadonlyArray<Case> = [
   ['keeper into a full roster', withConfig(withKeeper, { roster: { ...config.roster, size: 1 } }), candidate(withKeeper, 'character.retained', { ...keeper, character: 'char-23', basis: 'champion_reward' }), 'retain.roster_full'],
 
   // draft.pick
-  ['first pick with a sponsored tavern that never joined', { ...at.preseason, sponsors: [...sponsors(), { id: 'the-lost-god', tavern: 'the-empty-inn' }] }, candidate(at.preseason, 'draft.pick', { pick: 0, tavern: onTheClock(at.preseason)!, character: 'char-01', auto: false }), 'draft.sponsor_not_joined'],
-  ['first pick with no taverns', at.created, candidate(at.created, 'draft.pick', { pick: 0, tavern: A, character: 'char-01', auto: false }), 'draft.no_taverns'],
-  ['manual order that misses a tavern', withConfig(at.preseason, { draft: { ...config.draft, order: { mode: 'manual', taverns: [A] } } }), candidate(at.preseason, 'draft.pick', { pick: 0, tavern: A, character: 'char-01', auto: false }), 'draft.bad_order'],
+  ['first pick before every manager has a tavern', afterFirstChoice, candidate(afterFirstChoice, 'draft.pick', { pick: 0, tavern: firstChoice, character: 'char-01', auto: false }), 'draft.tavern_pick_incomplete'],
+  ['first pick with no managers', at.created, candidate(at.created, 'draft.pick', { pick: 0, tavern: A, character: 'char-01', auto: false }), 'draft.tavern_pick_incomplete'],
+  ['a season with seven taverns', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: sponsors(), taverns: [...tavernList(), ...['e', 'f', 'g'].map((id) => ({ id: `inn-${id}`, name: id }))] }, COMMISSIONER), 'season.bad_taverns'],
+  ['a sponsor of a tavern not in the season', initialState(), candidate(initialState(), 'season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: sponsors(), taverns: tavernList().slice(1) }, COMMISSIONER), 'season.bad_taverns'],
   ['pick number is not the count of prior picks', at.drafting, nextPick(at.drafting, { pick: 0 }), 'draft.wrong_pick'],
   ['tavern not on the clock', at.drafting, nextPick(at.drafting, { tavern: notOnClock }), 'draft.not_on_clock'],
   ['pick not pooled', at.drafting, nextPick(at.drafting, { character: 'ghost' }), 'draft.not_pooled'],
@@ -360,7 +398,7 @@ const cases: ReadonlyArray<Case> = [
   ['lineup for a locked week', at.w1Locked, candidate(at.w1Locked, 'lineup.set', { tavern: A, week: 1, lineup: lineupA }), 'lineup.week_locked'],
   ['lineup with characters not owned', at.drafted, candidate(at.drafted, 'lineup.set', { tavern: A, week: 1, lineup: foreignLineup }), 'lineup.not_owned'],
   ['lineup over budget', withConfig(at.drafted, { budget: { partyCr: 8 as CrEighths, modifierPointsPerCharacter: 3 } }), candidate(at.drafted, 'lineup.set', { tavern: B, week: 1, lineup: foreignLineup }), 'lineup.over_budget'],
-  ['captain also an ally', at.drafted, candidate(at.drafted, 'lineup.set', { tavern: B, week: 1, lineup: { captain: bRoster[0]!, allies: [bRoster[0]!, bRoster[1]!, bRoster[2]!] } }), 'lineup.duplicate'],
+  ['a starter listed twice', at.drafted, candidate(at.drafted, 'lineup.set', { tavern: B, week: 1, lineup: { starters: [bRoster[0]!, bRoster[0]!, bRoster[1]!, bRoster[2]!], retreat: 'never' } }), 'lineup.duplicate'],
 
   // lineup.locked
   ['lock before the draft completes', at.drafting, candidate(at.drafting, 'lineup.locked', { week: 1, lineups: [] }), 'lock.draft_incomplete'],
@@ -373,6 +411,14 @@ const cases: ReadonlyArray<Case> = [
   ['lock with a null lineup marked submitted', at.w1Pending, candidate(at.w1Pending, 'lineup.locked', { week: 1, lineups: [{ ...w1Entries[0]!, lineup: null }, ...w1Entries.slice(1)] }), 'lock.source_mismatch'],
   ['lock with an illegal lineup', at.w1Pending, candidate(at.w1Pending, 'lineup.locked', { week: 1, lineups: [{ ...w1Entries[0]!, lineup: foreignLineup }, ...w1Entries.slice(1)] }), 'lock.illegal_lineup'],
 
+  ['a week whose keywords name nothing in its mission', at.w1Locked, candidate(at.w1Locked, 'mission.revealed', { week: 1, mission: { ...missionFor(1), nodes: missionFor(1).nodes.filter((n) => n.kind !== 'check' || n.id !== 'find-path').concat([{ id: 'find-path', rank: 1, kind: 'check', check: { type: 'skill', skill: 'stealth', dc: 11 }, loot: 100 }]) }, sha256: lineHash('mission-w1'), salt: null }), 'reveal.dishonest_keywords'],
+  // hex.declared
+  ['a hex by an unknown tavern', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: 'nobody', target: B, ability: 'wis', week: 2 }, MANAGER), 'hex.unknown_tavern'],
+  ['a hex on itself', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: A, target: A, ability: 'wis', week: 2 }, MANAGER), 'hex.self'],
+  ['a hex past the season', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: A, target: B, ability: 'wis', week: 3 }, MANAGER), 'hex.bad_week'],
+  ['a hex on a locked week', at.w1Locked, candidate(at.w1Locked, 'hex.declared', { tavern: A, target: B, ability: 'wis', week: 1 }, MANAGER), 'hex.week_locked'],
+  ['a second hex in a season', hexedOnce, candidate(hexedOnce, 'hex.declared', { tavern: A, target: C, ability: 'str', week: 1 }, MANAGER), 'hex.used'],
+  ['a second hex on one target in one week', hexedOnce, candidate(hexedOnce, 'hex.declared', { tavern: C, target: B, ability: 'str', week: 2 }, MANAGER), 'hex.target_taken'],
   // waiver.claimed
   ['claim before the draft completes', at.drafting, candidate(at.drafting, 'waiver.claimed', { claim: 'c', tavern: A, add: 'char-24', drop: null }), 'waiver.draft_incomplete'],
   ['claim by an unknown tavern', at.w1Finalized, candidate(at.w1Finalized, 'waiver.claimed', { claim: 'c', tavern: 'nowhere', add: 'char-24', drop: null }), 'waiver.unknown_tavern'],
@@ -439,7 +485,8 @@ const cases: ReadonlyArray<Case> = [
   ['result for an unknown tavern', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, tavern: 'nowhere' }), 'resolve.unknown_tavern'],
   ['second result for one tavern', at.w1Resolved, candidate(at.w1Resolved, 'mission.resolved', resultA), 'resolve.duplicate'],
   ['result for a tavern with no lineup', w2Revealed, candidate(w2Revealed, 'mission.resolved', { ...resultA, week: 2, tavern: D, mission: 'mission-w2' }), 'resolve.no_lineup'],
-  ['result with a different lineup', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, lineup: { ...lineupA, captain: lineupA.allies[0], allies: [lineupA.captain, lineupA.allies[1], lineupA.allies[2]] } }), 'resolve.lineup_mismatch'],
+  ['result with a different lineup', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, lineup: { ...lineupA, starters: [lineupA.starters[1], lineupA.starters[0], lineupA.starters[2], lineupA.starters[3]] } }), 'resolve.lineup_mismatch'],
+  ['result with a different retreat order', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, lineup: { ...lineupA, retreat: { bank: 40 } } }), 'resolve.lineup_mismatch'],
   ['result whose counts disagree with its nodes', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ checksAttempted: resultA.run.checksAttempted + 1 })), 'resolve.counts_mismatch'],
   ['result whose score disagrees with its loot', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ score: resultA.run.score === 0.5 ? 0.25 : 0.5 })), 'resolve.score_mismatch'],
   ['result whose loot disagrees with its nodes', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ loot: resultA.run.loot + 1 })), 'resolve.score_mismatch'],
@@ -459,9 +506,28 @@ describe('preconditions', () => {
     expect(error.message).toContain(`[${code}]`);
   });
 
-  it('accepts bot taverns that share a strategy', () => {
-    const s = applyEvent(at.preseason, candidate(at.preseason, 'tavern.joined', { tavern: 'bot-inn', name: 'Bot Inn', manager: { bot: 'value' } }));
-    expect(s.taverns.get('bot-inn')?.manager).toEqual({ bot: 'value' });
+  it('records a hex for its target and week only (D-52)', () => {
+    expect(hexOn(hexedOnce, B, 2)).toBe('wis');
+    expect([hexOn(hexedOnce, B, 1), hexOn(hexedOnce, A, 2)]).toEqual([undefined, undefined]);
+    // Another tavern may hex the same target in another week.
+    const two = applyEvent(hexedOnce, candidate(hexedOnce, 'hex.declared', { tavern: C, target: B, ability: 'str', week: 1 }, MANAGER));
+    expect(hexOn(two, B, 1)).toBe('str');
+  });
+
+  it('accepts bot managers that share a strategy', () => {
+    let s = applyEvent(at.created, candidate(at.created, 'manager.joined', { manager: 'bot-1', account: { bot: 'value' } }));
+    s = applyEvent(s, candidate(s, 'manager.joined', { manager: 'bot-2', account: { bot: 'value' } }));
+    expect([...s.managers.values()].map((m) => m.account)).toEqual([{ bot: 'value' }, { bot: 'value' }]);
+  });
+
+  it('runs the tavern pick in reverse draft order, and drafts in draft order (D-52)', () => {
+    const order = at.preseason.draft.managerOrder;
+    const chosen = [...at.preseason.taverns.values()].map((t) => t.managerId);
+    expect(chosen).toEqual([...order].reverse());
+    expect(at.preseason.draft.order).toEqual([]);
+    expect(at.drafting.draft.order).toEqual(order.map((m) => at.preseason.managers.get(m)!.tavern));
+    // The manager who drafts last chose first.
+    expect(onTheClock(at.preseason)).toBe(at.preseason.managers.get(order[0]!)!.tavern);
   });
 
   it('a rejected event leaves the state untouched', () => {
@@ -472,8 +538,8 @@ describe('preconditions', () => {
 
   it('a log built by hand replays only in order', () => {
     const b = new LogBuilder();
-    b.append('season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: sponsors() }, COMMISSIONER);
-    b.append('tavern.joined', { tavern: A, name: 'A', manager: { bot: 'v' } }, COMMISSIONER);
+    b.append('season.created', { config, configSha256: lineHash('c'), engineVersion: '0', schedule: schedule(), sponsors: sponsors(), taverns: tavernList() }, COMMISSIONER);
+    b.append('manager.joined', { manager: 'manager-a', account: { bot: 'v' } }, COMMISSIONER);
     const swapped = [b.events[1]!, b.events[0]!];
     expect(() => replay(swapped)).toThrow(InvalidEventError);
   });
@@ -581,7 +647,7 @@ describe('tiny leagues', () => {
   });
 
   it('a manual order is used as given', () => {
-    let s = joined(created({ draft: { ...config.draft, rounds: 1, order: { mode: 'manual', taverns: [C, A, B] } } }), [A, B, C]);
+    let s = joined(created({ draft: { ...config.draft, rounds: 1, order: { mode: 'manual', managers: [C, A, B].map(managerFor) } } }), [A, B, C]);
     s = applyEvent(s, nextPick(s));
     expect(s.draft.order).toEqual([C, A, B]);
     expect(roster(s, C)).toEqual(['char-01']);

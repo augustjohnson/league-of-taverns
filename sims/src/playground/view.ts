@@ -3,8 +3,9 @@
  * histograms, Monte Carlo sampling, the draft board, and
  * the small formatters the page uses. No DOM, so tests run them in Node.
  */
-import { SKILLS, replay, runMission, rngFor } from '@league-of-taverns/engine';
+import { SKILLS, replay, retreatOptions, runMission, rngFor } from '@league-of-taverns/engine';
 import type {
+  Ability,
   Actor,
   BaseStats,
   BattleModel,
@@ -15,6 +16,8 @@ import type {
   MissionNode,
   Modifier,
   Party,
+  RetreatOrder,
+  RunOptions,
   Skill,
 } from '@league-of-taverns/engine';
 import type { Aggregate } from '../season-runner';
@@ -185,12 +188,13 @@ export function sampleMission(
   model: BattleModel,
   n: number,
   seed: string,
+  options: RunOptions = {},
 ): SampleResult {
   const scores: number[] = [];
   let dnfs = 0;
   let total = 0;
   for (let i = 0; i < n; i++) {
-    const run = runMission(party, mission, (node) => rngFor(seed, `${i}:roll:${node}`), baseOf, model);
+    const run = runMission(party, mission, (node) => rngFor(seed, `${i}:roll:${node}`), baseOf, model, options);
     scores.push(run.score);
     total += run.score;
     if (run.dnf) dnfs++;
@@ -198,9 +202,36 @@ export function sampleMission(
   return { n, scores, dnfs, mean: n === 0 ? 0 : total / n };
 }
 
-/** A party in lineup order: captain first, as the season runner builds it. */
-export function partyFrom(captain: string, allies: ReadonlyArray<string>, statsOf: (id: string) => EffectiveStats): Party {
-  return { captain, members: [captain, ...allies].map(statsOf) };
+/** A party in lineup order, as the season runner builds it, under a rival's hex if any (D-52). */
+export function partyFrom(starters: ReadonlyArray<string>, statsOf: (id: string) => EffectiveStats, hex?: Ability): Party {
+  const members = starters.map(statsOf);
+  return hex === undefined ? { members } : { members, hex };
+}
+
+// ── retreat orders (D-49) ──────────────────────────────────────────────────
+
+/** A retreat order in words. */
+export function retreatLabel(retreat: RetreatOrder): string {
+  if (retreat === 'never') return 'never turn back';
+  if (retreat === 'avoid_battles') return 'avoid every battle';
+  return `turn back with ${retreat.bank}+ loot`;
+}
+
+/** A retreat order as a `<select>` value: `never`, `avoid_battles` or `bank:N`. */
+export function retreatValue(retreat: RetreatOrder): string {
+  return typeof retreat === 'string' ? retreat : `bank:${retreat.bank}`;
+}
+
+/** The inverse of `retreatValue`. Anything unreadable is `never`, the default. */
+export function parseRetreat(value: string): RetreatOrder {
+  if (value === 'avoid_battles') return 'avoid_battles';
+  const bank = /^bank:(\d+)$/.exec(value);
+  return bank === null ? 'never' : { bank: Number(bank[1]) };
+}
+
+/** The retreat orders a picker offers: the engine's `retreatOptions` (D-49). */
+export function retreatChoices(haul: number): ReadonlyArray<RetreatOrder> {
+  return retreatOptions(haul);
 }
 
 // ── draft board ────────────────────────────────────────────────────────────
@@ -347,12 +378,14 @@ export function eventSummary(event: LeagueEvent): string {
       return `${event.payload.config.id}: ${event.payload.config.weeks} weeks, B = ${formatCr(event.payload.config.budget.partyCr)}`;
     case 'character.pooled':
       return `${event.payload.character} (${event.payload.base}, CR ${formatCr(event.payload.cr)})${event.payload.modifiers.length > 0 ? ` +${event.payload.modifiers.length} mod` : ''}`;
-    case 'tavern.joined':
-      return `${event.payload.tavern} (${'bot' in event.payload.manager ? event.payload.manager.bot : event.payload.manager.login})`;
+    case 'manager.joined':
+      return `${event.payload.manager} (${'bot' in event.payload.account ? event.payload.account.bot : event.payload.account.login})`;
+    case 'tavern.chosen':
+      return `${event.payload.manager} chooses ${event.payload.tavern}`;
     case 'draft.pick':
       return `#${event.payload.pick + 1} ${event.payload.tavern} takes ${event.payload.character}`;
     case 'lineup.set':
-      return `wk ${event.payload.week} ${event.payload.tavern}: ★${event.payload.lineup.captain}, ${event.payload.lineup.allies.join(', ')}`;
+      return `wk ${event.payload.week} ${event.payload.tavern}: ${event.payload.lineup.starters.join(', ')} (${retreatLabel(event.payload.lineup.retreat)})`;
     case 'lineup.locked':
       return `wk ${event.payload.week}: ${event.payload.lineups.length} lineups (${event.payload.lineups.map((l) => l.source).join(', ')})`;
     case 'mission.revealed':

@@ -104,7 +104,7 @@ function print(season: string, seed: string, totals: Aggregate, summaries: Reado
     const seats = Object.entries(totals.titlesByTavern)
       .map(([tavern, titles]) => `${tavern} ${fmtTitles(titles)}`)
       .join(', ');
-    console.log(`titles by seat: ${seats}`);
+    console.log(`titles by tavern: ${seats}`);
   }
 }
 

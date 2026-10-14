@@ -76,7 +76,7 @@ function sampleParty(rng: Rng, minCr: number): Party {
     const total = members.reduce((n, m) => n + m.cr, 0);
     if (total < minCr || total > BUDGET) continue;
     const stats = members.map((m) => effective.get(m.slug) as EffectiveStats);
-    return { captain: stats[0]?.characterId ?? '', members: stats };
+    return { members: stats };
   }
   throw new Error('could not sample a party');
 }

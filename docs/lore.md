@@ -28,7 +28,7 @@ are trades, and there's a waiver wire.
 | Stragglers who turn up after recruitment night | Free agents and waivers |
 | The party heads out on the god's trial | The weekly mission, run once |
 | Loot carried home | Score (D-45) |
-| The party is beaten and flees with what it is carrying | DNF: the mission ends and the party keeps the loot banked so far (D-46) |
+| The party is beaten and flees, dropping everything | DNF: the mission ends and the party loses everything it banked (D-54) |
 | Someone limps home hurt | Injury: after a DNF, one starter sits out next week (D-51) |
 | The party thinks better of it and turns for home | Retreat order: turn back before a battle with the loot in hand (D-49) |
 | A god chose this tavern long before the barkeep noticed | Every tavern is already blessed; managers pick a tavern, not a god (D-52) |

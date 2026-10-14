@@ -53,7 +53,7 @@ const CHARACTER_YARDSTICK = referenceFoe(24);
  * divided by CR: party strength in the model is ΣDPR × ΣeHP.
  */
 export function battleStrength(stats: EffectiveStats): number {
-  const b = evTtkBreakdown({ captain: stats.characterId, members: [stats] }, [{ stats: CHARACTER_YARDSTICK, count: 1 }]);
+  const b = evTtkBreakdown({ members: [stats] }, [{ stats: CHARACTER_YARDSTICK, count: 1 }]);
   return Math.sqrt(b.partyDpr * b.partyEhp);
 }
 

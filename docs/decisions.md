@@ -26,7 +26,9 @@ draft takes 42 characters, which leaves about 22 free agents from a pool of
 is always 6 weeks. *Note:* with exclusive ownership, a pool of 64 and a
 roster of 7, at most 9 taverns fit (63 characters), and waivers only work if
 some characters go undrafted. Size the pool to about taverns × 7 + 10.
-*Blocks:* nothing (T4.1 implements exclusive).
+*Blocks:* nothing (T4.1 implements exclusive). The 6-tavern cap is built
+(T4.10): `MAX_TAVERNS`, enforced by `season.created`, `manager.joined` and
+the loaders.
 
 **D-02 Draft format: DEFAULTED.** Snake vs auction (CR as salary suggests an
 auction could work) vs linear. *Default:* snake, seeded order. Reconfirmed
@@ -50,8 +52,10 @@ earlier default and is removed from the engine, config and sims.
 - Placement points per week (capping one blowout week) were considered and
   not chosen.
 
-**D-05 Waivers: DECIDED (2026-10-13): reverse standings.** Not built yet
-(`waivers.priority` only accepts `rolling` today).
+**D-05 Waivers: DECIDED (2026-10-13): reverse standings.** Built
+(2026-10-13, T4.8): `waivers.priority: reverse_standings`,
+`reverseStandingsPriority` and the `waiverPriority` selector. Season 1 and
+the mock season use it; `rolling` stays available.
 - Each waiver window, claims are tried in reverse order of the current
   standings: the lowest tavern on the table goes first. Ties on the table go
   to reverse draft order. Winning a claim doesn't move a tavern; the order is
@@ -103,7 +107,8 @@ ties to break. `scoring.tiebreakers` is removed: equal season totals share a
 rank, and a tie for first gives co-champions. *Defaulted (2026-10-13):* a
 tie for first at season end goes to the tavern with fewer DNFs over the
 season, and co-champions only if that is tied too. Ties for first are rare
-(5 in 300 mock seasons). *Earlier open question:* whether to add
+(5 in 300 mock seasons). *Built (2026-10-13, T4.9):* `standings(…, {
+breakFirstTie })`, applied by `seasonStandings` once the season is complete. *Earlier open question:* whether to add
 a tiebreak at season end only (for example a seeded coin) so there is always
 one champion. The original text follows. Score is a fraction with small
 denominators (about 3–6 checks), so many taverns land on the same values
@@ -161,7 +166,9 @@ schedule entry gains a **keyword description** next to its title,
 environment and theme: a short list of what the mission tests (skills, saves,
 gates, the lead creature of each battle), for example
 `[survival, stealth, athletics, con save, crocodile fight, lizardfolk fight]`.
-Not built yet.
+Built (2026-10-13, T5.7): `keywords` in `schedule.yaml` and `season.created`,
+the vocabulary and `dishonestKeywords` in `engine/src/missions/keywords.ts`,
+checked by `validate` and at `mission.revealed`.
 - Why keywords: they are the readable summary for managers who won't open
   mission YAML, and the vocabulary a hex (D-52) and environment fit are
   judged against.
@@ -224,13 +231,21 @@ engine.
 - *Open:* the haul amount.
 - *Loot shape, decided (2026-10-13): rising loot, late climax.* Missions are
   authored so loot grows along each path and the biggest battle sits near the
-  end. A DNF then costs about half the haul, retreat orders (D-49) matter, and
+  end. A DNF then costs everything banked (D-54), retreat orders (D-49) matter, and
   the reveal builds to a peak. This is an authoring rule, not a hard
   validator rule. *Default (confirm):* the difficulty report (T7.2) flags a
   mission whose best path doesn't pay at least half its loot in its last
   third, or whose last battle isn't in the last third of its ranks.
+  *Built (2026-10-13):* `lootShape` in `engine/src/missions` computes both,
+  and the mock missions were rewritten to pass it (T5.8). Measured over 200
+  mock seasons (seed `review`, bots always fight): DNFs rose from 15% to 30%
+  of runs, since every path now meets a climax battle, and `cr-greedy`
+  overtook `skill-coverage` for titles (0.33 against 0.20 per seat, from
+  0.23 against 0.36). Bots that pick a retreat order (T9.5) should pull DNFs
+  back down.
 
-**D-46 DNF keeps banked loot: DECIDED (2026-10-11).** Replaces "a DNF scores
+**D-46 DNF keeps banked loot: SUPERSEDED by D-54 (2026-10-14).** A DNF now
+loses everything; the original entry follows. Replaced "a DNF scores
 0". Losing a battle ends the mission, and the party keeps the loot banked
 before the battle. The penalty for a DNF is the loot it didn't reach, so
 where battles sit in a mission sets the penalty. Sims (200 seasons, mock
@@ -240,6 +255,32 @@ Re-run on the mock missions (same seed): DNFs stay at 20%, and runs scoring
 0 fall from 21% to 7%. The spread only falls to about ±32, because the mock
 missions' battles come early, so a DNF has banked little. Late battles and
 rising loot (lore.md) are the levers for cutting it further.
+
+**D-54 A DNF loses everything, and DNFs are rare: DECIDED (2026-10-14).**
+Supersedes D-46.
+- Losing a battle ends the mission and the party carries **nothing** home:
+  every check and bounty banked on that mission is lost. The injury (D-51)
+  still applies.
+- Missions are tuned so about **5%** of runs end in a DNF, against 30%
+  before. In the mock season that meant shrinking the climax battles to
+  about CR 1–2.5 (a 95–97% win chance for the parties the bots field), and
+  the early fights to about 97%.
+- Why: under D-46 a DNF cost only the loot not yet reached, so fighting was
+  never worse than turning back and retreat orders (D-49) had nothing to
+  weigh. Now a fight risks the whole bank, so a retreat order has a real
+  price, and a DNF is a rare, dramatic event rather than a weekly tax.
+- *Measured* (200 mock seasons, seed `review`, bots maximizing expected
+  loot): DNFs 4.6% of runs (cr-greedy 2.4%, skill-coverage 5.2%); mean
+  points rose from about 56 to 69; titles per seat: skill-coverage 0.36,
+  cr-greedy 0.15, value 0.15, random 0.09 (par 0.17). Taverns stayed even
+  (26 to 40 titles against a par of 33).
+- *Consequences:* with a 96% win chance, fighting still beats turning back
+  in expectation, so the expected-loot bots never retreat; a retreat order
+  becomes a variance choice, such as protecting a lead in the last weeks,
+  and it pays against the rare hard fight or a weak party. Battle strength
+  matters much less than skills now, which is why `cr-greedy` fell from
+  first to par. Mission authors (and the generator, D-53) target about 5%
+  DNFs; the difficulty report (T7.2) should show each mission's DNF rate.
 
 **D-47 Home bonus: DROPPED (2026-10-13), was ×1.25.** Season 1 sets
 `scoring.homeBonus: 1` (off). The engine support stays, so it can come back
@@ -292,7 +333,24 @@ mostly solved by the projection, the mission run free of player choices, and
 the captain and home bonus unable to change a decision. D-12 and D-42 above
 come from the same review.
 
-**D-49 Retreat orders: DECIDED (2026-10-13).** Not built yet.
+**D-49 Retreat orders: DECIDED (2026-10-13).** Built in the engine
+(2026-10-13, T4.7, T6.6): `Lineup.retreat`, `retreatsBeforeBattle`,
+`RunResult.retreatedBefore`, `Projection.pRetreat`, and the
+`verifyResolutions` audit. The `projection` bots try every order on their
+best three lineups and keep the one with the highest expected loot (T9.5).
+- *Found when building it (2026-10-13), RESOLVED by D-54 (2026-10-14): a DNF
+  now loses everything.* While a DNF kept the loot banked so far (D-46),
+  turning back could never raise a week's expected loot:
+  at a battle with L banked, retreating ends on L, and fighting ends on at
+  least L (a loss keeps L, a win adds the bounty and the rest of the path).
+  So the bots never turn back (200 mock seasons, seed `review`: no change
+  from always fighting), and a retreat order's only payoff is dodging the
+  injury (D-51) and a DNF in the tiebreak (D-14). For push-your-luck to
+  bite, a DNF has to cost loot. Options: (a) a DNF keeps only half the
+  banked loot ("flees with what it can carry"); (b) a DNF loses the loot
+  banked since the last check; (c) keep D-46 and let injuries carry the
+  risk. The "paid retreat" boon candidate (D-52) only makes sense under
+  (a) or (b).
 - Each locked lineup carries a **retreat order**, which says when the party
   turns back instead of fighting:
   - `never`: always fight (the default, and today's behaviour).
@@ -311,8 +369,8 @@ come from the same review.
   lineup carries its order over (D-07), and the D-27 fallback uses `never`.
 - *Blocks:* T4.7, T6.6.
 
-**D-50 Battles pay loot: DECIDED (2026-10-13): a bounty on a win.** Not
-built yet. Today a battle banks nothing, and the usual way into one is a
+**D-50 Battles pay loot: DECIDED (2026-10-13): a bounty on a win.** Built
+(2026-10-13, T5.8, T6.6). Before, a battle banks nothing, and the usual way into one is a
 failed check, so one bad roll is punished twice: the check's loot is lost,
 and the party risks a DNF for no reward. Now a battle node may carry `loot`,
 banked on a win. The `haul` validator rule counts it like check loot.
@@ -321,7 +379,12 @@ have, or fight for the bounty. *Not chosen:* a failed check costs some banked
 loot instead, which is harsher and closer to a DNF. *Blocks:* T5.8, T6.6.
 
 **D-51 Injuries: DECIDED (2026-10-13): a random starter is hurt on a DNF.**
-Not built yet.
+Built (2026-10-13, T6.7): `RunResult.injury`, `LeagueState.injuries`,
+`injuredFor`, and `validateLineup`'s `injured` violation. *Measured* (200
+mock seasons, seed `review`): 7 of 7,200 tavern-weeks had no legal lineup,
+because the injury left no four under B, so the tavern scored 0. *Open
+question:* should such a tavern start three, or go over B by the injured
+starter's CR, instead of scoring 0?
 - When a party loses a battle, one of its four starters, picked by a
   recorded random roll, is **injured**. An injured character can't start the
   next week's lineup. It can still be benched, traded or dropped.
@@ -340,7 +403,14 @@ Not built yet.
   captain or the most expensive starter, or letting the manager choose.
 - *Blocks:* T6.7.
 
-**D-52 Taverns, gods, boons and hexes: DECIDED (2026-10-13).** Not built yet.
+**D-52 Taverns, gods, boons and hexes: DECIDED (2026-10-13).** The tavern
+pick is built (2026-10-13, T4.10): `manager.joined`, `tavern.chosen`,
+taverns with their gods in `schedule.yaml`, and bots choosing at random.
+Hexes are built too (T6.9): `hex.declared`, `Party.hex`, disadvantage in
+`checkOdds` and the run, the `verifyResolutions` audit, and a `leader` bot
+strategy (in the second half, hex the highest rival who leads you, on the
+ability with the most loot that week; in the last week regardless). Boons
+are not built yet.
 The only custom concepts on top of draft, monsters and missions. Each one
 sits at its own level of play and borrows from D&D.
 - **The god chooses the tavern.** Each tavern is already blessed by one god,
@@ -514,7 +584,9 @@ theme real teeth. *Default:* the schema supports `requires`, the validator
 allows at most one gated check per mission, and the difficulty report flags it.
 *Defaulted (2026-10-13): gates are shortcuts, not walls.* A party with no
 special speeds or senses must still be able to reach the full haul. A gate
-may only open a better or safer route. A validator rule enforces it (T5.8).
+may only open a better or safer route. The `gates` validator rule enforces
+it (built 2026-10-13, T5.8): with every gated check failed, the best path
+must still pay the most.
 
 **D-28 Battle model v0: OPEN.** Spec 05 sketches DPR/eHP time-to-kill,
 logistic-squashed. Questions: party DPR as a sum of members; how to model

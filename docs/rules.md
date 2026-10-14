@@ -11,9 +11,10 @@
   has a **sponsor** (a god), and each week is one sponsor's mission
   ([lore.md](lore.md)).
 - Each **manager** runs one **tavern**. Managers are listed in
-  `managers.yaml` and identified by GitHub account. A league has at most
-  **6 taverns** **[D-01]**, so a season is 6 weeks.
-- **Gods, boons and hexes** **[D-52, not built yet]:** every tavern is
+  `managers.yaml` and identified by GitHub account; the season's taverns
+  and their gods are in `schedule.yaml`. A league has at most **6 taverns**
+  **[D-01]**, so a season is 6 weeks.
+- **Gods, boons and hexes** **[D-52; boons not built yet]:** every tavern is
   already blessed by one god, and the pairing never changes. The god gives
   its tavern:
   - a **boon**, which bends one rule for that tavern (the list is being
@@ -61,24 +62,27 @@
   `value` bot strategy **[OPEN D-26]**.
 - Keepers from last season (§12) are placed before the draft and cost the
   tavern a pick **[OPEN D-11]**.
-- **Tavern pick** **[D-52, not built yet]:** before the draft, managers
-  choose taverns (each with its god, boon and hex) in **reverse** draft
-  order. The manager who drafts monsters last chooses a tavern first.
+- **Tavern pick** **[D-52]:** before the draft, managers choose taverns
+  (each with its god, boon and hex) in **reverse** draft order. The manager
+  who drafts monsters last chooses a tavern first. The draft order is a
+  seeded shuffle of the managers, so it is fixed before the tavern pick.
 
 ## 5. Lineups and the budget
 
 - Each week a tavern starts a **party** of **4** from its roster. There is
   no captain **[D-12]**. The other 3 sit on the **bench**. Choosing who
-  starts is the main weekly decision. *(Until this is built, lineups still
-  name an inert captain, which only breaks best-fit ties.)*
+  starts is the main weekly decision. The order the starters are listed in
+  only breaks ties for who makes a check (§6).
 - **Budget:** the total CR of the four starters must be **≤ B**. Season 1 uses
   B = 12. Fractional CRs count exactly (four CR 1/2 characters total 2).
 - An **injured** character (§6) can't start the week after its injury
-  **[D-51, not built yet]**.
-- **Retreat order** **[D-49, not built yet]:** each lineup also says when the
+  **[D-51]**. If that leaves no legal lineup under B, the tavern scores 0
+  that week (as below).
+- **Retreat order** **[D-49]:** each lineup also says when the
   party turns back instead of fighting: `never` (the default),
   `avoid_battles`, or `bank: N` (turn back before a battle once at least N
-  loot is banked). Turning back keeps the banked loot and is not a DNF (§6).
+  loot is banked). Turning back keeps the banked loot and is not a DNF (§6),
+  while a DNF loses everything, so the order is a real gamble.
 - **Submitting:** use the *Set lineup* form any time before the weekly lock.
   The latest valid submission counts. An invalid submission is rejected with
   reasons and leaves the previous one standing.
@@ -96,7 +100,8 @@
 
 - Each week has a **public schedule entry**: title, environment, theme, and
   a **keyword description** of what the mission tests (skills, saves, gates,
-  the lead creature of each battle) **[D-42, keywords not built yet]**.
+  the lead creature of each battle) **[D-42]**. A keyword may leave things
+  out, but never names something the mission doesn't test.
 - The **mission itself** is a branching path of **skill checks** and
   **battles** that the GM locked before the draft. For now missions are
   public (§11), so a manager may read the full mission before the lock.
@@ -111,20 +116,22 @@
   safer route: a party with no special speeds or senses can still reach the
   full haul.
 - **Battles:** the party's odds of winning come from its combined strength
-  against the encounter. **Losing any battle ends the mission (DNF).** The
-  party keeps the loot banked so far **[D-46]**. A battle may carry loot,
-  banked when the party wins **[D-50, not built yet]**.
-- **Injuries** **[D-51, not built yet]:** when a party loses a battle, one
-  of its four starters, picked by a recorded random roll, is injured and
-  can't start next week. Injuries last one week.
-- **Hex** **[D-52, not built yet]:** once per season, a tavern names a
+  against the encounter. **Losing any battle ends the mission (DNF), and
+  the party loses everything it banked on it** **[D-54]**. Missions are
+  tuned so about 5% of runs end this way. A battle may carry loot,
+  banked when the party wins **[D-50]**.
+- **Injuries** **[D-51]:** when a party loses a battle, one of its four
+  starters, picked by a recorded random roll, is injured and can't start
+  next week. Injuries last one week, follow the character if it is traded,
+  and an injury in the last week expires with the season.
+- **Hex** **[D-52]:** once per season, a tavern names a
   rival, one **ability score** and one **week**. That week, the rival's party
   has disadvantage on every check and save using that ability (like
   *Bestow Curse*). Battles are unaffected, and disadvantage cancels
   advantage. A hex is declared with an issue form any time before that
   week's lock, so it is public and the target can adjust. At most one hex
   per target per week (the first declared counts), and it can't be withdrawn.
-- **Turning back** **[D-49, not built yet]:** just before a battle, the
+- **Turning back** **[D-49]:** just before a battle, the
   party's retreat order (§5) is checked. If it says to turn back, the mission
   ends there, the party keeps its banked loot, and it is not a DNF.
 - Passing or failing a check decides which way the mission branches. Failing
@@ -136,7 +143,7 @@
 
 - **Loot:** each check carries a loot value. Passing a check banks it, and
   failing banks nothing **[D-45]**. Battles may carry loot too, banked on a
-  win **[D-50, not built yet]**.
+  win **[D-50]**.
 - **Score** for a week = loot banked. **Points** = loot.
 - **Fixed haul:** every mission's best path pays the same total loot, so every
   week counts equally **[D-45]**.
@@ -171,14 +178,13 @@
   agent and drops one rostered character if the roster is full.
 - Claims resolve **once a week, after the run** (Friday 12:00 UTC), all
   together.
-- **Reverse-standings priority** **[D-05, not built yet]:** each window, the
+- **Reverse-standings priority** **[D-05]:** each window, the
   lowest tavern on the table claims first. Ties on the table go to reverse
   draft order. Each claim, in priority order, is awarded if the character is
   still available and the drop is still legal. Winning a claim doesn't move a
   tavern: the order is rebuilt from the standings every week. A tavern's own
-  claims are tried in submission order. *(Until this is built: rolling
-  priority, initial order reverse draft, and a tavern that wins a claim moves
-  to the back.)*
+  claims are tried in submission order. (A season can instead set rolling
+  priority, where a tavern that wins a claim moves to the back.)
 - Dropped characters become free agents at once and can be claimed in the
   next window.
 - A character claimed or dropped after the lock still played this week for its

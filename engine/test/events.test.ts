@@ -13,7 +13,7 @@ const HASH = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 const system = { kind: 'system', workflow: 'weekly-run' } as const;
 const manager = { kind: 'manager', githubId: 1234, login: 'someone' } as const;
 const commissioner = { kind: 'commissioner', githubId: 1, login: 'gm' } as const;
-const lineup: Lineup = { captain: 'bruno-the-bruiser', allies: ['moss-hag', 'tin-knight', 'pip-the-sly'] };
+const lineup: Lineup = { starters: ['bruno-the-bruiser', 'moss-hag', 'tin-knight', 'pip-the-sly'], retreat: { bank: 60 } };
 
 const config: SeasonConfig = {
   id: 'season-01',
@@ -86,8 +86,9 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
     config,
     configSha256: HASH,
     engineVersion: '0.0.0',
-    schedule: [{ week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded toll road.', commitment: null, sponsor: 'the-drowned-saint' }],
+    schedule: [{ week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded toll road.', keywords: ['survival', 'crocodile fight'], commitment: null, sponsor: 'the-drowned-saint' }],
     sponsors: [{ id: 'the-drowned-saint', tavern: 'the-gilded-flagon' }],
+    taverns: [{ id: 'the-gilded-flagon', name: 'The Gilded Flagon' }],
   }),
   'character.pooled': envelope('character.pooled', 2, commissioner, {
     character: 'bruno-the-bruiser',
@@ -103,11 +104,8 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
       { kind: 'trait', trait: 'thick-skull' },
     ],
   }),
-  'tavern.joined': envelope('tavern.joined', 3, commissioner, {
-    tavern: 'the-gilded-flagon',
-    name: 'The Gilded Flagon',
-    manager: { githubId: 1234, login: 'someone' },
-  }),
+  'manager.joined': envelope('manager.joined', 3, commissioner, { manager: 'someone', account: { githubId: 1234, login: 'someone' } }),
+  'tavern.chosen': envelope('tavern.chosen', 3, manager, { manager: 'someone', tavern: 'the-gilded-flagon' }),
   'character.retained': {
     ...envelope('character.retained', 4, commissioner, {
       tavern: 'the-gilded-flagon',
@@ -130,6 +128,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
       { tavern: 'the-rusty-nail', lineup: null, source: 'none' },
     ],
   }),
+  'hex.declared': envelope('hex.declared', 8, manager, { tavern: 'the-gilded-flagon', target: 'the-rusty-nail', ability: 'wis', week: 2 }),
   'waiver.claimed': envelope('waiver.claimed', 8, manager, {
     claim: 'claim-1',
     tavern: 'the-gilded-flagon',
@@ -167,14 +166,16 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
     run: {
       path: ['start', 'find-path', 'bog-ambush', 'crossed'],
       nodes: [
-        { node: 'find-path', kind: 'check', actor: 'moss-hag', d20: 7, modifier: 3, dc: 12, advantage: false, outcome: 'fail' },
+        { node: 'find-path', kind: 'check', actor: 'moss-hag', d20: 7, modifier: 3, dc: 12, advantage: false, disadvantage: false, outcome: 'fail' },
         { node: 'bog-ambush', kind: 'battle', pWin: 0.62, roll: 0.41, outcome: 'win' },
       ],
       dnf: false,
+      retreatedBefore: null,
       checksPassed: 0,
       checksAttempted: 1,
       loot: 0,
       score: 0,
+      injury: null,
     },
     projected: { expectedScore: 0.55, pDnf: 0.2 },
     points: 0,
@@ -196,8 +197,8 @@ function reverseKeys(value: unknown): unknown {
 
 describe('events', () => {
   it('has one fixture for every event type', () => {
-    expect(allEvents).toHaveLength(17);
-    expect(new Set(allEvents.map((event) => event.type)).size).toBe(17);
+    expect(allEvents).toHaveLength(19);
+    expect(new Set(allEvents.map((event) => event.type)).size).toBe(19);
   });
 
   it.each(Object.entries(fixtures))('parseLog(serializeEvent(e)) round-trips %s', (_type, event) => {
@@ -233,7 +234,7 @@ describe('events', () => {
   it('lineHash is sha256 hex of the UTF-8 line', () => {
     expect(lineHash('')).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
     expect(lineHash('abc')).toBe(HASH);
-    const line = serializeEvent({ ...fixtures['tavern.joined'], payload: { ...fixtures['tavern.joined'].payload, name: 'Le Café Brûlé 🍺' } });
+    const line = serializeEvent({ ...fixtures['season.created'], payload: { ...fixtures['season.created'].payload, taverns: [{ id: 'le-cafe', name: 'Le Café Brûlé 🍺' }] } });
     expect(lineHash(line)).toBe(createHash('sha256').update(line, 'utf8').digest('hex'));
   });
 
@@ -243,8 +244,8 @@ describe('events', () => {
   });
 
   it('reports the line number and field path of a schema violation', () => {
-    const broken = { ...fixtures['lineup.set'], payload: { ...fixtures['lineup.set'].payload, lineup: { captain: 'bruno-the-bruiser', allies: ['a', 'b'] } } };
-    const ndjson = [serializeEvent(fixtures['season.created']), serializeEvent(fixtures['tavern.joined']), JSON.stringify(broken)].join('\n');
+    const broken = { ...fixtures['lineup.set'], payload: { ...fixtures['lineup.set'].payload, lineup: { starters: ['bruno-the-bruiser', 'a', 'b'], retreat: 'never' } } };
+    const ndjson = [serializeEvent(fixtures['season.created']), serializeEvent(fixtures['manager.joined']), JSON.stringify(broken)].join('\n');
     let caught: unknown;
     try {
       parseLog(ndjson);
@@ -253,8 +254,8 @@ describe('events', () => {
     }
     expect(caught).toBeInstanceOf(LogParseError);
     expect((caught as LogParseError).line).toBe(3);
-    expect((caught as LogParseError).path).toBe('payload.lineup.allies');
-    expect((caught as Error).message).toMatch(/^events line 3: payload\.lineup\.allies: /);
+    expect((caught as LogParseError).path).toBe('payload.lineup.starters');
+    expect((caught as Error).message).toMatch(/^events line 3: payload\.lineup\.starters: /);
   });
 
   it('rejects an unknown event type, a blank line mid-log, and a CR given as a fraction', () => {
@@ -298,14 +299,16 @@ describe('replay and verification', () => {
     return {
       path: lost ? ['start', 'find-path', 'bog'] : ['start', 'find-path', 'bog', 'crossed'],
       nodes: [
-        { node: 'find-path', kind: 'check', actor: resolved.payload.lineup.captain, d20: 2, modifier: 1, dc: 11, advantage: false, outcome: 'fail' },
+        { node: 'find-path', kind: 'check', actor: resolved.payload.lineup.starters[0], d20: 2, modifier: 1, dc: 11, advantage: false, disadvantage: false, outcome: 'fail' },
         { node: 'bog', kind: 'battle', pWin: 0.6, roll: battle.roll, outcome: battle.outcome },
       ],
       dnf: lost,
+      retreatedBefore: null,
       checksPassed: 0,
       checksAttempted: 1,
       loot: 0,
       score: 0,
+      injury: null,
     };
   }
 
@@ -344,9 +347,9 @@ describe('replay and verification', () => {
   });
 
   it('detects an edited line at the line after it, even a whitespace-only edit', () => {
-    const k = log.events.findIndex((e) => e.type === 'tavern.joined');
+    const k = log.events.findIndex((e) => e.type === 'manager.joined');
     const renamed = [...log.lines];
-    renamed[k] = log.lines[k]!.replace('"name":"the-gilded-flagon"', '"name":"The Gilded Flagon"');
+    renamed[k] = log.lines[k]!.replace('"login":"manager-0"', '"login":"Manager-0"');
     expect(renamed[k]).not.toBe(log.lines[k]);
     expect(replayError(ndjson(renamed))).toMatchObject({ line: k + 2, code: 'chain.prev_mismatch' });
 
@@ -398,6 +401,34 @@ describe('replay and verification', () => {
     expect(fields({ run: { ...won, nodes: won.nodes.slice(0, 1) }, points: 0 })).toEqual(['run.nodes[1]']);
     expect(fields({ run: { ...won, nodes: [{ ...won.nodes[0]!, actor: 'stranger' } as (typeof won.nodes)[0], won.nodes[1]!] }, points: 0 })).toEqual(['run.nodes[0].actor']);
     expect(fields({ mission: 'another-mission' })).toEqual(['mission']);
+  });
+
+  it('verifyResolutions audits a retreat against the lineup\'s retreat order (D-49)', () => {
+    const fields = (patch: Partial<EventOf<'mission.resolved'>['payload']>) => verifyResolutions(withResolution(patch)).map((m) => m.field);
+    const won = battleRun({ roll: 0.3, outcome: 'win' });
+    const turnedBack = { ...won, path: ['start', 'find-path'], nodes: won.nodes.slice(0, 1), retreatedBefore: 'bog' };
+    const avoid = { ...resolved.payload.lineup, retreat: 'avoid_battles' as const };
+    // The order said to turn back, and the party did.
+    expect(fields({ lineup: avoid, run: turnedBack, points: 0 })).toEqual([]);
+    // The order said to fight, but the record turns back.
+    expect(fields({ run: turnedBack, points: 0 })).toEqual(['run.nodes[1]']);
+    // The order said to turn back, but the record fights on.
+    expect(fields({ lineup: avoid, run: won, points: 0 })).toEqual(['run.nodes', 'run.path', 'run.retreatedBefore']);
+    // A bank threshold the party never reached: it fights.
+    expect(fields({ lineup: { ...avoid, retreat: { bank: 1 } }, run: won, points: 0 })).toEqual([]);
+  });
+
+  it('verifyResolutions checks the injured starter against the injury roll (D-51)', () => {
+    const fields = (patch: Partial<EventOf<'mission.resolved'>['payload']>) => verifyResolutions(withResolution(patch)).map((m) => m.field);
+    const lost = battleRun({ roll: 0.9, outcome: 'lose' });
+    const starters = resolved.payload.lineup.starters;
+    // Roll 0.6 picks the third starter (floor(0.6 × 4) = 2).
+    expect(fields({ run: { ...lost, injury: { character: starters[2], roll: 0.6 } }, points: 0 })).toEqual([]);
+    expect(fields({ run: { ...lost, injury: { character: starters[0], roll: 0.6 } }, points: 0 })).toEqual(['run.injury']);
+    // A DNF without an injury is allowed (a boon may prevent it); an injury without a DNF is not.
+    expect(fields({ run: lost, points: 0 })).toEqual([]);
+    const won = battleRun({ roll: 0.3, outcome: 'win' });
+    expect(fields({ run: { ...won, injury: { character: starters[2], roll: 0.6 } }, points: 0 })).toEqual(['run.injury']);
   });
 
   it('verifyResolutions lets a gated check fail on a high roll (nobody may have met the gate)', () => {

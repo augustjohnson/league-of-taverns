@@ -7,13 +7,20 @@ import { SeasonSession, runMockSeason, type HumanSeat } from '../src/season-runn
 // the same engine checks as the all-bot season.
 
 const input = loadMockSeason();
-const tavern = input.taverns[0]!.id;
-const human: HumanSeat = { tavern, login: 'you', githubId: 1 };
+const human: HumanSeat = { manager: input.managers[0]!.id, login: 'you', githubId: 1 };
+
+/** The tavern pick and the draft, letting the advisor make every human decision. */
+function draftWithAdvisor(session: SeasonSession): void {
+  for (session.advanceDraft(); session.stage.kind === 'tavern' || session.stage.kind === 'draft'; session.advanceDraft()) {
+    if (session.stage.kind === 'tavern') session.chooseTavern(session.suggestTavern());
+    else session.draftPick(session.suggestPick());
+  }
+}
 
 /** Play a whole season, letting the advisor make every human decision. */
 function playWithAdvisor(seed: string): SeasonSession {
   const session = new SeasonSession(input, { seed, human });
-  for (session.advanceDraft(); session.stage.kind === 'draft'; session.advanceDraft()) session.draftPick(session.suggestPick());
+  draftWithAdvisor(session);
   while (session.stage.kind === 'week') {
     const lineup = session.suggestLineup();
     if (lineup !== null) session.setLineup(lineup);
@@ -24,16 +31,29 @@ function playWithAdvisor(seed: string): SeasonSession {
 }
 
 describe('a season with a human seat', () => {
-  it('stops the draft when the person is on the clock', () => {
+  it('stops the tavern pick on the person\'s turn, then the draft when they are on the clock (D-52)', () => {
     const session = new SeasonSession(input, { seed: 'pvb-1', human });
+    session.advanceDraft();
+    expect(session.stage).toEqual({ kind: 'tavern', manager: human.manager });
+    expect(session.humanTavern).toBeNull();
+    expect(() => session.draftPick('mock-ogre')).toThrow(/not on the clock/);
+    const open = session.openTaverns();
+    expect(open.length).toBe(input.taverns.length - session.state.taverns.size);
+    expect(() => session.chooseTavern('the-nowhere-inn')).toThrow(InvalidEventError);
+    session.chooseTavern(open.at(-1)!);
+    expect(session.humanTavern).toBe(open.at(-1));
     session.advanceDraft();
     const stage = session.stage;
     expect(stage.kind).toBe('draft');
-    if (stage.kind === 'draft') expect(stage.tavern).toBe(tavern);
+    if (stage.kind === 'draft') expect(stage.tavern).toBe(session.humanTavern);
+    // Everyone chose, in reverse draft order.
+    expect([...session.state.taverns.values()].map((t) => t.managerId)).toEqual([...session.state.draft.managerOrder].reverse());
   });
 
   it('rejects an illegal pick and leaves the session unchanged', () => {
     const session = new SeasonSession(input, { seed: 'pvb-1', human });
+    session.advanceDraft();
+    session.chooseTavern(session.suggestTavern());
     session.advanceDraft();
     const before = session.events.length;
     const owned = [...session.state.owner.keys()][0];
@@ -51,38 +71,39 @@ describe('a season with a human seat', () => {
     expect(result.audit.replayMatches).toBe(true);
     expect(result.audit.mismatches).toEqual([]);
     const mine = result.events.filter((e) => e.actor.kind === 'manager');
-    expect(new Set(mine.map((e) => e.type))).toEqual(new Set(['draft.pick', 'lineup.set', ...(mine.some((e) => e.type === 'waiver.claimed') ? ['waiver.claimed'] : [])]));
-    expect(result.summary.taverns.find((t) => t.tavern === tavern)?.bot).toBe('human');
+    expect(new Set(mine.map((e) => e.type))).toEqual(new Set(['tavern.chosen', 'draft.pick', 'lineup.set', ...(mine.some((e) => e.type === 'waiver.claimed') ? ['waiver.claimed'] : [])]));
+    expect(result.summary.taverns.find((t) => t.tavern === session.humanTavern)?.bot).toBe('human');
     for (let i = 1; i < result.events.length; i++) expect(result.events[i]!.at >= result.events[i - 1]!.at).toBe(true);
   });
 
   it('carries a lineup over when the person sets none', () => {
     const session = new SeasonSession(input, { seed: 'pvb-3', human });
-    for (session.advanceDraft(); session.stage.kind === 'draft'; session.advanceDraft()) session.draftPick(session.suggestPick());
+    draftWithAdvisor(session);
     while (session.stage.kind === 'week') session.playWeek();
     const result = session.finish();
-    const sources = result.summary.weeks.map((w) => w.results.find((r) => r.tavern === tavern)?.source);
+    const sources = result.summary.weeks.map((w) => w.results.find((r) => r.tavern === session.humanTavern)?.source);
     expect(sources.every((s) => s === 'fallback' || s === 'carried')).toBe(true);
   });
 
   it('lets the person replace a lineup before the lock', () => {
     const session = new SeasonSession(input, { seed: 'pvb-4', human });
-    for (session.advanceDraft(); session.stage.kind === 'draft'; session.advanceDraft()) session.draftPick(session.suggestPick());
+    draftWithAdvisor(session);
     const lineup = session.suggestLineup()!;
     session.setLineup(lineup);
-    const swapped = { captain: lineup.allies[0]!, allies: [lineup.captain, ...lineup.allies.slice(1)] } as unknown as typeof lineup;
+    const [a, b, c, d] = lineup.starters;
+    const swapped: typeof lineup = { starters: [b, a, c, d], retreat: { bank: 50 } };
     session.setLineup(swapped);
     expect(session.pendingLineup()).toEqual(swapped);
     session.playWeek();
-    expect(session.state.lockedLineups.get(1)?.find((l) => l.tavern === tavern)).toMatchObject({ source: 'submitted', lineup: swapped });
+    expect(session.state.lockedLineups.get(1)?.find((l) => l.tavern === session.humanTavern)).toMatchObject({ source: 'submitted', lineup: swapped });
   });
 
   it('refuses waiver claims in the last week', () => {
     const session = new SeasonSession(input, { seed: 'pvb-5', human });
-    for (session.advanceDraft(); session.stage.kind === 'draft'; session.advanceDraft()) session.draftPick(session.suggestPick());
+    draftWithAdvisor(session);
     while (session.stage.kind === 'week' && session.stage.week < input.config.weeks) session.playWeek();
     const free = freeAgents(session.state)[0]!;
-    const drop = session.state.taverns.get(tavern)!.roster[0]!;
+    const drop = session.state.taverns.get(session.humanTavern!)!.roster[0]!;
     expect(() => session.claimWaiver(free, drop)).toThrow('no waivers after the last week');
   });
 

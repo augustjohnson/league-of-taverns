@@ -43,6 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7, T4.10, T6.9, T5.7, part of T9.5. Next: T6.10 boons, waiting on the D-52 boon defaults. D-54 (a DNF loses everything, about 5% DNFs) is built.
 
 ## Phase 1 starting set (historical)
 
@@ -283,7 +284,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   tiebreakers (D-14).
 - **Depends:** T0.1.
 
-#### T4.7 Lineup shape: no captain + retreat order · S
+#### T4.7 Lineup shape: no captain + retreat order · S (done 2026-10-13)
 - **Goal:** lineups become `{ starters[4], retreat }` (D-12, D-49): the
   captain field, its tiebreak role and the `{captain}` story token go.
   Carry-over and the D-27 fallback follow the D-49 default.
@@ -292,7 +293,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   gone.
 - **Depends:** T4.2, T4.4.
 
-#### T4.10 Tavern pick + 6-tavern cap · S
+#### T4.10 Tavern pick + 6-tavern cap · M (done 2026-10-13)
 - **Goal:** `tavern.chosen` before the first `draft.pick`, in reverse draft
   order (D-52); `managers.yaml` lists managers apart from taverns; at most 6
   taverns (D-01).
@@ -301,7 +302,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   tavern; bots pick taverns in sims.
 - **Depends:** T4.3, T2.4.
 
-#### T4.8 Reverse-standings waivers · S
+#### T4.8 Reverse-standings waivers · S (done 2026-10-13)
 - **Goal:** `waivers.priority: reverse_standings` (D-05): each window's order
   is the current standings reversed, ties to reverse draft order, and winning
   a claim doesn't move a tavern.
@@ -309,7 +310,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   table tests for ties and for a week-1 window; the mock season switches to it.
 - **Depends:** T4.5, T4.6.
 
-#### T4.9 Season-end tiebreak · S
+#### T4.9 Season-end tiebreak · S (done 2026-10-13)
 - **Goal:** a tie for first at season end goes to fewer DNFs, then
   co-champions (D-14).
 - **Acceptance:** standings tests for a DNF-broken tie and a true tie.
@@ -371,7 +372,7 @@ Owns `engine/src/missions/`, `scripts/src/validate.ts`,
 - **Acceptance:** all 3 missions pass T5.2; the pool passes T3.2 budgets.
 - **Depends:** T5.1, T5.2, T3.2.
 
-#### T5.7 Schedule keywords · S
+#### T5.7 Schedule keywords · S (done 2026-10-13; lock-check will reuse `dishonestKeywords` when T8.4 lands)
 - **Goal:** `keywords` on schedule entries (D-42), carried into
   `season.created`, plus a `lock-check` rule that every keyword names a skill,
   save, gate or battle lead in the selected mission.
@@ -387,7 +388,7 @@ Owns `engine/src/missions/`, `scripts/src/validate.ts`,
   flags misses; a generated mock season runs end to end.
 - **Depends:** T5.8.
 
-#### T5.8 Battle loot, gate rule, loot shape · M
+#### T5.8 Battle loot, gate rule, loot shape · M (done 2026-10-13)
 - **Goal:** optional `loot` on battle nodes, counted by the `haul` rule when
   the path leaves by `win` (D-50); a `gates` validator rule that the full haul
   is reachable without speeds or senses (D-39); mock missions rewritten to
@@ -439,7 +440,7 @@ Owns `engine/src/resolution/`, `engine/src/projection/`.
   fast enough for CI (< 10 s).
 - **Depends:** T6.3, T6.4.
 
-#### T6.6 Retreat orders + battle loot in the run and projection · M
+#### T6.6 Retreat orders + battle loot in the run and projection · M (done 2026-10-13)
 - **Goal:** `runMission` and `projectMission` stop before a battle when the
   retreat order says so (D-49), keeping banked loot without a DNF, and bank a
   battle's loot on a win (D-50).
@@ -448,7 +449,7 @@ Owns `engine/src/resolution/`, `engine/src/projection/`.
   a retreat; `verifyResolutions` audits it.
 - **Depends:** T4.7, T5.8, T6.4.
 
-#### T6.7 Injuries · M
+#### T6.7 Injuries · M (done 2026-10-13)
 - **Goal:** on a DNF, `runMission` picks one starter by a recorded roll and
   records it as `injured` (D-51); the reducers mark it unavailable for the
   next week's lineup; lineup validation and the D-27 fallback respect it.
@@ -457,7 +458,7 @@ Owns `engine/src/resolution/`, `engine/src/projection/`.
   lineup with an injured starter falls back; injuries expire after one week.
 - **Depends:** T6.3, T4.4, T2.4.
 
-#### T6.9 Hexes · M
+#### T6.9 Hexes · M (done 2026-10-13)
 - **Goal:** `hex.declared` (D-52): once per season, a rival, an ability score
   and a week; that week the rival has disadvantage on checks and saves with
   that ability (cancelling advantage). Battles are unaffected.
@@ -602,6 +603,7 @@ Owns `bots/`, `sims/`.
 - **Depends:** T9.3.
 
 #### T9.5 Bots and playground for retreat orders, hexes and boons · M
+- *Partly done (2026-10-13):* bots choose a tavern (random), a hex (`leader`) and a retreat order (best expected loot); the playground has the tavern pick, a hex form, keywords and expected points per retreat order. Left: boons (T6.10), and the balance report rows (T9.3).
 - **Goal:** bots choose a retreat order (the projection scores each), when
   and whom to hex, and a tavern in the tavern pick; the playground's Play tab
   shows each tavern's god, boon and hex, the keywords, declared hexes, and
@@ -633,7 +635,7 @@ Owns `scripts/src/{run-week,seal,reveal,offseason,publish}.ts`.
 
 #### T10.5 Season bootstrap · S
 - **Goal:** produce `season.created`, `character.pooled` × N and
-  `tavern.joined` × N from the season files.
+  `manager.joined` × N from the season files (taverns are in `season.created`).
 - **Acceptance:** idempotent refusal if the season already exists; config
   sha256 recorded; requires `lock-check` to pass.
 - **Depends:** T3.4, T8.4, T2.4.

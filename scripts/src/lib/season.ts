@@ -15,6 +15,7 @@ import { join, resolve } from 'node:path';
 import { BOT_IDS } from '@league-of-taverns/bots';
 import type { BotId } from '@league-of-taverns/bots';
 import {
+  MAX_TAVERNS,
   PoolEntrySchema,
   REGISTRY_VERSION,
   TRAITS,
@@ -337,18 +338,20 @@ export interface Person {
   readonly githubId: number | null;
 }
 
-export type TavernManager = Person | { readonly bot: BotId };
+export type ManagerAccountEntry = Person | { readonly bot: BotId };
 
-export interface TavernEntry {
+/** A manager: chooses a tavern in reverse draft order, then runs it (D-52). */
+export interface ManagerEntry {
+  /** kebab-case, stable for the season. */
   readonly id: string;
-  readonly name: string;
-  readonly manager: TavernManager;
+  readonly account: ManagerAccountEntry;
 }
 
 export interface SeasonManagers {
   readonly commissioner: Person;
   readonly gm: Person;
-  readonly taverns: ReadonlyArray<TavernEntry>;
+  /** In join order. At most `MAX_TAVERNS` (D-01). */
+  readonly managers: ReadonlyArray<ManagerEntry>;
 }
 
 const personSchema = z.strictObject({ login: text, githubId: z.number().int().positive().nullable() });
@@ -356,22 +359,23 @@ const personSchema = z.strictObject({ login: text, githubId: z.number().int().po
 const managersFileSchema = z.strictObject({
   commissioner: personSchema,
   gm: personSchema,
-  taverns: z
+  managers: z
     .array(
       z.strictObject({
         id: kebabIdSchema,
-        name: text,
-        manager: z.union([personSchema, z.strictObject({ bot: z.enum(BOT_IDS) })]),
+        account: z.union([personSchema, z.strictObject({ bot: z.enum(BOT_IDS) })]),
       }),
     )
     .min(1),
 });
 
 /**
- * Load managers.yaml: the commissioner, the GM, and the taverns. Tavern ids
- * are unique, and among human tavern managers so are GitHub ids (where not
- * null) and logins (case-insensitive, as on GitHub). The commissioner and GM
- * may also manage a tavern (D-09), so they are not part of the uniqueness check.
+ * Load managers.yaml: the commissioner, the GM, and the managers. Manager
+ * ids are unique, there are at most `MAX_TAVERNS` (D-01), and among human
+ * managers GitHub ids (where not null) and logins (case-insensitive, as on
+ * GitHub) are unique. The commissioner and GM may also manage a tavern
+ * (D-09), so they are not part of the uniqueness check. Taverns live in
+ * schedule.yaml, with their gods (D-52).
  */
 export function loadManagers(season: SeasonSource, root: RepoRoot = REPO_ROOT): SeasonManagers {
   const ctx = seasonContext(season, root);
@@ -383,21 +387,22 @@ function readManagers(ctx: SeasonContext, loaded: LoadedSeasonConfig): SeasonMan
   const managers: SeasonManagers = parseOrThrow(managersFileSchema, readYaml(file, label), label);
   const issues = new Issues(label);
   const seen = { id: new Map<string, number>(), githubId: new Map<number, number>(), login: new Map<string, number>() };
-  managers.taverns.forEach((tavern, i) => {
-    const at = `taverns[${i}]`;
-    const firstId = seen.id.get(tavern.id);
-    if (firstId !== undefined) issues.add(`${at}.id`, `duplicate tavern id ${JSON.stringify(tavern.id)} (also taverns[${firstId}])`);
-    else seen.id.set(tavern.id, i);
-    if ('bot' in tavern.manager) return;
-    const { githubId, login } = tavern.manager;
+  if (managers.managers.length > MAX_TAVERNS) issues.add('managers', `has ${managers.managers.length} managers; a league has at most ${MAX_TAVERNS} (D-01)`);
+  managers.managers.forEach((manager, i) => {
+    const at = `managers[${i}]`;
+    const firstId = seen.id.get(manager.id);
+    if (firstId !== undefined) issues.add(`${at}.id`, `duplicate manager id ${JSON.stringify(manager.id)} (also managers[${firstId}])`);
+    else seen.id.set(manager.id, i);
+    if ('bot' in manager.account) return;
+    const { githubId, login } = manager.account;
     if (githubId !== null) {
       const first = seen.githubId.get(githubId);
-      if (first !== undefined) issues.add(`${at}.manager.githubId`, `GitHub id ${githubId} already manages taverns[${first}]`);
+      if (first !== undefined) issues.add(`${at}.account.githubId`, `GitHub id ${githubId} is already managers[${first}]`);
       else seen.githubId.set(githubId, i);
     }
     const key = login.toLowerCase();
     const first = seen.login.get(key);
-    if (first !== undefined) issues.add(`${at}.manager.login`, `${JSON.stringify(login)} already manages taverns[${first}]`);
+    if (first !== undefined) issues.add(`${at}.account.login`, `${JSON.stringify(login)} is already managers[${first}]`);
     else seen.login.set(key, i);
   });
   issues.throwIfAny();
@@ -409,24 +414,38 @@ function readManagers(ctx: SeasonContext, loaded: LoadedSeasonConfig): SeasonMan
 /** One public schedule entry, the same shape `season.created` records. */
 export type ScheduleWeek = z.infer<typeof scheduleWeekSchema>;
 
+/** One of the season's taverns, already blessed by one god (D-52). The god's name and voice are chrome. */
+export interface TavernEntry {
+  readonly id: string;
+  readonly name: string;
+  /** The god's id: the sponsor that sets one week's mission (D-44, D-48). */
+  readonly god: string;
+}
+
 export interface SeasonSchedule {
   readonly season: string;
-  /** The GM's gods and the tavern each sponsors (D-44). Names and voice live in chrome. */
+  /** The season's taverns and their gods, in package order (D-52). At most `MAX_TAVERNS`. */
+  readonly taverns: ReadonlyArray<TavernEntry>;
+  /** The gods and the tavern each sponsors (D-44), from `taverns`. */
   readonly sponsors: ReadonlyArray<Sponsor>;
   readonly weeks: ReadonlyArray<ScheduleWeek>;
 }
 
 const scheduleWeekSchema = payloadSchemas['season.created'].shape.schedule.element;
-const sponsorSchema = payloadSchemas['season.created'].shape.sponsors.element;
 
-const scheduleFileSchema = z.strictObject({ season: kebabIdSchema, sponsors: z.array(sponsorSchema), weeks: z.array(scheduleWeekSchema) });
+const scheduleFileSchema = z.strictObject({
+  season: kebabIdSchema,
+  taverns: z.array(z.strictObject({ id: kebabIdSchema, name: text, god: kebabIdSchema })).min(1),
+  weeks: z.array(scheduleWeekSchema),
+});
 
 /**
  * Load schedule.yaml, the GM's public plan for the season. `season` matches
  * config.yaml, the weeks are numbered 1..N in order with N equal to
- * config.yaml `weeks`, and `sponsors` passes `validateSponsors` (each week's
- * `sponsor` is listed, one week per sponsor, one sponsor per tavern).
- * `loadSeason` also checks every sponsored tavern is in managers.yaml.
+ * config.yaml `weeks`, the taverns have unique ids, there are at most
+ * `MAX_TAVERNS` (D-01), and the sponsors they imply pass `validateSponsors`
+ * (each week's `sponsor` is a tavern's god, one week per god, one god per
+ * tavern). `loadSeason` also checks there are no more managers than taverns.
  */
 export function loadSchedule(season: SeasonSource, root: RepoRoot = REPO_ROOT): SeasonSchedule {
   const ctx = seasonContext(season, root);
@@ -435,8 +454,10 @@ export function loadSchedule(season: SeasonSource, root: RepoRoot = REPO_ROOT): 
 
 function readSchedule(ctx: SeasonContext, loaded: LoadedSeasonConfig): SeasonSchedule {
   const { file, label } = seasonFile(ctx, loaded.files.schedule);
-  const schedule: SeasonSchedule = parseOrThrow(scheduleFileSchema, readYaml(file, label), label);
+  const parsed = parseOrThrow(scheduleFileSchema, readYaml(file, label), label);
+  const schedule: SeasonSchedule = { ...parsed, sponsors: parsed.taverns.map((t) => ({ id: t.god, tavern: t.id })) };
   const issues = new Issues(label);
+  if (schedule.taverns.length > MAX_TAVERNS) issues.add('taverns', `has ${schedule.taverns.length} taverns; a league has at most ${MAX_TAVERNS} (D-01)`);
   const { config } = loaded;
   if (schedule.season !== config.id) {
     issues.add('season', `${JSON.stringify(schedule.season)} does not match config.yaml id ${JSON.stringify(config.id)}`);
@@ -447,7 +468,7 @@ function readSchedule(ctx: SeasonContext, loaded: LoadedSeasonConfig): SeasonSch
   if (schedule.weeks.length !== config.weeks) {
     issues.add('weeks', `has ${schedule.weeks.length} entries, but config.yaml weeks is ${config.weeks}`);
   }
-  for (const issue of validateSponsors(schedule.sponsors, schedule.weeks)) issues.add('sponsors', issue.message);
+  for (const issue of validateSponsors(schedule.sponsors, schedule.weeks)) issues.add('taverns', issue.message);
   issues.throwIfAny();
   return schedule;
 }
@@ -522,14 +543,9 @@ export function loadSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT): Lo
   const pool = attempt(() => readPool(ctx, loaded, snapshot));
   const managers = attempt(() => readManagers(ctx, loaded));
   const schedule = attempt(() => readSchedule(ctx, loaded));
-  if (managers !== undefined && schedule !== undefined) {
-    const label = seasonFile(ctx, loaded.files.schedule).label;
-    const taverns = new Set(managers.taverns.map((t) => t.id));
-    schedule.sponsors.forEach((sponsor, i) => {
-      if (!taverns.has(sponsor.tavern)) {
-        failures.push(`${label}: sponsors[${i}].tavern: ${JSON.stringify(sponsor.tavern)} is not a tavern in ${loaded.files.managers}`);
-      }
-    });
+  if (managers !== undefined && schedule !== undefined && managers.managers.length > schedule.taverns.length) {
+    const label = seasonFile(ctx, loaded.files.managers).label;
+    failures.push(`${label}: managers: ${managers.managers.length} managers, but ${loaded.files.schedule} has only ${schedule.taverns.length} tavern(s) to choose from`);
   }
   if (pool === undefined || managers === undefined || schedule === undefined || failures.length > 0) throw new ValidationFailure(failures.join('\n'));
   return { ...loaded, dir: ctx.dir, snapshot, pool, managers, schedule };

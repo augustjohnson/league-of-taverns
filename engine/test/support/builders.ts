@@ -54,9 +54,9 @@ export function member(id: string, spec: MemberSpec = {}): EffectiveStats {
   };
 }
 
-/** A party in lineup order. The captain defaults to the first member. */
-export function partyOf(members: ReadonlyArray<EffectiveStats>, captain = members[0]?.characterId ?? ''): Party {
-  return { captain, members };
+/** A party in lineup order. */
+export function partyOf(members: ReadonlyArray<EffectiveStats>): Party {
+  return { members };
 }
 
 // ── missions ────────────────────────────────────────────────────────────────

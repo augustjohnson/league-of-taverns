@@ -20,7 +20,8 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import { runPoints, sponsoredTavern } from '../league';
 import { missionHaul, type Mission, type MissionNode } from '../missions';
 import { formatIssuePath } from '../missions/schema';
-import { lootScore, missionGraph } from '../resolution';
+import { checkAbility, injuredStarter, lootScore, missionGraph } from '../resolution';
+import { retreatsBeforeBattle } from '../roster';
 import { InvalidEventError, applyEvent, initialState } from './reducers';
 import { eventSchema } from './schema';
 import type { LeagueState } from './state';
@@ -205,9 +206,19 @@ export interface ResolutionMismatch {
  *   (`requires`) may fail on a high roll, since nobody may have met the gate
  *   (D-39), and that needs stats this audit doesn't have.
  * - Each battle's outcome is `roll < pWin`, and a lost battle ends the path.
- * - `dnf`, `checksPassed`, `checksAttempted`, `loot` (the `loot` of each
- *   passed check) and `score` (`lootScore(loot, missionHaul(mission))`, DNF
- *   or not) match the walk.
+ * - At each battle the walk reaches, the lineup's retreat order and the loot
+ *   banked so far decide whether the party turns back (D-49): the run must
+ *   name that battle in `retreatedBefore` and stop there exactly when
+ *   `retreatsBeforeBattle` says so.
+ * - A check's `disadvantage` is exactly the hex on the tavern that week (D-52)
+ *   for a check using the hexed ability, and a hexed check has no advantage
+ *   (the two cancel).
+ * - On a DNF the injured starter (if any) is `injuredStarter(lineup.starters,
+ *   roll)`, and there is no injury without a DNF (D-51). A DNF with no
+ *   injury is allowed, since a boon may prevent it (D-52).
+ * - `dnf`, `retreatedBefore`, `checksPassed`, `checksAttempted`, `loot` (the
+ *   `loot` of each passed check and won battle, or 0 on a DNF, D-54) and `score`
+ *   (`lootScore(loot, missionHaul(mission))`, DNF or not) match the walk.
  * - `points` = `runPoints(score, scoring, home)` from `season.created`'s
  *   scoring, where home means the tavern's sponsor set this week's mission
  *   (D-47).
@@ -219,10 +230,12 @@ export interface ResolutionMismatch {
 export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyArray<ResolutionMismatch> {
   const mismatches: ResolutionMismatch[] = [];
   const revealed = new Map<number, Mission>();
+  const hexes: Array<PayloadByType['hex.declared']> = [];
   let season: PayloadByType['season.created'] | null = null;
   for (const event of events) {
     if (event.type === 'season.created') season = event.payload;
     if (event.type === 'mission.revealed') revealed.set(event.payload.week, event.payload.mission);
+    if (event.type === 'hex.declared') hexes.push(event.payload);
     if (event.type !== 'mission.resolved') continue;
     const { week, tavern, run, lineup } = event.payload;
     const report = (field: string, message: string): void => {
@@ -248,18 +261,23 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
       continue;
     }
 
-    const starters = new Set([lineup.captain, ...lineup.allies]);
+    const starters = new Set(lineup.starters);
     const path: string[] = [];
     let index = 0;
     let passed = 0;
     let attempted = 0;
     let loot = 0;
     let dnf = false;
+    let retreatedBefore: string | null = null;
     let walked = true;
     try {
       const graph = missionGraph(mission, 'verifyResolutions');
       let node: MissionNode | undefined = graph.start;
       while (node !== undefined) {
+        if (node.kind === 'battle' && retreatsBeforeBattle(lineup.retreat, loot)) {
+          retreatedBefore = node.id;
+          break;
+        }
         path.push(node.id);
         if (node.kind === 'start') {
           node = graph.next(node, 'always');
@@ -283,6 +301,10 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
           }
           if (!starters.has(record.actor)) report(`${at}.actor`, `"${record.actor}" is not in the lineup`);
           if (record.dc !== node.check.dc) report(`${at}.dc`, `dc ${record.dc} but the mission says ${node.check.dc}`);
+          const hex = hexes.find((h) => h.target === tavern && h.week === week)?.ability;
+          const hexed = hex !== undefined && checkAbility(node.check) === hex;
+          if (record.disadvantage && !hexed) report(`${at}.disadvantage`, 'disadvantage, but no hex covers this check');
+          if (hexed && record.advantage) report(`${at}.advantage`, `advantage, but the ${hex} hex cancels it`);
           const total = record.d20 + record.modifier;
           const meets = total >= record.dc;
           if (record.outcome === 'pass' && !meets) {
@@ -298,8 +320,10 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
           }
           if (record.outcome === 'lose') {
             dnf = true;
+            loot = 0; // a DNF loses everything (D-54)
             break;
           }
+          if (node.kind === 'battle') loot += node.loot ?? 0;
           node = graph.next(node, 'win');
         }
       }
@@ -313,10 +337,24 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
     if (path.length !== run.path.length || path.some((id, i) => id !== run.path[i])) {
       report('run.path', `the walk visits ${path.join(' → ')}, but the run records ${run.path.join(' → ')}`);
     }
+    if (run.retreatedBefore !== retreatedBefore) {
+      report(
+        'run.retreatedBefore',
+        `retreatedBefore is ${JSON.stringify(run.retreatedBefore)}, but the retreat order ${JSON.stringify(lineup.retreat)} ` +
+          (retreatedBefore === null ? 'never turns back on this walk' : `turns back before "${retreatedBefore}"`),
+      );
+    }
+    if (run.injury !== null && !dnf) report('run.injury', `"${run.injury.character}" is injured, but the walk has no DNF`);
+    if (run.injury !== null && dnf) {
+      const picked = injuredStarter(lineup.starters, run.injury.roll);
+      if (picked !== run.injury.character) {
+        report('run.injury', `roll ${run.injury.roll} picks starter "${picked}", but the run injures "${run.injury.character}"`);
+      }
+    }
     if (run.dnf !== dnf) report('run.dnf', `dnf is ${run.dnf}, but the walk ${dnf ? 'loses a battle' : 'reaches an end'}`);
     if (run.checksPassed !== passed) report('run.checksPassed', `${run.checksPassed}, but ${passed} check(s) passed`);
     if (run.checksAttempted !== attempted) report('run.checksAttempted', `${run.checksAttempted}, but ${attempted} check(s) attempted`);
-    if (run.loot !== loot) report('run.loot', `${run.loot}, but the passed checks bank ${loot}`);
+    if (run.loot !== loot) report('run.loot', `${run.loot}, but the walk carries home ${loot}${dnf ? ' (a DNF loses everything)' : ''}`);
     const score = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - score) > 1e-9) report('run.score', `score ${run.score} should be ${score}`);
   }

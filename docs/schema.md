@@ -141,7 +141,7 @@ nodes:
       skill: survival        # for type: skill
       # ability: con         # for type: save | ability
       dc: 12
-      # requires: { speed: fly } | { sense: darkvision }   # OPEN D-39
+      # requires: { speed: fly } | { sense: darkvision }   # a shortcut, never a wall (D-39, the gates rule)
     loot: 20                 # banked on a pass (D-45); whole number ≥ 0
   - id: bog-ambush
     rank: 2
@@ -149,7 +149,7 @@ nodes:
     encounter:
       creatures:             # Open5e slugs in the pinned snapshot; the first is the "lead" ({battle_creature})
         - { ref: crocodile, count: 3 }
-    # loot: 30               # planned (D-50): banked on a win, counted by the haul rule
+    loot: 30                 # optional bounty, banked on a win and counted by the haul rule (D-50)
   - { id: crossed-dry, rank: 5, kind: end }
 edges:
   - { from: start, to: find-path, on: always }   # always | pass | fail | win
@@ -168,8 +168,8 @@ edges:
 | `edges.battle` | a battle has exactly one `win`. `lose` edges don't exist: losing is a DNF |
 | `edges.start` | start has exactly one `always` |
 | `scored` | every start→end path attempts ≥ 1 check |
-| `haul` | the most loot any start→end path can bank equals `missions.haul` (D-45). A check's loot counts when the path leaves it by `pass` or `always`. Planned (D-50): a battle's loot counts when the path leaves it by `win` |
-| `gates` | planned (D-39): a party with no special speeds or senses can still bank the full haul, so a `requires` gate only opens a better or safer route |
+| `haul` | the most loot any start→end path can bank equals `missions.haul` (D-45). A check's loot counts when the path leaves it by `pass` or `always`, and a battle's when the path leaves it by `win` (D-50) |
+| `gates` | a party with no special speeds or senses can bank as much as any party: with every gated check failed, the best path still pays the most (D-39). A `requires` gate only opens a better or safer route |
 | `dc` | `dcBand.min ≤ dc ≤ dcBand.max` |
 | `encounter.ref` | every creature ref exists in the pinned snapshot |
 | `encounter.budget` | Σ count × CR ≤ `encounterCrRatio × B` per battle |
@@ -211,8 +211,8 @@ beat is its DNF ending, so no separate DNF outro is needed. Beats for unknown
 node ids are errors.
 
 **Tokens:** `{actor}` (check beats only), `{battle_creature}` (battle beats
-only), `{captain}`, `{allies}`, `{tavern}` (anywhere). `{captain}` goes
-away with D-12 (no captain). Any other `{…}` is an
+only), `{party}` (the four starters, named together) and `{tavern}`
+(anywhere). There is no `{captain}` (D-12). Any other `{…}` is an
 error. Tokens bind to data at render time and never to new rolls.
 
 **Mechanical-fact lint (T8.3):** no digits, no `DC`, `roll`, `d20`,
@@ -242,7 +242,7 @@ The annotated example in the file is the reference. Key groups:
 | `roster` | `size`, `starters` (4), `ownership` |
 | `draft` | `format`, `rounds`, `order`, `pickWindowHours`, `onTimeout` |
 | `scoring` | `pointsScale`, `homeBonus` (D-47; 1 = off, and Season 1 is off) |
-| `waivers` | `priority`, `initialOrder`. Planned (D-05): `priority: reverse_standings` |
+| `waivers` | `priority` (`reverse_standings`, D-05, or `rolling`), `initialOrder` (`reverse_draft`) |
 | `trades` | `vetoWindowHours`, `vetoBy`, `deadlineWeek` |
 | `missedLineup` | `carry_over` |
 | `schedules` | cron for `lineupLock`, `weeklyRun`, `waivers` |
@@ -253,20 +253,23 @@ The annotated example in the file is the reference. Key groups:
 The config is copied into `season.created`. From then on the **event's copy**
 governs, and CI flags later edits to the file.
 
-`managers.yaml`: `commissioner`, `gm`, and `taverns: [{ id, name, manager: { login, githubId } | { bot } }]`.
+`managers.yaml`: `commissioner`, `gm`, and `managers: [{ id, account: { login, githubId } | { bot } }]`, at most 6 (D-01). Managers have no tavern until the tavern pick.
 
-`schedule.yaml`: `season`, `sponsors: [{ id, tavern }]`, `weeks: [{ week, title, environment, theme, keywords, commitment, sponsor }]`.
-`keywords` (planned, D-42) is a list of short strings naming what the mission
-tests, such as `survival`, `con save` or `lizardfolk fight`. `lock-check`
-rejects a keyword that names nothing in the selected mission.
-`sponsor` is a sponsor id or null. Each sponsor backs one tavern (in
-`managers.yaml`) and sets at most one week (D-48). On that week the tavern's
-points are × `scoring.homeBonus` (D-47; Season 1 sets 1, so nothing). A god's
-name and voice are chrome. Planned (D-52): each sponsor carries a `boon` (an id
-from a closed boon registry), and the tavern–god pairing becomes permanent, so
-it moves out of the per-season schedule into a league-level file.
-`managers.yaml` then lists managers without taverns, and the tavern pick
-(below) binds them. At most 6 taverns (D-01).
+`schedule.yaml`: `season`, `taverns: [{ id, name, god }]` (at most 6, D-01; each tavern already blessed by its god, D-52), `weeks: [{ week, title, environment, theme, keywords, commitment, sponsor }]`. The loader derives `sponsors: [{ id: god, tavern }]` from `taverns`.
+`keywords` (D-42) is a list of short strings naming what the mission tests,
+in a fixed vocabulary (`engine/src/missions/keywords.ts`): a skill with spaces
+(`sleight of hand`), `<ability> save`, `<ability> check`, a gate's speed or
+sense (`fly`, `darkvision`), or a battle's lead creature (`lizardfolk
+fight`). The GM may leave things out, never add: `validate` (and later
+`lock-check`) rejects a keyword that names nothing in the week's mission, and
+so does the reducer at `mission.revealed` (`reveal.dishonest_keywords`).
+`sponsor` is a god's id or null. Each god blesses one tavern and sets at most
+one week (D-48). On that week the tavern's points are × `scoring.homeBonus`
+(D-47; Season 1 sets 1, so nothing). A god's name and voice are chrome.
+Planned (D-52): each tavern carries a `boon` (an id from a closed boon
+registry), and the tavern–god pairing becomes permanent across seasons, so it
+may move out of the per-season schedule into a league-level file. A tavern
+nobody chooses sits the season out; its god's week is still played.
 
 ---
 
@@ -297,15 +300,15 @@ it moves out of the per-season schedule into a league-level file.
 
 | Type | Actor | Payload | Preconditions (reducer rejects otherwise) |
 |---|---|---|---|
-| `season.created` | commissioner | `config`, `configSha256`, `engineVersion`, `schedule[{week,title,environment,theme,commitment,sponsor}]`, `sponsors[{id,tavern}]` | first event, and only once; sponsors pass `validateSponsors` |
+| `season.created` | commissioner | `config`, `configSha256`, `engineVersion`, `schedule[{week,title,environment,theme,commitment,sponsor}]`, `sponsors[{id,tavern}]`, `taverns[{id,name}]` | first event, and only once; sponsors pass `validateSponsors`; at most 6 taverns (D-01), unique, and every sponsor's tavern among them |
 | `character.pooled` | commissioner | `character`, `base`, `cr`, `modifiers` | phase `preseason`, id not already pooled, modifiers within budget |
-| `tavern.joined` | commissioner | `tavern`, `name`, `manager` | phase `preseason`, tavern id unique, manager not already in a tavern |
+| `manager.joined` | commissioner | `manager`, `account` (`{githubId, login}` or `{bot}`) | phase `preseason`, the tavern pick not started, manager id unique, GitHub account not already in the league, at most min(6, taverns) managers (D-01) |
+| `tavern.chosen` | manager | `manager`, `tavern` | before the first draft pick; the manager is on the clock in reverse draft order (the first choice freezes the draft order over the joined managers); the tavern is one of the season's and unclaimed (D-52) |
 | `character.retained` | commissioner | `tavern`, `character`, `fromSeason`, `basis`, `costRound` | before the first pick, character pooled and unowned, tavern within its keeper limit |
-| `draft.pick` | manager / system (autopick) | `pick`, `tavern`, `character`, `auto` | `pick` = number of prior picks, `tavern` is on the clock, character pooled and unowned, roster not full. The first pick freezes the tavern list and order |
-| `lineup.set` | manager | `tavern`, `week`, `lineup{captain, allies[3]}`. Planned (D-12, D-49): `lineup{starters[4], retreat}`, where `retreat` is `never` \| `avoid_battles` \| `{ bank: N }` | draft complete, week not locked, lineup legal (§ Roster) |
+| `draft.pick` | manager / system (autopick) | `pick`, `tavern`, `character`, `auto` | `pick` = number of prior picks, `tavern` is on the clock, character pooled and unowned, roster not full. The first pick needs every manager to have chosen a tavern, and freezes the snake order as their taverns in draft order |
+| `lineup.set` | manager | `tavern`, `week`, `lineup{starters[4], retreat}`, where `retreat` is `never` \| `avoid_battles` \| `{ bank: N }` (D-12, D-49) | draft complete, week not locked, lineup legal (§ Roster) |
 | `lineup.locked` | system | `week`, `lineups[{tavern, lineup, source}]` | week not already locked, previous week finalized, one entry per tavern, each lineup legal |
-| `tavern.chosen` (planned, D-52) | manager | `tavern`, `manager` | phase `preseason`, the manager is on the clock in reverse draft order, the tavern is unclaimed |
-| `hex.declared` (planned, D-52) | manager | `tavern`, `target`, `ability`, `week` | target is another tavern, the week isn't locked, the tavern hasn't hexed this season, the target has no hex that week |
+| `hex.declared` | manager | `tavern`, `target`, `ability`, `week` | both taverns chosen, target is another tavern, the week is in the season and not locked, the tavern hasn't hexed this season (`HEXES_PER_SEASON`), the target has no hex that week (D-52) |
 | `waiver.claimed` | manager | `claim`, `tavern`, `add`, `drop` | draft complete, `add` is a free agent now, `drop` is on the roster |
 | `waiver.resolved` | system | `week`, `outcomes[{claim, awarded, reason}]`, `priorityAfter` | week finalized, outcomes cover every pending claim and match `resolveWaivers` |
 | `trade.proposed` | manager | `trade`, `from`, `to`, `give[]`, `receive[]` | both taverns own the listed characters, before the deadline |
@@ -318,12 +321,15 @@ it moves out of the per-season schedule into a league-level file.
 | `week.finalized` | system | `week` | every tavern has `mission.resolved` for the week, and the week isn't already finalized |
 
 `mission.resolved.run` holds the full `RunResult`: `path`, and for each node
-`{node, kind, actor, d20, modifier, dc, advantage, outcome}` (checks) or
+`{node, kind, actor, d20, modifier, dc, advantage, disadvantage, outcome}` (checks; `disadvantage` from a hex, D-52) or
 `{node, kind, pWin, roll, outcome}` (battles), plus `dnf`, `checksPassed`,
-`checksAttempted`, `loot` (banked by passed checks, kept on a DNF) and `score`
-(loot ÷ the mission's haul, D-45, D-46). Planned: a `retreated` marker for a
-party that turned back (D-49), and on a DNF the `injured` starter with the
-roll that picked it (D-51).
+`checksAttempted`, `loot` (carried home: banked by passed checks and won
+battles, kept on a retreat, 0 on a DNF, D-54) and `score` (loot ÷ the mission's haul, D-45, D-50, D-54).
+`retreatedBefore` names the battle a party turned back before by its retreat
+order, or is null (D-49); the battle is not on `path`. `injury` is, on a
+DNF, `{ character, roll }`: the starter hurt and the roll in [0, 1) that
+picked them, `starters[floor(roll × 4)]` from the die stream
+`injury:<battle-id>` (D-51), or null.
 
 ### What's recorded vs derived [D-20]
 
@@ -353,9 +359,10 @@ State shape: `LeagueState` in `engine/src/events/state.ts`.
 |---|---|
 | `season.created` | set `config`, `schedule`, `sponsors` and phase `preseason` |
 | `character.pooled` | add to `pool` |
-| `tavern.joined` | add to `taverns` with an empty roster |
+| `manager.joined` | add to `managers` with no tavern |
+| `tavern.chosen` | on the first choice, freeze `draft.managerOrder`. Set the manager's tavern, and add the tavern to `taverns` (name from `season.created`) with an empty roster |
 | `character.retained` | `owner[character] = tavern`, append to the roster, record the forfeited round |
-| `draft.pick` | on the first pick, freeze `draft.order` (from config + joined taverns). Set `owner`, append to the roster, `draft.picks++`. After the last pick, set `complete` and phase `regular`, and seed waiver priority from reverse draft order |
+| `draft.pick` | on the first pick, freeze `draft.order` (the managers' taverns in `draft.managerOrder`). Set `owner`, append to the roster, `draft.picks++`. After the last pick, set `complete` and phase `regular`, and seed waiver priority from reverse draft order |
 | `lineup.set` | `pendingLineups[week][tavern] = lineup` (replaces earlier) |
 | `lineup.locked` | `lockedLineups[week] = lineups`, clear `pendingLineups[week]` |
 | `waiver.claimed` | append to `waivers.pending` |

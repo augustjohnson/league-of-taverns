@@ -30,14 +30,14 @@ function member(slug: string, battleBonus = 0): EffectiveStats {
 
 function party(...members: ReadonlyArray<EffectiveStats | string>): Party {
   const stats = members.map((m) => (typeof m === 'string' ? member(m) : m));
-  return { captain: stats[0]?.characterId ?? '', members: stats };
+  return { members: stats };
 }
 
 function foes(...entries: ReadonlyArray<readonly [string, number]>): Foes {
   return entries.map(([slug, count]) => ({ stats: base(slug), count }));
 }
 
-/** Ogre captain with three allies averaging CR 1 (1/2 + 1/2 + 2). */
+/** An ogre with three allies averaging CR 1 (1/2 + 1/2 + 2). */
 const BOG_PARTY = party('ogre', 'black-bear', 'lizardfolk', 'bandit-captain');
 /** example-drowned-toll, node bog-ambush. */
 const BOG_AMBUSH = foes(['crocodile', 3], ['giant-frog', 4]);

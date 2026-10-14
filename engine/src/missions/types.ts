@@ -38,7 +38,11 @@ export interface CheckNode extends NodeBase {
 
 export type CheckSpec = CheckTarget & {
   readonly dc: number;
-  /** Party-level gate. If no starter meets it, the check auto-fails. OPEN: docs/decisions.md D-39. */
+  /**
+   * Party-level gate. If no starter meets it, the check auto-fails. A gate is
+   * a shortcut, not a wall: the `gates` rule keeps the full haul reachable
+   * without it (docs/decisions.md D-39).
+   */
   readonly requires?: Requirement;
 };
 
@@ -49,6 +53,8 @@ export type Requirement =
 export interface BattleNode extends NodeBase {
   readonly kind: 'battle';
   readonly encounter: Encounter;
+  /** Bounty banked when the party wins (docs/decisions.md D-50). Omitted means 0. Losing banks nothing. */
+  readonly loot?: number;
 }
 
 export interface Encounter {

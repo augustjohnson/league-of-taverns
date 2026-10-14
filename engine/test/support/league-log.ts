@@ -10,7 +10,7 @@ import { projectMission } from '../../src/projection';
 import { runMission, type BattleModel } from '../../src/resolution';
 import { applyEvent, initialState } from '../../src/events/reducers';
 import { lineHash, serializeEvent } from '../../src/events/replay';
-import { freeAgents, homeTavern, onTheClock } from '../../src/events/selectors';
+import { freeAgents, homeTavern, onTheClock, tavernPickOnTheClock } from '../../src/events/selectors';
 import type { LeagueState } from '../../src/events/state';
 import type { Actor, EventOf, EventType, LeagueEvent, PayloadByType } from '../../src/events/types';
 import { rngFor, weekSeed } from '../../src/rng';
@@ -24,8 +24,16 @@ export const SYSTEM: Actor = { kind: 'system', workflow: 'weekly-run' };
 export const COMMISSIONER: Actor = { kind: 'commissioner', githubId: 1, login: 'gm' };
 export const MANAGER: Actor = { kind: 'manager', githubId: 101, login: 'flagon' };
 
-/** Join order. */
+/** The season's taverns, in package order. */
 export const TAVERNS = ['the-gilded-flagon', 'the-rusty-nail', 'the-salty-dog', 'the-quiet-crow'] as const;
+
+/** Managers in join order. `manager-i` chooses `TAVERNS[i]` when its turn in the tavern pick comes. */
+export const MANAGERS = ['manager-0', 'manager-1', 'manager-2', 'manager-3'] as const;
+
+/** The package's taverns for `season.created`. */
+export function tavernList(): PayloadByType['season.created']['taverns'] {
+  return TAVERNS.map((id) => ({ id, name: id }));
+}
 
 export function miniConfig(overrides: Partial<SeasonConfig> = {}): SeasonConfig {
   return {
@@ -72,8 +80,8 @@ export const WEEK2_COMMITMENT = lineHash('mission-w2');
 
 export function schedule(): PayloadByType['season.created']['schedule'] {
   return [
-    { week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded road.', commitment: null, sponsor: 'the-drowned-saint' },
-    { week: 2, title: 'The Sunken Bell', environment: 'swamp', theme: 'A bell under the bog.', commitment: WEEK2_COMMITMENT, sponsor: 'the-bog-king' },
+    { week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded road.', keywords: ['survival'], commitment: null, sponsor: 'the-drowned-saint' },
+    { week: 2, title: 'The Sunken Bell', environment: 'swamp', theme: 'A bell under the bog.', keywords: ['survival', 'bat fight'], commitment: WEEK2_COMMITMENT, sponsor: 'the-bog-king' },
   ];
 }
 
@@ -148,7 +156,7 @@ export function bestLineup(state: LeagueState, tavern: string, previous: Lineup 
 /** The recorded `mission.resolved` payload for one tavern's run, built with `runMission` and the week seed. */
 export function resolution(state: LeagueState, week: number, tavern: string, lineup: Lineup): PayloadByType['mission.resolved'] {
   const mission = state.revealed.get(week)!;
-  const ids = [lineup.captain, ...lineup.allies];
+  const ids = lineup.starters;
   // Survival modifier from CR, so lineups differ.
   const party = partyOf(ids.map((id) => member(id, { skills: { survival: state.pool.get(id)!.cr / 4 } })));
   const seed = weekSeed({ season: SEASON, week, tavern });
@@ -196,6 +204,9 @@ export interface MiniSeason {
   /** States at named points, for precondition tests. */
   readonly at: {
     readonly created: LeagueState;
+    /** Every manager joined, no tavern chosen yet. */
+    readonly joined: LeagueState;
+    /** Every tavern chosen, no draft pick yet. */
     readonly preseason: LeagueState;
     readonly drafting: LeagueState;
     readonly drafted: LeagueState;
@@ -218,7 +229,8 @@ export interface MiniSeason {
 }
 
 /**
- * A whole 2-week season: created → pooled → joined → full snake draft →
+ * A whole 2-week season: created → pooled → managers joined → tavern pick →
+ * full snake draft →
  * week 1 (all submitted) → waivers (one award, one loss, from
  * `resolveWaivers`) → trades (one completed, one cancelled, one vetoed) →
  * week 2 (submitted, carried, and one tavern with no lineup) → complete.
@@ -228,15 +240,24 @@ export function miniSeason(): MiniSeason {
   const config = miniConfig();
   const [a, b, c, d] = TAVERNS;
 
-  log.append('season.created', { config, configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors() }, COMMISSIONER);
+  log.append(
+    'season.created',
+    { config, configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors(), taverns: tavernList() },
+    COMMISSIONER,
+  );
   const created = log.state;
   for (const [i, { id, cr }] of POOL.entries()) {
     const modifiers = i % 5 === 0 ? [{ kind: 'skill_bonus', skill: 'survival', value: 2 } as const] : [];
     log.append('character.pooled', { character: id, base: 'ogre', cr, modifiers }, COMMISSIONER);
   }
-  for (const [i, tavern] of TAVERNS.entries()) {
-    const manager = i === 3 ? { bot: 'value' } : { githubId: 101 + i, login: `manager-${i}` };
-    log.append('tavern.joined', { tavern, name: tavern, manager }, COMMISSIONER);
+  for (const [i, manager] of MANAGERS.entries()) {
+    const account = i === 3 ? { bot: 'value' } : { githubId: 101 + i, login: `manager-${i}` };
+    log.append('manager.joined', { manager, account }, COMMISSIONER);
+  }
+  const joined = log.state;
+  // The tavern pick, in reverse draft order (D-52).
+  for (let manager = tavernPickOnTheClock(log.state); manager !== null; manager = tavernPickOnTheClock(log.state)) {
+    log.append('tavern.chosen', { manager, tavern: TAVERNS[MANAGERS.indexOf(manager as (typeof MANAGERS)[number])]! }, MANAGER);
   }
   const preseason = log.state;
 
@@ -316,6 +337,7 @@ export function miniSeason(): MiniSeason {
     log,
     at: {
       created,
+      joined,
       preseason,
       drafting: drafting!,
       drafted,

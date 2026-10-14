@@ -49,10 +49,17 @@ export const modifierSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('trait'), trait: kebabIdSchema }),
 ]);
 
-/** A captain plus exactly three allies. Legality against a roster is T4.2's. */
+/** `never`, `avoid_battles`, or `{ bank: N }` (D-49). */
+export const retreatOrderSchema = z.union([
+  z.literal('never'),
+  z.literal('avoid_battles'),
+  z.strictObject({ bank: z.number().int().nonnegative() }),
+]);
+
+/** Exactly four starters and a retreat order (D-12, D-49). Legality against a roster is T4.2's. */
 export const lineupSchema = z.strictObject({
-  captain: kebabIdSchema,
-  allies: z.tuple([kebabIdSchema, kebabIdSchema, kebabIdSchema]),
+  starters: z.tuple([kebabIdSchema, kebabIdSchema, kebabIdSchema, kebabIdSchema]),
+  retreat: retreatOrderSchema,
 });
 
 const nodeRecordSchema = z.discriminatedUnion('kind', [
@@ -64,6 +71,7 @@ const nodeRecordSchema = z.discriminatedUnion('kind', [
     modifier: z.number().int(),
     dc: z.number().int(),
     advantage: z.boolean(),
+    disadvantage: z.boolean(),
     outcome: z.enum(['pass', 'fail']),
   }),
   z.strictObject({
@@ -80,10 +88,12 @@ export const runResultSchema = z.strictObject({
   path: z.array(kebabIdSchema),
   nodes: z.array(nodeRecordSchema),
   dnf: z.boolean(),
+  retreatedBefore: kebabIdSchema.nullable(),
   checksPassed: z.number().int().nonnegative(),
   checksAttempted: z.number().int().nonnegative(),
   loot: z.number().int().nonnegative(),
   score: probability,
+  injury: z.strictObject({ character: kebabIdSchema, roll: z.number().min(0).lt(1) }).nullable(),
 });
 
 const minMax = z.strictObject({ min: z.number().int(), max: z.number().int() });
@@ -108,7 +118,7 @@ export const seasonConfigSchema = z.strictObject({
     rounds: z.number().int().positive(),
     order: z.discriminatedUnion('mode', [
       z.strictObject({ mode: z.literal('seeded') }),
-      z.strictObject({ mode: z.literal('manual'), taverns: z.array(kebabIdSchema) }),
+      z.strictObject({ mode: z.literal('manual'), managers: z.array(kebabIdSchema) }),
     ]),
     pickWindowHours: z.number().positive(),
     onTimeout: z.enum(['autopick', 'skip', 'wait']),
@@ -117,7 +127,7 @@ export const seasonConfigSchema = z.strictObject({
     pointsScale: z.number().positive(),
     homeBonus: z.number().positive(),
   }),
-  waivers: z.strictObject({ priority: z.literal('rolling'), initialOrder: z.literal('reverse_draft') }),
+  waivers: z.strictObject({ priority: z.enum(['rolling', 'reverse_standings']), initialOrder: z.literal('reverse_draft') }),
   trades: z.strictObject({
     vetoWindowHours: z.number().nonnegative(),
     vetoBy: z.literal('commissioner'),
@@ -160,11 +170,13 @@ export const payloadSchemas = {
         title: text,
         environment: text,
         theme: z.string(),
+        keywords: z.array(text),
         commitment: sha256HexSchema.nullable(),
         sponsor: kebabIdSchema.nullable(),
       }),
     ),
     sponsors: z.array(z.strictObject({ id: kebabIdSchema, tavern: kebabIdSchema })),
+    taverns: z.array(z.strictObject({ id: kebabIdSchema, name: text })),
   }),
   'character.pooled': z.strictObject({
     character: kebabIdSchema,
@@ -172,11 +184,11 @@ export const payloadSchemas = {
     cr: crEighthsSchema,
     modifiers: z.array(modifierSchema),
   }),
-  'tavern.joined': z.strictObject({
-    tavern: kebabIdSchema,
-    name: text,
-    manager: z.union([z.strictObject({ githubId, login: text }), z.strictObject({ bot: text })]),
+  'manager.joined': z.strictObject({
+    manager: kebabIdSchema,
+    account: z.union([z.strictObject({ githubId, login: text }), z.strictObject({ bot: text })]),
   }),
+  'tavern.chosen': z.strictObject({ manager: kebabIdSchema, tavern: kebabIdSchema }),
   'character.retained': z.strictObject({
     tavern: kebabIdSchema,
     character: kebabIdSchema,
@@ -201,6 +213,7 @@ export const payloadSchemas = {
       }),
     ),
   }),
+  'hex.declared': z.strictObject({ tavern: kebabIdSchema, target: kebabIdSchema, ability: z.enum(ABILITIES), week }),
   'waiver.claimed': z.strictObject({
     claim: text,
     tavern: kebabIdSchema,
@@ -283,11 +296,13 @@ function envelope<T extends EventType>(type: T) {
 export const eventSchema = z.discriminatedUnion('type', [
   envelope('season.created'),
   envelope('character.pooled'),
-  envelope('tavern.joined'),
+  envelope('manager.joined'),
+  envelope('tavern.chosen'),
   envelope('character.retained'),
   envelope('draft.pick'),
   envelope('lineup.set'),
   envelope('lineup.locked'),
+  envelope('hex.declared'),
   envelope('waiver.claimed'),
   envelope('waiver.resolved'),
   envelope('trade.proposed'),

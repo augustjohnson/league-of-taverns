@@ -14,7 +14,7 @@ pool: pool.yaml
 managers: managers.yaml
 
 budget:
-  partyCr: 12                       # B: captain + 3 allies, total CR ≤ B
+  partyCr: 12                       # B: four starters, total CR ≤ B
   modifierPointsPerCharacter: 3
 
 roster:
@@ -31,10 +31,10 @@ draft:
 
 scoring:
   pointsScale: 100
-  homeBonus: 1.25
+  homeBonus: 1                      # D-47: no home bonus
 
 waivers:
-  priority: rolling
+  priority: reverse_standings       # D-05
   initialOrder: reverse_draft
 
 trades:
