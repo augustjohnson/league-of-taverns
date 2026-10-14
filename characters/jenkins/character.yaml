@@ -8,11 +8,14 @@ debut: season-01
 chrome:
   name: Jenkins
   epithet: Directions
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Gives directions to everyone, unprompted. Has never once been right.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: glowing pale-blue orb of light with a smug little face, (helpful know-it-all smirk:1.3)
     bodyPlan: blob
     path: portrait.png
-    seed: 387189370
+    face: { x: 0.15, y: 0.06, width: 0.7 } # card face crop, fractions of the portrait
+    imported: jenkins-gemini-1.png
   height: 1

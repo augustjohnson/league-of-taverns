@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Lou Varga
   epithet: Banned
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Banned from every all-you-can-eat in the realm for taking the phrase literally.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: gaunt pale-grey ghoul with long yellow nails, a stained linen bib and gravy on his chin, (ravenous drooling grin:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 368000613
+    imported: lou-varga-s703.png
   height: 5.8

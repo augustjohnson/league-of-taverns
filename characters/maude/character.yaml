@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Maude
   epithet: the Hugger
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Hugs everyone. The healers have asked her, formally, to stop.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: brown-feathered owlbear with huge amber eyes, a cracked beak tip and a heart tattoo on one arm, (overjoyed beaming face:1.3)
     bodyPlan: beast
     path: portrait.png
-    seed: 327082643
+    imported: maude-gemini-1.jpg
   height: 8

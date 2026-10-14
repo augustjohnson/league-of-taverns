@@ -560,3 +560,20 @@ export function bannerCss(gods: Readonly<Record<string, GodChrome>>): string {
     })
     .join('\n');
 }
+
+// ── card art ───────────────────────────────────────────────────────────────
+
+const PNG_URI = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
+
+/**
+ * The card art stylesheet: per character with a face crop, its face and its
+ * thumbnail as `--art-face` and `--art-thumb` on `[data-art="<id>"]`. Kept out of the
+ * card markup, which the page rebuilds on every move, so each image is parsed
+ * once. Ids and images that aren't well formed are skipped.
+ */
+export function artCss(chrome: Readonly<Record<string, { readonly face?: string; readonly portrait?: string }>>): string {
+  return Object.entries(chrome)
+    .filter(([id, c]) => KEBAB.test(id) && c.face !== undefined && PNG_URI.test(c.face) && (c.portrait === undefined || PNG_URI.test(c.portrait)))
+    .map(([id, c]) => `[data-art="${id}"]{--art-face:url("${c.face}")${c.portrait === undefined ? '' : `;--art-thumb:url("${c.portrait}")`}}`)
+    .join('\n');
+}

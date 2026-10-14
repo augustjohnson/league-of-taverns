@@ -52,8 +52,9 @@ export interface PixelateOptions {
   /** Turn see-through parts of the figure into glass (needs `cutout`). */
   readonly glass?: GlassOptions;
   /**
-   * Draw a 1-pixel outline in the palette's darkest colour around the
-   * figure, so every sprite has the same line art whatever the model drew.
+   * Draw a 1-pixel outline in the palette's darkest colour (the league
+   * palette's, or the image's own) around the figure, so every sprite has
+   * the same line art whatever the model drew.
    */
   readonly outline?: boolean;
   /** Colour grade applied before snapping to the palette. */
@@ -100,7 +101,6 @@ export function pixelate(render: RgbaImage, options: PixelateOptions): IndexedIm
   const { index: paletteIndex, palette } = quantize(colors, opaque, options);
   despeckle(paletteIndex, opaque, width, height);
   const framed = options.anchorBottom ? anchorBottom(paletteIndex, opaque, width, height, options.anchorTop) : { paletteIndex, opaque };
-  if (options.outline === true && palette !== options.palette) throw new PixelateError('an outline needs the league palette');
   if (options.outline === true) outline(framed.paletteIndex, framed.opaque, width, height, darkest(palette));
   return toIndexed(framed.paletteIndex, framed.opaque, width, height, palette, options.glass?.alpha ?? 255);
 }

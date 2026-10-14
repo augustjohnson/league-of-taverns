@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { projectMission, replayLog, rngFor } from '@league-of-taverns/engine';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { deepEqual } from '../src/deep-equal';
 import { loadMockSeason, loadMockSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
 import {
+  artCss,
   bannerCss,
   bestWeek,
   bannerGods,
@@ -77,7 +78,7 @@ describe('deepEqual (the replay self-check)', () => {
     expect(deepEqual(replayed, sim1.state)).toBe(true);
     expect(isDeepStrictEqual(replayed, sim1.state)).toBe(true);
     const owner = new Map(sim1.state.owner);
-    owner.set('mock-ape', 'someone-else');
+    owner.set('professor-albright', 'someone-else');
     const tampered = { ...sim1.state, owner };
     expect(deepEqual(tampered, sim1.state)).toBe(false);
     expect(isDeepStrictEqual(tampered, sim1.state)).toBe(false);
@@ -128,7 +129,7 @@ describe('view helpers', () => {
 
   it('bins sampled scores onto the projected support, and the sample mean converges to the projection', () => {
     expect(scoreHistogram([0, 0.5, 0.5, 1, 0.3], [0, 0.5, 1])).toEqual({ counts: [1, 2, 1], other: 1 });
-    const party = partyFrom(['mock-griffon', 'mock-ogre', 'mock-wolf', 'mock-goblin'], nodeInput.statsOf);
+    const party = partyFrom(['krrth', 'bruno-the-bruiser', 'doug', 'gizzik'], nodeInput.statsOf);
     const projection = projectMission(party, mission, nodeInput.baseOf, nodeInput.battleModel);
     const sample = sampleMission(party, mission, nodeInput.baseOf, nodeInput.battleModel, 4000, 'test-seed');
     expect(sample.scores).toHaveLength(4000);
@@ -165,7 +166,7 @@ describe('view helpers', () => {
     expect([0, 1, 0.5, 2 / 3, 0.8, 3 / 7].map(scoreFraction)).toEqual(['0', '1', '1/2', '2/3', '4/5', '3/7']);
     expect([0, 2, 30, 58, 96, 100].map(formatCrTotal)).toEqual(['0', '0.25', '3.75', '7.25', '12', '12.5']);
     expect(['awarded', 'add_unavailable', 'roster_full', 'something_new'].map(waiverReasonLabel)).toEqual(['awarded', 'already taken', 'roster full', 'something new']);
-    const skills = topSkills(nodeInput.statsOf('mock-goblin'));
+    const skills = topSkills(nodeInput.statsOf('gizzik'));
     expect(skills).toHaveLength(3);
     expect(skills[0]!.modifier).toBeGreaterThanOrEqual(skills[2]!.modifier);
     const rand = rngFor('seed-words', 'test');
@@ -247,6 +248,21 @@ describe('table moves', () => {
   });
 });
 
+describe('card art stylesheet', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+
+  it("sets each character's face and thumbnail as custom properties, once", () => {
+    expect(artCss({ doug: { face: png, portrait: png }, bruno: { face: png } }).split('\n')).toEqual([
+      `[data-art="doug"]{--art-face:url("${png}");--art-thumb:url("${png}")}`,
+      `[data-art="bruno"]{--art-face:url("${png}")}`,
+    ]);
+  });
+
+  it('skips a character with no face, or an id or image that could break out of the stylesheet', () => {
+    expect(artCss({ plain: { portrait: png }, 'x"]{}': { face: png }, sneaky: { face: 'data:image/png;base64,AA")}body{x:url("' } })).toBe('');
+  });
+});
+
 describe('banner stylesheet', () => {
   const crow = { name: 'The Storm Crow', banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: 'rain' as const } };
 
@@ -270,14 +286,20 @@ describe('banner stylesheet', () => {
 
 describe('playground build', () => {
   const dir = mkdtempSync(join(tmpdir(), 'lot-playground-'));
+  const out = join(dir, 'index.html');
+  let page: Awaited<ReturnType<typeof writePlayground>>;
+  beforeAll(async () => {
+    page = await writePlayground(out);
+  }, 60_000);
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('writes one self-contained Artifact body', async () => {
-    const out = join(dir, 'index.html');
-    const { bytes, data: built } = await writePlayground(out);
+  it('writes one self-contained Artifact body', () => {
+    const { bytes, data: built } = page;
     // Every sponsoring god's chrome rides along for the banners.
     expect(Object.keys(built.gods).sort()).toEqual(parts.sponsors.map((sp) => sp.id).sort());
     expect(bannerGods(built.gods).size).toBe(parts.sponsors.length);
+    // Every pooled character with a portrait gets the card's face crop.
+    for (const { character } of parts.pool) expect(built.chrome[character.ref.id]?.face, character.ref.id).toMatch(/^data:image\/png;base64,/);
     const html = readFileSync(out, 'utf8');
     expect(html.startsWith('<title>League of Taverns Playground</title>')).toBe(true);
     expect(html).not.toMatch(/<(html|head|body)\b|<!doctype/i);
@@ -290,7 +312,21 @@ describe('playground build', () => {
     expect(html).not.toMatch(/\bfetch\(/);
     expect(html).toMatch(/^[\t\n\r -~]*$/);
     expect(bytes).toBeLessThan(2 * 1024 * 1024);
-  }, 60_000);
+  });
+
+  it("carries each pooled character's name and a portrait thumbnail, and nothing the engine reads", () => {
+    const built = page.data;
+    const ids = parts.pool.map((p) => p.character.ref.id);
+    expect(Object.keys(built.chrome).sort()).toEqual([...ids].sort());
+    expect(built.chrome['bruno-the-bruiser']).toMatchObject({ name: 'Bruno', epithet: 'the Bruiser' });
+    for (const id of ids) {
+      const uri = built.chrome[id]!.portrait;
+      expect(uri, id).toMatch(/^data:image\/png;base64,/);
+      const png = Buffer.from(uri!.slice(uri!.indexOf(',') + 1), 'base64');
+      expect(Math.max(png.readUInt32BE(16), png.readUInt32BE(20)), id).toBe(88);
+    }
+    expect(runMockSeason(seasonInputFromData(built), { seed: 'sim-1' }).ndjson).toBe(sim1.ndjson);
+  });
 
   it('escapes the inlined JSON so nothing can close the script early', () => {
     expect(scriptSafeJson({ s: '</script><!-- é' })).toBe('{"s":"\\u003c/script>\\u003c!-- \\u00e9"}');

@@ -8,11 +8,14 @@ debut: season-01
 chrome:
   name: Shag
   epithet: Origin Unknown
+  pronouns: { subject: it, object: it, possessive: its }
   tagline: Has a stain nobody explains. Nobody asks twice.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: shaggy burnt-orange rug with tasselled edges, a large suspicious brown stain and two woven eyes, (sly lurking stare:1.3)
     bodyPlan: object
     path: portrait.png
-    seed: 823958789
+    face: { x: 0.28, y: 0.0, width: 0.65 } # card face crop, fractions of the portrait
+    imported: shag-gemini-1.webp
   height: 6

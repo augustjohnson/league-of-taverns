@@ -1,36 +1,125 @@
 # Images
 
-Every character gets a pixel-art lineup portrait, and every mission gets a
-wide pixel-art cover. They are chrome, so they never affect play. The style
-aims for an NFL "starting lineup" intro in 16-bit sports-game pixel art: one
-framing, one outline, one palette, so 64 separately generated characters read
-as one set.
+Every character gets a lineup portrait, and every mission gets a wide cover.
+They are chrome, so they never affect play. The style aims for an NFL
+"starting lineup" intro: the cast stands behind a tavern bar, at their true
+heights, in one shared look, so 64 separately generated characters read as
+one set.
 
-| Image | Size | Committed at | Subject comes from |
-|---|---|---|---|
-| Portrait | by creature size (below), transparent background | `characters/<id>/portrait.png` | `chrome.portrait.prompt` in `character.yaml` |
-| Mission cover | 216×72 (3:1) | `seasons/<s>/chrome/<mission>.cover.png` | `imagePrompts.cover` in the mission's chrome |
+| Image | Committed at | Subject comes from |
+|---|---|---|
+| Portrait | `characters/<id>/portrait.png` | `chrome.portrait.prompt` in `character.yaml` |
+| Mission cover | `seasons/<s>/chrome/<mission>.cover.png` | `imagePrompts.cover` in the mission's chrome |
 
-The UI scales them up with `image-rendering: pixelated` and puts the tavern's
-colours behind portraits, so a character's portrait doesn't change when they
-change taverns.
+## Modes
+
+`content/images/style.yaml` has a `mode`, and every image is made and checked
+for it:
+
+| | painted (current) | pixel |
+|---|---|---|
+| Stored | the painted original: whole figure, trimmed, full resolution and colour | a finished 16-bit sprite on the league palette |
+| Model | SDXL base | SDXL base + pixel-art LoRA |
+| Fitting the stage | scaled to the character's height when shown | baked into a card sized by creature size and height |
+| Pixel art | cut from the original when shown, at any zoom (post-processing) | is the stored image |
+| Typical file | ~0.9 MB portrait (cap 1.5 MB), ~1.4 MB cover (cap 2 MB) | 2–3 KB (cap 32 KB) |
+
+Painted became the mode on 2026-10-11. Side by side, the model followed
+subjects much better without the LoRA (species, framing, one figure). The
+pixel look stays: it is now post-processing of the painted original, so one
+image makes pixel art at several zooms and colour budgets, or none. Pixel
+mode stays for comparison; the rest of this page says which mode a section
+is about.
+
+## Painted mode
+
+```
+subject text ──▶ style.yaml `painted` wraps it ──▶ ComfyUI renders (SDXL, no LoRA)
+     ──▶ BiRefNet cuts out the figure ──▶ checks: one whole figure, in colour
+     ──▶ trimmed, full resolution ──▶ .image-drafts/ (+ pixel views) ──▶ GM accepts one
+```
+
+- **Whole figures.** Every portrait asks for the whole figure: standing
+  upright for humanoids and plants, the whole creature for the rest. The
+  stage scales the figure to the character's height, which only works if
+  head and feet are both in the picture. Tiny creatures are drawn whole too
+  (no tankard): the stage stands them on the bar.
+- **Canvas by pose.** Upright figures render at 832×1216, Huge beasts at
+  1216×832, everything else at 1024×1024.
+- **Drift.** The Warcraft cue pulls faces toward a green orc. The negative
+  prompt pushes that back unless the subject says orc, goblin or green skin.
+- **Checks** (`scripts/src/lib/images/paint.ts`), on the cut-out render
+  before it is trimmed: nothing on any edge (a cut-off figure can't be
+  scaled to height), the figure spans at least 40% of the canvas height, one
+  figure (the largest shape holds 80% of the cutout), and not greyscale
+  (mean colour at least 0.015, lower than pixel mode's 0.025: painted shading
+  is softer, and a grey-skinned golem in olive trousers measures 0.025).
+- **Translucency** works as in pixel mode: pale, washed-out parts become
+  see-through, at most alpha 112.
+- **Covers** render at 1728×576 and are stored as rendered, opaque.
+- **Storage** stays plain git (D-10): the originals are full-colour PNGs,
+  with each row filtered for the best compression, under `validate`'s caps.
+
+### Post-processing
+
+Everything lossy happens when an image is shown, never in the stored
+original (`scripts/src/lib/images/postprocess.ts`). A pixel view scales the
+figure to a height in art pixels and runs the pixel pipeline on it: one
+colour per art pixel, a colour budget, hard edges with no anti-aliasing,
+and a 1-pixel outline in the darkest colour. The style names its views
+(`painted.views`):
+
+| View | Zoom | Colours |
+|---|---|---|
+| `pixel` | 28 art px per foot | the league palette (Resurrect 64) |
+| `pixel-fine` | 56 art px per foot | 32 of the image's own |
+
+The zoom applies to the figure as the stage draws it, so a 9.5 ft ogre is
+266 art pixels tall in `pixel` and a 4.3 ft dwarf 120. Staging writes each
+view beside a painted candidate (`s<seed>.pixel.png`), and the review page
+shows them under the stage. Add a view to the style to try another look; no
+image needs redrawing.
+
+### On the stage
+
+`scripts/src/lib/images/stage.ts` places a portrait from its creature size
+and `chrome.height` (feet). The frame shows 6.5 ft above a 3.5 ft bar:
+
+- **Floor.** Everyone stands on the floor behind the bar, drawn at their
+  height, so heads land where they belong. A 9.5 ft ogre towers over a
+  4.3 ft dwarf.
+- **Stool.** Short folk show at least 1.75 ft above the bar, but always keep
+  half a foot hidden behind it.
+- **On the bar.** Tiny creatures, and anything 2.5 ft or shorter, stand on the
+  bar, drawn at least 0.8 ft tall so a four-inch pixie still reads.
+- **Looming.** Huge creatures, and anything over 10 ft, loom in from the left
+  with the head at the top of the frame, drawn at most twice the frame's
+  height (13 ft).
+
+The review page shows each painted candidate this way, on a slice of the stage
+at 32 px per foot.
+
+## Pixel mode
+
+Everything under this heading is about pixel mode.
 
 Portrait canvases follow the base's Open5e creature size, at the same pixel
 scale, so a Large creature's card is literally bigger than a Small one's.
 Cards line up on their bottom edge, so big creatures stand taller in a lineup.
 `draft-images` looks the size up in the newest pinned snapshot (or
-`--snapshot <id>`); `validate` checks it against the season's snapshot.
+`--snapshot <id>`); `validate` checks it against the season's snapshot. The
+UI scales them up with `image-rendering: pixelated`.
 
 | Size | Canvas | Render |
 |---|---|---|
-| Tiny | 80×104 | 640×832 |
+| Tiny | 40×52 (cell 16) | 640×832 |
 | Small | 96×120 | 768×960 |
 | Medium | 112×144 | 896×1152 |
 | Large | 128×160 | 1024×1280 |
 | Huge | 144×184 | 1152×1472 |
 | Gargantuan | 160×200 | 1280×1600 |
 
-## Heights
+### Heights
 
 Each character has `chrome.height` in feet: standing height for people,
 head height at the bar for animals, the top of a shape for objects. The
@@ -48,7 +137,7 @@ cast's size; Huge creatures keep entering from the top left.
 Every portrait also gets a 1-pixel outline in the palette's darkest colour,
 so line art matches across the cast.
 
-## Layering over the tavern
+### Layering over the tavern
 
 Portraits are made to stand side by side behind the bar in a tavern scene:
 
@@ -76,7 +165,7 @@ refuses failures without `--force`, and `validate` checks committed
 portraits. Proportions, such as a big head on a small body, are left to the
 GM's eye. Expect 2 or 3 of 4 candidates to pass for most sizes, fewer for Huge.
 
-## Translucency
+### Translucency
 
 A character with `chrome.portrait.translucent: true` (Wendell, a gelatinous
 cube clear as ice) gets glass: inside the cutout, cells close to the render's
@@ -87,7 +176,7 @@ whatever is frozen inside stay solid. `validate` allows that one opacity, and
 only on translucent characters. Translucent creatures still stand behind the
 bar like everyone else; their base is hidden by the counter.
 
-## Lighting
+### Lighting
 
 Portraits are shared by every tavern a character plays for, so tavern
 lighting is never baked in. Every portrait renders with the same soft, even
@@ -98,7 +187,7 @@ pulls colours toward its light colour, then snaps back to the palette, so
 sprites stay crisp. A candlelit winery, a dusk beer garden and a torchlit
 dungeon are three settings of the same remap.
 
-## Proportions
+### Proportions
 
 The prompt asks for waist-up framing, realistic adult proportions and broad
 shoulders, and the negative prompt rejects oversized heads, chibi and
@@ -106,7 +195,7 @@ bobblehead styles. That made big heads rare in testing (none in 8 seeds of
 the worst case), but no automatic check catches them reliably: silhouettes
 can't tell a big head from narrow clothing. The GM's review is the guarantee.
 
-## How an image is made
+### How a pixel image is made
 
 ```
 subject text ──▶ content/images/style.yaml wraps it ──▶ ComfyUI renders (SDXL + pixel-art LoRA)
@@ -127,6 +216,19 @@ subject text ──▶ content/images/style.yaml wraps it ──▶ ComfyUI rend
 - **Palette:** [Resurrect 64](https://lospec.com/palette-list/resurrect-64) by
   Kerrie Lake. It has few muted mid-tones, so browns lean red and greens lean
   olive. That's the price of a shared palette.
+
+## Card faces
+
+The playground's character cards show a face, not the whole figure: a window
+cut from the painted portrait at the card art's aspect (148 × 104), made at
+build time (`scripts/src/lib/images/face.ts`, `sims/src/playground-build.ts`).
+By default the window is head and shoulders: 45% of the figure's width,
+centred on the top band of the figure (where the head is, however the body
+leans) and starting just above it. That suits people and most monsters.
+Where it misses (a rhino's face is low and to one side, a dragon's sits off to
+the right, a wisp's is mid-glow), the character sets `chrome.portrait.face`:
+`{ x, y, width }` as fractions of the portrait, so it survives a re-render at
+another size. Check a new portrait's crop on its card before accepting it.
 
 ## Making images
 
@@ -155,8 +257,10 @@ Accepting a portrait copies it to `characters/<id>/portrait.png` and sets
 file's comments. Review it in the PR and set `status: final`.
 
 `validate` checks every pooled character's portrait and every cover in the
-season: it must exist, be exactly the style's size, use only palette colours
-with no partial transparency, and be under 32 KB.
+season against the mode. Painted: a portrait trimmed to one figure, in
+colour, under 1.5 MB, or an opaque 1728×576 cover under 2 MB. Pixel:
+exactly the style's size, palette colours only, no partial transparency,
+under 32 KB.
 
 ## Importing outside images
 
@@ -167,9 +271,11 @@ When the local model can't get a character right, generate it elsewhere
 pnpm draft-images import --character rhaa-baeh-skraa the-committee-gemini.png
 ```
 
-ComfyUI cuts out the background, the figure is scaled to fit the
+ComfyUI cuts out the background, then the image goes through the same steps
+as a render. Painted: checked and trimmed as it is, so ask for the whole
+figure, standing, on plain white. Pixel: the figure is scaled to fit the
 character's canvas (4 art pixels clear on each side, 8 above) and placed
-bottom-centre, then pixelated and checked like any render. Accepting it
+bottom-centre, then pixelated and checked. Accepting it
 records `imported: <file name>` instead of a seed. Ask for a composition
 the shape of the card: portrait, about 4:5, plain white background. JPEG and WebP work too. A wide
 image fits by width and ends up small, mostly hidden by the bar.
@@ -202,7 +308,11 @@ prompt: >-
   from people. Without it, "tavern patron" turned a tiny dragon into a
   dragon-knight. Don't dress small creatures: a leather jerkin pulled Doug
   back toward a person.
-- One or two props at most. They have to read at 112×144.
+- One or two props at most. They have to read at the size they're shown.
+- Painted: the subject is weighted 1.35 as a whole. Some shapes don't
+  survive it: two- and three-headed creatures (an ettin, a chimera) come out
+  as separate figures, and "a man's face frozen inside a cube" draws the man
+  holding a cube. Import those (see above).
 
 **Covers:** the place only: landmarks, weather, time of day, sky. No people
 or creatures, since the party changes weekly and the cover shouldn't spoil an
@@ -212,6 +322,10 @@ encounter.
 
 | Setting | Why |
 |---|---|
+| Painted: no LoRA | The pixel-art LoRA pulled subjects toward full-body game sprites and the wrong species. Without it, SDXL follows the subject. |
+| Painted: full-resolution originals | Pixel grids, zooms, colour budgets and hard edges are all post-processing, so one stored image serves every look. 256-colour storage looked the same at a fifth of the size, but colour reduction belongs to the look, not the file. |
+| Painted: whole figures, scaled at compose time | Any crop bakes in a guess about the stage. A whole figure can be scaled to height, so an 8 ft ogre and a 4 ft dwarf compare exactly. |
+| Painted: "World of Warcraft art style" at 1.1 | At 1.3, and with "concept art", it drew character sheets, logos and green orcs. |
 | LoRA strength 0.7 | At 1.0 every subject becomes a full-body game sprite whatever the prompt says. |
 | Weighted framing, `(full body:1.5)` in the negative | The only way to get head-and-shoulders out of this LoRA. |
 | "thick dark outline" + BiRefNet cutout | BiRefNet alone erases a white shirt on a white background: there is no edge to find. The outline gives it one. A magenta background was tried and rejected: SDXL ignored it and painted magenta onto lips and eyelids. |

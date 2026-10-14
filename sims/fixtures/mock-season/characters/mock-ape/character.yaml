@@ -1,5 +1,0 @@
-id: mock-ape
-base: ape
-status: active
-chrome:
-  name: Mock Ape

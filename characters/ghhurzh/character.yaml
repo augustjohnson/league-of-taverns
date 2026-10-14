@@ -8,11 +8,14 @@ debut: season-01
 chrome:
   name: Ghh'ŭrzh
   epithet: the Intern
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Fired from the Abyss for incompetence, which is difficult to arrange.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: pot-bellied grey demon with one snapped-off horn and a crooked parchment name tag pinned to his chest, (nervous sweaty grin:1.3)
     bodyPlan: humanoid
     path: portrait.png
+    face: { x: 0.19, y: 0.02, width: 0.62 } # card face crop, fractions of the portrait
     seed: 780276509
   height: 4

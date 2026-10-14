@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Mhʀ'ūūgh
   epithet: Maze Specialist
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: The league's leading expert on labyrinths. Gets lost in hallways.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: hulking brown bull-headed minotaur with a gold nose ring and one sawn-off horn, (confused squinting frown:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 840024920
+    imported: mhruugh-s703.png
   height: 8.5

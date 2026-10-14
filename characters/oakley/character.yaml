@@ -8,11 +8,14 @@ debut: season-01
 chrome:
   name: Oakley
   epithet: the Rookie
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Three hundred years old and still the newest member of the team. Sensitive about it.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: gnarled brown oak with a bark face, a bird's nest on its head and a carved heart with initials on its trunk, (shy hopeful smile:1.3)
     bodyPlan: plant
     path: portrait.png
-    seed: 981829699
+    face: { x: 0.12, y: 0.08, width: 0.7 } # card face crop, fractions of the portrait
+    imported: oakley-s703.png
   height: 18

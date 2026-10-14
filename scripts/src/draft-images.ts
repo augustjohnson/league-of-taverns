@@ -1,5 +1,5 @@
 /**
- * Draft pixel-art images on a local ComfyUI, then accept the ones to keep.
+ * Draft images on a local ComfyUI, then accept the ones to keep.
  *
  * Usage:
  *   draft-images portraits (--character <id>... | --all) [--snapshot <id>] [--candidates 4] [--seed <n>]
@@ -8,21 +8,25 @@
  *   draft-images accept --character <id> --seed <n> [--force]
  *   draft-images accept --season <id> --mission <id> --seed <n>
  *
- * A portrait's canvas follows its base's creature size, looked up in
- * `--snapshot` (default: the newest pinned snapshot).
+ * The style's mode (content/images/style.yaml) decides what an image becomes.
+ * Painted: a full-colour, full-body figure trimmed and stored at 256 colours,
+ * which the stage scales to the character's height (lib/images/paint.ts,
+ * lib/images/stage.ts). Pixel: a palette sprite on a card sized by creature
+ * size and height (lib/images/pixelate.ts). The creature size comes from the
+ * base, looked up in `--snapshot` (default: the newest pinned snapshot).
  *
  * `portraits` and `covers` render `--candidates` images per target with
- * consecutive seeds (from `--seed`, else a stable per-target seed), pixelate
- * them (lib/images/pixelate.ts), and stage them in .image-drafts/ with an
- * index.html to compare. Each portrait is checked against the framing rules
- * (lib/images/framing.ts: no clipping, no floating) and the page marks the
- * failures; `accept` refuses them without --force. `accept` copies one candidate into the repo and, for
+ * consecutive seeds (from `--seed`, else a stable per-target seed), turn them
+ * into stored images, and stage them in .image-drafts/ with an index.html to
+ * compare. Each portrait is checked (painted: one whole figure; pixel: no
+ * clipping, no floating) and the page marks the failures; `accept` refuses
+ * them without --force. `accept` copies one candidate into the repo and, for
  * a portrait, records path and seed in character.yaml with status draft.
  *
  * `import` stages an outside image (Gemini, a drawing) as a portrait
- * candidate: ComfyUI cuts out its background, it is scaled to fit the
- * character's canvas, then pixelated and checked like any render. Accepting
- * it records `imported: <file name>` instead of a seed.
+ * candidate: ComfyUI cuts out its background, then it goes through the same
+ * steps as a render. Accepting it records `imported: <file name>` instead of
+ * a seed.
  *
  * Needs a running ComfyUI (COMFYUI_URL, default http://127.0.0.1:8188).
  * Offline and human-triggered; never in CI. Setup and style: docs/images.md.
@@ -34,10 +38,13 @@ import { parseArgs } from 'node:util';
 import { ComfyUi } from './lib/images/comfyui';
 import { accept, coverTargets, defaultSeed, portraitTargets, shapeOfTarget, snapshotSizes, stage, stageImport, stagedPaths, writeReviewPage } from './lib/images/drafts';
 import type { DraftTarget } from './lib/images/drafts';
+import { paint } from './lib/images/paint';
 import { pixelate } from './lib/images/pixelate';
 import { decodePng, encodeIndexedPng, encodeRgbaPng } from './lib/images/png';
+import type { RgbaImage } from './lib/images/png';
 import { fitToCanvas } from './lib/images/resample';
-import { loadImageStyle, pixelateOptions, renderSize } from './lib/images/style';
+import { loadImageStyle, paintOptions, pixelateOptions, renderSize } from './lib/images/style';
+import type { ImageStyle } from './lib/images/style';
 import { ValidationFailure, runMain } from './lib/main';
 import { REPO_ROOT, rootDir } from './lib/repo';
 
@@ -100,6 +107,13 @@ function targetsFor(args: Args): DraftTarget[] {
   return portraitTargets(args.all ? 'all' : args.characters, snapshotSizes(args.snapshot));
 }
 
+/** A render as the style's mode stores it: the painted original at full resolution, or a pixel sprite. */
+function finish(style: ImageStyle, target: DraftTarget, render: RgbaImage): Uint8Array {
+  return style.mode === 'painted'
+    ? encodeRgbaPng(paint(render, paintOptions(style, target.kind, target.translucent)))
+    : encodeIndexedPng(pixelate(render, pixelateOptions(style, target.kind, target.translucent, shapeOfTarget(target))));
+}
+
 async function draft(args: Args): Promise<void> {
   const style = loadImageStyle();
   const targets = targetsFor(args);
@@ -140,8 +154,7 @@ async function draft(args: Args): Promise<void> {
     })),
     (_request, render) => {
       const { target, seed } = jobs[done]!;
-      const sprite = encodeIndexedPng(pixelate(decodePng(render), pixelateOptions(style, target.kind, target.translucent, shapeOfTarget(target))));
-      const problems = stage(target, seed, render, sprite, style);
+      const problems = stage(target, seed, render, finish(style, target, decodePng(render)), style);
       clean.set(target.id, (clean.get(target.id) ?? 0) + (problems.length === 0 ? 1 : 0));
       done++;
       const eta = Math.round(((Date.now() - started) / done) * (jobs.length - done) / 60_000);
@@ -165,7 +178,7 @@ function acceptOne(args: Args): void {
   console.log(`Wrote ${written}.${targets[0]!.kind === 'portrait' ? ' Portrait status is draft: set it to final in review.' : ''}`);
 }
 
-/** Margins kept around an imported figure, in art pixels: room on the sides and above the head. */
+/** Pixel mode: margins kept around an imported figure, in art pixels: room on the sides and above the head. */
 const IMPORT_MARGINS = { side: 4, top: 8 } as const;
 
 async function importOne(args: Args): Promise<void> {
@@ -179,13 +192,14 @@ async function importOne(args: Args): Promise<void> {
   await comfy.checkReady(style);
   const original = readFileSync(args.file);
   const cut = decodePng(await comfy.cutout(style, original, basename(args.file)));
-  const { cell } = style.pixelate;
-  const { width: rw, height: rh } = renderSize(style, 'portrait', shapeOfTarget(target));
-  const render = fitToCanvas(cut, rw, rh, {
-    side: IMPORT_MARGINS.side * cell,
-    top: IMPORT_MARGINS.top * cell,
-  });
-  const sprite = encodeIndexedPng(pixelate(render, pixelateOptions(style, 'portrait', target.translucent, shapeOfTarget(target))));
+  // Painted keeps the cutout as it is: it is trimmed anyway. Pixel fits it onto the card's render canvas first.
+  let render = cut;
+  if (style.mode === 'pixel') {
+    const { cell } = style.pixelate;
+    const { width: rw, height: rh } = renderSize(style, 'portrait', shapeOfTarget(target));
+    render = fitToCanvas(cut, rw, rh, { side: IMPORT_MARGINS.side * cell, top: IMPORT_MARGINS.top * cell });
+  }
+  const sprite = finish(style, target, render);
   const seed = createHash('sha256').update(original).digest().readUInt32BE(0) % 1_000_000_000;
   const problems = stageImport(target, seed, basename(args.file), encodeRgbaPng(render), sprite, style);
   console.log(`Staged ${target.id} s${seed} from ${basename(args.file)}: ${problems.length === 0 ? 'layers cleanly' : problems.join('; ')}`);

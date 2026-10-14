@@ -58,6 +58,9 @@ chrome:                      # everything below is cosmetic and never reaches th
     prompt: string           # the subject only; content/images/style.yaml adds the style
     path: portrait.png       # set by draft-images accept; required at draft and final
     seed: integer            # ComfyUI seed of the accepted image
+    face: { x, y, width }    # optional: the card's face crop, as fractions of the portrait (left, top, width;
+                             # the height follows the card's aspect). Only where the default head-and-shoulders
+                             # crop misses the face (scripts/src/lib/images/face.ts; docs/images.md § Card faces)
   history: [string]          # optional cosmetic notes
 ```
 
@@ -415,3 +418,59 @@ fails CI.
 `weeks/<n>.json` (per-tavern actual, projected, path, rolls, story),
 `rosters.json`, `characters/<id>.json` (career). This is a deployed build
 artifact and is never committed [D-19]. `explorer/` reads only this.
+
+## Recruiting bundle
+
+`pnpm package-characters --season <id>` → `seasons/<season>/recruiting/`, for
+a recruiting page built elsewhere. It is derived from `characters/` and the
+season's pool and snapshot, but committed, so the page can read it from the
+repo: rerun it after changing a character and commit the result. Code:
+`scripts/src/lib/recruiting.ts` (types `RecruitingBundle`,
+`RecruitingCharacter`).
+
+A season's recruits are the characters whose `debut` is the season, plus
+any in its `pool.yaml`.
+
+```
+characters.json                    the manifest below
+portraits/<id>.png                 painted portrait, longest side 640 px, ≤256 colours
+portraits/<id>.<view>.png          each pixel view (style painted.views), drawn at stage height
+```
+
+```yaml
+format: 1
+season: season-01
+snapshot: open5e-v1-2026-10
+stage: { barFt: 3.5, frameFt: 6.5 }     # the stage every placement assumes
+characters:
+  - id: doug
+    name: Doug
+    epithet: Fully Grown                 # optional, as are tagline, pronouns, story, heightFt
+    tagline: The size of a loaf of bread. Does not want to discuss loaves.
+    pronouns: { subject: he, object: him, possessive: his }
+    story: "Doug is fully grown. …\n\nHe wears a studded leather collar …"   # paragraphs split by a blank line
+    heightFt: 1.5
+    pooled: false                        # in pool.yaml yet
+    modifiers: []                        # season modifiers from pool.yaml
+    base:                                # the snapshot record, renamed, untouched
+      { slug: pseudodragon, name: Pseudodragon, size: Tiny, type: Dragon, subtype: "",
+        alignment: neutral good, cr: "1/4", crValue: 0.25, armorClass: 13, hitPoints: 7,
+        hitDice: 2d4+2, speed: { walk: 15, fly: 60 },
+        abilities: { str: 6, dex: 15, con: 13, int: 10, wis: 12, cha: 10 },
+        skills: { perception: 3, stealth: 4 }, senses: "…", languages: "…" }
+    portrait:                            # absent without an accepted portrait
+      original: characters/doug/portrait.png          # full-resolution original, repo-relative
+      web: { file: portraits/doug.png, width: 640, height: 594 }
+      views:
+        pixel: { file: portraits/doug.pixel.png, width: 47, height: 44, pxPerFt: 28 }
+        pixel-fine: { file: portraits/doug.pixel-fine.png, width: 92, height: 86, pxPerFt: 56 }
+      translucent: false
+      stage: { where: bar, shownFt: 1.5, topFt: 1.5 }  # absent without a height
+```
+
+**Placing a figure** (`scripts/src/lib/images/stage.ts`, docs/images.md § On
+the stage): pick pixels per foot `k`. Draw the figure `shownFt × k` tall with
+its top `topFt × k` above the bar top. `floor` and `loom` figures go behind
+the bar, which hides everything below its top; `bar` figures stand on it, in
+front. The frame shows `frameFt` above the bar. A view's image already
+includes a one-pixel clear border, so its figure is `height − 2` pixels tall.

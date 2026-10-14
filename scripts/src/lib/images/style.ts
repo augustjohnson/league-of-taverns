@@ -1,5 +1,7 @@
 /**
- * content/images/style.yaml: the fixed style every generated image shares.
+ * content/images/style.yaml: the fixed style every generated image shares,
+ * in one of two modes: painted (full-colour illustrations scaled to height on
+ * the stage) or pixel (palette-locked pixel art on fixed cards).
  */
 import { join } from 'node:path';
 import { toSchemaIssues } from '@league-of-taverns/engine';
@@ -13,9 +15,13 @@ import { EDGES } from './framing';
 import type { FramingRules } from './framing';
 import { PALETTES } from './palette';
 import type { PaletteName, Rgb } from './palette';
+import type { PaintOptions, PaintedRules } from './paint';
+import type { PixelViewOptions } from './postprocess';
 import type { PixelateOptions } from './pixelate';
 
 export const IMAGE_KINDS = ['portrait', 'cover'] as const;
+export const IMAGE_MODES = ['painted', 'pixel'] as const;
+export type ImageMode = (typeof IMAGE_MODES)[number];
 export type ImageKind = (typeof IMAGE_KINDS)[number];
 
 /** Open5e creature sizes, lower-cased. */
@@ -30,6 +36,7 @@ export interface Size {
 const SUBJECT = '{{subject}}';
 const FRAMING = '{{framing}}';
 const ANCHOR = '{{anchor}}';
+const POSE = '{{pose}}';
 const once = (token: string) => (s: string) => s.split(token).length === 2;
 
 const text = z.string().min(1);
@@ -59,7 +66,36 @@ const portraitSize = size.extend({
   framing: text.exactOptional(),
 });
 
+const view = z.strictObject({
+  pxPerFt: z.number().positive(),
+  colors: z.union([z.literal('palette'), z.number().int().min(2).max(64)]),
+  outline: z.boolean(),
+});
+
+const painted = z.strictObject({
+  views: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/), view),
+  portrait: z.strictObject({
+    renders: z.strictObject({ tall: size, square: size, wide: size }),
+    poses: z.strictObject({ default: text, ...Object.fromEntries(BODY_PLANS.map((p) => [p, text.exactOptional()])) } as Record<'default', typeof text> & Record<BodyPlan, ReturnType<typeof text.exactOptional>>),
+    drift: z.strictObject({ words: z.array(text).min(1), negative: text }),
+    tolerance: z.number().int().nonnegative(),
+    minFill: z.number().min(0).max(1),
+    minChroma: z.number().nonnegative(),
+    positive: text
+      .refine(once(SUBJECT), `must contain ${SUBJECT} exactly once`)
+      .refine(once(POSE), `must contain ${POSE} exactly once`)
+      .refine(once(ANCHOR), `must contain ${ANCHOR} exactly once`),
+    negative: text,
+  }),
+  cover: z.strictObject({
+    render: size,
+    positive: text.refine(once(SUBJECT), `must contain ${SUBJECT} exactly once`),
+    negative: text,
+  }),
+});
+
 const styleSchema = z.strictObject({
+  mode: z.enum(IMAGE_MODES),
   palette: z.enum(Object.keys(PALETTES) as [PaletteName, ...PaletteName[]]),
   model: z.strictObject({
     checkpoint: text,
@@ -100,8 +136,14 @@ const styleSchema = z.strictObject({
       .refine(once(FRAMING), `must contain ${FRAMING} exactly once`)
       .refine(once(ANCHOR), `must contain ${ANCHOR} exactly once`),
   }),
+  painted,
   stage: z.strictObject({
     barFt: z.number().positive(),
+    frameFt: z.number().positive(),
+    minHiddenFt: z.number().nonnegative(),
+    onBarMaxFt: z.number().positive(),
+    minShownFt: z.number().positive(),
+    loomAboveFt: z.number().positive(),
     pxPerFt: z.number().positive(),
     headroom: z.number().int().nonnegative(),
     minVisibleFt: z.number().positive(),
@@ -125,13 +167,22 @@ export function loadImageStyle(root: RepoRoot = REPO_ROOT): ImageStyle {
   const result = styleSchema.safeParse(readYaml(stylePath(root), label));
   if (!result.success) throw issuesFailure(label, toSchemaIssues(result.error));
   const style = result.data;
+  const renders: Array<[string, Size]> = [
+    ...(['tall', 'square', 'wide'] as const).map((r): [string, Size] => [`painted.portrait.renders.${r}`, style.painted.portrait.renders[r]]),
+    ['painted.cover.render', style.painted.cover.render],
+  ];
   const outputs: Array<[string, Size, number]> = [
+    ...renders.map(([path, s]): [string, Size, number] => [path, s, 1]),
     ...CREATURE_SIZES.map((s): [string, Size, number] => [`portrait.sizes.${s}`, style.portrait.sizes[s], style.portrait.sizes[s].cell ?? style.pixelate.cell]),
     ['cover.output', style.cover.output, style.pixelate.cell],
   ];
   const problems = outputs
     .filter(([, { width, height }, cell]) => (width * cell) % 64 !== 0 || (height * cell) % 64 !== 0)
-    .map(([path, { width, height }, cell]) => `${label}: ${path}: ${width}×${height} renders at ${width * cell}×${height * cell}, which must be multiples of 64`);
+    .map(([path, { width, height }, cell]) =>
+      cell === 1
+        ? `${label}: ${path}: ${width}×${height} must be multiples of 64`
+        : `${label}: ${path}: ${width}×${height} renders at ${width * cell}×${height * cell}, which must be multiples of 64`,
+    );
   if (problems.length > 0) throw new ValidationFailure(problems.join('\n'));
   return style;
 }
@@ -213,8 +264,22 @@ export function cellOf(style: ImageStyle, kind: ImageKind, arg?: ShapeArg): numb
   return (kind === 'portrait' && arg !== undefined ? style.portrait.sizes[shapeOf(arg).size].cell : undefined) ?? style.pixelate.cell;
 }
 
-/** The ComfyUI render size: the output times the pixel cell. */
+/** Body plans drawn standing upright: a tall canvas and the upright pose. */
+const UPRIGHT: ReadonlyArray<BodyPlan> = ['humanoid', 'plant'];
+
+/**
+ * The ComfyUI render size. Painted: by pose (upright figures tall, Huge beasts
+ * wide, the rest square). Pixel: the output times the pixel cell.
+ */
 export function renderSize(style: ImageStyle, kind: ImageKind, arg?: ShapeArg): Size {
+  if (style.mode === 'painted') {
+    if (kind === 'cover') return style.painted.cover.render;
+    if (arg === undefined) throw new Error('a portrait needs a creature size');
+    const { size, plan = 'humanoid' } = shapeOf(arg);
+    const { renders } = style.painted.portrait;
+    if (UPRIGHT.includes(plan)) return renders.tall;
+    return size === 'huge' || size === 'gargantuan' ? renders.wide : renders.square;
+  }
   const { width, height } = outputSize(style, kind, arg);
   const cell = cellOf(style, kind, arg);
   return { width: width * cell, height: height * cell };
@@ -232,6 +297,7 @@ export function paletteOf(style: ImageStyle, kind: ImageKind = 'portrait'): Read
  * chest-up for a dwarf on a stool, waist-up for a person, thigh-up for an ogre.
  */
 export function positivePrompt(style: ImageStyle, kind: ImageKind, subject: string, arg?: ShapeArg, planArg?: BodyPlan): string {
+  if (style.mode === 'painted') return paintedPositive(style, kind, subject, arg, planArg);
   const filled = style[kind].positive.replace(SUBJECT, subject.trim().replace(/\.$/, ''));
   if (kind === 'cover') return filled;
   if (arg === undefined) throw new Error('a portrait needs a creature size');
@@ -248,10 +314,35 @@ export function positivePrompt(style: ImageStyle, kind: ImageKind, subject: stri
   return filled.replace(ANCHOR, anchor.trim()).replace(FRAMING, text.trim());
 }
 
-/** The negative prompt, plus the body plan's own for portraits. */
-export function negativePrompt(style: ImageStyle, kind: ImageKind, plan: BodyPlan = 'humanoid'): string {
-  const extra = kind === 'portrait' ? style.portrait.bodyPlans[plan].negative : undefined;
-  return extra === undefined ? style[kind].negative : `${style[kind].negative}, ${extra.trim()}`;
+/**
+ * Painted: the body plan's anchor and the pose for it (the whole figure,
+ * so the stage can scale it to height). No size framing: a Tiny creature is
+ * drawn whole and placed on the bar by the stage, not perched in the picture.
+ */
+function paintedPositive(style: ImageStyle, kind: ImageKind, subject: string, arg?: ShapeArg, planArg?: BodyPlan): string {
+  const { portrait, cover } = style.painted;
+  const clean = subject.trim().replace(/\.$/, '');
+  if (kind === 'cover') return cover.positive.replace(SUBJECT, clean);
+  if (arg === undefined) throw new Error('a portrait needs a creature size');
+  const plan = planArg ?? shapeOf(arg).plan ?? 'humanoid';
+  const pose = portrait.poses[plan] ?? portrait.poses.default;
+  return portrait.positive.replace(ANCHOR, style.portrait.bodyPlans[plan].anchor.trim()).replace(POSE, pose.trim()).replace(SUBJECT, clean);
+}
+
+/**
+ * The negative prompt, plus the body plan's own for portraits. Painted
+ * portraits also push back the style's drift (green orcs) unless the subject
+ * asks for it.
+ */
+export function negativePrompt(style: ImageStyle, kind: ImageKind, plan: BodyPlan = 'humanoid', subject = ''): string {
+  const base = style.mode === 'painted' ? style.painted[kind].negative : style[kind].negative;
+  const extras = kind === 'portrait' ? [style.portrait.bodyPlans[plan].negative] : [];
+  if (style.mode === 'painted' && kind === 'portrait') {
+    const { words, negative } = style.painted.portrait.drift;
+    const lower = subject.toLowerCase();
+    if (!words.some((word) => lower.includes(word.toLowerCase()))) extras.push(negative);
+  }
+  return [base, ...extras.filter((e): e is string => e !== undefined).map((e) => e.trim())].join(', ');
 }
 
 export function pixelateOptions(style: ImageStyle, kind: ImageKind, translucent = false, arg?: ShapeArg): PixelateOptions {
@@ -275,4 +366,39 @@ export function pixelateOptions(style: ImageStyle, kind: ImageKind, translucent 
 /** The one partial opacity a translucent portrait may use. */
 export function glassAlpha(style: ImageStyle, kind: ImageKind, translucent = false): number | undefined {
   return kind === 'portrait' && translucent ? style.portrait.glass.alpha : undefined;
+}
+
+/** Painted mode: how a render becomes the stored original (./paint.ts). */
+export function paintOptions(style: ImageStyle, kind: ImageKind, translucent = false): PaintOptions {
+  if (kind === 'cover') return { kind };
+  const { alpha, minLightness, maxChroma } = style.portrait.glass;
+  return { kind, ...(translucent ? { glass: { alpha, minLightness, maxChroma } } : {}) };
+}
+
+/**
+ * Post-processing options for one of the style's views of a painted portrait
+ * drawn `shownFt` tall on the stage (./postprocess.ts).
+ */
+export function pixelViewOptions(style: ImageStyle, name: string, shownFt: number, translucent = false): PixelViewOptions {
+  const view = style.painted.views[name];
+  if (view === undefined) throw new Error(`no view ${JSON.stringify(name)} in the style (has ${Object.keys(style.painted.views).join(', ')})`);
+  return {
+    heightPx: shownFt * view.pxPerFt,
+    palette: view.colors === 'palette' ? PALETTES[style.palette] : 'own',
+    colorGroups: view.colors === 'palette' ? style.pixelate.colorGroups : view.colors,
+    chromaWeight: style.pixelate.chromaWeight,
+    outline: view.outline,
+    ...(style.portrait.grade === undefined ? {} : { grade: style.portrait.grade }),
+    ...(translucent ? { glass: style.portrait.glass } : {}),
+  };
+}
+
+/**
+ * Painted mode: the checks a portrait render must pass to be scaled onto the
+ * stage (./paint.ts). A swarm is many small shapes by design, so it skips the
+ * one-figure check.
+ */
+export function paintedRules(style: ImageStyle, plan: BodyPlan = 'humanoid'): PaintedRules {
+  const { tolerance, minFill, minChroma } = style.painted.portrait;
+  return { tolerance, minFill, minMainShare: plan === 'swarm' ? 0 : style.portrait.minMainShare, minChroma };
 }

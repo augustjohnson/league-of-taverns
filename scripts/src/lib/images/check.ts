@@ -1,12 +1,13 @@
 /**
- * Checks for committed images (D-10: small palette PNGs in plain git).
+ * Checks for committed images (D-10: PNGs in plain git, capped per file).
  *
  * - A pooled character's portrait at `draft` or `final` must name a `path`.
  * - Any named portrait, and any seasons/<s>/chrome/<mission>.cover.png, must
- *   exist, be the style's output size (for a portrait, the canvas for its
- *   base's creature size), use only palette colours with no
- *   partial transparency, and stay under MAX_IMAGE_BYTES.
- * - A portrait must also layer cleanly (./framing.ts): no clipping, no floating.
+ *   exist, be what the style's mode makes, and stay under its byte cap.
+ *   Painted: a full-resolution portrait trimmed to one figure, or an opaque
+ *   cover of the render size. Pixel: the canvas for
+ *   the base's creature size, palette colours only, no partial transparency,
+ *   and a card that layers cleanly (./framing.ts).
  * - A cover must sit next to its mission's chrome file.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -16,15 +17,22 @@ import { REPO_ROOT, loadCharacterChrome, rootDir } from '../repo';
 import type { RepoRoot } from '../repo';
 import { charactersRootDir, seasonDir } from '../season';
 import type { SeasonSource } from '../season';
+import { storedImageProblems } from './drafts';
 import { framingProblems } from './framing';
-import { checkSprite } from './pixelate';
 import { PngError, decodePng } from './png';
-import { framingRules, glassAlpha, loadImageStyle, outputSize, paletteOf } from './style';
+import { framingRules, loadImageStyle } from './style';
 import type { BodyPlan } from './body-plans';
-import type { CreatureSize, ImageKind, ImageStyle, PortraitShape } from './style';
+import type { CreatureSize, ImageKind, ImageMode, ImageStyle, PortraitShape } from './style';
 
-/** A palette sprite at league sizes is a few KB; anything near this is not one. */
-export const MAX_IMAGE_BYTES = 32 * 1024;
+/**
+ * Byte caps by mode and kind. A pixel sprite is a few KB. A painted original
+ * is kept at full resolution and colour: about 0.9 MB a portrait and 1.4 MB a
+ * cover. Anything over didn't come from draft-images.
+ */
+export const MAX_IMAGE_BYTES: Readonly<Record<ImageMode, Readonly<Record<ImageKind, number>>>> = {
+  pixel: { portrait: 32 * 1024, cover: 32 * 1024 },
+  painted: { portrait: 1536 * 1024, cover: 2048 * 1024 },
+};
 
 /** A pooled character and its base's creature size (undefined when the base isn't in the snapshot). */
 export interface PooledPortrait {
@@ -82,29 +90,29 @@ export function checkSeasonImages(season: SeasonSource, characters: ReadonlyArra
   }
   for (const { file, kind, size, translucent, plan, heightFt } of images) {
     const shape = size === undefined ? undefined : { size, ...(plan === undefined ? {} : { plan }), ...(heightFt === undefined ? {} : { heightFt }) };
-    issues.push(...checkImageFile(file, outputSize(style, kind, shape), kind, shape, glassAlpha(style, kind, translucent), style, label));
+    issues.push(...checkImageFile(file, kind, shape, translucent, style, label));
   }
   return issues;
 }
 
 function checkImageFile(
   file: string,
-  expected: { readonly width: number; readonly height: number },
   kind: ImageKind,
   shape: PortraitShape | undefined,
-  glass: number | undefined,
+  translucent: boolean | undefined,
   style: ImageStyle,
   label: (file: string) => string,
 ): string[] {
   if (!existsSync(file)) return [`${label(file)}: file not found`];
   const bytes = statSync(file).size;
-  if (bytes > MAX_IMAGE_BYTES) {
-    return [`${label(file)}: ${Math.round(bytes / 1024)} KB, over the ${MAX_IMAGE_BYTES / 1024} KB limit for a ${kind}; images must come from draft-images`];
+  const cap = MAX_IMAGE_BYTES[style.mode][kind];
+  if (bytes > cap) {
+    return [`${label(file)}: ${Math.round(bytes / 1024)} KB, over the ${cap / 1024} KB limit for a ${style.mode} ${kind}; images must come from draft-images`];
   }
   try {
     const image = decodePng(readFileSync(file));
-    const problems = checkSprite(image, expected, paletteOf(style, kind), glass);
-    if (shape !== undefined && problems.length === 0) problems.push(...framingProblems(image, framingRules(style, shape)));
+    const problems = storedImageProblems(image, kind, shape, translucent, style);
+    if (style.mode === 'pixel' && shape !== undefined && problems.length === 0) problems.push(...framingProblems(image, framingRules(style, shape)));
     return problems.map((p) => `${label(file)}: ${p}`);
   } catch (error) {
     if (error instanceof PngError) return [`${label(file)}: ${error.message}`];

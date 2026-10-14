@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
@@ -12,7 +12,10 @@ import { framingProblems } from '../src/lib/images/framing';
 import type { Edge } from '../src/lib/images/framing';
 import { PixelateError, checkSprite, pixelate } from '../src/lib/images/pixelate';
 import type { PixelateOptions } from '../src/lib/images/pixelate';
+import { checkPainted, paint, paintedProblems } from '../src/lib/images/paint';
+import { pixelView } from '../src/lib/images/postprocess';
 import { PngError, decodePng, encodeIndexedPng, encodeRgbaPng } from '../src/lib/images/png';
+import { placeOnStage } from '../src/lib/images/stage';
 import { fitToCanvas } from '../src/lib/images/resample';
 import type { RgbaImage } from '../src/lib/images/png';
 import {
@@ -23,15 +26,24 @@ import {
   outputSize,
   pixelateOptions,
   negativePrompt,
+  paintOptions,
+  paintedRules,
+  pixelViewOptions,
   positivePrompt,
   renderSize,
   stageFit,
   stylePath,
 } from '../src/lib/images/style';
+import type { ImageStyle } from '../src/lib/images/style';
 import { ValidationFailure } from '../src/lib/main';
 
 const PALETTE = PALETTES['resurrect-64'];
-const style = loadImageStyle();
+const repoStyle = loadImageStyle();
+/** Each suite pins the mode it tests; the repo's style may be in either. */
+const style: ImageStyle = { ...repoStyle, mode: 'pixel' };
+const painted: ImageStyle = { ...repoStyle, mode: 'painted' };
+/** A copy of the repo's style file in the given mode, for a temporary root. */
+const styleFileIn = (mode: ImageStyle['mode']): string => readFileSync(stylePath(), 'utf8').replace(/^mode: \w+$/m, `mode: ${mode}`);
 
 /** A render of `cols`×`rows` cells, each `cell` pixels of one colour, with a noisy 1-pixel rim. */
 function blockRender(colors: ReadonlyArray<ReadonlyArray<Rgb | null>>, cell = 8): RgbaImage {
@@ -473,7 +485,7 @@ describe('drafts and committed images', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'lot-images-'));
     mkdirSync(join(root, 'content', 'images'), { recursive: true });
-    copyFileSync(stylePath(), join(root, 'content', 'images', 'style.yaml'));
+    writeFileSync(join(root, 'content', 'images', 'style.yaml'), styleFileIn('pixel'));
     mkdirSync(join(root, 'characters', 'ogre-one'), { recursive: true });
     writeFileSync(
       join(root, 'characters', 'ogre-one', 'character.yaml'),
@@ -540,6 +552,237 @@ describe('drafts and committed images', () => {
       'characters/ogre-one/character.yaml: chrome.portrait: status is final but no path is set',
       'seasons/s1/chrome/moor.cover.png: no moor.yaml chrome file next to it',
       `seasons/s1/chrome/bog.cover.png: is ${cw}×${ch - 1}, expected ${cw}×${ch}`,
+    ]);
+  });
+});
+
+// ── painted mode ───────────────────────────────────────────────────────────
+
+/** An RGBA render with opaque rectangles [x, y, w, h, colour] on a transparent canvas. */
+function rectRender(width: number, height: number, rects: ReadonlyArray<readonly [number, number, number, number, Rgb]>): RgbaImage {
+  const data = new Uint8Array(width * height * 4);
+  for (const [x0, y0, w, h, c] of rects) {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) data.set([...c, 255], (y * width + x) * 4);
+  }
+  return { width, height, data };
+}
+const RUST: Rgb = [180, 70, 40];
+const MOSS: Rgb = [70, 140, 60];
+
+describe('painted style and graph', () => {
+  it('asks for the whole figure in the painted wrapper, with the body plan anchor', () => {
+    const ogre = positivePrompt(painted, 'portrait', 'a green ogre in an apron. ', 'large');
+    expect(ogre).toContain('World of Warcraft');
+    expect(ogre).toContain('(a green ogre in an apron:1.35)');
+    expect(ogre).toContain(painted.painted.portrait.poses.humanoid!.trim());
+    expect(ogre).toContain('tavern patron');
+    expect(ogre).not.toMatch(/\{\{|pixel art,/);
+    // No size framing: a tiny dragon is drawn whole, and the stage puts it on the bar.
+    const dragon = positivePrompt(painted, 'portrait', 'a tiny dragon', 'tiny', 'winged');
+    expect(dragon).not.toContain('tankard');
+    expect(dragon).toContain(painted.painted.portrait.poses.default.trim());
+    expect(positivePrompt(painted, 'cover', 'a bog')).toContain('a bog');
+  });
+
+  it('pushes back green orcs unless the subject asks for one', () => {
+    expect(negativePrompt(painted, 'portrait', 'humanoid', 'a dusty tan mummy')).toContain('(orc, green skin:1.3)');
+    expect(negativePrompt(painted, 'portrait', 'humanoid', 'a scarred orc bouncer')).not.toContain('(orc, green skin:1.3)');
+    expect(negativePrompt(painted, 'portrait', 'beast', 'a bear')).toMatch(/human, person/);
+    expect(negativePrompt(painted, 'cover')).not.toContain('orc');
+  });
+
+  it('renders upright figures tall, Huge beasts wide, the rest square, with no LoRA', () => {
+    const { renders } = painted.painted.portrait;
+    expect(renderSize(painted, 'portrait', 'medium')).toEqual(renders.tall);
+    expect(renderSize(painted, 'portrait', { size: 'huge', plan: 'beast' })).toEqual(renders.wide);
+    expect(renderSize(painted, 'portrait', { size: 'large', plan: 'blob' })).toEqual(renders.square);
+    expect(renderSize(painted, 'cover')).toEqual(painted.painted.cover.render);
+    const graph = renderGraph(painted, { kind: 'portrait', size: 'medium', subject: 'a dwarf', seed: 3, prefix: 'p' });
+    expect(graph['lora']).toBeUndefined();
+    expect(graph['sample']!.inputs['model']).toEqual(['checkpoint', 0]);
+    expect(graph['positive']!.inputs['clip']).toEqual(['checkpoint', 1]);
+    expect(graph['latent']!.inputs).toMatchObject(renders.tall);
+    expect(graph['save']!.inputs['images']).toEqual(['rgba', 0]);
+    expect(renderGraph(style, { kind: 'portrait', size: 'medium', subject: 'a dwarf', seed: 3, prefix: 'p' })['lora']).toBeDefined();
+  });
+});
+
+describe('paint', () => {
+  it('keeps a portrait at full resolution, trimmed to its figure', () => {
+    const render = rectRender(100, 200, [[30, 20, 40, 160, RUST]]);
+    const original = paint(render, { kind: 'portrait' });
+    expect([original.width, original.height]).toEqual([40, 160]);
+    const decoded = decodePng(encodeRgbaPng(original));
+    expect(pixel(decoded, 20, 80)).toEqual([...RUST, 255]);
+    expect(checkPainted(decoded, 'portrait', paintedRules(painted))).toEqual([]);
+    expect(checkPainted(render, 'portrait')).toEqual(['is not trimmed to its figure']);
+  });
+
+  it('drops faint cutout fringe before trimming, and turns pale parts of a translucent figure to glass', () => {
+    const render = rectRender(60, 60, [[10, 10, 40, 40, MOSS], [20, 20, 20, 20, [235, 240, 238]]]);
+    render.data[3] = 10; // a faint speck in the corner
+    expect([paint(render, { kind: 'portrait' }).width, paint(render, { kind: 'portrait' }).height]).toEqual([40, 40]);
+    const options = paintOptions(painted, 'portrait', true);
+    expect(options).toMatchObject({ kind: 'portrait', glass: { alpha: painted.portrait.glass.alpha } });
+    const glass = paint(render, options);
+    expect(pixel(glass, 20, 20)[3]).toBe(painted.portrait.glass.alpha);
+    expect(pixel(glass, 2, 2)[3]).toBe(255);
+  });
+
+  it('keeps a cover as rendered, opaque', () => {
+    const cover = decodePng(encodeRgbaPng(paint(rectRender(80, 40, [[0, 0, 80, 20, MOSS]]), { kind: 'cover' })));
+    expect(checkPainted(cover, { width: 80, height: 40 })).toEqual([]);
+    expect(checkPainted(cover, { width: 80, height: 41 })).toEqual(['is 80×40, expected 80×41']);
+    expect(checkPainted(rectRender(80, 40, [[0, 0, 80, 20, MOSS]]), { width: 80, height: 40 })).toEqual(['has transparent pixels; a cover must be opaque']);
+  });
+
+  it('writes filtered true-colour PNGs that round-trip, RGB when opaque', () => {
+    const data = new Uint8Array(37 * 23 * 4);
+    for (let i = 0; i < 37 * 23; i++) data.set([(i * 7) % 256, (i * 13) % 256, (i >> 3) % 256, 255], i * 4);
+    const opaque = { width: 37, height: 23, data };
+    const png = encodeRgbaPng(opaque);
+    expect(png[25]).toBe(2); // colour type RGB
+    expect(decodePng(png).data).toEqual(data);
+    const clear = { ...opaque, data: Uint8Array.from(data, (v, i) => (i % 4 === 3 && i % 3 === 0 ? 0 : v)) };
+    expect(encodeRgbaPng(clear)[25]).toBe(6);
+    expect(decodePng(encodeRgbaPng(clear)).data).toEqual(clear.data);
+  });
+
+  it('flags a render that is cut off, too small, more than one figure or greyscale', () => {
+    const rules = paintedRules(painted);
+    expect(paintedProblems(rectRender(100, 200, [[30, 20, 40, 160, RUST]]), rules)).toEqual([]);
+    expect(paintedProblems(rectRender(100, 200, [[30, 20, 40, 180, RUST]]), rules)).toEqual(['is cut off at the bottom (40 pixels on the edge)']);
+    expect(paintedProblems(rectRender(100, 200, [[30, 20, 40, 40, RUST]]), rules)[0]).toMatch(/too small in the frame/);
+    expect(paintedProblems(rectRender(100, 200, [[5, 20, 40, 160, RUST], [55, 20, 40, 160, RUST]]), rules)[0]).toMatch(/more than one figure/);
+    // A swarm is many shapes by design.
+    expect(paintedProblems(rectRender(100, 200, [[5, 20, 40, 160, RUST], [55, 20, 40, 160, RUST]]), paintedRules(painted, 'swarm'))).toEqual([]);
+    expect(paintedProblems(rectRender(100, 200, [[30, 20, 40, 160, [120, 120, 120]]]), rules)[0]).toMatch(/greyscale/);
+    expect(paintedProblems(rectRender(10, 10, []), rules)).toEqual(['is empty: nothing survived the cutout']);
+  });
+});
+
+describe('post-processing', () => {
+  /** A 2-colour figure at full resolution: rust top half, moss bottom half, with soft (anti-aliased) edges. */
+  const original = (() => {
+    const image = rectRender(90, 180, [[0, 0, 90, 90, RUST], [0, 90, 90, 90, MOSS]]);
+    for (let y = 0; y < 180; y++) for (const x of [0, 89]) image.data[(y * 90 + x) * 4 + 3] = 100;
+    return image;
+  })();
+
+  it('cuts pixel art at a zoom: the figure is heightPx art pixels tall, with a clear border for the outline', () => {
+    const view = decodePng(encodeIndexedPng(pixelView(original, pixelViewOptions(painted, 'pixel', 1)))); // 1 ft at 28 px/ft
+    expect(view.height).toBe(28 + 2);
+    expect(view.width).toBe(14 + 2);
+    const fine = pixelView(original, pixelViewOptions(painted, 'pixel-fine', 1));
+    expect(fine.height).toBe(56 + 2);
+  });
+
+  it('drops to the colour budget with hard edges, and outlines the figure', () => {
+    const view = decodePng(encodeIndexedPng(pixelView(original, pixelViewOptions(painted, 'pixel', 1))));
+    const colours = new Set<string>();
+    for (let i = 0; i < view.data.length; i += 4) {
+      expect([0, 255]).toContain(view.data[i + 3]);
+      if (view.data[i + 3] === 255) colours.add(view.data.slice(i, i + 3).join(','));
+    }
+    for (const c of colours) expect(PALETTE.map((p) => p.join(','))).toContain(c);
+    // Outline: the border ring around the figure is one dark colour; the corners stay clear.
+    expect(pixel(view, 0, 0)[3]).toBe(0);
+    expect(pixel(view, 0, 10)[3]).toBe(255);
+    expect(pixel(view, 0, 10)).toEqual(pixel(view, 8, 0));
+    expect(pixel(view, 0, 10)).not.toEqual(pixel(view, 8, 6));
+    // The figure itself keeps its two halves apart.
+    expect(pixel(view, 8, 6)).not.toEqual(pixel(view, 8, 24));
+  });
+
+  it("can keep the image's own colours instead of the league palette", () => {
+    const options = pixelViewOptions(painted, 'pixel-fine', 1);
+    expect(options.palette).toBe('own');
+    expect(options.colorGroups).toBe(painted.painted.views['pixel-fine']!.colors);
+    expect(() => pixelViewOptions(painted, 'mosaic', 1)).toThrow(/no view "mosaic"/);
+  });
+});
+
+describe('stage placement', () => {
+  const { barFt, frameFt, minVisibleFt } = painted.stage;
+
+  it('stands people on the floor at their height, short folk on a stool', () => {
+    expect(placeOnStage(painted, 'medium', 6)).toEqual({ where: 'floor', shownFt: 6, topFt: 6 - barFt });
+    expect(placeOnStage(painted, 'large', 9.5)).toEqual({ where: 'floor', shownFt: 9.5, topFt: 9.5 - barFt });
+    expect(placeOnStage(painted, 'medium', 4.3)).toEqual({ where: 'floor', shownFt: 4.3, topFt: minVisibleFt });
+    // A 3 ft creature still keeps half a foot hidden behind the bar.
+    expect(placeOnStage(painted, 'medium', 3).topFt).toBeLessThanOrEqual(3 - painted.stage.minHiddenFt);
+  });
+
+  it('puts the smallest on the bar, at least minShownFt tall', () => {
+    expect(placeOnStage(painted, 'tiny', 1.5)).toEqual({ where: 'bar', shownFt: 1.5, topFt: 1.5 });
+    expect(placeOnStage(painted, 'tiny', 0.4)).toEqual({ where: 'bar', shownFt: painted.stage.minShownFt, topFt: painted.stage.minShownFt });
+    expect(placeOnStage(painted, 'small', 2).where).toBe('bar');
+  });
+
+  it('looms anything too tall for the frame in from the top, at most twice its height', () => {
+    expect(placeOnStage(painted, 'huge', 20)).toEqual({ where: 'loom', shownFt: 2 * frameFt, topFt: frameFt });
+    expect(placeOnStage(painted, 'large', 13)).toEqual({ where: 'loom', shownFt: Math.min(13, 2 * frameFt), topFt: frameFt });
+    expect(placeOnStage(painted, 'huge', 11).shownFt).toBe(11);
+  });
+});
+
+describe('painted drafts and committed images', () => {
+  let root: string;
+  const sizeOf = (base: string) => (base === 'ogre' ? ('large' as const) : undefined);
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'lot-painted-'));
+    mkdirSync(join(root, 'content', 'images'), { recursive: true });
+    writeFileSync(join(root, 'content', 'images', 'style.yaml'), styleFileIn('painted'));
+    mkdirSync(join(root, 'characters', 'ogre-one'), { recursive: true });
+    writeFileSync(
+      join(root, 'characters', 'ogre-one', 'character.yaml'),
+      'id: ogre-one\nbase: ogre\nstatus: active\nchrome:\n  name: One\n  height: 8\n  portrait:\n    status: prompt\n    prompt: a green ogre\n',
+    );
+    mkdirSync(join(root, 'seasons', 's1', 'chrome'), { recursive: true });
+    writeFileSync(join(root, 'seasons', 's1', 'chrome', 'bog.yaml'), 'mission: bog\nstatus: draft\n');
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('stages candidates with their stage placement and views, accepts a whole figure and validates it', () => {
+    const [target] = portraitTargets(['ogre-one'], sizeOf, root);
+    const whole = rectRender(200, 300, [[60, 30, 80, 240, RUST]]);
+    const cropped = rectRender(200, 300, [[60, 30, 80, 270, RUST]]);
+    const finish = (render: RgbaImage) => encodeRgbaPng(paint(render, paintOptions(painted, 'portrait')));
+    expect(stage(target!, 1, encodeRgbaPng(whole), finish(whole), painted, root)).toEqual([]);
+    expect(stage(target!, 2, encodeRgbaPng(cropped), finish(cropped), painted, root)).toEqual(['is cut off at the bottom (80 pixels on the edge)']);
+    const framing = JSON.parse(readFileSync(join(root, '.image-drafts', 'portrait', 'ogre-one', 's1.framing.json'), 'utf8')) as { placement: unknown };
+    expect(framing.placement).toEqual({ where: 'floor', shownFt: 8, topFt: 8 - painted.stage.barFt, heightFt: 8 });
+    writeReviewPage(painted, root);
+    const page = readFileSync(join(root, '.image-drafts', 'index.html'), 'utf8');
+    expect(page).toContain('class="stage floor"');
+    expect(page).toContain('8 ft');
+    // Each view is staged at the size the stage draws the figure: 8 ft at its px per foot, plus the border.
+    for (const [name, view] of Object.entries(painted.painted.views)) {
+      expect(page).toContain(`s1.${name}.png`);
+      const staged = decodePng(readFileSync(join(root, '.image-drafts', 'portrait', 'ogre-one', `s1.${name}.png`)));
+      expect(staged.height).toBe(8 * view.pxPerFt + 2);
+    }
+
+    expect(() => accept(target!, 2, painted, root)).toThrow(/cut off at the bottom/);
+    expect(accept(target!, 1, painted, root)).toBe('characters/ogre-one/portrait.png');
+    expect(checkSeasonImages('s1', [{ id: 'ogre-one', size: 'large' }], root)).toEqual([]);
+  });
+
+  it('flags an untrimmed portrait and a wrong-sized cover', () => {
+    writeFileSync(
+      join(root, 'characters', 'ogre-one', 'character.yaml'),
+      'id: ogre-one\nbase: ogre\nstatus: active\nchrome:\n  name: One\n  portrait:\n    status: draft\n    path: portrait.png\n',
+    );
+    writeFileSync(join(root, 'characters', 'ogre-one', 'portrait.png'), encodeRgbaPng(rectRender(120, 200, [[10, 0, 100, 200, RUST]])));
+    writeFileSync(join(root, 'seasons', 's1', 'chrome', 'bog.cover.png'), encodeRgbaPng(rectRender(216, 72, [[0, 0, 216, 72, MOSS]])));
+    const { width, height } = painted.painted.cover.render;
+    expect(checkSeasonImages('s1', [{ id: 'ogre-one', size: 'large' }], root)).toEqual([
+      'characters/ogre-one/portrait.png: is not trimmed to its figure',
+      `seasons/s1/chrome/bog.cover.png: is 216×72, expected ${width}×${height}`,
     ]);
   });
 });

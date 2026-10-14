@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Stanley
   epithet: Undefeated
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Has never lost a staring contest. His opponents are now garden ornaments.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: green eight-legged lizard with a scar along its jaw and smoked-glass spectacles pushed up on its head, (unblinking intense stare:1.3)
     bodyPlan: beast
     path: portrait.png
-    seed: 9003
+    imported: stanley-s701.png
   height: 3

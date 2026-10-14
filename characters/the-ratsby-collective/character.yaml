@@ -7,11 +7,13 @@ status: active
 debut: season-01
 chrome:
   name: The Ratsby Collective
+  pronouns: { subject: they, object: them, possessive: their }
   tagline: Holds a binding referendum before every step. Turnout is excellent.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: heap of brown rats piled into the rough shape of a face, one white rat sitting on top, (many solemn beady eyes:1.3)
     bodyPlan: swarm
     path: portrait.png
-    seed: 891726515
+    seed: 5100
   height: 3

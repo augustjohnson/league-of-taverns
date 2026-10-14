@@ -21,7 +21,8 @@
     "apply-command": "tsx src/apply-command.ts",
     "run-week": "tsx src/run-week.ts",
     "offseason": "tsx src/offseason.ts",
-    "publish": "tsx src/publish.ts"
+    "publish": "tsx src/publish.ts",
+    "package-characters": "tsx src/package-characters.ts"
   },
   "dependencies": {
     "@league-of-taverns/bots": "workspace:*",

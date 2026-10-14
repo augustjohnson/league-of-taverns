@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Auntie Grizelda
   epithet: Your Aunt
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Attends every family event uninvited, with a casserole nobody should eat.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: green-skinned warty hag with a single long tooth, rag curls tied in her grey hair and a smoking clay pipe, (gossipy knowing smirk:1.3)
