@@ -43,7 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
-- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7, T4.10, T6.9, T5.7.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7, T4.10, T6.9, T5.7, part of T9.5. Next: T6.10 boons, waiting on the D-52 boon defaults and the D-49 DNF-cost question.
 
 ## Phase 1 starting set (historical)
 
@@ -603,6 +603,7 @@ Owns `bots/`, `sims/`.
 - **Depends:** T9.3.
 
 #### T9.5 Bots and playground for retreat orders, hexes and boons · M
+- *Partly done (2026-10-13):* bots choose a tavern (random), a hex (`leader`) and a retreat order (best expected loot); the playground has the tavern pick, a hex form, keywords and expected points per retreat order. Left: boons (T6.10), and the balance report rows (T9.3).
 - **Goal:** bots choose a retreat order (the projection scores each), when
   and whom to hex, and a tavern in the tavern pick; the playground's Play tab
   shows each tavern's god, boon and hex, the keywords, declared hexes, and
