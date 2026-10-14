@@ -61,7 +61,7 @@ import {
 } from '../reports';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInputFromData, type PlaygroundData } from './data';
-import { clockBack, crownChampion, hailChampion, layCurse, nodMeter, raiseBanner, revealWeek, turnCard, weekMoment } from './fx';
+import { clockBack, crownChampion, hailChampion, layCurse, nodMeter, raiseBanner, revealWeek, slideStandings, turnCard, weekMoment } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -88,6 +88,7 @@ import {
   seedWords,
   signed,
   bestWeek,
+  tableMoves,
   taleSteps,
   weekOutcome,
   topSkills,
@@ -2122,12 +2123,18 @@ function revealMyWeek(): void {
   const mine = bannerColours(me);
   // The last week's reveal ends the season: its fanfare takes the place of the week's own moment if you won.
   const final = panel.querySelector<HTMLElement>('.season-final');
+  // When it ends, the table below slides from last week's order into this week's.
+  const slide = (): void => slideStandings(panel.querySelector<HTMLTableElement>('#play-standings'));
   if (s === null || s.stage.kind !== 'complete' || final === null) {
-    revealWeek(card, mine);
+    revealWeek(card, mine, () => {
+      weekMoment(card, mine);
+      slide();
+    });
     return;
   }
   const champs = seasonStandings(s.state).filter((r) => r.rank === 1).map((r) => r.tavern);
   revealWeek(card, mine, () => {
+    slide();
     if (me !== null && champs.includes(me)) {
       crownChampion(final, mine);
       return;
@@ -2142,15 +2149,25 @@ function renderPlayStandings(s: SeasonSession): string {
   const rows = seasonStandings(s.state);
   if (s.state.finalizedWeeks.size === 0) return '';
   const done = s.stage.kind === 'complete';
+  // How the table moved this week: against the standings before the latest week (none after week 1). The rows carry
+  // their previous row, so fx.ts slideStandings can slide them from there when the week's reveal ends.
+  const played = [...s.state.finalizedWeeks].sort((a, b) => a - b);
+  const before = played.length < 2 ? null : standings([...s.state.taverns.keys()], played.slice(0, -1).flatMap((w) => weekResults(s.state, w)));
+  const moves = before === null ? null : tableMoves(before, rows);
+  const moveCell = (tavern: string): string => {
+    const rose = moves?.get(tavern)?.rose ?? 0;
+    if (moves === null) return '';
+    return `<td class="n move">${rose > 0 ? `<span class="pass" title="Up ${rose} since last week">▲${rose}</span>` : rose < 0 ? `<span class="fail" title="Down ${-rose} since last week">▼${-rose}</span>` : '<span class="muted" title="No change since last week">–</span>'}</td>`;
+  };
   const body = rows
     .map(
       (r) =>
-        `<tr class="${r.tavern === me ? 'sel mine' : ''} ${done && r.rank === 1 ? 'champ' : ''}"${r.tavern === me ? bannerAttr(me) : ''}><td class="n">${r.rank}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
+        `<tr class="${r.tavern === me ? 'sel mine' : ''} ${done && r.rank === 1 ? 'champ' : ''}"${r.tavern === me ? bannerAttr(me) : ''}${moves === null ? '' : ` data-was="${moves.get(r.tavern)?.wasRow ?? 0}"`}><td class="n">${r.rank}</td>${moveCell(r.tavern)}<td><b>${esc(tavernName(r.tavern))}</b></td>` +
         `<td><span class="tag ${r.tavern === me ? (bannerOf(me) === null ? 'brass' : 'banner') : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
   const table =
-    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">loot</th></tr></thead><tbody>${body}</tbody></table></div>` +
+    `<div class="scroll"><table id="play-standings"><thead><tr><th class="n">#</th>${moves === null ? '' : '<th class="n" title="Places moved since last week">±</th>'}<th>tavern</th><th>manager</th><th class="n">loot</th></tr></thead><tbody>${body}</tbody></table></div>` +
     (done ? '<p class="hint">The season is loaded into the other tabs: Standings, Weeks, Draft board, Pool and Event log.</p>' : '');
   if (!done) return `<section class="card"><h2>Standings</h2>${table}</section>`;
 

@@ -146,7 +146,9 @@ a breath out for turning back, a dimmed run after a DNF, and nothing for a
 quiet week. A hex takes a second click to declare (it is public and final),
 then lands in the list in your colours with a jolt and a few embers; a rival's
 hex on you opens that week's reveal in the rival's colours before the party
-sets out. The last week's reveal ends the season: if you won, your banner
+sets out. From week 2 the Play standings show how far each tavern moved
+since last week (▲/▼, `tableMoves`), and when a week's reveal ends the rows
+slide from last week's order into this week's. The last week's reveal ends the season: if you won, your banner
 goes up over the final card and the only full-screen confetti in the page
 rises in its colours; if not, you get your week's moment, the champion's flag
 swings in theirs, and the card gives your finish and your best week. The

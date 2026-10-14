@@ -22,6 +22,7 @@ import {
   scoreFraction,
   scoreHistogram,
   seedWords,
+  tableMoves,
   taleSteps,
   topSkills,
   weekOutcome,
@@ -220,6 +221,29 @@ describe('season finish', () => {
     expect(bestWeek([])).toBeNull();
     expect(bestWeek([{ week: 1, points: 40, rank: 3 }, { week: 2, points: 90, rank: 1 }, { week: 3, points: 90, rank: 2 }])).toEqual({ week: 2, points: 90, topped: true });
     expect(bestWeek([{ week: 4, points: 0, rank: 1 }])).toEqual({ week: 4, points: 0, topped: false });
+  });
+});
+
+describe('table moves', () => {
+  it('gives each tavern its previous row and the places it rose, shared ranks included', () => {
+    const before = [
+      { tavern: 'a', rank: 1 },
+      { tavern: 'b', rank: 2 },
+      { tavern: 'c', rank: 2 },
+      { tavern: 'd', rank: 4 },
+    ];
+    const after = [
+      { tavern: 'd', rank: 1 },
+      { tavern: 'a', rank: 2 },
+      { tavern: 'c', rank: 2 },
+      { tavern: 'e', rank: 4 },
+    ];
+    expect(Object.fromEntries(tableMoves(before, after))).toEqual({
+      d: { wasRow: 3, rose: 3 },
+      a: { wasRow: 0, rose: -1 },
+      c: { wasRow: 2, rose: 0 },
+      e: { wasRow: 3, rose: 0 },
+    });
   });
 });
 

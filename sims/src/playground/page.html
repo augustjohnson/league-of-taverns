@@ -400,6 +400,13 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 .champ-line[data-banner] b { color: var(--banner-ink); }
 .champ-line .flag { transform-origin: center top; }
 
+/* The table moves (fx.ts slideStandings): a sliding row stays above the rows it passes, yours on top of all. */
+#play-standings tr.sliding { position: relative; z-index: 1; }
+#play-standings tr.sliding.mine { z-index: 2; }
+#play-standings tr.sliding td { background: var(--surface); }
+#play-standings tr.sliding.mine[data-banner] td { background: var(--banner-bg); }
+td.move { width: 3.2em; font-size: 12px; }
+
 /* What a week leaves behind (fx.ts weekMoment): after a DNF the run dims except where it ended; after a retreat the
    loot kept is marked. Static, so a reload shows them; they arrive with the end of the reveal. */
 .week-result[data-outcome="dnf"]:not(.revealing) .graph :is(.edge, .elabel, .node:not(.lost)) { opacity: 0.4; transition: opacity 1.2s ease-out; }
