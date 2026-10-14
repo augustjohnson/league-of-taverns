@@ -14,8 +14,9 @@
  *   banks its loot, and so does each battle won (D-50). Losing a battle ends
  *   the run (DNF) and keeps the loot banked so far. Just before each battle
  *   the lineup's retreat order may turn the party back, keeping its loot
- *   without a DNF (D-49). Score = loot banked ÷ the mission's haul
- *   (docs/decisions.md D-45, D-46).
+ *   without a DNF (D-49). A DNF injures one starter, picked by a recorded
+ *   roll (D-51). Score = loot banked ÷ the mission's haul (docs/decisions.md
+ *   D-45, D-46).
  *
  * Projection (exact expectation) lives in ../projection. Both must use these
  * same odds functions so they agree by construction.
@@ -143,12 +144,32 @@ export interface RunResult {
   readonly loot: number;
   /** `lootScore(loot, missionHaul(mission))`: in [0, 1], and 1 on the best path. */
   readonly score: number;
+  /**
+   * On a DNF, the starter who is hurt and can't start next week, and the roll
+   * in [0, 1) that picked them: `members[floor(roll × members.length)]` in
+   * lineup order (D-51). Null when there was no DNF, or injuries are off.
+   */
+  readonly injury: { readonly character: string; readonly roll: number } | null;
+}
+
+/** The die stream for the injury roll after losing `battleId`. The colon keeps it apart from every node id. */
+export function injuryStream(battleId: string): string {
+  return `injury:${battleId}`;
+}
+
+/** The starter an injury roll picks: `members[floor(roll × n)]`, in lineup order (D-51). */
+export function injuredStarter<T>(members: ReadonlyArray<T>, roll: number): T {
+  const member = members[Math.min(members.length - 1, Math.floor(roll * members.length))];
+  if (member === undefined) throw new Error('injuredStarter: the party has no members');
+  return member;
 }
 
 /** The lineup's orders for one run. */
 export interface RunOptions {
   /** When the party turns back instead of fighting (D-49). Defaults to `never`. */
   readonly retreat?: RetreatOrder;
+  /** Whether a DNF injures a starter (D-51). Defaults to true. */
+  readonly injuries?: boolean;
 }
 
 /**
@@ -168,6 +189,10 @@ export interface RunOptions {
  * far (`retreatsBeforeBattle`). If it says to turn back, the run ends there:
  * `retreatedBefore` names the battle, no die is drawn for it, and it is not a
  * DNF (D-49).
+ *
+ * On a DNF, one more draw, `rngForNode(injuryStream(battle.id))()`, picks the
+ * injured starter with `injuredStarter`, unless `options.injuries` is false
+ * (D-51).
  *
  * `path` lists every visited node, start and end included (on a DNF it ends at
  * the lost battle; on a retreat, at the node before the battle). Each passed
@@ -201,7 +226,7 @@ export function runMission(
   let loot = 0;
   const haul = missionHaul(mission);
 
-  const result = (dnf: boolean, retreatedBefore: string | null): RunResult => ({
+  const result = (dnf: boolean, retreatedBefore: string | null, injury: RunResult['injury'] = null): RunResult => ({
     path,
     nodes,
     dnf,
@@ -210,6 +235,7 @@ export function runMission(
     checksAttempted,
     loot,
     score: lootScore(loot, haul),
+    injury,
   });
 
   let node: MissionNode | undefined = graph.start;
@@ -249,7 +275,11 @@ export function runMission(
         const roll = rngForNode(node.id)();
         const won = roll < pWin;
         nodes.push({ node: node.id, kind: 'battle', pWin, roll, outcome: won ? 'win' : 'lose' });
-        if (!won) return result(true, null);
+        if (!won) {
+          if (options.injuries === false) return result(true, null);
+          const injuryRoll = rngForNode(injuryStream(node.id))();
+          return result(true, null, { character: injuredStarter(party.members, injuryRoll).characterId, roll: injuryRoll });
+        }
         loot += node.loot ?? 0;
         node = graph.next(node, 'win');
         break;

@@ -15,6 +15,7 @@ import {
   evTtkBreakdown,
   freeAgents,
   homeTavern,
+  injuredFor,
   lineHash,
   projectMission,
   projectedPoints,
@@ -311,6 +312,12 @@ function rollLog(mission: Mission, run: RunResult, home = false): string {
       `<td class="sum">roll ${won ? '<' : '≥'} win chance ${r.pWin.toFixed(3)}</td><td class="${r.outcome === 'win' ? 'pass' : 'fail'}">${r.outcome}${bounty}</td></tr>`
     );
   });
+  if (run.injury !== null) {
+    rows.push(
+      `<tr><td class="n">${rows.length + 1}</td><td>injury</td><td>${esc(charName(run.injury.character))}</td><td><span class="die">${run.injury.roll.toFixed(3)}</span></td>` +
+        `<td class="sum">the roll picks one of the four starters</td><td class="fail">hurt: sits out next week</td></tr>`,
+    );
+  }
   if (run.retreatedBefore !== null) {
     rows.push(
       `<tr><td class="n">${rows.length + 1}</td><td>${esc(run.retreatedBefore)}</td><td class="muted">party</td><td></td>` +
@@ -1527,7 +1534,8 @@ function syncBuilder(s: SeasonSession, week: number): void {
     play.picks = lineup === null ? [] : [...lineup.starters];
     play.retreat = lineup?.retreat ?? 'never';
   }
-  play.picks = play.picks.filter((id) => roster.has(id));
+  const hurt = injuredFor(s.state, week);
+  play.picks = play.picks.filter((id) => roster.has(id) && !hurt.has(id));
   if (!roster.has(play.drop)) play.drop = '';
   if (!freeAgents(s.state).includes(play.add)) play.add = '';
 }
@@ -1670,7 +1678,8 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   const mission = missionOf(week);
   const roster = myRoster(s);
   const lineup = builderLineup();
-  const violations = lineup === null ? [] : validateLineup(lineup, { tavern: me, characters: roster }, crOf, config);
+  const hurt = injuredFor(s.state, week);
+  const violations = lineup === null ? [] : validateLineup(lineup, { tavern: me, characters: roster }, crOf, config, { unavailable: hurt });
   const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.starters, input.statsOf), mission, input.baseOf, input.battleModel, { retreat: lineup.retreat });
   const home = homeTavern(s.state, week) === me;
   const total = play.picks.reduce((t, id) => t + crOf(id), 0);
@@ -1686,7 +1695,9 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     const on = play.picks.includes(id);
     const btn = on
       ? `<button type="button" class="small" data-action="play-lu-remove" data-id="${esc(id)}" aria-label="Move ${esc(charName(id))} to the bench">Bench</button>`
-      : `<button type="button" class="small" data-action="play-lu-add" data-id="${esc(id)}" ${full ? 'disabled title="Bench a starter first"' : ''}>Start</button>`;
+      : hurt.has(id)
+        ? '<span class="tag bad" title="Hurt in last week\'s DNF: can\'t start this week (D-51)">injured</span>'
+        : `<button type="button" class="small" data-action="play-lu-add" data-id="${esc(id)}" ${full ? 'disabled title="Bench a starter first"' : ''}>Start</button>`;
     const slot = on ? `<span class="small muted">${play.picks.indexOf(id) + 1}</span>` : '';
     return charRow(id, btn, `<td>${slot}</td>`).replace('<tr>', `<tr class="${on ? 'sel' : ''}">`);
   };
@@ -1895,7 +1906,8 @@ function playClick(action: string, id: string | undefined): boolean {
       const pending = s.pendingLineup();
       const same =
         pending !== null && lineup !== null && pending.starters.join() === lineup.starters.join() && retreatValue(pending.retreat) === retreatValue(lineup.retreat);
-      const legal = lineup !== null && validateLineup(lineup, { tavern: s.human!.tavern, characters: myRoster(s) }, crOf, config).length === 0;
+      const unavailable = injuredFor(s.state, stage.week);
+      const legal = lineup !== null && validateLineup(lineup, { tavern: s.human!.tavern, characters: myRoster(s) }, crOf, config, { unavailable }).length === 0;
       const moves: PlayMove[] = lineup === null || same || !legal ? [] : [{ t: 'lineup', starters: [...lineup.starters], retreat: lineup.retreat }];
       playMoves([...moves, { t: 'week' }], () => {
         play.played = stage.week;

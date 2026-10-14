@@ -36,13 +36,13 @@
  * | `tavern.joined` | `tavern.wrong_phase`, `tavern.duplicate`, `tavern.manager_taken` |
  * | `character.retained` | `retain.wrong_phase`, `retain.unknown_tavern`, `retain.not_pooled`, `retain.already_owned`, `retain.over_limit`, `retain.roster_full` |
  * | `draft.pick` | `draft.complete`, `draft.no_taverns`, `draft.sponsor_not_joined`, `draft.bad_order`, `draft.wrong_pick`, `draft.not_on_clock`, `draft.not_pooled`, `draft.already_owned`, `draft.roster_full` |
- * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `bad_retreat`, `duplicate`, `not_owned`, `unknown_character`, `over_budget`) |
+ * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `bad_retreat`, `duplicate`, `not_owned`, `injured`, `unknown_character`, `over_budget`) |
  * | `lineup.locked` | `lock.draft_incomplete`, `lock.bad_week`, `lock.already_locked`, `lock.previous_not_finalized`, `lock.unknown_tavern`, `lock.duplicate_tavern`, `lock.missing_tavern`, `lock.source_mismatch`, `lock.illegal_lineup` |
  * | `waiver.claimed` | `waiver.draft_incomplete`, `waiver.unknown_tavern`, `waiver.duplicate_claim`, `waiver.not_pooled`, `waiver.not_free_agent`, `waiver.drop_not_owned` |
  * | `waiver.resolved` | `waiver.bad_week`, `waiver.week_not_finalized`, `waiver.already_resolved`, `waiver.unknown_claim`, `waiver.duplicate_outcome`, `waiver.missing_outcome`, `waiver.bad_priority`, `waiver.outcome_mismatch` |
  * | `trade.*` | `trade.draft_incomplete`, `trade.duplicate_id`, `trade.unknown_tavern`, `trade.unknown`, `trade.not_proposed`, `trade.not_accepted`, `trade.not_open`, `trade.past_deadline` (at acceptance), and the `validateTrade` codes below |
  * | `mission.revealed` | `reveal.bad_week`, `reveal.week_not_locked`, `reveal.already_revealed`, `reveal.wrong_season`, `reveal.commitment_mismatch`, `reveal.invalid_mission` |
- * | `mission.resolved` | `resolve.bad_week`, `resolve.week_not_locked`, `resolve.not_revealed`, `resolve.wrong_mission`, `resolve.week_finalized`, `resolve.unknown_tavern`, `resolve.duplicate`, `resolve.no_lineup`, `resolve.lineup_mismatch`, `resolve.counts_mismatch`, `resolve.score_mismatch` |
+ * | `mission.resolved` | `resolve.bad_week`, `resolve.week_not_locked`, `resolve.not_revealed`, `resolve.wrong_mission`, `resolve.week_finalized`, `resolve.unknown_tavern`, `resolve.duplicate`, `resolve.no_lineup`, `resolve.lineup_mismatch`, `resolve.counts_mismatch`, `resolve.score_mismatch`, `resolve.bad_injury` |
  * | `week.finalized` | `finalize.bad_week`, `finalize.already_finalized`, `finalize.week_not_locked`, `finalize.missing_result` |
  *
  * `trade.proposed` and `trade.completed` run `validateTrade` and report its
@@ -121,8 +121,12 @@
  * - `mission.resolved`: the counts and the loot (the `loot` of each passed
  *   check node and won battle node) are recomputed from the recorded nodes, and the score must
  *   equal `lootScore(loot, missionHaul(mission))`, DNF or not, to within
- *   1e-9. Everything else (path, d20s, points) is audited by
+ *   1e-9. An `injury` needs a DNF and a starter from the lineup, and that
+ *   starter can't start the next week (D-51; `injuredFor`). Everything else
+ *   (path, d20s, points, which starter the injury roll picks) is audited by
  *   `verifyResolutions`, which reports instead of throwing.
+ * - `lineup.set` and `lineup.locked` reject a starter injured the week
+ *   before (`lineup.injured`, `lock.illegal_lineup`).
  * - `week.finalized` needs a result for every tavern whose locked lineup is
  *   non-null. A tavern locked with no lineup needs none and scores 0 (rules
  *   §5; see `weekResults`). Finalizing week `config.weeks` completes the season.
@@ -143,7 +147,7 @@ import {
   type WaiverClaim,
 } from '../roster';
 import type { CrEighths } from '../vocabulary';
-import { freeAgents, waiverPriority } from './selectors';
+import { freeAgents, injuredFor, waiverPriority } from './selectors';
 import type { LeagueState, TavernState, TradeState } from './state';
 import type { EventOf, EventType, LeagueEvent, PayloadByType } from './types';
 
@@ -177,6 +181,7 @@ export function initialState(): LeagueState {
     trades: new Map(),
     revealed: new Map(),
     results: new Map(),
+    injuries: new Map(),
     finalizedWeeks: new Set(),
   };
 }
@@ -333,7 +338,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     const t = tavernOr(state, event, tavern, 'lineup.unknown_tavern');
     weekOr(config, event, week, 'lineup.bad_week');
     if (state.lockedLineups.has(week)) fail(event, 'lineup.week_locked', `week ${week} is already locked`);
-    const violations = validateLineup(lineup, rosterView(t), crOf(state), config);
+    const violations = validateLineup(lineup, rosterView(t), crOf(state), config, { unavailable: injuredFor(state, week) });
     const first = violations[0];
     if (first !== undefined) fail(event, `lineup.${first.code}`, violations.map((v) => v.message).join('; '));
     const week_ = state.pendingLineups.get(week) ?? new Map<string, Lineup>();
@@ -350,6 +355,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       fail(event, 'lock.previous_not_finalized', `week ${week - 1} must be finalized before week ${week} locks`);
     }
     const seen = new Set<string>();
+    const unavailable = injuredFor(state, week);
     for (const entry of lineups) {
       const t = tavernOr(state, event, entry.tavern, 'lock.unknown_tavern');
       if (seen.has(entry.tavern)) fail(event, 'lock.duplicate_tavern', `"${entry.tavern}" is listed twice`);
@@ -358,7 +364,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
         fail(event, 'lock.source_mismatch', `"${entry.tavern}": source "${entry.source}" with ${entry.lineup === null ? 'no' : 'a'} lineup`);
       }
       if (entry.lineup !== null) {
-        const violations = validateLineup(entry.lineup, rosterView(t), crOf(state), config);
+        const violations = validateLineup(entry.lineup, rosterView(t), crOf(state), config, { unavailable });
         if (violations.length > 0) {
           fail(event, 'lock.illegal_lineup', `"${entry.tavern}": ${violations.map((v) => v.message).join('; ')}`);
         }
@@ -534,8 +540,18 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     if (loot !== run.loot) fail(event, 'resolve.score_mismatch', `nodes bank ${loot} loot, run says ${run.loot}`);
     const expected = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - expected) > 1e-9) fail(event, 'resolve.score_mismatch', `score ${run.score} should be ${expected}`);
+    const { injury } = run;
+    if (injury !== null && !run.dnf) fail(event, 'resolve.bad_injury', `"${injury.character}" is injured, but the run is not a DNF`);
+    if (injury !== null && !result.lineup.starters.includes(injury.character)) {
+      fail(event, 'resolve.bad_injury', `"${injury.character}" is injured, but did not start`);
+    }
     const byTavern = state.results.get(week) ?? new Map<string, typeof result>();
-    return { ...state, results: mapSet(state.results, week, mapSet(byTavern, tavern, result)) };
+    return {
+      ...state,
+      results: mapSet(state.results, week, mapSet(byTavern, tavern, result)),
+      // The injured starter sits out next week; an injury in the last week expires with the season.
+      injuries: injury === null || week >= config.weeks ? state.injuries : mapSet(state.injuries, injury.character, week + 1),
+    };
   },
 
   'week.finalized': (state, event) => {

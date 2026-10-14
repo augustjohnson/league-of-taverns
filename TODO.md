@@ -43,7 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
-- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7.
 
 ## Phase 1 starting set (historical)
 
@@ -449,7 +449,7 @@ Owns `engine/src/resolution/`, `engine/src/projection/`.
   a retreat; `verifyResolutions` audits it.
 - **Depends:** T4.7, T5.8, T6.4.
 
-#### T6.7 Injuries · M
+#### T6.7 Injuries · M (done 2026-10-13)
 - **Goal:** on a DNF, `runMission` picks one starter by a recorded roll and
   records it as `injured` (D-51); the reducers mark it unavailable for the
   next week's lineup; lineup validation and the D-27 fallback respect it.

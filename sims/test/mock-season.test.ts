@@ -74,9 +74,40 @@ describe('one seeded mock season', () => {
     }
   });
 
+  it('benches the injured: a DNF hurts one starter, who starts nowhere the next week (D-51)', () => {
+    let injuries = 0;
+    for (const seed of ['sim-1', 'sim-2', 'sim-3']) {
+      const { events, state } = seed === 'sim-1' ? sim1 : runMockSeason(input, { seed });
+      for (const event of events) {
+        if (event.type !== 'mission.resolved') continue;
+        const { run, week, lineup } = event.payload;
+        expect(run.injury === null, `${seed} week ${week} ${event.payload.tavern}`).toBe(!run.dnf);
+        if (run.injury === null) continue;
+        injuries++;
+        expect(lineup.starters).toContain(run.injury.character);
+        for (const next of state.lockedLineups.get(week + 1) ?? []) expect(next.lineup?.starters ?? []).not.toContain(run.injury.character);
+      }
+      expect(verifyResolutions(events)).toEqual([]);
+    }
+    expect(injuries).toBeGreaterThan(10);
+  });
+
+  it('refuses a lineup with last week\'s injured starter', () => {
+    const resolved = sim1.events.find((e) => e.type === 'mission.resolved' && e.payload.run.injury !== null && e.payload.week < 6);
+    if (resolved?.type !== 'mission.resolved') throw new Error('expected an injury before the last week');
+    const { week, run } = resolved.payload;
+    // The state just after that week's waivers: the next week's lineups are open.
+    const cut = sim1.events.findIndex((e) => e.type === 'waiver.resolved' && e.payload.week === week);
+    const before = replay(sim1.events.slice(0, cut + 1));
+    const owner = before.owner.get(run.injury!.character)!;
+    const others = before.taverns.get(owner)!.roster.filter((id) => id !== run.injury!.character).slice(0, 3);
+    const bad = { ...sim1.events[cut]!, seq: cut + 2, type: 'lineup.set', payload: { tavern: owner, week: week + 1, lineup: { starters: [run.injury!.character, ...others], retreat: 'never' } } };
+    expect(() => replay([...sim1.events.slice(0, cut + 1), bad as (typeof sim1.events)[number]])).toThrow(/lineup\.injured/);
+  });
+
   it('pins the sim-1 champion', () => {
-    expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'cr-greedy' }]);
-    expect(sim1.summary.standings[0]!.tavern).toBe('the-gilded-flagon');
+    expect(sim1.summary.champions).toEqual([{ tavern: 'the-rusty-tankard', bot: 'random' }]);
+    expect(sim1.summary.standings[0]!.tavern).toBe('the-rusty-tankard');
   });
 });
 

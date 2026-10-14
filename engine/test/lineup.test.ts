@@ -123,6 +123,13 @@ describe('validateLineup', () => {
     }
   });
 
+  it('injured: a starter hurt in last week\'s DNF can\'t start (D-51)', () => {
+    const violations = validateLineup(legal, flagon.roster, flagon.crOf, config, { unavailable: new Set(['moss-hag', 'wisp']) });
+    expect(violations.map((v) => v.code)).toEqual(['injured']);
+    expect(violations[0]!.message).toContain('"moss-hag" was injured');
+    expect(codes(legal)).toEqual([]);
+  });
+
   it('over_budget: shows both totals in human CR form', () => {
     const t = tavern([
       ['a', 32],
@@ -208,6 +215,15 @@ describe('carriedLineup', () => {
     expect(carriedLineup(previous, flagon.roster, flagon.crOf, config)?.retreat).toEqual({ bank: 50 });
     const gone: Lineup = { starters: ['nib', 'wisp', 'old-gristle', 'traded-away'], retreat: 'avoid_battles' };
     expect(carriedLineup(gone, flagon.roster, flagon.crOf, config)?.retreat).toBe('never');
+  });
+
+  it('falls back past an injured starter, and never picks one (D-51)', () => {
+    const unavailable = new Set(['bruno-the-bruiser']);
+    const fallback = carriedLineup(legal, flagon.roster, flagon.crOf, config, { unavailable });
+    expect(fallback?.starters).not.toContain('bruno-the-bruiser');
+    // Without bruno: 3 + 3 + 2 + 1 = 9.
+    expect(fallback?.starters).toEqual(['moss-hag', 'tin-knight', 'pip-the-sly', 'old-gristle']);
+    expect(carriedLineup(legal, flagon.roster, flagon.crOf, config, { unavailable: new Set(['nib']) })).toBe(legal);
   });
 
   it('falls back when there is no previous lineup', () => {

@@ -176,6 +176,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
       checksAttempted: 1,
       loot: 0,
       score: 0,
+      injury: null,
     },
     projected: { expectedScore: 0.55, pDnf: 0.2 },
     points: 0,
@@ -308,6 +309,7 @@ describe('replay and verification', () => {
       checksAttempted: 1,
       loot: 0,
       score: 0,
+      injury: null,
     };
   }
 
@@ -415,6 +417,19 @@ describe('replay and verification', () => {
     expect(fields({ lineup: avoid, run: won, points: 0 })).toEqual(['run.nodes', 'run.path', 'run.retreatedBefore']);
     // A bank threshold the party never reached: it fights.
     expect(fields({ lineup: { ...avoid, retreat: { bank: 1 } }, run: won, points: 0 })).toEqual([]);
+  });
+
+  it('verifyResolutions checks the injured starter against the injury roll (D-51)', () => {
+    const fields = (patch: Partial<EventOf<'mission.resolved'>['payload']>) => verifyResolutions(withResolution(patch)).map((m) => m.field);
+    const lost = battleRun({ roll: 0.9, outcome: 'lose' });
+    const starters = resolved.payload.lineup.starters;
+    // Roll 0.6 picks the third starter (floor(0.6 × 4) = 2).
+    expect(fields({ run: { ...lost, injury: { character: starters[2], roll: 0.6 } }, points: 0 })).toEqual([]);
+    expect(fields({ run: { ...lost, injury: { character: starters[0], roll: 0.6 } }, points: 0 })).toEqual(['run.injury']);
+    // A DNF without an injury is allowed (a boon may prevent it); an injury without a DNF is not.
+    expect(fields({ run: lost, points: 0 })).toEqual([]);
+    const won = battleRun({ roll: 0.3, outcome: 'win' });
+    expect(fields({ run: { ...won, injury: { character: starters[2], roll: 0.6 } }, points: 0 })).toEqual(['run.injury']);
   });
 
   it('verifyResolutions lets a gated check fail on a high roll (nobody may have met the gate)', () => {

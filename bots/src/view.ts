@@ -1,7 +1,7 @@
 /**
  * Small read-only helpers over a `PublicView`, shared by every strategy.
  */
-import { DEFAULT_RETREAT, validateLineup, type CrEighths, type Lineup, type RetreatOrder, type SeasonConfig } from '@league-of-taverns/engine';
+import { DEFAULT_RETREAT, injuredFor, validateLineup, type CrEighths, type Lineup, type RetreatOrder, type SeasonConfig } from '@league-of-taverns/engine';
 import type { PublicView } from './types';
 
 /** The season config. Throws before `season.created`, when no decision makes sense. */
@@ -42,6 +42,12 @@ export function nextWeek(view: PublicView): number {
   for (const week of view.state.finalizedWeeks) latest = Math.max(latest, week);
   for (const week of view.state.lockedLineups.keys()) latest = Math.max(latest, week);
   return latest + 1;
+}
+
+/** The characters on `roster` who may start in `week`: everyone but last week's injured (D-51). */
+export function startable(view: PublicView, roster: ReadonlyArray<string>, week: number): ReadonlyArray<string> {
+  const injured = injuredFor(view.state, week);
+  return injured.size === 0 ? roster : roster.filter((id) => !injured.has(id));
 }
 
 /** One legal 4-subset of a roster: its ids in roster order, and their total CR in eighths. */
@@ -100,10 +106,10 @@ export function startersOf(lineup: Lineup): ReadonlyArray<string> {
   return lineup.starters;
 }
 
-/** Throws unless `lineup` is legal for the bot's own roster. A guard: strategies should never trip it. */
-export function assertLegal(view: PublicView, lineup: Lineup, strategy: string): Lineup {
+/** Throws unless `lineup` is legal for the bot's own roster in `week`. A guard: strategies should never trip it. */
+export function assertLegal(view: PublicView, lineup: Lineup, strategy: string, week: number): Lineup {
   const roster = { tavern: view.tavern, characters: rosterOf(view) };
-  const violations = validateLineup(lineup, roster, crLookup(view), configOf(view));
+  const violations = validateLineup(lineup, roster, crLookup(view), configOf(view), { unavailable: injuredFor(view.state, week) });
   if (violations.length > 0) {
     throw new Error(`bot ${view.tavern} (${strategy}): illegal lineup: ${violations.map((v) => v.message).join('; ')}`);
   }

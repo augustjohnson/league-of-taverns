@@ -28,7 +28,7 @@
  * Pure: no I/O, no clock, no ambient randomness. Title odds draw from
  * `rngFor(seed, ...)`, so a seed gives the same report everywhere.
  */
-import { botManager, legalSubsets, lineupFrom, projectionLineup } from '@league-of-taverns/bots';
+import { botManager, legalSubsets, lineupFrom, projectionLineup, startable } from '@league-of-taverns/bots';
 import type { LineupStrategy, PublicView, Subset } from '@league-of-taverns/bots';
 import {
   DEFAULT_RETREAT,
@@ -428,7 +428,7 @@ export function benchReport(ctx: ReportContext): ReadonlyArray<BenchRow> {
         projected: ctx.expected(ctx.project(mission, ids, retreat), home),
         points: sameDice ? runPoints(rerun(ids).score, config.scoring, home) : null,
       });
-      const subsets: ReadonlyArray<Subset> = legalSubsets(view, roster);
+      const subsets: ReadonlyArray<Subset> = legalSubsets(view, startable(view, roster, week));
       const options = subsets.map((s) => option(startersOf(lineupFrom(s))));
       const best = (key: (o: BenchOption) => number | null): BenchOption | null => {
         let top: BenchOption | null = null;

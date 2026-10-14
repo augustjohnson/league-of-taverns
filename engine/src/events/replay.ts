@@ -20,7 +20,7 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import { runPoints, sponsoredTavern } from '../league';
 import { missionHaul, type Mission, type MissionNode } from '../missions';
 import { formatIssuePath } from '../missions/schema';
-import { lootScore, missionGraph } from '../resolution';
+import { injuredStarter, lootScore, missionGraph } from '../resolution';
 import { retreatsBeforeBattle } from '../roster';
 import { InvalidEventError, applyEvent, initialState } from './reducers';
 import { eventSchema } from './schema';
@@ -210,6 +210,9 @@ export interface ResolutionMismatch {
  *   banked so far decide whether the party turns back (D-49): the run must
  *   name that battle in `retreatedBefore` and stop there exactly when
  *   `retreatsBeforeBattle` says so.
+ * - On a DNF the injured starter (if any) is `injuredStarter(lineup.starters,
+ *   roll)`, and there is no injury without a DNF (D-51). A DNF with no
+ *   injury is allowed, since a boon may prevent it (D-52).
  * - `dnf`, `retreatedBefore`, `checksPassed`, `checksAttempted`, `loot` (the
  *   `loot` of each passed check and won battle) and `score`
  *   (`lootScore(loot, missionHaul(mission))`, DNF or not) match the walk.
@@ -330,6 +333,13 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
         `retreatedBefore is ${JSON.stringify(run.retreatedBefore)}, but the retreat order ${JSON.stringify(lineup.retreat)} ` +
           (retreatedBefore === null ? 'never turns back on this walk' : `turns back before "${retreatedBefore}"`),
       );
+    }
+    if (run.injury !== null && !dnf) report('run.injury', `"${run.injury.character}" is injured, but the walk has no DNF`);
+    if (run.injury !== null && dnf) {
+      const picked = injuredStarter(lineup.starters, run.injury.roll);
+      if (picked !== run.injury.character) {
+        report('run.injury', `roll ${run.injury.roll} picks starter "${picked}", but the run injures "${run.injury.character}"`);
+      }
     }
     if (run.dnf !== dnf) report('run.dnf', `dnf is ${run.dnf}, but the walk ${dnf ? 'loses a battle' : 'reaches an end'}`);
     if (run.checksPassed !== passed) report('run.checksPassed', `${run.checksPassed}, but ${passed} check(s) passed`);

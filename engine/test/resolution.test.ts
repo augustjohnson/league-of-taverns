@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BaseStats } from '../src/adapters/open5e';
 import { TRAITS, effectiveStats } from '../src/characters';
 import type { CheckSpec, Encounter } from '../src/missions';
-import { battleOdds, checkOdds, passChance, runMission, type BattleModel, type RunResult } from '../src/resolution';
+import { battleOdds, checkOdds, injuredStarter, passChance, runMission, type BattleModel, type RunResult } from '../src/resolution';
 import { rngFor, rollD20, weekSeed, type Rng } from '../src/rng';
 // The engine has no YAML parser, so the example mission and Bruno's ref are
 // read through the scripts loaders, as in missions.test.ts.
@@ -261,6 +261,7 @@ describe('runMission', () => {
       checksAttempted: 2,
       loot: 40,
       score: 0.4,
+      injury: null,
     });
   });
 
@@ -276,7 +277,7 @@ describe('runMission', () => {
   });
 
   it('a lost battle is a DNF: the run stops there, here with nothing banked', () => {
-    const run = runMission(party, branching, scripted({ a: [0], fight: [0.3] }), baseOf, constantModel(0.2));
+    const run = runMission(party, branching, scripted({ a: [0], fight: [0.3], 'injury:fight': [0.7] }), baseOf, constantModel(0.2));
     expect(run).toEqual({
       path: ['start', 'a', 'fight'],
       nodes: [
@@ -289,9 +290,25 @@ describe('runMission', () => {
       checksAttempted: 1,
       loot: 0,
       score: 0,
+      // floor(0.7 × 2 starters) = 1: the second starter is hurt (D-51).
+      injury: { character: 'ally', roll: 0.7 },
     });
     // pWin 0 always loses, even on a roll of 0.
     expect(runMission(party, branching, scripted({ a: [0], fight: [0] }), baseOf, constantModel(0)).dnf).toBe(true);
+  });
+
+  it('a DNF injures one starter by its own roll, which a finished run never draws (D-51)', () => {
+    const four = partyOf(['a', 'b', 'c', 'd'].map((id) => member(id)));
+    const lost = (roll: number) => runMission(four, branching, scripted({ a: [0], fight: [0.9], 'injury:fight': [roll] }), baseOf, constantModel(0.5));
+    expect([0, 0.25, 0.49, 0.5, 0.999].map((roll) => lost(roll).injury?.character)).toEqual(['a', 'b', 'b', 'c', 'd']);
+    // The injury draw comes from its own stream, so the seeded run is unchanged by it.
+    const failA = scripted({ a: [0] });
+    const seeded = runMission(four, branching, (id) => (id === 'a' ? failA(id) : rngFor(SEED, 'roll:' + id)), baseOf, constantModel(0));
+    expect(seeded.injury).toEqual({ character: injuredStarter(four.members, rngFor(SEED, 'roll:injury:fight')()).characterId, roll: rngFor(SEED, 'roll:injury:fight')() });
+    // Off when a boon says so (D-52), and never on a finished run or a retreat.
+    expect(runMission(four, branching, scripted({ a: [0], fight: [0.9] }), baseOf, constantModel(0.5), { injuries: false })).toMatchObject({ dnf: true, injury: null });
+    expect(runMission(four, branching, scripted({ a: [0.99] }), baseOf, constantModel(0.5)).injury).toBeNull();
+    expect(runMission(four, branching, scripted({ a: [0] }), baseOf, constantModel(0.5), { retreat: 'avoid_battles' }).injury).toBeNull();
   });
 
   it('a DNF keeps the loot banked before the lost battle (D-46)', () => {
@@ -347,6 +364,7 @@ describe('runMission', () => {
         checksAttempted: 1,
         loot: 30,
         score: 0.3,
+        injury: null,
       });
       expect(drawn).toBe(false);
     });
@@ -430,6 +448,7 @@ describe('runMission', () => {
       checksAttempted: 2,
       loot: 50,
       score: 0.5,
+      injury: null,
     });
   });
 });

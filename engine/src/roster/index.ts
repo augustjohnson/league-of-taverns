@@ -47,6 +47,12 @@ export interface RosterView {
 
 export type RuleViolation = { readonly code: string; readonly message: string };
 
+/** Week-specific limits on who may start. */
+export interface LineupOptions {
+  /** Characters who can't start this week: injured in last week's DNF (D-51). */
+  readonly unavailable?: ReadonlySet<string>;
+}
+
 /** Starters per party: `config.roster.starters`, which the config schema fixes at 4. */
 const STARTER_COUNT = 4;
 
@@ -94,13 +100,15 @@ function knownCr(crOf: (characterId: string) => CrEighths, id: string): number |
 /**
  * All reasons a lineup is illegal, empty when legal. Every violation is
  * reported, in this order: `wrong_size`, `bad_retreat`, `duplicate`,
- * `not_owned`, `unknown_character`, `over_budget`.
+ * `not_owned`, `injured`, `unknown_character`, `over_budget`.
  *
  * - `wrong_size`: not exactly four starter ids (checked at runtime, since
  *   lineups arrive from parsed input).
  * - `bad_retreat`: `retreat` is not a retreat order (`isRetreatOrder`).
  * - `duplicate`: a character listed twice. One violation per repeated id.
  * - `not_owned`: a starter is not on `roster`. One per id.
+ * - `injured`: a starter is in `options.unavailable`, hurt in last week's DNF
+ *   (D-51). One per id.
  * - `unknown_character`: `crOf` throws or returns anything but a
  *   non-negative integer. One per id.
  * - `over_budget`: the starters' CRs, as listed, sum to more than
@@ -112,6 +120,7 @@ export function validateLineup(
   roster: RosterView,
   crOf: (characterId: string) => CrEighths,
   config: SeasonConfig,
+  options: LineupOptions = {},
 ): ReadonlyArray<RuleViolation> {
   const violations: RuleViolation[] = [];
 
@@ -143,6 +152,12 @@ export function validateLineup(
   for (const id of distinct) {
     if (!owned.has(id)) {
       violations.push({ code: 'not_owned', message: `"${id}" is not on ${roster.tavern}'s roster` });
+    }
+  }
+
+  for (const id of distinct) {
+    if (options.unavailable?.has(id) === true) {
+      violations.push({ code: 'injured', message: `"${id}" was injured last week and can't start this week` });
     }
   }
 
@@ -450,7 +465,7 @@ export function validateTrade(
  * fallback in docs/rules.md § Missed lineups and docs/decisions.md D-27.
  *
  * Fallback: among every 4-character subset of the roster that is a legal
- * lineup, take the one with the highest total CR. Ties go to the subset
+ * lineup (so without anyone in `options.unavailable`, D-51), take the one with the highest total CR. Ties go to the subset
  * whose roster indices (roster order is draft order) come first
  * lexicographically. The starters are listed in roster order, and the
  * retreat order is the default, `never` (D-49). Returns null when no legal
@@ -463,8 +478,9 @@ export function carriedLineup(
   roster: RosterView,
   crOf: (characterId: string) => CrEighths,
   config: SeasonConfig,
+  options: LineupOptions = {},
 ): Lineup | null {
-  if (previous !== null && validateLineup(previous, roster, crOf, config).length === 0) return previous;
+  if (previous !== null && validateLineup(previous, roster, crOf, config, options).length === 0) return previous;
 
   // Candidates in roster order: first occurrence of each id with a known CR.
   // A character without a known CR can never be in a legal lineup.
@@ -472,7 +488,7 @@ export function carriedLineup(
   const crs: number[] = [];
   for (const id of new Set(roster.characters)) {
     const cr = knownCr(crOf, id);
-    if (cr !== null) {
+    if (cr !== null && options.unavailable?.has(id) !== true) {
       ids.push(id);
       crs.push(cr);
     }

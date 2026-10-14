@@ -2,7 +2,7 @@
  * Lineup strategies. Each enumerates every legal 4-subset of the roster (35
  * at most for 7 characters) and keeps the best under one objective. Every
  * lineup returned passes `validateLineup` by construction, and `lineup`
- * re-checks it anyway.
+ * re-checks it anyway. Last week's injured never start (D-51).
  *
  * There is no captain (docs/decisions.md D-12), and lineup order only breaks
  * ties between equal pass chances, which leaves every pass chance unchanged.
@@ -12,7 +12,7 @@ import { projectMission, type EffectiveStats, type Party } from '@league-of-tave
 import { checkFit, fitWeights } from '../environment';
 import { referenceFoe } from '../metrics';
 import type { LineupStrategy, PublicView, ScoredLineup } from '../types';
-import { assertLegal, configOf, legalSubsets, lineupFrom, rosterOf, type Subset } from '../view';
+import { assertLegal, configOf, legalSubsets, lineupFrom, rosterOf, startable, type Subset } from '../view';
 
 /** Scores closer than this are equal, so float noise never decides a lineup. */
 const EPS = 1e-12;
@@ -29,7 +29,7 @@ function strategy(id: string, best: LineupStrategy['best']): LineupStrategy {
     best,
     lineup(view, week) {
       const chosen = best(view, rosterOf(view), week);
-      return chosen === null ? null : assertLegal(view, chosen.lineup, id);
+      return chosen === null ? null : assertLegal(view, chosen.lineup, id, week);
     },
   };
 }
@@ -38,14 +38,14 @@ function strategy(id: string, best: LineupStrategy['best']): LineupStrategy {
  * The legal subset with the highest total CR, ties to the earliest in roster
  * order. Score: total CR in eighths.
  */
-function bestByCr(view: PublicView, roster: ReadonlyArray<string>): ScoredLineup | null {
+function bestByCr(view: PublicView, roster: ReadonlyArray<string>, week: number): ScoredLineup | null {
   let best: Subset | null = null;
-  for (const subset of legalSubsets(view, roster)) if (best === null || subset.total > best.total) best = subset;
+  for (const subset of legalSubsets(view, startable(view, roster, week))) if (best === null || subset.total > best.total) best = subset;
   return best === null ? null : { lineup: lineupFrom(best), score: best.total };
 }
 
 /** `max-cr`: spend the most CR possible under B. */
-export const maxCrLineup: LineupStrategy = strategy('max-cr', (view, roster) => bestByCr(view, roster));
+export const maxCrLineup: LineupStrategy = strategy('max-cr', (view, roster, week) => bestByCr(view, roster, week));
 
 /**
  * `projection`: with the week's mission known (open missions, D-08/D-42),
@@ -56,9 +56,9 @@ export const maxCrLineup: LineupStrategy = strategy('max-cr', (view, roster) => 
  */
 export const projectionLineup: LineupStrategy = strategy('projection', (view, roster, week) => {
   const mission = view.missionFor(week);
-  if (mission === null) return bestByCr(view, roster);
+  if (mission === null) return bestByCr(view, roster, week);
   let best: { subset: Subset; expected: number; pDnf: number } | null = null;
-  for (const subset of legalSubsets(view, roster)) {
+  for (const subset of legalSubsets(view, startable(view, roster, week))) {
     const { expectedScore: expected, pDnf } = projectMission(partyOf(view, subset), mission, view.baseOf, view.battleModel);
     const better =
       best === null ||
@@ -84,7 +84,7 @@ export const environmentFitLineup: LineupStrategy = strategy('environment-fit', 
   const weights = fitWeights(view.schedule.find((entry) => entry.week === week));
   const foes = [{ stats: referenceFoe(Math.round(ENVIRONMENT_FOE_RATIO * configOf(view).budget.partyCr)), count: 1 }];
   let best: { subset: Subset; score: number } | null = null;
-  for (const subset of legalSubsets(view, roster)) {
+  for (const subset of legalSubsets(view, startable(view, roster, week))) {
     const party = partyOf(view, subset);
     const score = view.battleModel.pWin(party, foes) * checkFit(party.members, weights);
     if (best === null || score > best.score + EPS || (score > best.score - EPS && subset.total > best.subset.total)) {

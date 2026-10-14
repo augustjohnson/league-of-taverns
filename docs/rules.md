@@ -74,7 +74,8 @@
 - **Budget:** the total CR of the four starters must be **≤ B**. Season 1 uses
   B = 12. Fractional CRs count exactly (four CR 1/2 characters total 2).
 - An **injured** character (§6) can't start the week after its injury
-  **[D-51, not built yet]**.
+  **[D-51]**. If that leaves no legal lineup under B, the tavern scores 0
+  that week (as below).
 - **Retreat order** **[D-49]:** each lineup also says when the
   party turns back instead of fighting: `never` (the default),
   `avoid_battles`, or `bank: N` (turn back before a battle once at least N
@@ -114,9 +115,10 @@
   against the encounter. **Losing any battle ends the mission (DNF).** The
   party keeps the loot banked so far **[D-46]**. A battle may carry loot,
   banked when the party wins **[D-50]**.
-- **Injuries** **[D-51, not built yet]:** when a party loses a battle, one
-  of its four starters, picked by a recorded random roll, is injured and
-  can't start next week. Injuries last one week.
+- **Injuries** **[D-51]:** when a party loses a battle, one of its four
+  starters, picked by a recorded random roll, is injured and can't start
+  next week. Injuries last one week, follow the character if it is traded,
+  and an injury in the last week expires with the season.
 - **Hex** **[D-52, not built yet]:** once per season, a tavern names a
   rival, one **ability score** and one **week**. That week, the rival's party
   has disadvantage on every check and save using that ability (like

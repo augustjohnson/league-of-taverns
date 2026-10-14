@@ -7,6 +7,13 @@ import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
 import type { LeagueState } from './state';
 
+/** Characters who can't start in `week`: hurt in a DNF the week before (D-51). */
+export function injuredFor(state: LeagueState, week: number): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const [character, out_] of state.injuries) if (out_ === week) out.add(character);
+  return out;
+}
+
 /** Pooled characters nobody owns, in pooling order. */
 export function freeAgents(state: LeagueState): ReadonlyArray<string> {
   return [...state.pool.keys()].filter((id) => !state.owner.has(id));

@@ -323,8 +323,10 @@ it moves out of the per-season schedule into a league-level file.
 `checksAttempted`, `loot` (banked by passed checks and won battles, kept on a
 DNF or a retreat) and `score` (loot ÷ the mission's haul, D-45, D-46, D-50).
 `retreatedBefore` names the battle a party turned back before by its retreat
-order, or is null (D-49); the battle is not on `path`. Planned: on a DNF the
-`injured` starter with the roll that picked it (D-51).
+order, or is null (D-49); the battle is not on `path`. `injury` is, on a
+DNF, `{ character, roll }`: the starter hurt and the roll in [0, 1) that
+picked them, `starters[floor(roll × 4)]` from the die stream
+`injury:<battle-id>` (D-51), or null.
 
 ### What's recorded vs derived [D-20]
 

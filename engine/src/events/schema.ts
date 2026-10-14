@@ -92,6 +92,7 @@ export const runResultSchema = z.strictObject({
   checksAttempted: z.number().int().nonnegative(),
   loot: z.number().int().nonnegative(),
   score: probability,
+  injury: z.strictObject({ character: kebabIdSchema, roll: z.number().min(0).lt(1) }).nullable(),
 });
 
 const minMax = z.strictObject({ min: z.number().int(), max: z.number().int() });

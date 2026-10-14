@@ -43,10 +43,16 @@ describe('luckReport', () => {
     expect(byProjected[0]!.projectedRank).toBe(1);
   });
 
-  it('marks home weeks and keeps every percentile in [0, 1]', () => {
+  it('marks home weeks and keeps every percentile in [0, 1], with none for a week without a lineup', () => {
     for (const row of luck) {
       for (const w of row.weeks) {
         expect(w.home).toBe(sim.summary.weeks[w.week - 1]!.home === row.tavern);
+        const played = sim.summary.weeks[w.week - 1]!.results.find((r) => r.tavern === row.tavern)!.starters !== null;
+        if (!played) {
+          // An injury (D-51) can leave no legal four under B: no run, so no percentile.
+          expect(w.percentile).toBeNull();
+          continue;
+        }
         expect(w.percentile!).toBeGreaterThanOrEqual(0);
         expect(w.percentile!).toBeLessThanOrEqual(1);
       }

@@ -334,7 +334,12 @@ have, or fight for the bounty. *Not chosen:* a failed check costs some banked
 loot instead, which is harsher and closer to a DNF. *Blocks:* T5.8, T6.6.
 
 **D-51 Injuries: DECIDED (2026-10-13): a random starter is hurt on a DNF.**
-Not built yet.
+Built (2026-10-13, T6.7): `RunResult.injury`, `LeagueState.injuries`,
+`injuredFor`, and `validateLineup`'s `injured` violation. *Measured* (200
+mock seasons, seed `review`): 7 of 7,200 tavern-weeks had no legal lineup,
+because the injury left no four under B, so the tavern scored 0. *Open
+question:* should such a tavern start three, or go over B by the injured
+starter's CR, instead of scoring 0?
 - When a party loses a battle, one of its four starters, picked by a
   recorded random roll, is **injured**. An injured character can't start the
   next week's lineup. It can still be benched, traded or dropped.

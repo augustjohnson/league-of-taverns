@@ -36,6 +36,7 @@ import {
   freeAgents,
   homeTavern,
   initialState,
+  injuredFor,
   lineHash,
   onTheClock,
   projectMission,
@@ -50,6 +51,7 @@ import {
   standings,
   serializeEvent,
   toBaseStats,
+  validateLineup,
   verifyResolutions,
   weekResults,
   weekSeed,
@@ -606,12 +608,14 @@ export class SeasonSession {
       if (entry === undefined) throw new Error(`"${id}" is not pooled`);
       return entry.cr;
     };
+    // Injured starters (D-51) can't start: a submitted or carried lineup with one falls back (D-27).
+    const unavailable = injuredFor(state, week);
     const lineups = input.taverns.map(({ id: tavern }): PayloadByType['lineup.locked']['lineups'][number] => {
-      const own = submitted?.get(tavern);
-      if (own !== undefined) return { tavern, lineup: own, source: 'submitted' };
-      const last = previous?.find((entry) => entry.tavern === tavern)?.lineup ?? null;
       const roster = { tavern, characters: state.taverns.get(tavern)?.roster ?? [] };
-      const lineup = carriedLineup(last, roster, crOf, config);
+      const own = submitted?.get(tavern);
+      if (own !== undefined && validateLineup(own, roster, crOf, config, { unavailable }).length === 0) return { tavern, lineup: own, source: 'submitted' };
+      const last = previous?.find((entry) => entry.tavern === tavern)?.lineup ?? null;
+      const lineup = carriedLineup(last, roster, crOf, config, { unavailable });
       if (lineup === null) return { tavern, lineup: null, source: 'none' };
       return { tavern, lineup, source: lineup === last ? 'carried' : 'fallback' };
     });

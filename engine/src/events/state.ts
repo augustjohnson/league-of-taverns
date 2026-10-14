@@ -51,6 +51,12 @@ export interface LeagueState {
   readonly trades: ReadonlyMap<string, TradeState>;
   readonly revealed: ReadonlyMap<number, Mission>;
   readonly results: ReadonlyMap<number, ReadonlyMap<string, PayloadByType['mission.resolved']>>;
+  /**
+   * characterId → the week it can't start, from an injury in the week before
+   * (D-51). Injuries last one week and don't stack: a later one replaces the
+   * entry. Read with `injuredFor`.
+   */
+  readonly injuries: ReadonlyMap<string, number>;
   readonly finalizedWeeks: ReadonlySet<number>;
 }
 
