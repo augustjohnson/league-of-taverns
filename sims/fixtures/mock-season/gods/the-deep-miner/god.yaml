@@ -1,0 +1,16 @@
+# A god: stable id and chrome. Schema: docs/schema.md § God.
+#
+# Chrome only: it never affects the game. Which tavern the god blesses and
+# which week it sets are in the season's schedule.yaml (D-52).
+# Banner: `field` and `charge` are pale fills, `mark` is the tavern's strong
+# colour, `texture` is one of rain | waves | thorns | stipple | crosshatch | rays.
+
+id: the-deep-miner
+chrome:
+  name: The Deep Miner
+  call: Dig. The good loot is always further down.
+  banner: # slate, ember
+    field: '#dde1e6'
+    charge: '#f7cfae'
+    mark: '#eb6834'
+    texture: crosshatch

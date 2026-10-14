@@ -121,9 +121,28 @@ open. The tabs:
 How it is built: `src/build-playground.ts` loads the season with the scripts
 loaders (`loadMockSeasonParts`), serializes it with `serializeSeason`
 (`src/playground/data.ts`: the config, schedule, taverns, pool, missions,
-only the snapshot records used, and each pooled character's chrome name for
-display; names never reach the engine), bundles `src/playground/app.ts` with esbuild
+only the snapshot records used, each pooled character's chrome name, and each
+sponsoring god's chrome (name, call and banner) for display; chrome never
+reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
+Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
+your tavern raises its banner with one burst of party.js sparkles (bundled)
+and micron's swing (its CSS vendored into `page.html` with its MIT notice),
+and playing a week plays your run back node by node in the scrying ball:
+dice tumble before they settle, the loot counter climbs, and a DNF drains it
+to 0. The reveal ends in a moment sized to the week (`weekOutcome`): confetti
+in your banner's colours for topping it, sparkles for beating the projection,
+a breath out for turning back, a dimmed run after a DNF, and nothing for a
+quiet week. A hex takes a second click to declare (it is public and final),
+then lands in the list in your colours with a jolt and a few embers; a rival's
+hex on you opens that week's reveal in the rival's colours before the party
+sets out. The last week's reveal ends the season: if you won, your banner
+goes up over the final card and the only full-screen confetti in the page
+rises in its colours; if not, you get your week's moment, the champion's flag
+swings in theirs, and the card gives your finish and your best week. The
+result card holds the whole result and the reveal only holds pieces
+back, so Skip (or Esc), a reload and `prefers-reduced-motion` all show the
+same thing at once. Each moment plays once after the render its move caused.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI
 uses, so a seed gives the same season, byte for byte: the engine avoids
 `Math.exp`/`Math.log` (not bit-identical across JS engines) in favor of

@@ -25,6 +25,9 @@
   --radius: 4px;
   /* Series colours, one per tavern in managers-file order (validated for CVD separation in both themes). */
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  /* Banner theme dials (see Banners below): how much of a god's pale field and charge show, and the OKLCH lightness
+     range for its mark as a line and as text. Light: fields at full strength, text dark enough to read on them. */
+  --bn-fill: 100%; --bn-tex: 100%; --bn-shade: 14%; --bn-line-lo: 0; --bn-ink-lo: 0; --bn-ink-hi: 0.42;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -43,6 +46,7 @@
     --bad-soft: #3c1f1a;
     --node: #1e2a25;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --bn-fill: 14%; --bn-tex: 34%; --bn-shade: 0%; --bn-line-lo: 0.66; --bn-ink-lo: 0.84; --bn-ink-hi: 1;
     color-scheme: dark;
   }
 }
@@ -62,6 +66,7 @@
   --bad-soft: #3c1f1a;
   --node: #1e2a25;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --bn-fill: 14%; --bn-tex: 34%; --bn-shade: 0%; --bn-line-lo: 0.66; --bn-ink-lo: 0.84; --bn-ink-hi: 1;
   color-scheme: dark;
 }
 
@@ -262,6 +267,131 @@ td.flow { white-space: normal; }
 .kv .v.muted { color: var(--muted); }
 #run-error.off-tab { display: none; }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+
+/* Banners: each tavern fights under its god's colours (gods/<id>/god.yaml). The page adds one generated rule per god
+   (view.ts bannerCss) setting --banner-field, --banner-charge, --banner-mark and --banner-pattern on
+   [data-banner="<god>"]; everything below is shared, so no god has CSS of its own. Field and charge are pale fills and
+   never carry text; the mark is the strong colour, clamped by the --bn-* dials into a line colour and a text colour.
+   Banners never stand in for pass, fail or brass. */
+[data-banner] {
+  --banner-bg: color-mix(in oklch, var(--banner-field) var(--bn-fill), var(--surface));
+  /* The ground a texture sits on: in the light theme the field a shade darker, so a pale charge still shows on a pale field
+     whatever its hue. */
+  --banner-ground: color-mix(in oklch, var(--banner-bg), var(--ink) var(--bn-shade));
+  --banner-tex: color-mix(in oklch, var(--banner-charge) var(--bn-tex), var(--surface));
+  --banner-line: oklch(from var(--banner-mark) clamp(var(--bn-line-lo), l, 1) c h);
+  --banner-ink: oklch(from var(--banner-mark) clamp(var(--bn-ink-lo), l, var(--bn-ink-hi)) c h);
+  /* The texture vocabulary (BANNER_TEXTURES in scripts/src/lib/god-schema.ts), drawn in --banner-tex. Large surfaces only, never behind numbers. */
+  --tex-rain: repeating-linear-gradient(112deg, var(--banner-tex) 0 2.5px, transparent 2.5px 11px);
+  --tex-waves: radial-gradient(circle at 50% 100%, transparent 4.5px, var(--banner-tex) 5px 7px, transparent 7.5px) 0 0 / 16px 9px,
+    radial-gradient(circle at 50% 100%, transparent 4.5px, var(--banner-tex) 5px 7px, transparent 7.5px) 8px 4.5px / 16px 9px;
+  --tex-thorns: linear-gradient(135deg, var(--banner-tex) 25%, transparent 25%) -6px 0 / 12px 12px,
+    linear-gradient(225deg, var(--banner-tex) 25%, transparent 25%) -6px 0 / 12px 12px;
+  --tex-stipple: radial-gradient(var(--banner-tex) 1.6px, transparent 2.1px) 0 0 / 9px 9px,
+    radial-gradient(var(--banner-tex) 1.2px, transparent 1.7px) 4.5px 4.5px / 9px 9px;
+  --tex-crosshatch: repeating-linear-gradient(45deg, var(--banner-tex) 0 1.5px, transparent 1.5px 9px),
+    repeating-linear-gradient(-45deg, var(--banner-tex) 0 1.5px, transparent 1.5px 9px);
+  --tex-rays: repeating-conic-gradient(from -90deg at 50% 120%, var(--banner-tex) 0 4deg, transparent 4deg 13deg);
+}
+/* Your tavern's card: the god's field, a textured pennant along the top, and its call. */
+.card.banner-card { background: var(--banner-bg); border-color: color-mix(in oklch, var(--banner-line) 40%, var(--line)); padding-top: 0; }
+.banner-card .pennant { height: 22px; margin-inline: -14px; background: var(--banner-pattern), var(--banner-ground); border-bottom: 2px solid var(--banner-line); }
+.banner-card h2 { color: var(--banner-ink); }
+.banner-call { font-family: var(--font-display); font-size: 1.05rem; color: var(--banner-ink); }
+.banner-call .label { font-family: var(--font-ui); color: var(--banner-ink); margin-right: 6px; }
+.tag.banner { border-color: var(--banner-line); color: var(--banner-ink); background: var(--banner-bg); }
+/* A small flag: the banner at swatch size, for any tavern. */
+.flag { display: inline-block; width: 28px; height: 18px; border-radius: 2px; vertical-align: middle; background: var(--banner-pattern), var(--banner-ground); border-left: 5px solid var(--banner-line); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--banner-line) 35%, transparent); }
+.god-name { color: var(--banner-ink); font-weight: 600; }
+/* Your tavern's row in any table. */
+tr.mine[data-banner] td { background: var(--banner-bg); }
+tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-line); }
+
+/* Moments (fx.ts): a move with emotional weight gets one small effect, played once after the render it caused and never
+   under prefers-reduced-motion. Choosing your tavern raises its banner: the pennant unfurls, the card glows in the
+   banner's line colour, the call rises in, and the tavern sign swings (micron, below). */
+@keyframes banner-unfurl { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@keyframes banner-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes banner-glow {
+  from { box-shadow: 0 0 0 0 color-mix(in oklch, var(--banner-line) 55%, transparent); }
+  to { box-shadow: 0 0 0 16px color-mix(in oklch, var(--banner-line) 0%, transparent); }
+}
+.banner-card.raised { animation: banner-glow 1.2s 0.35s ease-out both; }
+.banner-card.raised .pennant { animation: banner-unfurl 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.banner-card.raised .banner-call { animation: banner-rise 0.5s 0.5s ease-out both; }
+.banner-card .flag { margin-right: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .banner-card.raised, .banner-card.raised *, [class*="mjs-"] { animation: none !important; }
+}
+
+/* The week reveal (fx.ts revealWeek): the scrying ball plays your run back. While the card is .revealing, the path,
+   the outcomes, everything marked data-spoiler and every section after the card stay hidden; .shown brings each piece
+   in as the run reaches it, and .revealed fades the rest in at the end. */
+.tale-box { display: grid; gap: 6px; }
+.tale { margin: 0; padding-left: 1.6em; display: grid; gap: 5px; font-size: 13px; }
+.tale .die { margin-inline: 2px; }
+.week-result:not(.revealing) [data-reveal-skip], .week-result.revealing [data-after-reveal] { display: none; }
+.panel:has(.week-result.revealing) [data-spoiler], .week-result.revealing ~ * { display: none !important; }
+.week-result.revealing .tale > li:not(.shown) { display: none; }
+.week-result.revealing .tale > li.shown { animation: banner-rise 0.3s ease-out both; }
+.tale li.rolling .outcome { visibility: hidden; }
+.tale .die.rolling { border-color: var(--brass); color: var(--ink); }
+.week-result.revealing .graph .edge.on:not(.shown) { stroke: var(--muted); stroke-width: 1.3; opacity: 0.55; }
+.week-result.revealing .graph .elabel.on:not(.shown) { fill: var(--muted); }
+.week-result.revealing .graph .node:not(.shown) rect { stroke: var(--line); stroke-width: 1.2; fill: var(--node); }
+.week-result.revealing .graph .node.battle:not(.shown) rect { stroke: var(--muted); }
+.week-result.revealing .graph .node:not(.shown) .out { opacity: 0; }
+.week-result.revealing .graph .node.current rect { stroke: var(--brass); stroke-width: 2.4; animation: scry 0.8s ease-in-out infinite alternate; }
+@keyframes scry { from { stroke-opacity: 1; } to { stroke-opacity: 0.3; } }
+.panel:has(.week-result.revealed) [data-spoiler], .week-result.revealed ~ * { animation: banner-rise 0.45s ease-out both; }
+.week-result:focus { outline: none; }
+/* Hexes (fx.ts layCurse, and the curse that opens a week's reveal): a hex involving you wears a banner, yours when you
+   laid it and the rival's when it fell on you. The ground stays plain behind the text; the colour is the edge and ink. */
+.hexes { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.curse[data-banner] { background: var(--banner-bg); border-left: 4px solid var(--banner-line); border-radius: var(--radius); padding: 3px 8px; color: var(--banner-ink); }
+.curse[data-banner] b { color: var(--banner-ink); }
+.curse-confirm[data-banner] { background: var(--banner-bg); border: 1px solid var(--banner-line); border-radius: var(--radius); padding: 8px 10px; }
+.curse.laid { animation: banner-glow 1.1s ease-out both; }
+/* Not a list item, so the steps below still count from 1. */
+.tale > li.curse { display: block; margin-left: -1.6em; }
+
+/* The season's end (fx.ts crownChampion, hailChampion). A champion's final card flies their banner with a taller
+   pennant; otherwise the champion line wears the champion's banner on its flag and ink only. */
+.season-final.champion h2 { font-size: 1.8rem; }
+.season-final.champion .pennant { height: 30px; }
+.champ-line[data-banner] b { color: var(--banner-ink); }
+.champ-line .flag { transform-origin: center top; }
+
+/* What a week leaves behind (fx.ts weekMoment): after a DNF the run dims except where it ended; after a retreat the
+   loot kept is marked. Static, so a reload shows them; they arrive with the end of the reveal. */
+.week-result[data-outcome="dnf"]:not(.revealing) .graph :is(.edge, .elabel, .node:not(.lost)) { opacity: 0.4; transition: opacity 1.2s ease-out; }
+.week-result[data-outcome="retreat"]:not(.revealing) [data-tail="retreat"] { background: var(--good-soft); border-radius: var(--radius); padding: 2px 6px; transition: background-color 0.8s ease-out; }
+@media (prefers-reduced-motion: reduce) { .week-result .graph *, .week-result [data-tail] { transition: none !important; } }
+
+/* Vendored: micron 1.1.6 (https://github.com/webkul/micron), its CSS only; fx.ts applies the interactions.
+MIT License
+
+Copyright (c) 2018 Webkul
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+.mjs-linear{animation-timing-function:cubic-bezier(0,0,1,1)}.mjs-ease-in{animation-timing-function:cubic-bezier(.4,0,1,1)}.mjs-ease-out{animation-timing-function:cubic-bezier(0,0,.2,1)}.mjs-ease-in-out{animation-timing-function:cubic-bezier(.4,0,.2,1)}.mjs-jelly{animation-name:action-jelly}@keyframes action-jelly{0%,100%{transform:scaleX(1)}20%{transform:scaleX(.9)}50%{transform:scaleX(1.25)}85%{transform:scaleX(.8)}}.mjs-fade{animation-name:action-fade}@keyframes action-fade{0%,100%{opacity:1}33%{opacity:.65}67%{opacity:.85}}.mjs-blink{animation-name:action-blink}@keyframes action-blink{0%,100%{transform:scale(1)}25%{transform:scale(.95)}50%{transform:scale(.97)}75%{transform:scale(.93)}}.mjs-bounce{animation-name:action-bounce}@keyframes action-bounce{0%,100%{transform:translate(0,0)}10%{transform:translate(0,2px)}50%{transform:translate(0,-7px)}90%{transform:translate(0,4px)}}.mjs-flicker{animation-name:action-flicker}@keyframes action-flicker{0%,100%{transform:skewX(0)}20%{transform:skewX(8deg)}40%{transform:skewX(-8deg)}60%{transform:skewX(4deg)}80%{transform:skewX(-4deg)}}.mjs-groove{animation-name:action-groove}@keyframes action-groove{0%,100%{transform:skewY(0) rotate(0)}15%{transform:skewY(-10deg) rotateZ(8deg)}35%{transform:skewY(10deg) rotateZ(-8deg)}55%{transform:skewY(-6deg) rotateZ(-4deg)}85%{transform:skewY(6deg) rotateZ(4deg)}}.mjs-jerk{animation-name:action-jerk}@keyframes action-jerk{0%,100%{transform:translateX(0) rotateZ(0)}20%{transform:translateX(-5px) rotateZ(-15deg)}40%{transform:translateX(5px) rotateZ(15deg)}60%{transform:translateX(-3px) rotateZ(5deg)}80%{transform:translateX(3px) rotateZ(-5deg)}}.mjs-pop{animation-name:action-pop}@keyframes action-pop{0%,100%{transform:scaleX(1) scaleY(1)}20%,45%{transform:scaleX(1.35) scaleY(.1)}65%{transform:scaleX(.8) scaleY(1.7)}80%{transform:scaleX(.6) scaleY(.85)}}.mjs-shake{animation-name:action-shake}@keyframes action-shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-3px)}25%,65%{transform:translateX(3px)}45%,85%{transform:translateX(-2px)}}.mjs-squeeze{animation-name:action-squeeze}@keyframes action-squeeze{0%,100%{transform:scaleY(1)}15%,85%{transform:scaleY(.95)}30%{transform:scaleY(.9)}55%{transform:scaleY(.75)}70%{transform:scaleY(1.3)}}.mjs-swing{animation-name:action-swing;transform-origin:center top}@keyframes action-swing{0%,100%{transform:rotateZ(0)}20%{transform:rotateZ(15deg)}40%{transform:rotateZ(-15deg)}60%{transform:rotateZ(7deg)}80%{transform:rotateZ(-7deg)}}.mjs-tada{animation-name:action-tada}@keyframes action-tada{0%,100%{transform:scale(1)}20%{transform:scale(1.1) rotate(3deg)}40%{transform:scale(.97)}60%{transform:scale(.99) rotate(-3deg)}80%{transform:scale(1.05)}}
 </style>
 
 <div class="wrap">

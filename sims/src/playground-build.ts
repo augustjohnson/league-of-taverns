@@ -15,7 +15,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { REPO_ROOT, loadCharacterChrome, rootDir } from '@league-of-taverns/scripts/lib/repo';
+import { REPO_ROOT, loadCharacterChrome, loadGodChrome, rootDir } from '@league-of-taverns/scripts/lib/repo';
 import { DEFAULT_SEASON_DIR, loadMockSeasonParts } from './load';
 import { serializeSeason, type PlaygroundData } from './playground/data';
 
@@ -74,10 +74,12 @@ export function renderPage(template: string, data: PlaygroundData, bundle: strin
 /** Load the season in `dir`, bundle the app and return the page. */
 export async function buildPlaygroundHtml(dir: string = DEFAULT_SEASON_DIR): Promise<{ readonly html: string; readonly data: PlaygroundData }> {
   const parts = loadMockSeasonParts(dir);
-  // The season folder keeps its own characters/ (load.ts): read each pooled character's chrome name there, for display only.
+  // The season folder keeps its own characters/ and gods/ (load.ts): read each pooled character's chrome name and each
+  // sponsoring god's chrome there, for display only.
   const charactersRoot = resolve(rootDir(REPO_ROOT), dir);
   const names = Object.fromEntries(parts.pool.map(({ character }) => [character.ref.id, loadCharacterChrome(character.ref.id, charactersRoot).name]));
-  const data = serializeSeason(parts, dir, names);
+  const gods = Object.fromEntries(parts.sponsors.map(({ id }) => [id, loadGodChrome(id, charactersRoot)]));
+  const data = serializeSeason(parts, dir, names, gods);
   const template = readFileSync(join(PLAYGROUND_SRC, 'page.html'), 'utf8');
   const html = renderPage(template, data, await bundleApp());
   return { html, data };

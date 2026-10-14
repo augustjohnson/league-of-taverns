@@ -59,10 +59,14 @@ import {
   type LuckSeason,
   type TitleOddsPoint,
 } from '../reports';
+import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInputFromData, type PlaygroundData } from './data';
+import { crownChampion, hailChampion, layCurse, raiseBanner, revealWeek, weekMoment } from './fx';
 import {
   actorLabel,
   aggregateRows,
+  bannerCss,
+  bannerGods,
   checkLabel,
   draftBoard,
   eventSummary,
@@ -83,6 +87,9 @@ import {
   scoreHistogram,
   seedWords,
   signed,
+  bestWeek,
+  taleSteps,
+  weekOutcome,
   topSkills,
   waiverReasonLabel,
   type GraphLayout,
@@ -114,6 +121,26 @@ const tavernName = (id: string): string => tavernById.get(id)?.name ?? id;
 const botOf = (id: string): string => run?.result.summary.taverns.find((t) => t.tavern === id)?.bot ?? '?';
 const managerBot = (id: string): string => input.managers.find((m) => m.id === id)?.bot ?? '?';
 const layouts = new Map<number, GraphLayout>(WEEKS.map((w) => [w, layoutMission(missionOf(w))]));
+
+// Banners: each tavern fights under its god's colours (chrome from gods/<id>/god.yaml). One generated rule per god sets
+// its colours as custom properties; page.html § Banners does the rest.
+const godOf = new Map(input.sponsors.map((s) => [s.tavern, s.id]));
+const BANNERED = bannerGods(data.gods);
+const bannerStyle = document.createElement('style');
+bannerStyle.textContent = bannerCss(data.gods);
+document.head.append(bannerStyle);
+/** The god whose banner a tavern fights under, if its god has one. */
+const bannerOf = (tavern: string): string | null => {
+  const god = godOf.get(tavern);
+  return god !== undefined && BANNERED.has(god) ? god : null;
+};
+/** ` data-banner="<god>"` for a tavern with a banner, else nothing. */
+const bannerAttr = (tavern: string): string => {
+  const god = bannerOf(tavern);
+  return god === null ? '' : ` data-banner="${esc(god)}"`;
+};
+/** A god's display name (chrome), else its id. */
+const godName = (god: string): string => data.gods[god]?.name ?? god;
 
 function missionOf(week: number): Mission {
   const m = input.missions.get(week);
@@ -251,14 +278,14 @@ function graphSvg(layout: GraphLayout, overlay: Overlay = {}): string {
   const edges = layout.edges
     .map((e) => {
       const on = pathEdges.has(`${e.from}>${e.to}`) ? ' on' : '';
-      return `<path class="edge${on}" d="${e.d}"/>`;
+      return `<path class="edge${on}" data-edge="${esc(`${e.from}>${e.to}`)}" d="${e.d}"/>`;
     })
     .join('');
   const labels = layout.edges
     .filter((e) => e.on !== 'always')
     .map((e) => {
       const on = pathEdges.has(`${e.from}>${e.to}`) ? ' on' : '';
-      return `<text class="elabel${on}" x="${e.lx}" y="${e.ly + 3}" text-anchor="middle">${esc(e.on)}</text>`;
+      return `<text class="elabel${on}" data-edge="${esc(`${e.from}>${e.to}`)}" x="${e.lx}" y="${e.ly + 3}" text-anchor="middle">${esc(e.on)}</text>`;
     })
     .join('');
   const nodes = layout.nodes
@@ -270,7 +297,7 @@ function graphSvg(layout: GraphLayout, overlay: Overlay = {}): string {
       const outText = outcome === undefined ? '' : `<text class="out ${outcome}" x="${n.x + n.w - 6}" y="${n.y + n.h - 7}" text-anchor="end">${esc(outcome)}</text>`;
       const rx = n.kind === 'start' || n.kind === 'end' ? 18 : 3;
       return (
-        `<g class="node ${cls}"><title>${esc(n.id)}: ${esc(n.detail)}${reach === undefined ? '' : ` (reach ${pct(reach)})`}</title>` +
+        `<g class="node ${cls}" data-node="${esc(n.id)}"><title>${esc(n.id)}: ${esc(n.detail)}${reach === undefined ? '' : ` (reach ${pct(reach)})`}</title>` +
         `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}"/>` +
         `<text class="id" x="${n.x + 8}" y="${n.y + 18}">${esc(clip(n.id, reach === undefined ? 19 : 14))}</text>` +
         `<text class="detail" x="${n.x + 8}" y="${n.y + 35}">${esc(clip(n.detail, outcome === undefined ? 24 : 18))}</text>` +
@@ -427,9 +454,15 @@ function markTabs(focus = false): void {
   $('run-error').classList.toggle('off-tab', tab === 'play');
 }
 
+/** A moment (fx.ts) to play once the next render is on screen; set by the move that earns it. */
+let pendingFx: (() => void) | null = null;
+
 function renderTab(): void {
+  const fx = pendingFx;
+  pendingFx = null;
   if (tab === 'play') {
     panel.innerHTML = renderPlay();
+    fx?.();
     return;
   }
   if (tab === 'batch') {
@@ -480,7 +513,7 @@ function renderStandings(r: Run): string {
   const rows = summary.standings
     .map(
       (s) =>
-        `<tr class="${s.rank === 1 ? 'champ' : ''}"><td class="n">${s.rank}</td><td><b>${esc(tavernName(s.tavern))}</b></td>` +
+        `<tr class="${s.rank === 1 ? 'champ' : ''}${s.bot === 'human' ? ' mine' : ''}"${s.bot === 'human' ? bannerAttr(s.tavern) : ''}><td class="n">${s.rank}</td><td><b>${esc(tavernName(s.tavern))}</b></td>` +
         `<td><span class="tag">${esc(s.bot)}</span></td><td class="n"><b>${s.points}</b></td>${weekly(s.tavern)}</tr>`,
     )
     .join('');
@@ -548,8 +581,14 @@ function reportsOf(r: Run): Reports {
   return rep;
 }
 
-/** Each tavern's series colour (`--s1`…`--s8`), fixed by package order so it never follows rank. */
+/**
+ * Each tavern's series colour: its god's banner mark, lightened in the dark theme as banner lines are, so a tavern is
+ * the same colour in every table and chart. A tavern without a banner falls back to `--s1`…`--s8` by package order.
+ * Never follows rank.
+ */
 function seriesVar(tavern: string): string {
+  const god = bannerOf(tavern);
+  if (god !== null) return `oklch(from var(--mark-${god}) clamp(var(--bn-line-lo), l, 1) c h)`;
   const i = input.taverns.findIndex((t) => t.id === tavern);
   return `var(--s${(i < 0 ? 0 : i % 8) + 1})`;
 }
@@ -1413,6 +1452,8 @@ const play = {
   moves: [] as PlayMove[],
   /** True while "New season" waits for a second, confirming click. */
   confirmReset: false,
+  /** The hex form is asking "are you sure?" (a hex is public and final). */
+  confirmHex: false,
   draftSort: 'value' as 'value' | 'cr',
   filter: '',
   /** The lineup builder: starters in lineup order, and the retreat order. */
@@ -1442,7 +1483,7 @@ function startPlay(): void {
   play.notice = null;
   try {
     const session = newSession(play.manager, seed);
-    Object.assign(play, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', played: null, confirmReset: false });
+    Object.assign(play, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', played: null, confirmReset: false, confirmHex: false });
     savePlay();
   } catch (e) {
     play.error = e instanceof Error ? e.message : String(e);
@@ -1642,16 +1683,31 @@ function playHeader(s: SeasonSession): string {
           : 'Season complete';
   const rows = seasonStandings(s.state);
   const row = rows.find((r) => r.tavern === me);
-  const rec = row === undefined || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip">${ordinal(row.rank)} of ${rows.length} · ${row.points} loot</span>`;
+  const rec = row === undefined || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip" data-spoiler>${ordinal(row.rank)} of ${rows.length} · ${row.points} loot</span>`;
   // Abandoning a season takes a second click: one stray press must not throw away a draft and weeks of results.
   const reset = play.confirmReset
     ? `<span class="small" role="alert">Abandon this season? Your draft and results will be lost.</span>` +
       `<button type="button" class="small" data-action="play-reset-confirm">Abandon season</button><button type="button" class="primary small" data-action="play-reset-cancel">Keep playing</button>`
     : `<button type="button" data-action="play-reset">New season</button>`;
+  // Once you hold a tavern, the card flies its god's banner and carries the god's call.
+  const god = me === null ? null : bannerOf(me);
+  const chrome = god === null ? undefined : data.gods[god];
+  const call =
+    chrome === undefined
+      ? ''
+      : `<p class="banner-call"><span class="label">${esc(chrome.name)}</span> ${esc(chrome.call ?? `You fight under the banner of ${chrome.name}.`)}</p>`;
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><div class="row"><h2>${me === null ? 'No tavern yet' : esc(tavernName(me))}</h2><span class="tag brass">you</span>` +
-    `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}${reset}</div></div></section>`
+    `<section class="card${chrome === undefined ? '' : ' banner-card'}"${me === null ? '' : bannerAttr(me)}>${chrome === undefined ? '' : '<div class="pennant" aria-hidden="true"></div>'}` +
+    `<div class="row" style="justify-content:space-between"><div class="row"><h2>${chrome === undefined ? '' : '<i class="flag" aria-hidden="true"></i> '}${me === null ? 'No tavern yet' : esc(tavernName(me))}</h2><span class="tag ${chrome === undefined ? 'brass' : 'banner'}">you</span>` +
+    `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}${reset}</div></div>${call}</section>`
   );
+}
+
+/** The tavern-pick moment: your banner goes up over the Play header. */
+function raiseMyBanner(): void {
+  const me = play.session?.humanTavern;
+  const god = me === undefined || me === null ? null : bannerOf(me);
+  if (god !== null) raiseBanner(panel.querySelector<HTMLElement>('.banner-card'), data.gods[god]!.banner);
 }
 
 function ordinal(n: number): string {
@@ -1670,18 +1726,23 @@ function renderPlayTavernPick(s: SeasonSession): string {
   const rows = input.taverns
     .map((t) => {
       const owner = s.state.taverns.get(t.id)?.managerId;
-      const god = s.state.sponsors.find((sp) => sp.tavern === t.id)?.id ?? '—';
+      const god = s.state.sponsors.find((sp) => sp.tavern === t.id)?.id;
       const week = weekOf(t.id);
       const action = open.has(t.id)
         ? `<button type="button" class="${t.id === advice ? 'primary ' : ''}small" data-action="play-tavern-pick" data-id="${esc(t.id)}">Choose</button>`
         : `<span class="muted small">${esc(owner ?? '')}</span>`;
-      return `<tr class="${open.has(t.id) ? '' : 'muted'}"><td>${action}</td><td><b>${esc(t.name)}</b></td><td class="small">${esc(god)}</td><td class="n small">${week ?? '—'}</td></tr>`;
+      const banner = bannerOf(t.id);
+      const flag = banner === null ? '' : `<i class="flag" aria-hidden="true"></i> `;
+      return (
+        `<tr class="${open.has(t.id) ? '' : 'muted'}"${bannerAttr(t.id)}><td>${action}</td><td>${flag}<b>${esc(t.name)}</b></td>` +
+        `<td class="small"><span class="${banner === null ? '' : 'god-name'}">${god === undefined ? '—' : esc(godName(god))}</span></td><td class="n small">${week ?? '—'}</td></tr>`
+      );
     })
     .join('');
   const order = [...s.state.draft.managerOrder];
   return (
     `<section class="card"><div class="row" style="justify-content:space-between"><h2>Choose your tavern</h2><span class="muted small">reverse draft order: whoever drafts last chooses first</span></div>` +
-    `<p class="small">Every tavern is already blessed by one god, who sets one week's mission. Boons and hexes come later (D-52); for now the taverns differ only in their god's week.</p>` +
+    `<p class="small">Every tavern is already blessed by one god, who sets one week's mission, and fights under that god's banner. Boons and hexes come later (D-52); for now the taverns differ only in their god's week.</p>` +
     `<div class="scroll"><table><thead><tr><th></th><th>tavern</th><th>god</th><th class="n">god's week</th></tr></thead><tbody>${rows}</tbody></table></div>` +
     (order.length === 0 ? '' : `<p class="hint">Draft order: ${order.map((m) => esc(m === s.human?.manager ? 'you' : m)).join(' → ')}.</p>`) +
     `</section>`
@@ -1830,30 +1891,49 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   );
 }
 
-/** Every hex declared so far, and the person's hex form while they still hold it (D-52). */
+const ABILITY_NAMES: Readonly<Record<Ability, string>> = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+
+/**
+ * Every hex declared so far, and the person's hex form while they still hold it (D-52). A hex is public at once and
+ * can't be withdrawn, so declaring takes a second click. Rows wear a banner only when they involve you: your own hex
+ * in your colours, a rival's hex on you in theirs.
+ */
 function renderPlayHex(s: SeasonSession, week: number): string {
   const me = s.humanTavern!;
   const declared = s.state.hexes;
   const list =
     declared.length === 0
       ? '<p class="muted small">No hexes declared yet.</p>'
-      : `<ul class="small">${declared
-          .map((h) => `<li>${h.tavern === me ? '<b>You</b>' : esc(tavernName(h.tavern))} hexed ${h.target === me ? '<b>you</b>' : esc(tavernName(h.target))}: <b>${h.ability}</b>, week ${h.week}</li>`)
+      : `<ul class="hexes small">${declared
+          .map((h) => {
+            const by = h.tavern === me ? me : h.target === me ? h.tavern : null;
+            const flag = by === null || bannerOf(by) === null ? '' : '<i class="flag" aria-hidden="true"></i> ';
+            return (
+              `<li class="${by === null ? '' : 'curse'}"${by === null ? '' : ` data-hex="${esc(`${h.tavern}>${h.target}>${h.week}`)}"${bannerAttr(by)}`}>${flag}` +
+              `${h.tavern === me ? '<b>You</b>' : esc(tavernName(h.tavern))} hexed ${h.target === me ? '<b>you</b>' : esc(tavernName(h.target))}: <b>${h.ability}</b>, week ${h.week}</li>`
+            );
+          })
           .join('')}</ul>`;
   const used = declared.some((h) => h.tavern === me);
   const rivals = s.taverns.filter((t) => t !== me);
   const weeks = WEEKS.filter((w) => w >= week);
+  const target = play.hexTarget !== '' && rivals.includes(play.hexTarget) ? play.hexTarget : rivals[0]!;
+  const hexWeek = Math.max(play.hexWeek, week);
   const form = used
     ? '<p class="small muted">You have used your hex this season.</p>'
-    : `<div class="row"><label class="label" for="play-hex-target">Rival</label><select id="play-hex-target" data-action="play-hex-target">${rivals
-        .map((t) => `<option value="${esc(t)}" ${t === play.hexTarget ? 'selected' : ''}>${esc(tavernName(t))}</option>`)
-        .join('')}</select>` +
-      `<label class="label" for="play-hex-ability">Ability</label><select id="play-hex-ability" data-action="play-hex-ability">${ABILITIES.map((a) => `<option value="${a}" ${a === play.hexAbility ? 'selected' : ''}>${a}</option>`).join('')}</select>` +
-      `<label class="label" for="play-hex-week">Week</label><select id="play-hex-week" data-action="play-hex-week">${weeks
-        .map((w) => `<option value="${w}" ${w === play.hexWeek ? 'selected' : ''}>${w}: ${esc(missionOf(w).id)}</option>`)
-        .join('')}</select>` +
-      `<button type="button" data-action="play-hex">Declare hex</button></div>` +
-      `<p class="hint">Once a season: that week the rival has disadvantage on every check and save using the ability. It is public at once and can't be withdrawn, and only the first hex on a rival in a week counts.</p>`;
+    : play.confirmHex
+      ? `<div class="row curse-confirm"${bannerAttr(me)} role="alert"><span>Curse <b>${esc(tavernName(target))}</b>: disadvantage on every ${esc(ABILITY_NAMES[play.hexAbility])} check and save in week ${hexWeek}? ` +
+        `Everyone sees it at once, and it can't be withdrawn.</span>` +
+        `<button type="button" class="primary" data-action="play-hex-confirm">Lay the curse</button><button type="button" data-action="play-hex-cancel">Not yet</button></div>`
+      : `<div class="row"><label class="label" for="play-hex-target">Rival</label><select id="play-hex-target" data-action="play-hex-target">${rivals
+          .map((t) => `<option value="${esc(t)}" ${t === play.hexTarget ? 'selected' : ''}>${esc(tavernName(t))}</option>`)
+          .join('')}</select>` +
+        `<label class="label" for="play-hex-ability">Ability</label><select id="play-hex-ability" data-action="play-hex-ability">${ABILITIES.map((a) => `<option value="${a}" ${a === play.hexAbility ? 'selected' : ''}>${a}</option>`).join('')}</select>` +
+        `<label class="label" for="play-hex-week">Week</label><select id="play-hex-week" data-action="play-hex-week">${weeks
+          .map((w) => `<option value="${w}" ${w === play.hexWeek ? 'selected' : ''}>${w}: ${esc(missionOf(w).id)}</option>`)
+          .join('')}</select>` +
+        `<button type="button" data-action="play-hex">Declare hex…</button></div>` +
+        `<p class="hint">Once a season: that week the rival has disadvantage on every check and save using the ability. It is public at once and can't be withdrawn, and only the first hex on a rival in a week counts.</p>`;
   return `<section class="card"><h2>Hexes</h2>${list}${form}</section>`;
 }
 
@@ -1879,23 +1959,31 @@ function renderPlayResult(s: SeasonSession, week: number): string {
   const others = table
     .map(
       (r) =>
-        `<tr class="${r.tavern === me ? 'sel' : ''}"><td class="n">${r.rank}</td><td><span class="${r.rank === 1 ? 'win' : ''}">${esc(tavernName(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
+        `<tr class="${r.tavern === me ? 'sel mine' : ''}"${r.tavern === me ? bannerAttr(me) : ''}><td class="n">${r.rank}</td><td><span class="${r.rank === 1 ? 'win' : ''}">${esc(tavernName(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
+  const outcome =
+    mine === undefined || res === undefined
+      ? 'quiet'
+      : weekOutcome({ rank: mine.rank, points: mine.points, projected: results.get(me)?.projected ?? mine.points, dnf: res.run.dnf, retreated: res.run.retreatedBefore !== null });
   const claimed = new Map(s.events.flatMap((e) => (e.type === 'waiver.claimed' ? [[e.payload.claim, e.payload] as const] : [])));
   const waivers = s.events
     .flatMap((e) => (e.type === 'waiver.resolved' && e.payload.week === week ? e.payload.outcomes : []))
     .filter((o) => claimed.get(o.claim)?.tavern === me);
+  // The week reveal (fx.ts revealWeek) plays the run back node by node and keeps everything marked data-spoiler, and
+  // every section after this card, out of sight until it ends. Without it (a reload, reduced motion) all shows at once.
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week} result</h2><span class="small">${headline}</span></div>` +
+    `<section class="card week-result"${res === undefined ? '' : ` data-path="${esc(JSON.stringify(res.run.path))}"`} data-outcome="${outcome}" tabindex="-1">` +
+    `<div class="row" style="justify-content:space-between"><h2>Week ${week} result</h2><span class="small" data-spoiler data-headline>${headline}</span></div>` +
     (res === undefined
       ? '<p class="muted">You fielded no lineup and scored 0.</p>'
       : graphSvg(layouts.get(week)!, { path: res.run.path, outcomes: outcomesOf(res.run) }) +
-        `<details><summary>Your roll log</summary>${rollLog(mission, res.run, homeTavern(s.state, week) === me)}</details>`) +
-    (others === '' ? '' : `<h3>This week's table</h3><div class="scroll"><table><tbody>${others}</tbody></table></div>`) +
+        taleHtml(mission, res.run, curseOn(s, me, week)) +
+        `<details data-spoiler><summary>Your roll log</summary>${rollLog(mission, res.run, homeTavern(s.state, week) === me)}</details>`) +
+    (others === '' ? '' : `<div class="stack" data-spoiler><h3>This week's table</h3><div class="scroll"><table><tbody>${others}</tbody></table></div></div>`) +
     (waivers.length === 0
       ? ''
-      : `<p class="small">Your claims: ${waivers
+      : `<p class="small" data-spoiler>Your claims: ${waivers
           .map((o) => {
             const c = claimed.get(o.claim);
             const what = c === undefined ? '' : `+${esc(charName(c.add))}${c.drop === null ? '' : ` −${esc(charName(c.drop))}`}: `;
@@ -1906,6 +1994,105 @@ function renderPlayResult(s: SeasonSession, week: number): string {
   );
 }
 
+/**
+ * The scrying ball's account of a run: one line per check or battle in path order, then how it ended, beside the loot
+ * carried. Each line carries the loot banked so far (`data-total`) for the reveal's counter; the outcome sits in
+ * `.outcome` and the die in `[data-roll]`, so the reveal can roll the die and hold the outcome back.
+ */
+function taleHtml(mission: Mission, run: RunResult, curse: { readonly by: string; readonly ability: Ability } | null = null): string {
+  const byId = new Map(mission.nodes.map((n) => [n.id, n]));
+  const steps = taleSteps(mission, run);
+  const banked = steps.at(-1)?.total ?? 0;
+  // A rival's hex opens the tale, in the rival's colours: the curse falls before the party sets out.
+  const head =
+    curse === null
+      ? []
+      : [
+          `<li data-head="curse" class="curse"${bannerAttr(curse.by)}>${bannerOf(curse.by) === null ? '' : '<i class="flag" aria-hidden="true"></i> '}` +
+            `<b>${esc(godOf.has(curse.by) ? godName(godOf.get(curse.by)!) : tavernName(curse.by))}</b>'s curse falls on your party, from <b>${esc(tavernName(curse.by))}</b>: ` +
+            `disadvantage on every ${esc(ABILITY_NAMES[curse.ability])} check and save.</li>`,
+        ];
+  const lines = steps.flatMap(({ node: id, record: r, bank, total }) => {
+    if (r === null) return [];
+    const node = byId.get(id);
+    const loot = bank > 0 ? ` <span class="tag brass" data-bank>+${bank} loot</span>` : '';
+    const attrs = `data-node="${esc(id)}" data-total="${total}"`;
+    if (r.kind === 'check') {
+      const sum = r.d20 + r.modifier;
+      const gated = node?.kind === 'check' && node.check.requires !== undefined && sum >= r.dc && r.outcome === 'fail';
+      const what = node?.kind === 'check' ? checkLabel(node.check) : id;
+      const edge = r.advantage ? ' <span class="tag brass">adv</span>' : r.disadvantage ? ' <span class="tag bad" title="Hexed: the lower of two d20s">dis</span>' : '';
+      return [
+        `<li ${attrs} data-kind="check"><b>${esc(what)}</b>: ${esc(charName(r.actor))} rolls ` +
+          `<span class="die ${r.d20 === 20 ? 'hi' : r.d20 === 1 ? 'lo' : ''}" data-roll="d20">${r.d20}</span>${edge} ` +
+          `<span class="outcome">${signed(r.modifier)} = ${sum}: <span class="${r.outcome}">${r.outcome}</span>${gated ? ' <span class="tag bad">gate</span>' : ''}${loot}</span></li>`,
+      ];
+    }
+    const foes = node?.kind === 'battle' ? node.encounter.creatures.map((c) => `${c.count}× ${c.ref}`).join(', ') : id;
+    return [
+      `<li ${attrs} data-kind="battle"><b>Battle</b> with ${esc(foes)}: needs under ${r.pWin.toFixed(3)}, the ball shows ` +
+        `<span class="die" data-roll="unit">${r.roll.toFixed(3)}</span> <span class="outcome"><span class="${r.outcome === 'win' ? 'pass' : 'fail'}">${r.outcome === 'win' ? 'won' : 'lost'}</span>${loot}</span></li>`,
+    ];
+  });
+  if (run.retreatedBefore !== null) {
+    lines.push(`<li data-tail="retreat" data-total="${run.loot}">The party thinks better of <b>${esc(run.retreatedBefore)}</b> and turns for home, keeping ${run.loot} loot.</li>`);
+  }
+  if (run.dnf) {
+    lines.push(`<li data-tail="dnf" data-total="0"><span class="fail">Beaten.</span> The party flees, dropping all ${banked} loot.</li>`);
+    if (run.injury !== null) lines.push(`<li data-tail="injury" data-total="0"><b data-hurt>${esc(charName(run.injury.character))}</b> limps home hurt and sits out next week.</li>`);
+  } else if (run.retreatedBefore === null) {
+    lines.push(`<li data-tail="home" data-total="${run.loot}">Home with ${run.loot} loot.</li>`);
+  }
+  return (
+    `<div class="tale-box"><div class="row" style="justify-content:space-between"><span class="label">The scrying ball</span>` +
+    `<div class="row"><span class="small">loot carried <b class="num loot-count" data-loot="${run.loot}">${run.loot}</b></span>` +
+    `<button type="button" class="small" data-reveal-skip title="Show the result now (Esc)">Skip</button>` +
+    `<button type="button" class="small" data-action="play-replay" data-after-reveal>Watch again</button></div></div>` +
+    `<ol class="tale" aria-live="polite">${[...head, ...lines].join('')}</ol></div>`
+  );
+}
+
+/** The hex that counted against `tavern` in `week` (the first declared, D-52), and who laid it. */
+function curseOn(s: SeasonSession, tavern: string, week: number): { readonly by: string; readonly ability: Ability } | null {
+  const hex = s.state.hexes.find((h) => h.target === tavern && h.week === week);
+  return hex === undefined ? null : { by: hex.tavern, ability: hex.ability };
+}
+
+/** The hex moment: your declared hex lands in the list, in your colours. */
+function layMyCurse(key: string): void {
+  layCurse(panel.querySelector<HTMLElement>(`.hexes [data-hex="${CSS.escape(key)}"]`), bannerColours(play.session?.humanTavern ?? null));
+}
+
+/** A tavern's banner colours for an effect, if it has a banner. */
+function bannerColours(tavern: string | null): Banner | undefined {
+  const god = tavern === null ? null : bannerOf(tavern);
+  return god === null ? undefined : data.gods[god]!.banner;
+}
+
+/** The week reveal: your run plays back over the result card, ending in a moment the size of the week (fx.ts). */
+function revealMyWeek(): void {
+  const card = panel.querySelector<HTMLElement>('.week-result[data-path]');
+  if (card === null) return;
+  const s = play.session;
+  const me = s?.humanTavern ?? null;
+  const mine = bannerColours(me);
+  // The last week's reveal ends the season: its fanfare takes the place of the week's own moment if you won.
+  const final = panel.querySelector<HTMLElement>('.season-final');
+  if (s === null || s.stage.kind !== 'complete' || final === null) {
+    revealWeek(card, mine);
+    return;
+  }
+  const champs = seasonStandings(s.state).filter((r) => r.rank === 1).map((r) => r.tavern);
+  revealWeek(card, mine, () => {
+    if (me !== null && champs.includes(me)) {
+      crownChampion(final, mine);
+      return;
+    }
+    weekMoment(card, mine);
+    window.setTimeout(() => hailChampion(final, bannerColours(champs[0] ?? null)), 1200);
+  });
+}
+
 function renderPlayStandings(s: SeasonSession): string {
   const me = s.humanTavern!;
   const rows = seasonStandings(s.state);
@@ -1914,27 +2101,54 @@ function renderPlayStandings(s: SeasonSession): string {
   const body = rows
     .map(
       (r) =>
-        `<tr class="${r.tavern === me ? 'sel' : ''} ${done && r.rank === 1 ? 'champ' : ''}"><td class="n">${r.rank}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
-        `<td><span class="tag ${r.tavern === me ? 'brass' : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
+        `<tr class="${r.tavern === me ? 'sel mine' : ''} ${done && r.rank === 1 ? 'champ' : ''}"${r.tavern === me ? bannerAttr(me) : ''}><td class="n">${r.rank}</td><td><b>${esc(tavernName(r.tavern))}</b></td>` +
+        `<td><span class="tag ${r.tavern === me ? (bannerOf(me) === null ? 'brass' : 'banner') : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
+  const table =
+    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">loot</th></tr></thead><tbody>${body}</tbody></table></div>` +
+    (done ? '<p class="hint">The season is loaded into the other tabs: Standings, Weeks, Draft board, Pool and Event log.</p>' : '');
+  if (!done) return `<section class="card"><h2>Standings</h2>${table}</section>`;
+
+  // The season's end (fx.ts crownChampion / hailChampion play over this card when the last week's reveal ends).
   const champs = rows.filter((r) => r.rank === 1).map((r) => r.tavern);
   const mine = rows.find((r) => r.tavern === me);
-  const banner = !done
-    ? ''
-    : mine?.rank === 1
-      ? `<p><span class="chip ok"><span class="dot"></span>Champions!</span> ${esc(tavernName(me))} ${champs.length === 1 ? 'wins the season' : 'shares the title'}.</p>`
-      : `<p>${champs.map((t) => esc(tavernName(t))).join(' and ')} ${champs.length === 1 ? 'wins' : 'share'} the season. You finish ${ordinal(mine?.rank ?? rows.length)}.</p>`;
+  const godLine = (tavern: string): string => {
+    const god = godOf.get(tavern);
+    return god === undefined ? '' : ` under the banner of <b>${esc(godName(god))}</b>`;
+  };
+  if (mine?.rank === 1) {
+    const chrome = bannerColours(me) === undefined ? undefined : data.gods[godOf.get(me)!];
+    return (
+      `<section class="card season-final champion${chrome === undefined ? '' : ' banner-card'}"${bannerAttr(me)}>${chrome === undefined ? '' : '<div class="pennant" aria-hidden="true"></div>'}` +
+      `<h2>${champs.length === 1 ? 'Champions of the League' : 'Co-champions of the League'}</h2>` +
+      `<p class="banner-call">${esc(tavernName(me))} ${champs.length === 1 ? 'takes the season' : 'shares the title'} with ${num(mine.points)} loot${godLine(me)}.</p>` +
+      table +
+      `</section>`
+    );
+  }
+  const weeks = [...s.state.finalizedWeeks].flatMap((week) => {
+    const row = standings([], weekResults(s.state, week)).find((r) => r.tavern === me);
+    return row === undefined ? [] : [{ week, points: row.points, rank: row.rank }];
+  });
+  const best = bestWeek(weeks);
+  const champLine = champs
+    .map((t) => `<span class="champ-line"${bannerAttr(t)}>${bannerOf(t) === null ? '' : '<i class="flag" aria-hidden="true"></i> '}<b>${esc(tavernName(t))}</b>${godLine(t)}</span>`)
+    .join(' and ');
   return (
-    `<section class="card"><h2>${done ? 'Final standings' : 'Standings'}</h2>${banner}` +
-    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">loot</th></tr></thead><tbody>${body}</tbody></table></div>` +
-    (done ? '<p class="hint">The season is loaded into the other tabs: Standings, Weeks, Draft board, Pool and Event log.</p>' : '') +
+    `<section class="card season-final">` +
+    `<h2>Final standings</h2>` +
+    `<p>${champLine} ${champs.length === 1 ? 'wins' : 'share'} the season.</p>` +
+    `<p class="finish">You finish <b>${ordinal(mine?.rank ?? rows.length)} of ${rows.length}</b> with ${num(mine?.points ?? 0)} loot.` +
+    (best === null || best.points === 0 ? '' : ` Your best week was week ${best.week}: ${num(best.points)} loot${best.topped ? ', and you topped it' : ''}.`) +
+    `</p>` +
+    table +
     `</section>`
   );
 }
 
 function resetPlay(): void {
-  Object.assign(play, { session: null, error: null, notice: null, seed: '', moves: [], confirmReset: false });
+  Object.assign(play, { session: null, error: null, notice: null, seed: '', moves: [], confirmReset: false, confirmHex: false });
   storageRemove(PLAY_KEY);
 }
 
@@ -1958,7 +2172,8 @@ function playClick(action: string, id: string | undefined): boolean {
       renderTab();
       return true;
     case 'play-tavern-pick':
-      if (id !== undefined) playMoves([{ t: 'tavern', id }]);
+      // Only once the engine accepts the pick: a refusal skips `after`, so no banner goes up.
+      if (id !== undefined) playMoves([{ t: 'tavern', id }], () => (pendingFx = raiseMyBanner));
       return true;
     case 'play-draft':
       if (id !== undefined) playMoves([{ t: 'draft', id }]);
@@ -1983,12 +2198,23 @@ function playClick(action: string, id: string | undefined): boolean {
         play.retreat = lineup.retreat;
       });
       return true;
-    case 'play-hex': {
+    case 'play-hex':
+      play.confirmHex = true;
+      renderTab();
+      return true;
+    case 'play-hex-cancel':
+      play.confirmHex = false;
+      renderTab();
+      return true;
+    case 'play-hex-confirm': {
       const s = play.session;
       const stage = s?.stage;
+      play.confirmHex = false;
       if (s === null || stage?.kind !== 'week') return true;
-      const target = play.hexTarget !== '' && s.taverns.includes(play.hexTarget) ? play.hexTarget : s.taverns.find((t) => t !== s.humanTavern)!;
-      playMoves([{ t: 'hex', target, ability: play.hexAbility, week: Math.max(play.hexWeek, stage.week) }]);
+      const rivals = s.taverns.filter((t) => t !== s.humanTavern);
+      const target = play.hexTarget !== '' && rivals.includes(play.hexTarget) ? play.hexTarget : rivals[0]!;
+      const week = Math.max(play.hexWeek, stage.week);
+      playMoves([{ t: 'hex', target, ability: play.hexAbility, week }], () => (pendingFx = () => layMyCurse(`${s.humanTavern}>${target}>${week}`)));
       return true;
     }
     case 'play-claim':
@@ -2016,9 +2242,14 @@ function playClick(action: string, id: string | undefined): boolean {
       const moves: PlayMove[] = lineup === null || same || !legal ? [] : [{ t: 'lineup', starters: [...lineup.starters], retreat: lineup.retreat }];
       playMoves([...moves, { t: 'week' }], () => {
         play.played = stage.week;
+        pendingFx = revealMyWeek;
       });
       return true;
     }
+    case 'play-replay':
+      pendingFx = revealMyWeek;
+      renderTab();
+      return true;
   }
   return false;
 }

@@ -233,6 +233,9 @@ importers:
       '@league-of-taverns/scripts':
         specifier: workspace:*
         version: link:../scripts
+      party-js:
+        specifier: 2.2.0
+        version: 2.2.0
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -997,6 +1000,9 @@ packages:
   p-locate@5.0.0:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
+
+  party-js@2.2.0:
+    resolution: {integrity: sha512-50hGuALCpvDTrQLPQ1fgUgxKIWAH28ShVkmeK/3zhO0YJyCqkhrZhQEkWPxDYLvbFJ7YAXyROmFEu35gKpZLtQ==}
 
   path-exists@4.0.0:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
@@ -1842,6 +1848,8 @@ snapshots:
   p-locate@5.0.0:
     dependencies:
       p-limit: 3.1.0
+
+  party-js@2.2.0: {}
 
   path-exists@4.0.0: {}
 

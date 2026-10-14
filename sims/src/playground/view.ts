@@ -1,7 +1,7 @@
 /**
  * Pure view-model helpers for the playground: mission graph layout, score
- * histograms, Monte Carlo sampling, the draft board, and
- * the small formatters the page uses. No DOM, so tests run them in Node.
+ * histograms, Monte Carlo sampling, the draft board, the banner stylesheet,
+ * and the small formatters the page uses. No DOM, so tests run them in Node.
  */
 import { SKILLS, replay, retreatOptions, runMission, rngFor } from '@league-of-taverns/engine';
 import type {
@@ -15,11 +15,14 @@ import type {
   Mission,
   MissionNode,
   Modifier,
+  NodeRecord,
   Party,
   RetreatOrder,
   RunOptions,
+  RunResult,
   Skill,
 } from '@league-of-taverns/engine';
+import type { GodChrome } from '@league-of-taverns/scripts/lib/god-schema';
 import type { Aggregate } from '../season-runner';
 
 // ── mission graph layout ───────────────────────────────────────────────────
@@ -430,4 +433,112 @@ const SEED_NOUNS = ['ale', 'anvil', 'barrel', 'candle', 'flagon', 'goblet', 'hea
 export function seedWords(rand: () => number): string {
   const pick = <T>(list: ReadonlyArray<T>): T => list[Math.floor(rand() * list.length)]!;
   return `${pick(SEED_ADJECTIVES)}-${pick(SEED_NOUNS)}-${Math.floor(rand() * 100)}`;
+}
+
+// ── the week reveal ────────────────────────────────────────────────────────
+
+/** One node of a run, in path order, as the week reveal plays it. */
+export interface TaleStep {
+  readonly node: string;
+  /** The node before it on the path, null for the first. */
+  readonly from: string | null;
+  /** The check or battle rolled here, null for a node with no roll (start, end). */
+  readonly record: NodeRecord | null;
+  /** Loot this node banked: a passed check's `loot`, a won battle's bounty, else 0. */
+  readonly bank: number;
+  /** Loot banked so far, this node included. A DNF loses it all afterwards (D-54). */
+  readonly total: number;
+}
+
+/**
+ * The steps of a run in path order, with the loot banked along the way. The
+ * last step's `total` is `run.loot` unless the run ended in a DNF, which
+ * carries nothing home.
+ */
+export function taleSteps(mission: Mission, run: RunResult): ReadonlyArray<TaleStep> {
+  const nodes = new Map(mission.nodes.map((n) => [n.id, n]));
+  const records = new Map(run.nodes.map((r) => [r.node, r]));
+  let total = 0;
+  return run.path.map((id, i) => {
+    const node = nodes.get(id);
+    const record = records.get(id) ?? null;
+    const bank =
+      record === null || node === undefined
+        ? 0
+        : record.kind === 'check' && node.kind === 'check' && record.outcome === 'pass'
+          ? node.loot
+          : record.kind === 'battle' && node.kind === 'battle' && record.outcome === 'win'
+            ? (node.loot ?? 0)
+            : 0;
+    total += bank;
+    return { node: id, from: i === 0 ? null : run.path[i - 1]!, record, bank, total };
+  });
+}
+
+/**
+ * How a week went for one tavern, which sets the size of its moment (fx.ts
+ * weekMoment). One per week, the first that holds: a DNF (loss), topping the
+ * week (triumph), turning back (relief), beating the scrying ball's own
+ * projection (satisfaction), else quiet, which gets no effect at all so the
+ * others keep meaning something.
+ */
+export type WeekOutcome = 'dnf' | 'top' | 'retreat' | 'good' | 'quiet';
+
+export function weekOutcome(week: {
+  readonly rank: number;
+  readonly points: number;
+  readonly projected: number;
+  readonly dnf: boolean;
+  readonly retreated: boolean;
+}): WeekOutcome {
+  if (week.dnf) return 'dnf';
+  if (week.rank === 1 && week.points > 0) return 'top';
+  if (week.retreated) return 'retreat';
+  if (week.points > week.projected) return 'good';
+  return 'quiet';
+}
+
+/** A tavern's best week of a season: the most points, the earliest on a tie, and whether it topped that week. Null with no weeks. */
+export function bestWeek(
+  weeks: ReadonlyArray<{ readonly week: number; readonly points: number; readonly rank: number }>,
+): { readonly week: number; readonly points: number; readonly topped: boolean } | null {
+  let best: { week: number; points: number; rank: number } | null = null;
+  for (const w of weeks) if (best === null || w.points > best.points || (w.points === best.points && w.week < best.week)) best = w;
+  return best === null ? null : { week: best.week, points: best.points, topped: best.rank === 1 && best.points > 0 };
+}
+
+// ── banners ────────────────────────────────────────────────────────────────
+
+const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const HEX = /^#[0-9a-f]{6}$/;
+
+/**
+ * The gods that get a banner: those whose id, colours and texture name are
+ * well formed. The build validates every god file; this keeps a bad value
+ * out of a selector or a style attribute all the same.
+ */
+export function bannerGods(gods: Readonly<Record<string, GodChrome>>): ReadonlySet<string> {
+  return new Set(
+    Object.entries(gods)
+      .filter(([god, { banner: b }]) => KEBAB.test(god) && HEX.test(b.field) && HEX.test(b.charge) && HEX.test(b.mark) && KEBAB.test(b.texture))
+      .map(([god]) => god),
+  );
+}
+
+/**
+ * The banner stylesheet: per god, its mark as `--mark-<god>` on :root (for
+ * swatches and chart lines anywhere) and, on `[data-banner="<god>"]`, its
+ * colours and texture as custom properties. page.html § Banners turns those
+ * into every banner surface, so no god has CSS of its own. Only `bannerGods`.
+ */
+export function bannerCss(gods: Readonly<Record<string, GodChrome>>): string {
+  return [...bannerGods(gods)]
+    .map((god) => {
+      const b = gods[god]!.banner;
+      return (
+        `:root{--mark-${god}:${b.mark}}\n` +
+        `[data-banner="${god}"]{--banner-field:${b.field};--banner-charge:${b.charge};--banner-mark:${b.mark};--banner-pattern:var(--tex-${b.texture})}`
+      );
+    })
+    .join('\n');
 }

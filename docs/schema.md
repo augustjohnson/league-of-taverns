@@ -69,6 +69,31 @@ the latter.
 **Changing base** between seasons is allowed but rare. It is a GM decision
 recorded in the PR, and the career history follows the id.
 
+## God
+
+`gods/<god-id>/god.yaml`. One per god, kept across seasons. Chrome only:
+which tavern a god blesses and which week it sets are mechanical and live in
+`schedule.yaml` (D-52). A season with its own `characters/` folder (the mock
+season) keeps its `gods/` beside it. Types: `scripts/src/lib/god-schema.ts`.
+
+```yaml
+id: the-storm-crow           # required, kebab-case, must match the folder name and schedule.yaml's `god`
+chrome:                      # everything is cosmetic and never reaches the engine
+  name: The Storm Crow       # required
+  call: You fight under the banner of the Storm Crow!   # optional; what the god says to its barkeep
+  banner:                    # required: the colours the god's tavern fights under
+    field: '#d4e6f7'         # pale ground (relative luminance at least 0.6); never carries text
+    charge: '#f5e9a8'        # pale accent the texture is drawn in (same rule)
+    mark: '#2a78d6'          # strong colour: swatch, chart line, row edge, base for banner text
+    texture: rain            # rain | waves | thorns | stipple | crosshatch | rays
+```
+
+Colours are lowercase `#rrggbb`. `validate` requires a god file for every
+tavern's god and a different `mark` for each god in the season. The page
+derives everything else (dark-theme fills, text and line colours, the texture
+itself) from these four values with one shared set of CSS rules, so no god
+has CSS of its own. A banner never stands in for pass, fail or brass.
+
 ## Pool and modifiers
 
 `seasons/<season>/pool.yaml`

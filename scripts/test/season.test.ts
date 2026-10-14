@@ -70,6 +70,8 @@ interface SeasonFixture {
   readonly keywordsOf?: Readonly<Record<number, ReadonlyArray<string>>>;
   /** Week → sponsor (god) id. Unlisted weeks are unsponsored. */
   readonly sponsorOf?: Readonly<Record<number, string>>;
+  /** God → banner mark; null leaves the god's gods/<id>/god.yaml out. Unlisted gods get a file with a mark of their own. */
+  readonly godMarks?: Readonly<Record<string, string | null>>;
 }
 
 /** Write seasons/<id>/ under `root` with season-01's config adjusted by `fixture`. */
@@ -105,6 +107,12 @@ function makeSeason(root: string, id: string, fixture: SeasonFixture = {}): void
   }));
   const taverns = fixture.taverns ?? [{ id: 'the-inn', name: 'The Inn', god: 'the-sea' }];
   write(join(dir, 'schedule.yaml'), toYaml({ season: id, taverns, weeks }));
+  taverns.forEach(({ god }, i) => {
+    const mark = fixture.godMarks?.[god] === undefined ? `#${String(i).padStart(6, '0')}` : fixture.godMarks[god];
+    if (mark === null) return;
+    const banner = { field: '#dde8f0', charge: '#f2ead0', mark, texture: 'rain' };
+    write(join(root, 'gods', god, 'god.yaml'), toYaml({ id: god, chrome: { name: god, banner } }));
+  });
 }
 
 describe('season-01', () => {
@@ -404,6 +412,22 @@ describe('validateSeason', () => {
     const { issues } = validateSeason('fibbing', root);
     expect(issues.filter((i) => i.includes('keywords'))).toEqual([
       'seasons/fibbing/schedule.yaml: weeks[0].keywords: "stealth" names nothing in mission "climb" (D-42)',
+    ]);
+  });
+
+  it("reports a tavern's god with no banner, and two gods sharing a mark (D-52)", () => {
+    makeSeason(root, 'clashing', {
+      taverns: [
+        { id: 'the-inn', name: 'The Inn', god: 'the-gull' },
+        { id: 'the-den', name: 'The Den', god: 'the-moth' },
+        { id: 'the-pit', name: 'The Pit', god: 'the-void' },
+      ],
+      godMarks: { 'the-gull': '#2a78d6', 'the-moth': '#2a78d6', 'the-void': null },
+    });
+    const { issues } = validateSeason('clashing', root);
+    expect(issues).toEqual([
+      'seasons/clashing/schedule.yaml: gods "the-gull" and "the-moth" share the banner mark #2a78d6: give each tavern its own colour',
+      expect.stringMatching(/^gods\/the-void\/god\.yaml: /),
     ]);
   });
 

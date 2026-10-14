@@ -9,6 +9,9 @@ import { loadMockSeason, loadMockSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
 import {
+  bannerCss,
+  bestWeek,
+  bannerGods,
   draftBoard,
   formatCr,
   formatCrTotal,
@@ -19,7 +22,9 @@ import {
   scoreFraction,
   scoreHistogram,
   seedWords,
+  taleSteps,
   topSkills,
+  weekOutcome,
   waiverReasonLabel,
 } from '../src/playground/view';
 import { runMockSeason } from '../src/season-runner';
@@ -167,19 +172,97 @@ describe('view helpers', () => {
   });
 });
 
+describe('the week reveal', () => {
+  it('banks loot along the path and ends on what the engine carried home, or on 0 after a DNF', () => {
+    let runs = 0;
+    let dnfs = 0;
+    for (const [week, byTavern] of sim1.state.results) {
+      const mission = nodeInput.missions.get(week)!.mission;
+      for (const { run } of byTavern.values()) {
+        const steps = taleSteps(mission, run);
+        expect(steps.map((st) => st.node)).toEqual(run.path);
+        expect(steps.map((st) => st.from)).toEqual([null, ...run.path.slice(0, -1)]);
+        expect(steps.filter((st) => st.record !== null).map((st) => st.record)).toEqual(run.nodes);
+        const banked = steps.at(-1)?.total ?? 0;
+        expect(banked).toBe(steps.reduce((sum, st) => sum + st.bank, 0));
+        if (run.dnf) {
+          dnfs++;
+          expect(run.loot).toBe(0);
+        } else {
+          expect(banked).toBe(run.loot);
+        }
+        runs++;
+      }
+    }
+    expect(runs).toBeGreaterThan(30);
+    expect(dnfs).toBeLessThan(runs);
+  });
+});
+
+describe('week outcomes', () => {
+  const week = { rank: 3, points: 40, projected: 50, dnf: false, retreated: false };
+
+  it('picks one moment per week, the first that holds: DNF, top, retreat, beat the projection, else quiet', () => {
+    expect(weekOutcome(week)).toBe('quiet');
+    expect(weekOutcome({ ...week, points: 51 })).toBe('good');
+    expect(weekOutcome({ ...week, points: 51, retreated: true })).toBe('retreat');
+    expect(weekOutcome({ ...week, rank: 1, retreated: true })).toBe('top');
+    expect(weekOutcome({ ...week, rank: 1, points: 0, dnf: true })).toBe('dnf');
+  });
+
+  it('does not crown a week where every tavern scored nothing', () => {
+    expect(weekOutcome({ ...week, rank: 1, points: 0, projected: 0 })).toBe('quiet');
+  });
+});
+
+describe('season finish', () => {
+  it('finds the best week: the most points, the earliest on a tie, and whether it topped the week', () => {
+    expect(bestWeek([])).toBeNull();
+    expect(bestWeek([{ week: 1, points: 40, rank: 3 }, { week: 2, points: 90, rank: 1 }, { week: 3, points: 90, rank: 2 }])).toEqual({ week: 2, points: 90, topped: true });
+    expect(bestWeek([{ week: 4, points: 0, rank: 1 }])).toEqual({ week: 4, points: 0, topped: false });
+  });
+});
+
+describe('banner stylesheet', () => {
+  const crow = { name: 'The Storm Crow', banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: 'rain' as const } };
+
+  it('sets each god\'s colours and texture as custom properties, and its mark on :root', () => {
+    expect(bannerCss({ 'the-storm-crow': crow }).split('\n')).toEqual([
+      ':root{--mark-the-storm-crow:#2a78d6}',
+      '[data-banner="the-storm-crow"]{--banner-field:#d4e6f7;--banner-charge:#f5e9a8;--banner-mark:#2a78d6;--banner-pattern:var(--tex-rain)}',
+    ]);
+  });
+
+  it('skips a god whose id or colours could break out of the stylesheet', () => {
+    const gods = {
+      'the-storm-crow': crow,
+      'bad"]{x:y}': crow,
+      'the-red-one': { ...crow, banner: { ...crow.banner, mark: 'red;}body{display:none' } },
+    };
+    expect([...bannerGods(gods)]).toEqual(['the-storm-crow']);
+    expect(bannerCss(gods)).not.toMatch(/bad|red|display/);
+  });
+});
+
 describe('playground build', () => {
   const dir = mkdtempSync(join(tmpdir(), 'lot-playground-'));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   it('writes one self-contained Artifact body', async () => {
     const out = join(dir, 'index.html');
-    const { bytes } = await writePlayground(out);
+    const { bytes, data: built } = await writePlayground(out);
+    // Every sponsoring god's chrome rides along for the banners.
+    expect(Object.keys(built.gods).sort()).toEqual(parts.sponsors.map((sp) => sp.id).sort());
+    expect(bannerGods(built.gods).size).toBe(parts.sponsors.length);
     const html = readFileSync(out, 'utf8');
     expect(html.startsWith('<title>League of Taverns Playground</title>')).toBe(true);
     expect(html).not.toMatch(/<(html|head|body)\b|<!doctype/i);
     expect(html.match(/<script\b/g)).toHaveLength(1);
     expect(html.match(/<style\b/g)).toHaveLength(1);
     expect(html).toContain('var __PLAYGROUND_DATA__=');
+    // micron's CSS is vendored into the one style block, with its MIT notice.
+    expect(html).toContain('.mjs-swing{');
+    expect(html).toContain('Copyright (c) 2018 Webkul');
     expect(html).not.toMatch(/\bfetch\(/);
     expect(html).toMatch(/^[\t\n\r -~]*$/);
     expect(bytes).toBeLessThan(2 * 1024 * 1024);
