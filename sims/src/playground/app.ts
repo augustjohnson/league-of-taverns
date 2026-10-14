@@ -61,7 +61,7 @@ import {
 } from '../reports';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInputFromData, type PlaygroundData } from './data';
-import { crownChampion, hailChampion, layCurse, raiseBanner, revealWeek, weekMoment } from './fx';
+import { crownChampion, hailChampion, layCurse, raiseBanner, revealWeek, turnCard, weekMoment } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -1455,6 +1455,8 @@ const play = {
   /** The hex form is asking "are you sure?" (a hex is public and final). */
   confirmHex: false,
   draftSort: 'value' as 'value' | 'cr',
+  /** Free agents as character cards or the dense table; remembered in this browser. */
+  faView: (storageGet('lot-playground-fa-view') === 'table' ? 'table' : 'cards') as 'cards' | 'table',
   filter: '',
   /** The lineup builder: starters in lineup order, and the retreat order. */
   picks: [] as string[],
@@ -1630,6 +1632,35 @@ function charRow(id: string, action: string, extra = ''): string {
 }
 const CHAR_HEAD = '<th></th><th>character</th><th class="n">CR</th><th>best skills</th><th>moves</th><th class="n">AC / HP</th>';
 
+/** A head-and-shoulders outline: the card's art until the character has a portrait. */
+const SILHOUETTE =
+  '<svg class="silhouette" viewBox="0 0 100 80" aria-hidden="true"><circle cx="50" cy="30" r="17"/><path d="M14 80c2-20 17-30 36-30s34 10 36 30z"/></svg>';
+
+/**
+ * A character card: name and CR across the top, the art (a silhouette until portraits reach the page), the monster
+ * line with its size in words ("Ape · Medium beast"), AC, HP and speed, and the best skills. Neutral until a tavern
+ * owns the character; then it wears that tavern's banner. `foot` is the card's action or note.
+ */
+function charCard(id: string, { owner = null, foot = '', advised = false }: { owner?: string | null; foot?: string; advised?: boolean } = {}): string {
+  const st = input.statsOf(id);
+  const themed = owner !== null && bannerOf(owner) !== null;
+  const speeds = Object.entries(st.speeds).filter(([k]) => k !== 'walk');
+  const speed = speeds.length > 0 ? speeds.map(([k, v]) => `${k} ${v}`).join(' · ') : `walk ${st.speeds.walk ?? 0}`;
+  const size = st.base.size.charAt(0).toUpperCase() + st.base.size.slice(1);
+  return (
+    `<article class="lcard ${themed ? 'themed' : 'neutral'}${advised ? ' advised' : ''}" data-card="${esc(id)}"${themed ? bannerAttr(owner) : ''}>` +
+    `<header><div class="who"><b>${esc(charName(id))}</b></div><span class="cr" title="Challenge rating">${formatCr(crOf(id))}</span></header>` +
+    `<div class="art">${SILHOUETTE}</div>` +
+    `<div class="typeline"><b>${esc(st.base.typeName)}</b><span class="sizeword">${esc(size)} ${esc(st.base.creatureType)}</span></div>` +
+    `<div class="stats"><span>AC <b>${st.base.ac}</b></span><span>HP <b>${st.base.hp}</b></span><span>${esc(speed)}</span></div>` +
+    `<div class="skills">${topSkills(st, 2)
+      .map((t) => `${esc(t.skill.replaceAll('_', ' '))} ${signed(t.modifier)}`)
+      .join(' · ')}</div>` +
+    (foot === '' ? '' : `<div class="card-foot">${foot}</div>`) +
+    `</article>`
+  );
+}
+
 function matchesFilter(id: string, q: string): boolean {
   if (q === '') return true;
   const s = input.statsOf(id);
@@ -1759,15 +1790,25 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
   const q = play.filter.trim().toLowerCase();
   const available = freeAgents(s.state);
   const values = s.draftValues(available);
-  const rows = available
+  const shown = available
     .filter((id) => matchesFilter(id, q))
-    .sort((a, b) => (play.draftSort === 'value' ? values.get(b)! - values.get(a)! : crOf(b) - crOf(a)) || charName(a).localeCompare(charName(b)))
+    .sort((a, b) => (play.draftSort === 'value' ? values.get(b)! - values.get(a)! : crOf(b) - crOf(a)) || charName(a).localeCompare(charName(b)));
+  const draftButton = (id: string): string =>
+    `<button type="button" class="${id === advice ? 'primary ' : ''}small" data-action="play-draft" data-id="${esc(id)}">Draft</button>`;
+  const rows = shown
     .map((id) => {
       const advised = id === advice;
-      const btn = `<button type="button" class="${advised ? 'primary ' : ''}small" data-action="play-draft" data-id="${esc(id)}">Draft</button>`;
       const extra = `<td class="n small">${values.get(id)!.toFixed(2)}</td><td>${advised ? '<span class="tag brass">advisor</span>' : ''}</td>`;
-      return charRow(id, btn, extra).replace('<tr>', advised ? '<tr class="advised">' : '<tr>');
+      return charRow(id, draftButton(id), extra).replace('<tr>', advised ? '<tr class="advised">' : '<tr>');
     })
+    .join('');
+  const cards = shown
+    .map((id) =>
+      charCard(id, {
+        advised: id === advice,
+        foot: `${draftButton(id)}<span class="small muted" title="The bots' rating">value ${values.get(id)!.toFixed(2)}</span>${id === advice ? '<span class="tag brass">advisor</span>' : ''}`,
+      }),
+    )
     .join('');
   const board = draftBoard(
     s.state.draft.order,
@@ -1786,13 +1827,16 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(charName(p.character))}</b>`).join('; ')}.</p>`) +
     `<p class="small">Advisor (${esc(managerBot(s.human!.manager))}) suggests <b>${esc(charName(advice))}</b> <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
     `<button type="button" class="primary small" data-action="play-draft" data-id="${esc(advice)}">Take it</button></p>` +
-    `<div class="cols"><div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
-    (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<ul class="stack" style="list-style:none;margin:0;padding:0">${mine.map((id) => `<li>${charLabel(id)}</li>`).join('')}</ul>`) +
-    `<p class="hint">Each week you start ${config.roster.starters} with total CR at most ${formatCr(BUDGET)}.</p></div>` +
-    `<div class="stack"><div class="row"><span class="label">Free agents</span><input type="text" id="play-filter" placeholder="Filter by name or skill" value="${esc(play.filter)}" data-action="play-filter">` +
-    `<label class="label" for="play-sort">Sort</label><select id="play-sort" data-action="play-sort"><option value="value" ${play.draftSort === 'value' ? 'selected' : ''}>value, best first</option><option value="cr" ${play.draftSort === 'cr' ? 'selected' : ''}>CR, high first</option></select></div>` +
-    `<div id="play-fa" class="scroll"><table><thead><tr>${CHAR_HEAD}<th class="n" title="The bots' rating: battle strength plus skill breadth, per CR">value</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted">No match.</td></tr>'}</tbody></table></div>` +
-    `<p class="hint">Value is the bots' rating: battle strength plus skill breadth, per CR, with the cheapest picks rated as if they cost more, since unspent budget is worth nothing. Your advisor also weighs your roster so far.</p></div></div></section>` +
+    `<div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
+    (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<div class="deck" id="play-roster">${mine.map((id) => charCard(id, { owner: me })).join('')}</div>`) +
+    `<p class="hint">Each week you start ${config.roster.starters} with total CR at most ${formatCr(BUDGET)}.</p></div></section>` +
+    `<section class="card"><div class="row"><h3>Free agents</h3><input type="text" id="play-filter" placeholder="Filter by name or skill" value="${esc(play.filter)}" data-action="play-filter">` +
+    `<label class="label" for="play-sort">Sort</label><select id="play-sort" data-action="play-sort"><option value="value" ${play.draftSort === 'value' ? 'selected' : ''}>value, best first</option><option value="cr" ${play.draftSort === 'cr' ? 'selected' : ''}>CR, high first</option></select>` +
+    `<label class="label" for="play-fa-view">Show</label><select id="play-fa-view" data-action="play-fa-view"><option value="cards" ${play.faView === 'cards' ? 'selected' : ''}>cards</option><option value="table" ${play.faView === 'table' ? 'selected' : ''}>table</option></select></div>` +
+    (play.faView === 'cards'
+      ? `<div id="play-fa" class="deck">${cards || '<p class="muted">No match.</p>'}</div>`
+      : `<div id="play-fa" class="scroll"><table><thead><tr>${CHAR_HEAD}<th class="n" title="The bots' rating: battle strength plus skill breadth, per CR">value</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted">No match.</td></tr>'}</tbody></table></div>`) +
+    `<p class="hint">Value is the bots' rating: battle strength plus skill breadth, per CR, with the cheapest picks rated as if they cost more, since unspent budget is worth nothing. Your advisor also weighs your roster so far.</p></section>` +
     `<section class="card"><h3>Draft board</h3><div class="scroll"><table class="draft"><thead><tr><th>round</th>${s.state.draft.order
       .map((t) => `<th class="${t === me ? 'hot' : ''}">${esc(tavernName(t))}</th>`)
       .join('')}</tr></thead><tbody>${boardRows || `<tr><td colspan="${n + 1}" class="muted">No picks yet.</td></tr>`}</tbody></table></div></section>`
@@ -2176,7 +2220,8 @@ function playClick(action: string, id: string | undefined): boolean {
       if (id !== undefined) playMoves([{ t: 'tavern', id }], () => (pendingFx = raiseMyBanner));
       return true;
     case 'play-draft':
-      if (id !== undefined) playMoves([{ t: 'draft', id }]);
+      // The drafted card turns over into your colours once it lands in your roster.
+      if (id !== undefined) playMoves([{ t: 'draft', id }], () => (pendingFx = () => turnCard(panel.querySelector<HTMLElement>(`#play-roster [data-card="${CSS.escape(id)}"]`))));
       return true;
     case 'play-lu-add':
       if (id !== undefined && play.picks.length < config.roster.starters && !play.picks.includes(id)) {
@@ -2379,6 +2424,11 @@ panel.addEventListener('change', (ev) => {
       break;
     case 'play-sort':
       play.draftSort = target.value as typeof play.draftSort;
+      renderTab();
+      break;
+    case 'play-fa-view':
+      play.faView = target.value === 'table' ? 'table' : 'cards';
+      storageSet('lot-playground-fa-view', play.faView);
       renderTab();
       break;
     case 'wk-week':

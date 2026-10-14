@@ -125,6 +125,12 @@ only the snapshot records used, each pooled character's chrome name, and each
 sponsoring god's chrome (name, call and banner) for display; chrome never
 reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
+In the draft, characters show as cards (`charCard` in `src/playground/app.ts`):
+name and CR, the art (a silhouette until portraits reach the page), the
+monster line with its size in words, AC, HP, speed and best skills. Free
+agents are neutral; your roster wears your banner, and a drafted card turns
+over into it. A Show control swaps the free agents back to the table.
+
 Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
 your tavern raises its banner with one burst of party.js sparkles (bundled)
 and micron's swing (its CSS vendored into `page.html` with its MIT notice),

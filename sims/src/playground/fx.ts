@@ -336,3 +336,22 @@ export function hailChampion(card: HTMLElement, banner?: Banner): void {
   }
   micron(card.querySelector('.finish'), 'fade', { duration: 0.9, delay: 0.6 });
 }
+
+/**
+ * A drafted card turns over: it lands in your roster in neutral chrome, turns
+ * away, and comes back in your banner. A nod. Nothing for a card without a
+ * banner, which stays neutral. Timers, not animationend, drive the turn, so a
+ * tab that stops animating (hidden, or the animation cancelled) still ends
+ * with the card face up in your colours.
+ */
+export function turnCard(card: HTMLElement | null): void {
+  if (card === null || reducedMotion() || !card.classList.contains('themed')) return;
+  card.classList.replace('themed', 'neutral');
+  card.classList.add('turning-out');
+  window.setTimeout(() => {
+    card.classList.remove('turning-out');
+    card.classList.replace('neutral', 'themed');
+    card.classList.add('turning-in');
+    window.setTimeout(() => card.classList.remove('turning-in'), 340);
+  }, 230);
+}
