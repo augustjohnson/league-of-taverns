@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BaseStats } from '../src/adapters/open5e';
 import { TRAITS, effectiveStats } from '../src/characters';
 import type { CheckSpec, Encounter } from '../src/missions';
-import { battleOdds, checkOdds, injuredStarter, passChance, runMission, type BattleModel, type RunResult } from '../src/resolution';
+import { battleOdds, checkAbility, checkOdds, injuredStarter, passChance, runMission, type BattleModel, type RunResult } from '../src/resolution';
 import { rngFor, rollD20, weekSeed, type Rng } from '../src/rng';
 // The engine has no YAML parser, so the example mission and Bruno's ref are
 // read through the scripts loaders, as in missions.test.ts.
@@ -41,6 +41,13 @@ describe('checkOdds', () => {
     expect(passChance(30, 5, true)).toBe(1);
   });
 
+  it('squares the chance under disadvantage, and cancels advantage with disadvantage (D-52)', () => {
+    expect(passChance(0, 11, false, true)).toBeCloseTo(0.25, 12);
+    expect(passChance(0, 11, true, true)).toBeCloseTo(0.5, 12);
+    expect(passChance(0, 11, true, false)).toBeCloseTo(0.75, 12);
+    expect(passChance(30, 5, false, true)).toBe(1);
+  });
+
   it('reads skills for a skill check, saves for a save, ability modifiers for an ability check', () => {
     const party = partyOf([member('a', { skills: { athletics: 5 }, saves: { str: 3 }, abilityMods: { str: 1 } })]);
     expect(checkOdds(party, { type: 'skill', skill: 'athletics', dc: 15 }).modifier).toBe(5);
@@ -76,7 +83,7 @@ describe('checkOdds', () => {
   describe('best fit and tiebreak (D-15)', () => {
     it('picks the highest pass chance, even over an earlier starter', () => {
       const party = partyOf([member('cap', { skills: { stealth: 2 } }), member('b', { skills: { stealth: 5 } })]);
-      expect(checkOdds(party, stealth(14))).toEqual({ actor: 'b', modifier: 5, advantage: false, eligible: true, pPass: 0.6 });
+      expect(checkOdds(party, stealth(14))).toEqual({ actor: 'b', modifier: 5, advantage: false, disadvantage: false, eligible: true, pPass: 0.6 });
     });
 
     it('breaks ties in lineup order (there is no captain, D-12)', () => {
@@ -113,6 +120,37 @@ describe('checkOdds', () => {
     });
   });
 
+  describe('hex (D-52)', () => {
+    const wis = partyOf([member('a', { skills: { perception: 3 } }), member('b', { skills: { perception: 2 }, advantages: ['skill:perception'] })]);
+    const perception = (dc: number): CheckSpec => ({ type: 'skill', skill: 'perception', dc });
+
+    it('gives disadvantage on checks and saves using the hexed ability, and leaves the rest alone', () => {
+      const hexed = { ...wis, hex: 'wis' as const };
+      // Unhexed: b's advantage (+2, DC 12: 1 − 0.45² = 0.7975) beats a's +3 (0.6).
+      expect(checkOdds(wis, perception(12))).toMatchObject({ actor: 'b', advantage: true, disadvantage: false });
+      // Hexed: a rolls with disadvantage (0.6² = 0.36); b's advantage is cancelled (0.55), so b still acts.
+      const odds = checkOdds(hexed, perception(12));
+      expect(odds).toMatchObject({ actor: 'b', advantage: false, disadvantage: false });
+      expect(odds.pPass).toBeCloseTo(0.55, 12);
+      const onlyA = { members: [wis.members[0]!], hex: 'wis' as const };
+      expect(checkOdds(onlyA, perception(12))).toMatchObject({ disadvantage: true });
+      expect(checkOdds(onlyA, perception(12)).pPass).toBeCloseTo(0.36, 12);
+      // A wis save is hexed too; a dex check is not.
+      expect(checkOdds(onlyA, { type: 'save', ability: 'wis', dc: 10 }).disadvantage).toBe(true);
+      expect(checkOdds(onlyA, { type: 'skill', skill: 'stealth', dc: 10 }).disadvantage).toBe(false);
+      expect(checkAbility({ type: 'skill', skill: 'athletics' })).toBe('str');
+    });
+
+    it('rolls two d20s and keeps the lower under disadvantage', () => {
+      const onlyA = { members: [partyOf([member('a', { skills: { perception: 3 } })]).members[0]!], hex: 'wis' as const };
+      const one = missionOf([start(), skillCheck('c', 1, 'perception', 12), end('done', 2)], [edge('start', 'c', 'always'), edge('c', 'done', 'always')]);
+      let i = 0;
+      const dice = [0.9, 0.2]; // d20 19, then 5: keeps 5, and 5 + 3 < 12
+      const run = runMission(onlyA, one, () => () => dice[i++ % 2]!, baseOf, constantModel(1));
+      expect(run.nodes[0]).toMatchObject({ d20: 5, disadvantage: true, advantage: false, outcome: 'fail' });
+    });
+  });
+
   describe('requires gate (D-39)', () => {
     const party = partyOf(
       [
@@ -127,6 +165,7 @@ describe('checkOdds', () => {
         actor: 'flier',
         modifier: 1,
         advantage: false,
+        disadvantage: false,
         eligible: true,
         pPass: 0.5,
       });
@@ -144,6 +183,7 @@ describe('checkOdds', () => {
         actor: 'cap',
         modifier: 6,
         advantage: false,
+        disadvantage: false,
         eligible: false,
         pPass: 0,
       });
@@ -252,8 +292,8 @@ describe('runMission', () => {
     expect(run).toEqual({
       path: ['start', 'a', 'b', 'done'],
       nodes: [
-        { node: 'a', kind: 'check', actor: 'cap', d20: 10, modifier: 2, dc: 12, advantage: false, outcome: 'pass' },
-        { node: 'b', kind: 'check', actor: 'ally', d20: 6, modifier: 3, dc: 10, advantage: false, outcome: 'fail' },
+        { node: 'a', kind: 'check', actor: 'cap', d20: 10, modifier: 2, dc: 12, advantage: false, disadvantage: false, outcome: 'pass' },
+        { node: 'b', kind: 'check', actor: 'ally', d20: 6, modifier: 3, dc: 10, advantage: false, disadvantage: false, outcome: 'fail' },
       ],
       dnf: false,
       retreatedBefore: null,
@@ -281,7 +321,7 @@ describe('runMission', () => {
     expect(run).toEqual({
       path: ['start', 'a', 'fight'],
       nodes: [
-        { node: 'a', kind: 'check', actor: 'cap', d20: 1, modifier: 2, dc: 12, advantage: false, outcome: 'fail' },
+        { node: 'a', kind: 'check', actor: 'cap', d20: 1, modifier: 2, dc: 12, advantage: false, disadvantage: false, outcome: 'fail' },
         { node: 'fight', kind: 'battle', pWin: 0.2, roll: 0.3, outcome: 'lose' },
       ],
       dnf: true,
@@ -357,7 +397,7 @@ describe('runMission', () => {
       const run = runMission(party, late, watch, baseOf, constantModel(0.5), { retreat: 'avoid_battles' });
       expect(run).toEqual({
         path: ['start', 'a'],
-        nodes: [{ node: 'a', kind: 'check', actor: 'cap', d20: 10, modifier: 2, dc: 12, advantage: false, outcome: 'pass' }],
+        nodes: [{ node: 'a', kind: 'check', actor: 'cap', d20: 10, modifier: 2, dc: 12, advantage: false, disadvantage: false, outcome: 'pass' }],
         dnf: false,
         retreatedBefore: 'fight',
         checksPassed: 1,
@@ -385,9 +425,9 @@ describe('runMission', () => {
     const one = missionOf([start(), skillCheck('c', 1, 'stealth', 16), end('done', 2)], [edge('start', 'c', 'always'), edge('c', 'done', 'always')]);
     // 3 and 15: keeps 15, and 15 + 2 ≥ 16. 13 and 2: keeps 13, and 13 + 2 < 16.
     const high = runMission(lucky, one, scripted({ c: [0.1, 0.7] }), baseOf, constantModel(1));
-    expect(high.nodes[0]).toMatchObject({ d20: 15, advantage: true, outcome: 'pass' });
+    expect(high.nodes[0]).toMatchObject({ d20: 15, advantage: true, disadvantage: false, outcome: 'pass' });
     const low = runMission(lucky, one, scripted({ c: [0.6, 0.05] }), baseOf, constantModel(1));
-    expect(low.nodes[0]).toMatchObject({ d20: 13, advantage: true, outcome: 'fail' });
+    expect(low.nodes[0]).toMatchObject({ d20: 13, advantage: true, disadvantage: false, outcome: 'fail' });
     // A check with one `always` edge still counts.
     expect(low).toMatchObject({ path: ['start', 'c', 'done'], checksAttempted: 1, checksPassed: 0, score: 0 });
   });
@@ -404,7 +444,7 @@ describe('runMission', () => {
       [edge('start', 'c', 'always'), edge('c', 'done', 'pass'), edge('c', 'done', 'fail')],
     );
     const run = runMission(party, gated, scripted({ c: [0.99] }), baseOf, constantModel(1));
-    expect(run.nodes).toEqual([{ node: 'c', kind: 'check', actor: 'cap', d20: 20, modifier: 2, dc: 2, advantage: false, outcome: 'fail' }]);
+    expect(run.nodes).toEqual([{ node: 'c', kind: 'check', actor: 'cap', d20: 20, modifier: 2, dc: 2, advantage: false, disadvantage: false, outcome: 'fail' }]);
     expect(run.score).toBe(0);
   });
 
@@ -438,9 +478,9 @@ describe('runMission', () => {
     expect(run).toEqual({
       path: ['start', 'find-path', 'bog-ambush', 'haul-chain', 'crossed-dry'],
       nodes: [
-        { node: 'find-path', kind: 'check', actor: 'bruno-the-bruiser', d20: 12, modifier: -2, dc: 12, advantage: false, outcome: 'fail' },
+        { node: 'find-path', kind: 'check', actor: 'bruno-the-bruiser', d20: 12, modifier: -2, dc: 12, advantage: false, disadvantage: false, outcome: 'fail' },
         { node: 'bog-ambush', kind: 'battle', pWin: 0.5, roll: 0.34700014791451395, outcome: 'win' },
-        { node: 'haul-chain', kind: 'check', actor: 'bruno-the-bruiser', d20: 14, modifier: 4, dc: 13, advantage: false, outcome: 'pass' },
+        { node: 'haul-chain', kind: 'check', actor: 'bruno-the-bruiser', d20: 14, modifier: 4, dc: 13, advantage: false, disadvantage: false, outcome: 'pass' },
       ],
       dnf: false,
       retreatedBefore: null,

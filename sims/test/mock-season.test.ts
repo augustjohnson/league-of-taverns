@@ -112,6 +112,26 @@ describe('one seeded mock season', () => {
     expect(() => replay([...sim1.events.slice(0, cut + 1), bad as (typeof sim1.events)[number]])).toThrow(/lineup\.injured/);
   });
 
+  it('lets bots hex once each, and the hexed rolls at disadvantage on that ability (D-52)', () => {
+    let hexes = 0;
+    let hexedChecks = 0;
+    for (const seed of ['sim-1', 'sim-2', 'sim-3']) {
+      const { events } = seed === 'sim-1' ? sim1 : runMockSeason(input, { seed });
+      const declared = events.flatMap((e) => (e.type === 'hex.declared' ? [e.payload] : []));
+      expect(new Set(declared.map((h) => h.tavern)).size).toBe(declared.length);
+      hexes += declared.length;
+      for (const e of events) {
+        if (e.type !== 'mission.resolved') continue;
+        const hex = declared.find((h) => h.target === e.payload.tavern && h.week === e.payload.week);
+        for (const n of e.payload.run.nodes) if (n.kind === 'check' && n.disadvantage) hexedChecks++;
+        if (hex === undefined) expect(e.payload.run.nodes.every((n) => n.kind !== 'check' || !n.disadvantage)).toBe(true);
+      }
+      expect(verifyResolutions(events)).toEqual([]);
+    }
+    expect(hexes).toBeGreaterThan(6);
+    expect(hexedChecks).toBeGreaterThan(0);
+  });
+
   it('pins the sim-1 champion', () => {
     expect(sim1.summary.champions).toEqual([{ tavern: 'the-drowned-rat', bot: 'cr-greedy' }]);
     expect(sim1.summary.standings[0]!.tavern).toBe('the-drowned-rat');

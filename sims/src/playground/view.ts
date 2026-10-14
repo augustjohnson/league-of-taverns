@@ -5,6 +5,7 @@
  */
 import { SKILLS, replay, runMission, rngFor } from '@league-of-taverns/engine';
 import type {
+  Ability,
   Actor,
   BaseStats,
   BattleModel,
@@ -201,9 +202,10 @@ export function sampleMission(
   return { n, scores, dnfs, mean: n === 0 ? 0 : total / n };
 }
 
-/** A party in lineup order, as the season runner builds it. */
-export function partyFrom(starters: ReadonlyArray<string>, statsOf: (id: string) => EffectiveStats): Party {
-  return { members: starters.map(statsOf) };
+/** A party in lineup order, as the season runner builds it, under a rival's hex if any (D-52). */
+export function partyFrom(starters: ReadonlyArray<string>, statsOf: (id: string) => EffectiveStats, hex?: Ability): Party {
+  const members = starters.map(statsOf);
+  return hex === undefined ? { members } : { members, hex };
 }
 
 // ── retreat orders (D-49) ──────────────────────────────────────────────────

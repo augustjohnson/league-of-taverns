@@ -5,7 +5,13 @@
 import { reverseStandingsPriority, sponsoredTavern, standings, type StandingRow, type WeekResult } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
+import type { Ability } from '../vocabulary';
 import type { LeagueState } from './state';
+
+/** The ability `tavern` is hexed on in `week`, or undefined (D-52). At most one hex per target per week. */
+export function hexOn(state: LeagueState, tavern: string, week: number): Ability | undefined {
+  return state.hexes.find((h) => h.target === tavern && h.week === week)?.ability;
+}
 
 /** Characters who can't start in `week`: hurt in a DNF the week before (D-51). */
 export function injuredFor(state: LeagueState, week: number): ReadonlySet<string> {

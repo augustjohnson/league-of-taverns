@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InvalidEventError, applyEvent, initialState } from '../src/events/reducers';
 import { lineHash, replay, replayLog } from '../src/events/replay';
-import { freeAgents, homeTavern, onTheClock, seasonStandings, tavernPickOnTheClock, weekResults } from '../src/events/selectors';
+import { freeAgents, hexOn, homeTavern, onTheClock, seasonStandings, tavernPickOnTheClock, weekResults } from '../src/events/selectors';
 import type { LeagueState } from '../src/events/state';
 import type { LeagueEvent, PayloadByType } from '../src/events/types';
 import { standings, type SeasonConfig } from '../src/league';
@@ -268,6 +268,8 @@ const pickOrder = [...draftOrder(MANAGERS, config, rngFor(draftOrderSeed(config.
 const [firstToChoose, secondToChoose] = [pickOrder[0]!, pickOrder[1]!];
 const firstChoice = A;
 const afterFirstChoice = applyEvent(at.joined, candidate(at.joined, 'tavern.chosen', { manager: firstToChoose, tavern: firstChoice }, MANAGER));
+/** A hexes B's wisdom in week 2 (D-52). */
+const hexedOnce = applyEvent(at.drafted, candidate(at.drafted, 'hex.declared', { tavern: A, target: B, ability: 'wis', week: 2 }, MANAGER));
 /** Three managers joined into a fresh season. */
 const joinedThree = [0, 1, 2].reduce(
   (s, i) => applyEvent(s, candidate(s, 'manager.joined', { manager: `manager-${i}`, account: { githubId: 101 + i, login: `manager-${i}` } }, COMMISSIONER)),
@@ -409,6 +411,13 @@ const cases: ReadonlyArray<Case> = [
   ['lock with a null lineup marked submitted', at.w1Pending, candidate(at.w1Pending, 'lineup.locked', { week: 1, lineups: [{ ...w1Entries[0]!, lineup: null }, ...w1Entries.slice(1)] }), 'lock.source_mismatch'],
   ['lock with an illegal lineup', at.w1Pending, candidate(at.w1Pending, 'lineup.locked', { week: 1, lineups: [{ ...w1Entries[0]!, lineup: foreignLineup }, ...w1Entries.slice(1)] }), 'lock.illegal_lineup'],
 
+  // hex.declared
+  ['a hex by an unknown tavern', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: 'nobody', target: B, ability: 'wis', week: 2 }, MANAGER), 'hex.unknown_tavern'],
+  ['a hex on itself', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: A, target: A, ability: 'wis', week: 2 }, MANAGER), 'hex.self'],
+  ['a hex past the season', at.drafted, candidate(at.drafted, 'hex.declared', { tavern: A, target: B, ability: 'wis', week: 3 }, MANAGER), 'hex.bad_week'],
+  ['a hex on a locked week', at.w1Locked, candidate(at.w1Locked, 'hex.declared', { tavern: A, target: B, ability: 'wis', week: 1 }, MANAGER), 'hex.week_locked'],
+  ['a second hex in a season', hexedOnce, candidate(hexedOnce, 'hex.declared', { tavern: A, target: C, ability: 'str', week: 1 }, MANAGER), 'hex.used'],
+  ['a second hex on one target in one week', hexedOnce, candidate(hexedOnce, 'hex.declared', { tavern: C, target: B, ability: 'str', week: 2 }, MANAGER), 'hex.target_taken'],
   // waiver.claimed
   ['claim before the draft completes', at.drafting, candidate(at.drafting, 'waiver.claimed', { claim: 'c', tavern: A, add: 'char-24', drop: null }), 'waiver.draft_incomplete'],
   ['claim by an unknown tavern', at.w1Finalized, candidate(at.w1Finalized, 'waiver.claimed', { claim: 'c', tavern: 'nowhere', add: 'char-24', drop: null }), 'waiver.unknown_tavern'],
@@ -494,6 +503,14 @@ describe('preconditions', () => {
     expect(error.code).toBe(code);
     expect(error.seq).toBe(event.seq);
     expect(error.message).toContain(`[${code}]`);
+  });
+
+  it('records a hex for its target and week only (D-52)', () => {
+    expect(hexOn(hexedOnce, B, 2)).toBe('wis');
+    expect([hexOn(hexedOnce, B, 1), hexOn(hexedOnce, A, 2)]).toEqual([undefined, undefined]);
+    // Another tavern may hex the same target in another week.
+    const two = applyEvent(hexedOnce, candidate(hexedOnce, 'hex.declared', { tavern: C, target: B, ability: 'str', week: 1 }, MANAGER));
+    expect(hexOn(two, B, 1)).toBe('str');
   });
 
   it('accepts bot managers that share a strategy', () => {

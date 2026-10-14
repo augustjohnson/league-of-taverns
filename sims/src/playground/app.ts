@@ -10,10 +10,12 @@
  * on `data-action` attributes. Pure helpers live in ./view.ts.
  */
 import {
+  ABILITIES,
   battleOdds,
   checkOdds,
   evTtkBreakdown,
   freeAgents,
+  hexOn,
   homeTavern,
   injuredFor,
   lineHash,
@@ -30,6 +32,7 @@ import {
   validateLineup,
 } from '@league-of-taverns/engine';
 import type {
+  Ability,
   CrEighths,
   EvTtkBreakdown,
   LeagueEvent,
@@ -299,7 +302,7 @@ function rollLog(mission: Mission, run: RunResult, home = false): string {
       const what = node?.kind === 'check' ? checkLabel(node.check) : '';
       return (
         `<tr><td class="n">${i + 1}</td><td>${esc(r.node)}<div class="muted small">${esc(what)}</div></td><td>${esc(charName(r.actor))}</td>` +
-        `<td><span class="die ${r.d20 === 20 ? 'hi' : r.d20 === 1 ? 'lo' : ''}">${r.d20}</span>${r.advantage ? ' <span class="tag brass">adv</span>' : ''}</td>` +
+        `<td><span class="die ${r.d20 === 20 ? 'hi' : r.d20 === 1 ? 'lo' : ''}">${r.d20}</span>${r.advantage ? ' <span class="tag brass">adv</span>' : ''}${r.disadvantage ? ' <span class="tag bad" title="Hexed: the lower of two d20s">dis</span>' : ''}</td>` +
         `<td class="sum">${signed(r.modifier)} = <b>${total}</b> ${meets ? '≥' : '<'} DC ${r.dc}</td>` +
         `<td class="${r.outcome}">${r.outcome}${gated ? ' <span class="tag bad">gate</span>' : ''}</td></tr>`
       );
@@ -825,7 +828,7 @@ function renderWeeks(r: Run): string {
   if (entry !== undefined) {
     let projection: Projection | null = null;
     if (entry.lineup !== null) {
-      const party = partyFrom(entry.lineup.starters, input.statsOf);
+      const party = partyFrom(entry.lineup.starters, input.statsOf, hexOn(r.result.state, weeksUi.tavern, week));
       projection = projectMission(party, mission, input.baseOf, input.battleModel, { retreat: entry.lineup.retreat });
     }
     const overlay: Overlay = {
@@ -848,6 +851,10 @@ function renderWeeks(r: Run): string {
           `<div><span class="label">chance of DNF</span><span class="v">${pct(res.projected.pDnf)}</span></div>` +
           `<div><span class="label">checks passed</span><span class="v">${res.run.dnf ? 'DNF' : `${res.run.checksPassed} of ${res.run.checksAttempted}`}</span></div></div>` +
           (homeTavern(r.result.state, week) === weeksUi.tavern ? `<p class="small">Home week: loot × ${config.scoring.homeBonus}.</p>` : '') +
+          (() => {
+            const hex = r.result.state.hexes.find((h) => h.target === weeksUi.tavern && h.week === week);
+            return hex === undefined ? '' : `<p class="small">Hexed by ${esc(tavernName(hex.tavern))}: disadvantage on ${hex.ability} checks and saves.</p>`;
+          })() +
           `<p class="small muted">Dice seed ${num(res.seed)}${seedCheck}</p></div>`) +
       `</div>` +
       graphSvg(layouts.get(week)!, overlay) +
@@ -1372,6 +1379,7 @@ type PlayMove =
   | { readonly t: 'draft'; readonly id: string }
   | { readonly t: 'lineup'; readonly starters: ReadonlyArray<string>; readonly retreat: RetreatOrder }
   | { readonly t: 'claim'; readonly add: string; readonly drop: string | null }
+  | { readonly t: 'hex'; readonly target: string; readonly ability: Ability; readonly week: number }
   | { readonly t: 'week' };
 
 interface SavedPlay {
@@ -1407,6 +1415,10 @@ const play = {
   builderWeek: 0,
   add: '',
   drop: '',
+  /** The hex form (D-52). */
+  hexTarget: '',
+  hexAbility: 'wis' as Ability,
+  hexWeek: 1,
   /** The week just played, to show its result. */
   played: null as number | null,
 };
@@ -1448,6 +1460,9 @@ function applyMove(s: SeasonSession, m: PlayMove): void {
       s.setLineup({ starters, retreat: m.retreat ?? 'never' } as unknown as Lineup);
       break;
     }
+    case 'hex':
+      s.declareHex(m.target, m.ability, m.week);
+      break;
     case 'claim':
       s.claimWaiver(m.add, m.drop);
       break;
@@ -1723,7 +1738,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   const lineup = builderLineup();
   const hurt = injuredFor(s.state, week);
   const violations = lineup === null ? [] : validateLineup(lineup, { tavern: me, characters: roster }, crOf, config, { unavailable: hurt });
-  const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.starters, input.statsOf), mission, input.baseOf, input.battleModel, { retreat: lineup.retreat });
+  const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.starters, input.statsOf, hexOn(s.state, me, week)), mission, input.baseOf, input.battleModel, { retreat: lineup.retreat });
   const home = homeTavern(s.state, week) === me;
   const total = play.picks.reduce((t, id) => t + crOf(id), 0);
   const legal = lineup !== null && violations.length === 0;
@@ -1763,7 +1778,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
         `<div><span class="label">chance of DNF</span><span class="v">${pct(projection.pDnf)}</span></div>` +
         `<div><span class="label">chance to turn back</span><span class="v">${pct(projection.pRetreat)}</span></div></div>` +
         (home ? `<p class="hint">Includes your home bonus (× ${config.scoring.homeBonus}).</p>` : '') +
-        retreatTable(partyFrom(lineup!.starters, input.statsOf), mission, play.retreat, home)) +
+        retreatTable(partyFrom(lineup!.starters, input.statsOf, hexOn(s.state, me, week)), mission, play.retreat, home)) +
     `<div class="row"><button type="button" data-action="play-lu-advice">Use the advisor's lineup</button></div>` +
     (projection === null ? '' : graphSvg(layouts.get(week)!, { reach: projection.reach }) + graphLegend({ reach: projection.reach })) +
     `</section>`;
@@ -1800,10 +1815,38 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
       : '<span class="fail">Your lineup is not legal yet.</span> Fix it above, or use the advisor\'s lineup, to play the week.';
   return (
     lineupCardHtml +
+    renderPlayHex(s, week) +
     waivers +
     `<section class="card"><div class="row" style="justify-content:space-between"><span class="small">${playNote}</span>` +
     `<button type="button" class="primary" data-action="play-week" ${legal || stuck ? '' : 'disabled'}>Play week ${week}</button></div></section>`
   );
+}
+
+/** Every hex declared so far, and the person's hex form while they still hold it (D-52). */
+function renderPlayHex(s: SeasonSession, week: number): string {
+  const me = s.humanTavern!;
+  const declared = s.state.hexes;
+  const list =
+    declared.length === 0
+      ? '<p class="muted small">No hexes declared yet.</p>'
+      : `<ul class="small">${declared
+          .map((h) => `<li>${h.tavern === me ? '<b>You</b>' : esc(tavernName(h.tavern))} hexed ${h.target === me ? '<b>you</b>' : esc(tavernName(h.target))}: <b>${h.ability}</b>, week ${h.week}</li>`)
+          .join('')}</ul>`;
+  const used = declared.some((h) => h.tavern === me);
+  const rivals = s.taverns.filter((t) => t !== me);
+  const weeks = WEEKS.filter((w) => w >= week);
+  const form = used
+    ? '<p class="small muted">You have used your hex this season.</p>'
+    : `<div class="row"><label class="label" for="play-hex-target">Rival</label><select id="play-hex-target" data-action="play-hex-target">${rivals
+        .map((t) => `<option value="${esc(t)}" ${t === play.hexTarget ? 'selected' : ''}>${esc(tavernName(t))}</option>`)
+        .join('')}</select>` +
+      `<label class="label" for="play-hex-ability">Ability</label><select id="play-hex-ability" data-action="play-hex-ability">${ABILITIES.map((a) => `<option value="${a}" ${a === play.hexAbility ? 'selected' : ''}>${a}</option>`).join('')}</select>` +
+      `<label class="label" for="play-hex-week">Week</label><select id="play-hex-week" data-action="play-hex-week">${weeks
+        .map((w) => `<option value="${w}" ${w === play.hexWeek ? 'selected' : ''}>${w}: ${esc(missionOf(w).id)}</option>`)
+        .join('')}</select>` +
+      `<button type="button" data-action="play-hex">Declare hex</button></div>` +
+      `<p class="hint">Once a season: that week the rival has disadvantage on every check and save using the ability. It is public at once and can't be withdrawn, and only the first hex on a rival in a week counts.</p>`;
+  return `<section class="card"><h2>Hexes</h2>${list}${form}</section>`;
 }
 
 /** Whose home week it is, from the sponsors in the season package. */
@@ -1932,6 +1975,14 @@ function playClick(action: string, id: string | undefined): boolean {
         play.retreat = lineup.retreat;
       });
       return true;
+    case 'play-hex': {
+      const s = play.session;
+      const stage = s?.stage;
+      if (s === null || stage?.kind !== 'week') return true;
+      const target = play.hexTarget !== '' && s.taverns.includes(play.hexTarget) ? play.hexTarget : s.taverns.find((t) => t !== s.humanTavern)!;
+      playMoves([{ t: 'hex', target, ability: play.hexAbility, week: Math.max(play.hexWeek, stage.week) }]);
+      return true;
+    }
     case 'play-claim':
       playMoves([{ t: 'claim', add: play.add, drop: play.drop === '' ? null : play.drop }], () => {
         play.add = '';
@@ -2067,6 +2118,15 @@ panel.addEventListener('change', (ev) => {
       break;
     case 'play-drop':
       play.drop = target.value;
+      break;
+    case 'play-hex-target':
+      play.hexTarget = target.value;
+      break;
+    case 'play-hex-ability':
+      play.hexAbility = target.value as Ability;
+      break;
+    case 'play-hex-week':
+      play.hexWeek = Number(target.value);
       break;
     case 'play-retreat':
       play.retreat = parseRetreat(target.value);

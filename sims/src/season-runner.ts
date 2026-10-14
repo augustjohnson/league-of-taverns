@@ -35,6 +35,7 @@ import {
   effectiveStats,
   freeAgents,
   homeTavern,
+  hexOn,
   initialState,
   injuredFor,
   lineHash,
@@ -58,6 +59,7 @@ import {
   weekSeed,
 } from '@league-of-taverns/engine';
 import type {
+  Ability,
   Actor,
   BaseStats,
   BattleModel,
@@ -625,6 +627,12 @@ export class SeasonSession {
     return this.botOf(tavern).manager.waivers.claims(this.viewFor(tavern, `advice:waivers:${week}`), freeAgents(this.log.state));
   }
 
+  /** Declare the person's hex (D-52) on `target` for `week`, before that week's lock. Throws if it is illegal. */
+  declareHex(target: string, ability: Ability, week: number): void {
+    const tavern = this.requireHumanTavern();
+    this.append('hex.declared', { tavern, target, ability, week }, this.humanActor!, this.lastAt + MINUTE);
+  }
+
   /** Claims waiting for the next resolution. */
   pendingClaims(): LeagueState['waivers']['pending'] {
     return this.log.state.waivers.pending;
@@ -642,6 +650,14 @@ export class SeasonSession {
     const scheduled = input.missions.get(week);
     if (scheduled === undefined) throw new Error(`no mission for week ${week}`);
     const system = (workflow: string): Actor => ({ kind: 'system', workflow });
+
+    // Hexes (D-52): each bot that still holds its hex may declare it for this week, before the lineups.
+    this.taverns.forEach((tavern, i) => {
+      if (this.isHuman(tavern) || this.log.state.hexes.some((h) => h.tavern === tavern)) return;
+      const bot = this.botOf(tavern);
+      const hex = bot.manager.hex.declare(this.viewFor(tavern, `hex:${week}`), week);
+      if (hex !== null) this.append('hex.declared', { tavern, target: hex.target, ability: hex.ability, week }, bot.actor, base + 16 * HOUR + i * MINUTE);
+    });
 
     // Lineups, then the lock.
     this.taverns.forEach((tavern, i) => {
@@ -679,7 +695,7 @@ export class SeasonSession {
     this.append('mission.revealed', { week, mission, sha256, salt: null }, system('weekly-run'), run + r++ * SECOND);
     for (const { tavern, lineup } of lineups) {
       if (lineup === null) continue;
-      const party = partyOf(lineup, input.statsOf);
+      const party = partyOf(lineup, input.statsOf, hexOn(this.log.state, tavern, week));
       const seed = weekSeed({ season, week, tavern, salt: this.seed });
       const orders = { retreat: lineup.retreat };
       const result = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel, orders);
@@ -900,8 +916,9 @@ export function runMockSeason(input: SeasonInput, options: RunOptions): MockSeas
   return session.finish();
 }
 
-function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats): Party {
-  return { members: lineup.starters.map(statsOf) };
+function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats, hex: Ability | undefined): Party {
+  const members = lineup.starters.map(statsOf);
+  return hex === undefined ? { members } : { members, hex };
 }
 
 // ── summary ────────────────────────────────────────────────────────────────

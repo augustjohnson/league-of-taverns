@@ -14,8 +14,7 @@
   `managers.yaml` and identified by GitHub account; the season's taverns
   and their gods are in `schedule.yaml`. A league has at most **6 taverns**
   **[D-01]**, so a season is 6 weeks.
-- **Gods, boons and hexes** **[D-52; the tavern pick is built, boons and
-  hexes not yet]:** every tavern is
+- **Gods, boons and hexes** **[D-52; boons not built yet]:** every tavern is
   already blessed by one god, and the pairing never changes. The god gives
   its tavern:
   - a **boon**, which bends one rule for that tavern (the list is being
@@ -122,7 +121,7 @@
   starters, picked by a recorded random roll, is injured and can't start
   next week. Injuries last one week, follow the character if it is traded,
   and an injury in the last week expires with the season.
-- **Hex** **[D-52, not built yet]:** once per season, a tavern names a
+- **Hex** **[D-52]:** once per season, a tavern names a
   rival, one **ability score** and one **week**. That week, the rival's party
   has disadvantage on every check and save using that ability (like
   *Bestow Curse*). Battles are unaffected, and disadvantage cancels

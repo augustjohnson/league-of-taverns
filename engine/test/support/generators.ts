@@ -171,7 +171,8 @@ export function randomParty(rng: Rng): Party {
     const slug = pick(rng, FIXTURE_SLUGS);
     members.push(effectiveStats({ ref: { id: `m${i}`, base: slug }, modifiers: randomModifiers(rng) }, baseOf(slug), TRAITS));
   }
-  return { members };
+  // A hex on about a third of parties, so disadvantage comes into play (D-52).
+  return rng() < 0.35 ? { members, hex: pick(rng, ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const) } : { members };
 }
 
 function randomModifiers(rng: Rng): Modifier[] {

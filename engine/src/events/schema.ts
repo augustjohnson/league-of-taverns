@@ -71,6 +71,7 @@ const nodeRecordSchema = z.discriminatedUnion('kind', [
     modifier: z.number().int(),
     dc: z.number().int(),
     advantage: z.boolean(),
+    disadvantage: z.boolean(),
     outcome: z.enum(['pass', 'fail']),
   }),
   z.strictObject({
@@ -211,6 +212,7 @@ export const payloadSchemas = {
       }),
     ),
   }),
+  'hex.declared': z.strictObject({ tavern: kebabIdSchema, target: kebabIdSchema, ability: z.enum(ABILITIES), week }),
   'waiver.claimed': z.strictObject({
     claim: text,
     tavern: kebabIdSchema,
@@ -299,6 +301,7 @@ export const eventSchema = z.discriminatedUnion('type', [
   envelope('draft.pick'),
   envelope('lineup.set'),
   envelope('lineup.locked'),
+  envelope('hex.declared'),
   envelope('waiver.claimed'),
   envelope('waiver.resolved'),
   envelope('trade.proposed'),

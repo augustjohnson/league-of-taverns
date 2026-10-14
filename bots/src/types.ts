@@ -1,4 +1,5 @@
 import type { BaseStats, BattleModel, CrEighths, EffectiveStats, LeagueState, Lineup, Mission, Rng } from '@league-of-taverns/engine';
+import type { HexStrategy } from './strategies/hex';
 import type { TavernStrategy } from './strategies/tavern';
 
 /**
@@ -94,6 +95,7 @@ export interface WaiverStrategy {
 export interface BotManager {
   readonly id: string;
   readonly tavern: TavernStrategy;
+  readonly hex: HexStrategy;
   readonly draft: DraftStrategy;
   readonly lineup: LineupStrategy;
   readonly waivers: WaiverStrategy;

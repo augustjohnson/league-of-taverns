@@ -215,6 +215,7 @@ describe('projection property', () => {
     let withAdvantage = 0;
     let withDnf = 0;
     let partRetreat = 0;
+    let withDisadvantage = 0;
     let withBounty = 0;
     for (let c = 0; c < CASES; c++) {
       const gen = rngFor('projection-property', 'case:' + c);
@@ -258,6 +259,7 @@ describe('projection property', () => {
 
       if (mission.nodes.some((n) => n.kind === 'check' && n.check.requires !== undefined)) gated++;
       if (mission.nodes.some((n) => n.kind === 'check' && checkOdds(party, n.check).advantage)) withAdvantage++;
+      if (mission.nodes.some((n) => n.kind === 'check' && checkOdds(party, n.check).disadvantage)) withDisadvantage++;
       if (projection.pDnf > 0) withDnf++;
       if (projection.pRetreat > 0 && projection.pRetreat < 1) partRetreat++;
       if (mission.nodes.some((n) => n.kind === 'battle' && (n.loot ?? 0) > 0)) withBounty++;
@@ -268,6 +270,7 @@ describe('projection property', () => {
     expect(withAdvantage).toBeGreaterThan(CASES / 10);
     expect(withDnf).toBeGreaterThan(CASES / 4);
     expect(partRetreat).toBeGreaterThan(CASES / 10);
+    expect(withDisadvantage).toBeGreaterThan(CASES / 20);
     expect(withBounty).toBeGreaterThan(CASES / 4);
   }, 30_000); // about 3 s alone; the 5 s default is too tight when the whole suite runs in parallel
 });

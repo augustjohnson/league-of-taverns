@@ -39,6 +39,7 @@
  * | `draft.pick` | `draft.complete`, `draft.tavern_pick_incomplete`, `draft.wrong_pick`, `draft.not_on_clock`, `draft.not_pooled`, `draft.already_owned`, `draft.roster_full` |
  * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `bad_retreat`, `duplicate`, `not_owned`, `injured`, `unknown_character`, `over_budget`) |
  * | `lineup.locked` | `lock.draft_incomplete`, `lock.bad_week`, `lock.already_locked`, `lock.previous_not_finalized`, `lock.unknown_tavern`, `lock.duplicate_tavern`, `lock.missing_tavern`, `lock.source_mismatch`, `lock.illegal_lineup` |
+ * | `hex.declared` | `hex.unknown_tavern`, `hex.self`, `hex.bad_week`, `hex.week_locked`, `hex.used`, `hex.target_taken` |
  * | `waiver.claimed` | `waiver.draft_incomplete`, `waiver.unknown_tavern`, `waiver.duplicate_claim`, `waiver.not_pooled`, `waiver.not_free_agent`, `waiver.drop_not_owned` |
  * | `waiver.resolved` | `waiver.bad_week`, `waiver.week_not_finalized`, `waiver.already_resolved`, `waiver.unknown_claim`, `waiver.duplicate_outcome`, `waiver.missing_outcome`, `waiver.bad_priority`, `waiver.outcome_mismatch` |
  * | `trade.*` | `trade.draft_incomplete`, `trade.duplicate_id`, `trade.unknown_tavern`, `trade.unknown`, `trade.not_proposed`, `trade.not_accepted`, `trade.not_open`, `trade.past_deadline` (at acceptance), and the `validateTrade` codes below |
@@ -137,6 +138,9 @@
  *   `verifyResolutions`, which reports instead of throwing.
  * - `lineup.set` and `lineup.locked` reject a starter injured the week
  *   before (`lineup.injured`, `lock.illegal_lineup`).
+ * - `hex.declared` (D-52): any time after the tavern pick and before the
+ *   named week locks; `HEXES_PER_SEASON` per tavern; at most one hex per
+ *   target per week (the first declared counts); never withdrawn.
  * - `week.finalized` needs a result for every tavern whose locked lineup is
  *   non-null. A tavern locked with no lineup needs none and scores 0 (rules
  *   §5; see `weekResults`). Finalizing week `config.weeks` completes the season.
@@ -160,6 +164,9 @@ import type { CrEighths } from '../vocabulary';
 import { freeAgents, injuredFor, waiverPriority } from './selectors';
 import type { LeagueState, TavernState, TradeState } from './state';
 import type { EventOf, EventType, LeagueEvent, PayloadByType } from './types';
+
+/** Hexes each tavern may declare in a season (D-52). */
+export const HEXES_PER_SEASON = 1;
 
 export class InvalidEventError extends Error {
   constructor(
@@ -194,6 +201,7 @@ export function initialState(): LeagueState {
     revealed: new Map(),
     results: new Map(),
     injuries: new Map(),
+    hexes: [],
     finalizedWeeks: new Set(),
   };
 }
@@ -424,6 +432,21 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
       lockedLineups: mapSet(state.lockedLineups, week, lineups),
       pendingLineups: mapDelete(state.pendingLineups, week),
     };
+  },
+
+  'hex.declared': (state, event) => {
+    const config = configOf(state);
+    const { tavern, target, week } = event.payload;
+    tavernOr(state, event, tavern, 'hex.unknown_tavern');
+    tavernOr(state, event, target, 'hex.unknown_tavern');
+    if (tavern === target) fail(event, 'hex.self', `"${tavern}" cannot hex itself`);
+    weekOr(config, event, week, 'hex.bad_week');
+    if (state.lockedLineups.has(week)) fail(event, 'hex.week_locked', `week ${week} is already locked`);
+    const used = state.hexes.filter((h) => h.tavern === tavern).length;
+    if (used >= HEXES_PER_SEASON) fail(event, 'hex.used', `"${tavern}" has already used its hex this season`);
+    const taken = state.hexes.find((h) => h.target === target && h.week === week);
+    if (taken !== undefined) fail(event, 'hex.target_taken', `"${target}" is already hexed in week ${week} (by "${taken.tavern}")`);
+    return { ...state, hexes: [...state.hexes, event.payload] };
   },
 
   'waiver.claimed': (state, event) => {

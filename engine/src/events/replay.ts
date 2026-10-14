@@ -20,7 +20,7 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import { runPoints, sponsoredTavern } from '../league';
 import { missionHaul, type Mission, type MissionNode } from '../missions';
 import { formatIssuePath } from '../missions/schema';
-import { injuredStarter, lootScore, missionGraph } from '../resolution';
+import { checkAbility, injuredStarter, lootScore, missionGraph } from '../resolution';
 import { retreatsBeforeBattle } from '../roster';
 import { InvalidEventError, applyEvent, initialState } from './reducers';
 import { eventSchema } from './schema';
@@ -210,6 +210,9 @@ export interface ResolutionMismatch {
  *   banked so far decide whether the party turns back (D-49): the run must
  *   name that battle in `retreatedBefore` and stop there exactly when
  *   `retreatsBeforeBattle` says so.
+ * - A check's `disadvantage` is exactly the hex on the tavern that week (D-52)
+ *   for a check using the hexed ability, and a hexed check has no advantage
+ *   (the two cancel).
  * - On a DNF the injured starter (if any) is `injuredStarter(lineup.starters,
  *   roll)`, and there is no injury without a DNF (D-51). A DNF with no
  *   injury is allowed, since a boon may prevent it (D-52).
@@ -227,10 +230,12 @@ export interface ResolutionMismatch {
 export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyArray<ResolutionMismatch> {
   const mismatches: ResolutionMismatch[] = [];
   const revealed = new Map<number, Mission>();
+  const hexes: Array<PayloadByType['hex.declared']> = [];
   let season: PayloadByType['season.created'] | null = null;
   for (const event of events) {
     if (event.type === 'season.created') season = event.payload;
     if (event.type === 'mission.revealed') revealed.set(event.payload.week, event.payload.mission);
+    if (event.type === 'hex.declared') hexes.push(event.payload);
     if (event.type !== 'mission.resolved') continue;
     const { week, tavern, run, lineup } = event.payload;
     const report = (field: string, message: string): void => {
@@ -296,6 +301,10 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
           }
           if (!starters.has(record.actor)) report(`${at}.actor`, `"${record.actor}" is not in the lineup`);
           if (record.dc !== node.check.dc) report(`${at}.dc`, `dc ${record.dc} but the mission says ${node.check.dc}`);
+          const hex = hexes.find((h) => h.target === tavern && h.week === week)?.ability;
+          const hexed = hex !== undefined && checkAbility(node.check) === hex;
+          if (record.disadvantage && !hexed) report(`${at}.disadvantage`, 'disadvantage, but no hex covers this check');
+          if (hexed && record.advantage) report(`${at}.advantage`, `advantage, but the ${hex} hex cancels it`);
           const total = record.d20 + record.modifier;
           const meets = total >= record.dc;
           if (record.outcome === 'pass' && !meets) {

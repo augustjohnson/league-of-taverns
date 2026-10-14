@@ -70,6 +70,8 @@ export interface LeagueState {
    * entry. Read with `injuredFor`.
    */
   readonly injuries: ReadonlyMap<string, number>;
+  /** Every declared hex, in log order (D-52). Read with `hexOn`. */
+  readonly hexes: ReadonlyArray<PayloadByType['hex.declared']>;
   readonly finalizedWeeks: ReadonlySet<number>;
 }
 

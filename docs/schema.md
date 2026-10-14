@@ -304,7 +304,7 @@ nobody chooses sits the season out; its god's week is still played.
 | `draft.pick` | manager / system (autopick) | `pick`, `tavern`, `character`, `auto` | `pick` = number of prior picks, `tavern` is on the clock, character pooled and unowned, roster not full. The first pick needs every manager to have chosen a tavern, and freezes the snake order as their taverns in draft order |
 | `lineup.set` | manager | `tavern`, `week`, `lineup{starters[4], retreat}`, where `retreat` is `never` \| `avoid_battles` \| `{ bank: N }` (D-12, D-49) | draft complete, week not locked, lineup legal (§ Roster) |
 | `lineup.locked` | system | `week`, `lineups[{tavern, lineup, source}]` | week not already locked, previous week finalized, one entry per tavern, each lineup legal |
-| `hex.declared` (planned, D-52) | manager | `tavern`, `target`, `ability`, `week` | target is another tavern, the week isn't locked, the tavern hasn't hexed this season, the target has no hex that week |
+| `hex.declared` | manager | `tavern`, `target`, `ability`, `week` | both taverns chosen, target is another tavern, the week is in the season and not locked, the tavern hasn't hexed this season (`HEXES_PER_SEASON`), the target has no hex that week (D-52) |
 | `waiver.claimed` | manager | `claim`, `tavern`, `add`, `drop` | draft complete, `add` is a free agent now, `drop` is on the roster |
 | `waiver.resolved` | system | `week`, `outcomes[{claim, awarded, reason}]`, `priorityAfter` | week finalized, outcomes cover every pending claim and match `resolveWaivers` |
 | `trade.proposed` | manager | `trade`, `from`, `to`, `give[]`, `receive[]` | both taverns own the listed characters, before the deadline |
@@ -317,7 +317,7 @@ nobody chooses sits the season out; its god's week is still played.
 | `week.finalized` | system | `week` | every tavern has `mission.resolved` for the week, and the week isn't already finalized |
 
 `mission.resolved.run` holds the full `RunResult`: `path`, and for each node
-`{node, kind, actor, d20, modifier, dc, advantage, outcome}` (checks) or
+`{node, kind, actor, d20, modifier, dc, advantage, disadvantage, outcome}` (checks; `disadvantage` from a hex, D-52) or
 `{node, kind, pWin, roll, outcome}` (battles), plus `dnf`, `checksPassed`,
 `checksAttempted`, `loot` (banked by passed checks and won battles, kept on a
 DNF or a retreat) and `score` (loot ÷ the mission's haul, D-45, D-46, D-50).

@@ -363,7 +363,11 @@ starter's CR, instead of scoring 0?
 **D-52 Taverns, gods, boons and hexes: DECIDED (2026-10-13).** The tavern
 pick is built (2026-10-13, T4.10): `manager.joined`, `tavern.chosen`,
 taverns with their gods in `schedule.yaml`, and bots choosing at random.
-Boons and hexes are not built yet.
+Hexes are built too (T6.9): `hex.declared`, `Party.hex`, disadvantage in
+`checkOdds` and the run, the `verifyResolutions` audit, and a `leader` bot
+strategy (in the second half, hex the highest rival who leads you, on the
+ability with the most loot that week; in the last week regardless). Boons
+are not built yet.
 The only custom concepts on top of draft, monsters and missions. Each one
 sits at its own level of play and borrows from D&D.
 - **The god chooses the tavern.** Each tavern is already blessed by one god,

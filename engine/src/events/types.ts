@@ -3,7 +3,7 @@ import type { SeasonConfig, Sponsor } from '../league';
 import type { Mission } from '../missions';
 import type { RunResult } from '../resolution';
 import type { Lineup } from '../roster';
-import type { CrEighths } from '../vocabulary';
+import type { Ability, CrEighths } from '../vocabulary';
 
 /**
  * The event log is the only source of truth. Rosters, standings, records and
@@ -111,6 +111,17 @@ export interface PayloadByType {
       readonly lineup: Lineup | null;
       readonly source: 'submitted' | 'carried' | 'fallback' | 'none';
     }>;
+  };
+  /**
+   * Once a season, a tavern curses a rival for one week: disadvantage on every
+   * check and save using `ability` (D-52, after *Bestow Curse*). Public as
+   * soon as it is declared.
+   */
+  'hex.declared': {
+    readonly tavern: string;
+    readonly target: string;
+    readonly ability: Ability;
+    readonly week: number;
   };
   'waiver.claimed': {
     readonly claim: string;

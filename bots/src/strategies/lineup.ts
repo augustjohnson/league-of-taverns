@@ -8,7 +8,7 @@
  * ties between equal pass chances, which leaves every pass chance unchanged.
  * So each subset is scored once, in roster order.
  */
-import { projectMission, type EffectiveStats, type Party } from '@league-of-taverns/engine';
+import { hexOn, projectMission, type EffectiveStats, type Party } from '@league-of-taverns/engine';
 import { checkFit, fitWeights } from '../environment';
 import { referenceFoe } from '../metrics';
 import type { LineupStrategy, PublicView, ScoredLineup } from '../types';
@@ -17,9 +17,11 @@ import { assertLegal, configOf, legalSubsets, lineupFrom, rosterOf, startable, t
 /** Scores closer than this are equal, so float noise never decides a lineup. */
 const EPS = 1e-12;
 
-function partyOf(view: PublicView, subset: Subset): Party {
+/** The subset as a party for `week`, under any hex a rival has put on this tavern that week (D-52). */
+function partyOf(view: PublicView, subset: Subset, week: number): Party {
   const members: EffectiveStats[] = subset.ids.map((id) => view.statsOf(id));
-  return { members };
+  const hex = hexOn(view.state, view.tavern, week);
+  return hex === undefined ? { members } : { members, hex };
 }
 
 /** Wraps `best` into the `LineupStrategy` contract for the bot's own roster. */
@@ -59,7 +61,7 @@ export const projectionLineup: LineupStrategy = strategy('projection', (view, ro
   if (mission === null) return bestByCr(view, roster, week);
   let best: { subset: Subset; expected: number; pDnf: number } | null = null;
   for (const subset of legalSubsets(view, startable(view, roster, week))) {
-    const { expectedScore: expected, pDnf } = projectMission(partyOf(view, subset), mission, view.baseOf, view.battleModel);
+    const { expectedScore: expected, pDnf } = projectMission(partyOf(view, subset, week), mission, view.baseOf, view.battleModel);
     const better =
       best === null ||
       expected > best.expected + EPS ||
@@ -85,7 +87,7 @@ export const environmentFitLineup: LineupStrategy = strategy('environment-fit', 
   const foes = [{ stats: referenceFoe(Math.round(ENVIRONMENT_FOE_RATIO * configOf(view).budget.partyCr)), count: 1 }];
   let best: { subset: Subset; score: number } | null = null;
   for (const subset of legalSubsets(view, startable(view, roster, week))) {
-    const party = partyOf(view, subset);
+    const party = partyOf(view, subset, week);
     const score = view.battleModel.pWin(party, foes) * checkFit(party.members, weights);
     if (best === null || score > best.score + EPS || (score > best.score - EPS && subset.total > best.subset.total)) {
       best = { subset, score };

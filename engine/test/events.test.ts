@@ -128,6 +128,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
       { tavern: 'the-rusty-nail', lineup: null, source: 'none' },
     ],
   }),
+  'hex.declared': envelope('hex.declared', 8, manager, { tavern: 'the-gilded-flagon', target: 'the-rusty-nail', ability: 'wis', week: 2 }),
   'waiver.claimed': envelope('waiver.claimed', 8, manager, {
     claim: 'claim-1',
     tavern: 'the-gilded-flagon',
@@ -165,7 +166,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
     run: {
       path: ['start', 'find-path', 'bog-ambush', 'crossed'],
       nodes: [
-        { node: 'find-path', kind: 'check', actor: 'moss-hag', d20: 7, modifier: 3, dc: 12, advantage: false, outcome: 'fail' },
+        { node: 'find-path', kind: 'check', actor: 'moss-hag', d20: 7, modifier: 3, dc: 12, advantage: false, disadvantage: false, outcome: 'fail' },
         { node: 'bog-ambush', kind: 'battle', pWin: 0.62, roll: 0.41, outcome: 'win' },
       ],
       dnf: false,
@@ -196,8 +197,8 @@ function reverseKeys(value: unknown): unknown {
 
 describe('events', () => {
   it('has one fixture for every event type', () => {
-    expect(allEvents).toHaveLength(18);
-    expect(new Set(allEvents.map((event) => event.type)).size).toBe(18);
+    expect(allEvents).toHaveLength(19);
+    expect(new Set(allEvents.map((event) => event.type)).size).toBe(19);
   });
 
   it.each(Object.entries(fixtures))('parseLog(serializeEvent(e)) round-trips %s', (_type, event) => {
@@ -298,7 +299,7 @@ describe('replay and verification', () => {
     return {
       path: lost ? ['start', 'find-path', 'bog'] : ['start', 'find-path', 'bog', 'crossed'],
       nodes: [
-        { node: 'find-path', kind: 'check', actor: resolved.payload.lineup.starters[0], d20: 2, modifier: 1, dc: 11, advantage: false, outcome: 'fail' },
+        { node: 'find-path', kind: 'check', actor: resolved.payload.lineup.starters[0], d20: 2, modifier: 1, dc: 11, advantage: false, disadvantage: false, outcome: 'fail' },
         { node: 'bog', kind: 'battle', pWin: 0.6, roll: battle.roll, outcome: battle.outcome },
       ],
       dnf: lost,

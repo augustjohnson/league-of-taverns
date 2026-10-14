@@ -26,12 +26,18 @@
  * - `random`: a seeded uniform choice among the open taverns (D-52), until
  *   boons give taverns something to choose between.
  *
+ * Hex (./hex.ts):
+ * - `leader`: in the second half, hex the highest rival who leads you, on
+ *   the ability with the most loot in that week's mission; in the last week
+ *   regardless (D-52).
+ *
  * Every strategy is deterministic given the view: all randomness comes from
  * `view.rng`, never `Math.random`.
  */
 import type { BotManager } from '../types';
 import { DRAFT_STRATEGIES } from './draft';
 import { LINEUP_STRATEGIES } from './lineup';
+import { leaderHex } from './hex';
 import { randomTavern } from './tavern';
 import { bestAvailable } from './waivers';
 
@@ -39,6 +45,8 @@ export { DRAFT_STRATEGIES, crGreedyDraft, keepsLineupPossible, randomDraft, skil
 export { ENVIRONMENT_FOE_RATIO, LINEUP_STRATEGIES, environmentFitLineup, maxCrLineup, projectionLineup } from './lineup';
 export { MAX_FALLBACK_CLAIMS, bestAvailable } from './waivers';
 export { randomTavern } from './tavern';
+export { costliestAbility, leaderHex } from './hex';
+export type { HexStrategy } from './hex';
 export type { TavernStrategy } from './tavern';
 
 /**
@@ -51,7 +59,7 @@ export const BOT_IDS = ['random', 'cr-greedy', 'skill-coverage', 'value', 'proje
 export type BotId = (typeof BOT_IDS)[number];
 
 function manager(id: BotId, draft: BotManager['draft'], lineup: BotManager['lineup']): BotManager {
-  return { id, tavern: randomTavern, draft, lineup, waivers: bestAvailable(lineup) };
+  return { id, tavern: randomTavern, hex: leaderHex, draft, lineup, waivers: bestAvailable(lineup) };
 }
 
 const MANAGERS: Readonly<Record<BotId, BotManager>> = {

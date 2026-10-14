@@ -22,7 +22,8 @@
  * same odds functions so they agree by construction.
  */
 import type { BaseStats } from '../adapters/open5e';
-import { checkTargetKey, type EffectiveStats } from '../characters';
+import { checkTargetKey, type CheckTarget, type EffectiveStats } from '../characters';
+import { SKILL_ABILITY, type Ability } from '../vocabulary';
 import { missionHaul, type CheckSpec, type Encounter, type Mission, type MissionNode, type Requirement } from '../missions';
 import { rollD20, type Rng } from '../rng';
 import { DEFAULT_RETREAT, retreatsBeforeBattle, type RetreatOrder } from '../roster';
@@ -35,6 +36,12 @@ import { DEFAULT_RETREAT, retreatsBeforeBattle, type RetreatOrder } from '../ros
 export interface Party {
   /** The starters, in lineup order. */
   readonly members: ReadonlyArray<EffectiveStats>;
+  /**
+   * The ability a rival's hex names for this week, if any (D-52): the party
+   * has disadvantage on every check and save that uses it, which cancels
+   * advantage. Battles are unaffected.
+   */
+  readonly hex?: Ability;
 }
 
 export interface CheckOdds {
@@ -42,6 +49,8 @@ export interface CheckOdds {
   readonly actor: string;
   readonly modifier: number;
   readonly advantage: boolean;
+  /** Disadvantage from a hex (D-52). Never true together with `advantage`: the two cancel. */
+  readonly disadvantage: boolean;
   /** False when a `requires` gate is unmet and the check auto-fails. */
   readonly eligible: boolean;
   readonly pPass: number;
@@ -60,11 +69,18 @@ export interface BattleModel {
 /**
  * `clamp((21 − (dc − mod)) / 20, 0, 1)`: the chance that `d20 + mod ≥ dc` on
  * one d20 with no natural-20 rule. With advantage (roll twice, keep the
- * higher) it is `1 − (1 − p)²`.
+ * higher) it is `1 − (1 − p)²`, and with disadvantage (keep the lower) `p²`.
+ * Both at once cancel, as in 5e.
  */
-export function passChance(modifier: number, dc: number, advantage: boolean): number {
+export function passChance(modifier: number, dc: number, advantage: boolean, disadvantage = false): number {
   const p = Math.min(1, Math.max(0, (21 - (dc - modifier)) / 20));
-  return advantage ? 1 - (1 - p) * (1 - p) : p;
+  if (advantage === disadvantage) return p;
+  return advantage ? 1 - (1 - p) * (1 - p) : p * p;
+}
+
+/** The ability a check uses: a skill's ability (`SKILL_ABILITY`), or the save's or ability check's own. */
+export function checkAbility(check: CheckTarget): Ability {
+  return check.type === 'skill' ? SKILL_ABILITY[check.skill] : check.ability;
 }
 
 /**
@@ -72,7 +88,9 @@ export function passChance(modifier: number, dc: number, advantage: boolean): nu
  *
  * Each starter's modifier is `skills[skill]` for a skill check, `saves[ability]`
  * for a save, and `abilityMods[ability]` for an ability check. A starter has
- * advantage when `advantages` holds `checkTargetKey(check)`.
+ * advantage when `advantages` holds `checkTargetKey(check)`. When the party
+ * is hexed on `checkAbility(check)`, every starter has disadvantage, which
+ * cancels a starter's advantage (D-52).
  *
  * The actor is the eligible starter with the highest `pPass` (so advantage
  * beats an equal modifier). Ties go to the earliest of `members`, in lineup
@@ -88,6 +106,7 @@ export function passChance(modifier: number, dc: number, advantage: boolean): nu
 export function checkOdds(party: Party, check: CheckSpec): CheckOdds {
   const order = party.members;
   const key = checkTargetKey(check);
+  const hexed = party.hex !== undefined && checkAbility(check) === party.hex;
   const requires = check.requires;
   const eligibleMembers = requires === undefined ? order : order.filter((m) => meets(m, requires));
   const eligible = eligibleMembers.length > 0;
@@ -95,11 +114,13 @@ export function checkOdds(party: Party, check: CheckSpec): CheckOdds {
   let best: CheckOdds | undefined;
   for (const member of eligible ? eligibleMembers : order) {
     const modifier = modifierFor(member, check);
-    const advantage = member.advantages.has(key);
-    const pPass = passChance(modifier, check.dc, advantage);
+    const has = member.advantages.has(key);
+    const advantage = has && !hexed;
+    const disadvantage = hexed && !has;
+    const pPass = passChance(modifier, check.dc, advantage, disadvantage);
     // Strictly greater: on a tie the earlier member in tiebreak order keeps it.
     if (best === undefined || pPass > best.pPass) {
-      best = { actor: member.characterId, modifier, advantage, eligible, pPass };
+      best = { actor: member.characterId, modifier, advantage, disadvantage, eligible, pPass };
     }
   }
   if (best === undefined) throw new Error('checkOdds: the party has no members');
@@ -125,7 +146,7 @@ export function battleOdds(
 
 /** What happened at one node in the seeded run. Recorded verbatim in `mission.resolved`. */
 export type NodeRecord =
-  | { readonly node: string; readonly kind: 'check'; readonly actor: string; readonly d20: number; readonly modifier: number; readonly dc: number; readonly advantage: boolean; readonly outcome: 'pass' | 'fail' }
+  | { readonly node: string; readonly kind: 'check'; readonly actor: string; readonly d20: number; readonly modifier: number; readonly dc: number; readonly advantage: boolean; readonly disadvantage: boolean; readonly outcome: 'pass' | 'fail' }
   | { readonly node: string; readonly kind: 'battle'; readonly pWin: number; readonly roll: number; readonly outcome: 'win' | 'lose' };
 
 export interface RunResult {
@@ -177,9 +198,10 @@ export interface RunOptions {
  *
  * Starts at the start node and follows its `always` edge. At a check, with
  * `rng = rngForNode(node.id)`, the actor from `checkOdds` rolls
- * `d20 = rollD20(rng)`; with advantage a second d20 comes from the same stream
- * and the higher is kept. The check passes iff it is eligible and
- * `d20 + modifier ≥ dc`. There is no natural-20 rule, matching `passChance`.
+ * `d20 = rollD20(rng)`; with advantage (or disadvantage, from a hex) a second
+ * d20 comes from the same stream and the higher (lower) is kept. The check
+ * passes iff it is eligible and `d20 + modifier ≥ dc`. There is no natural-20
+ * rule, matching `passChance`.
  * An auto-failed (ineligible) check still draws and records its die. At a
  * battle, `roll = rngForNode(node.id)()` and the party wins iff
  * `roll < pWin` from `battleOdds`. Losing ends the run as a DNF, and winning
@@ -250,7 +272,7 @@ export function runMission(
         const odds = checkOdds(party, node.check);
         const rng = rngForNode(node.id);
         const first = rollD20(rng);
-        const d20 = odds.advantage ? Math.max(first, rollD20(rng)) : first;
+        const d20 = odds.advantage ? Math.max(first, rollD20(rng)) : odds.disadvantage ? Math.min(first, rollD20(rng)) : first;
         const passed = odds.eligible && d20 + odds.modifier >= node.check.dc;
         nodes.push({
           node: node.id,
@@ -260,6 +282,7 @@ export function runMission(
           modifier: odds.modifier,
           dc: node.check.dc,
           advantage: odds.advantage,
+          disadvantage: odds.disadvantage,
           outcome: passed ? 'pass' : 'fail',
         });
         checksAttempted++;
