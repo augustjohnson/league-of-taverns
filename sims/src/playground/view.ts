@@ -3,7 +3,7 @@
  * histograms, Monte Carlo sampling, the draft board, and
  * the small formatters the page uses. No DOM, so tests run them in Node.
  */
-import { SKILLS, replay, runMission, rngFor } from '@league-of-taverns/engine';
+import { SKILLS, replay, retreatOptions, runMission, rngFor } from '@league-of-taverns/engine';
 import type {
   Ability,
   Actor,
@@ -229,11 +229,9 @@ export function parseRetreat(value: string): RetreatOrder {
   return bank === null ? 'never' : { bank: Number(bank[1]) };
 }
 
-/** The retreat orders a picker offers: never, avoid battles, and banking every tenth of the haul in between. */
+/** The retreat orders a picker offers: the engine's `retreatOptions` (D-49). */
 export function retreatChoices(haul: number): ReadonlyArray<RetreatOrder> {
-  const banks: RetreatOrder[] = [];
-  for (let n = 1; n < 10; n++) banks.push({ bank: Math.round((n * haul) / 10) });
-  return ['never', ...banks, 'avoid_battles'];
+  return retreatOptions(haul);
 }
 
 // ── draft board ────────────────────────────────────────────────────────────

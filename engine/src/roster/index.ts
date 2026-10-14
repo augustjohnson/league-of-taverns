@@ -64,6 +64,17 @@ export function isRetreatOrder(retreat: unknown): retreat is RetreatOrder {
   return Object.keys(retreat).length === 1 && typeof bank === 'number' && Number.isInteger(bank) && bank >= 0;
 }
 
+/**
+ * The retreat orders a manager is offered (D-49's default): `never`, a bank
+ * threshold at every tenth of the haul, and `avoid_battles`. Thresholds above
+ * the loot a mission can bank before its battles behave like `never`.
+ */
+export function retreatOptions(haul: number): ReadonlyArray<RetreatOrder> {
+  const banks: RetreatOrder[] = [];
+  for (let n = 1; n < 10; n++) banks.push({ bank: Math.round((n * haul) / 10) });
+  return ['never', ...banks, 'avoid_battles'];
+}
+
 /** Whether a party with `banked` loot turns back before a battle under `retreat` (D-49). */
 export function retreatsBeforeBattle(retreat: RetreatOrder, banked: number): boolean {
   if (retreat === 'never') return false;

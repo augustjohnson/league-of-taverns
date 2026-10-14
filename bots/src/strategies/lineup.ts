@@ -8,7 +8,7 @@
  * ties between equal pass chances, which leaves every pass chance unchanged.
  * So each subset is scored once, in roster order.
  */
-import { hexOn, projectMission, type EffectiveStats, type Party } from '@league-of-taverns/engine';
+import { hexOn, projectMission, retreatOptions, type EffectiveStats, type Party, type RetreatOrder } from '@league-of-taverns/engine';
 import { checkFit, fitWeights } from '../environment';
 import { referenceFoe } from '../metrics';
 import type { LineupStrategy, PublicView, ScoredLineup } from '../types';
@@ -49,27 +49,40 @@ function bestByCr(view: PublicView, roster: ReadonlyArray<string>, week: number)
 /** `max-cr`: spend the most CR possible under B. */
 export const maxCrLineup: LineupStrategy = strategy('max-cr', (view, roster, week) => bestByCr(view, roster, week));
 
+/** How many of the best subsets (under `never`) `projection` tries every retreat order on. */
+export const RETREAT_CANDIDATES = 3;
+
 /**
  * `projection`: with the week's mission known (open missions, D-08/D-42),
- * the legal subset with the highest exact `projectMission` expected score.
- * Ties go to the lower P(DNF), then the higher total CR, then roster order.
+ * the lineup with the highest exact `projectMission` expected score.
+ * Subsets are ranked under `never`, ties to the lower P(DNF), then the higher
+ * total CR, then roster order. The best `RETREAT_CANDIDATES` of them are then
+ * tried with every retreat order (`retreatOptions`, D-49), and the best pair
+ * wins, ties to the lower P(DNF) and then the earlier order (`never` first).
  * Score: expected score in [0, 1]. Without a mission it is `max-cr`, scored
  * as `max-cr` scores.
  */
 export const projectionLineup: LineupStrategy = strategy('projection', (view, roster, week) => {
   const mission = view.missionFor(week);
   if (mission === null) return bestByCr(view, roster, week);
-  let best: { subset: Subset; expected: number; pDnf: number } | null = null;
+  const ranked: Array<{ subset: Subset; expected: number; pDnf: number }> = [];
   for (const subset of legalSubsets(view, startable(view, roster, week))) {
     const { expectedScore: expected, pDnf } = projectMission(partyOf(view, subset, week), mission, view.baseOf, view.battleModel);
-    const better =
-      best === null ||
-      expected > best.expected + EPS ||
-      (expected > best.expected - EPS &&
-        (pDnf < best.pDnf - EPS || (pDnf < best.pDnf + EPS && subset.total > best.subset.total)));
-    if (better) best = { subset, expected, pDnf };
+    ranked.push({ subset, expected, pDnf });
   }
-  return best === null ? null : { lineup: lineupFrom(best.subset), score: best.expected };
+  // Array.prototype.sort is stable, so equal subsets keep roster order.
+  ranked.sort((a, b) => b.expected - a.expected || a.pDnf - b.pDnf || b.subset.total - a.subset.total);
+  let best: { subset: Subset; retreat: RetreatOrder; expected: number; pDnf: number } | null = null;
+  for (const { subset } of ranked.slice(0, RETREAT_CANDIDATES)) {
+    const party = partyOf(view, subset, week);
+    for (const retreat of retreatOptions(configOf(view).missions.haul)) {
+      const { expectedScore: expected, pDnf } = projectMission(party, mission, view.baseOf, view.battleModel, { retreat });
+      if (best === null || expected > best.expected + EPS || (expected > best.expected - EPS && pDnf < best.pDnf - EPS)) {
+        best = { subset, retreat, expected, pDnf };
+      }
+    }
+  }
+  return best === null ? null : { lineup: lineupFrom(best.subset, best.retreat), score: best.expected };
 });
 
 /** The reference encounter's CR as a fraction of B. */

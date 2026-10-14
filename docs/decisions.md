@@ -309,7 +309,20 @@ come from the same review.
 **D-49 Retreat orders: DECIDED (2026-10-13).** Built in the engine
 (2026-10-13, T4.7, T6.6): `Lineup.retreat`, `retreatsBeforeBattle`,
 `RunResult.retreatedBefore`, `Projection.pRetreat`, and the
-`verifyResolutions` audit. Bots still always say `never` (T9.5).
+`verifyResolutions` audit. The `projection` bots try every order on their
+best three lineups and keep the one with the highest expected loot (T9.5).
+- *Found when building it (2026-10-13), OPEN:* while a DNF keeps the loot
+  banked so far (D-46), turning back can never raise a week's expected loot:
+  at a battle with L banked, retreating ends on L, and fighting ends on at
+  least L (a loss keeps L, a win adds the bounty and the rest of the path).
+  So the bots never turn back (200 mock seasons, seed `review`: no change
+  from always fighting), and a retreat order's only payoff is dodging the
+  injury (D-51) and a DNF in the tiebreak (D-14). For push-your-luck to
+  bite, a DNF has to cost loot. Options: (a) a DNF keeps only half the
+  banked loot ("flees with what it can carry"); (b) a DNF loses the loot
+  banked since the last check; (c) keep D-46 and let injuries carry the
+  risk. The "paid retreat" boon candidate (D-52) only makes sense under
+  (a) or (b).
 - Each locked lineup carries a **retreat order**, which says when the party
   turns back instead of fighting:
   - `never`: always fight (the default, and today's behaviour).

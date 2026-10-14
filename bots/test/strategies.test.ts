@@ -393,6 +393,21 @@ describe('lineup strategies', () => {
     }
   });
 
+  it('projection picks a retreat order only when it beats fighting on (D-49)', () => {
+    const view = flagonView();
+    for (const week of [1, 2] as const) {
+      const mission = MISSIONS[week];
+      const chosen = projectionLineup.best(view, FLAGON, week)!;
+      const members = chosen.lineup.starters.map(view.statsOf);
+      const withOrder = projectMission({ members }, mission, view.baseOf, view.battleModel, { retreat: chosen.lineup.retreat }).expectedScore;
+      expect(withOrder).toBeCloseTo(chosen.score, 12);
+      // Never worse than the best lineup that always fights.
+      expect(chosen.score).toBeGreaterThanOrEqual(projected(view, { ...chosen.lineup, retreat: 'never' }, mission) - 1e-12);
+    }
+    // The heist has no battles, so every order is the same and the bot keeps `never`.
+    expect(projectionLineup.lineup(view, 2)!.retreat).toBe('never');
+  });
+
   it('projection falls back to max-cr when the mission is unknown', () => {
     const view = flagonView({});
     expect(projectionLineup.lineup(view, 1)).toEqual(maxCrLineup.lineup(view, 1));
