@@ -21,6 +21,7 @@ import {
   scoreFraction,
   scoreHistogram,
   seedWords,
+  taleSteps,
   topSkills,
   waiverReasonLabel,
 } from '../src/playground/view';
@@ -166,6 +167,33 @@ describe('view helpers', () => {
     expect(skills[0]!.modifier).toBeGreaterThanOrEqual(skills[2]!.modifier);
     const rand = rngFor('seed-words', 'test');
     for (let i = 0; i < 50; i++) expect(seedWords(rand)).toMatch(/^[a-z]+-[a-z]+-\d{1,2}$/);
+  });
+});
+
+describe('the week reveal', () => {
+  it('banks loot along the path and ends on what the engine carried home, or on 0 after a DNF', () => {
+    let runs = 0;
+    let dnfs = 0;
+    for (const [week, byTavern] of sim1.state.results) {
+      const mission = nodeInput.missions.get(week)!.mission;
+      for (const { run } of byTavern.values()) {
+        const steps = taleSteps(mission, run);
+        expect(steps.map((st) => st.node)).toEqual(run.path);
+        expect(steps.map((st) => st.from)).toEqual([null, ...run.path.slice(0, -1)]);
+        expect(steps.filter((st) => st.record !== null).map((st) => st.record)).toEqual(run.nodes);
+        const banked = steps.at(-1)?.total ?? 0;
+        expect(banked).toBe(steps.reduce((sum, st) => sum + st.bank, 0));
+        if (run.dnf) {
+          dnfs++;
+          expect(run.loot).toBe(0);
+        } else {
+          expect(banked).toBe(run.loot);
+        }
+        runs++;
+      }
+    }
+    expect(runs).toBeGreaterThan(30);
+    expect(dnfs).toBeLessThan(runs);
   });
 });
 

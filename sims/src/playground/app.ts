@@ -60,7 +60,7 @@ import {
   type TitleOddsPoint,
 } from '../reports';
 import { seasonInputFromData, type PlaygroundData } from './data';
-import { raiseBanner } from './fx';
+import { raiseBanner, revealWeek } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -86,6 +86,7 @@ import {
   scoreHistogram,
   seedWords,
   signed,
+  taleSteps,
   topSkills,
   waiverReasonLabel,
   type GraphLayout,
@@ -274,14 +275,14 @@ function graphSvg(layout: GraphLayout, overlay: Overlay = {}): string {
   const edges = layout.edges
     .map((e) => {
       const on = pathEdges.has(`${e.from}>${e.to}`) ? ' on' : '';
-      return `<path class="edge${on}" d="${e.d}"/>`;
+      return `<path class="edge${on}" data-edge="${esc(`${e.from}>${e.to}`)}" d="${e.d}"/>`;
     })
     .join('');
   const labels = layout.edges
     .filter((e) => e.on !== 'always')
     .map((e) => {
       const on = pathEdges.has(`${e.from}>${e.to}`) ? ' on' : '';
-      return `<text class="elabel${on}" x="${e.lx}" y="${e.ly + 3}" text-anchor="middle">${esc(e.on)}</text>`;
+      return `<text class="elabel${on}" data-edge="${esc(`${e.from}>${e.to}`)}" x="${e.lx}" y="${e.ly + 3}" text-anchor="middle">${esc(e.on)}</text>`;
     })
     .join('');
   const nodes = layout.nodes
@@ -293,7 +294,7 @@ function graphSvg(layout: GraphLayout, overlay: Overlay = {}): string {
       const outText = outcome === undefined ? '' : `<text class="out ${outcome}" x="${n.x + n.w - 6}" y="${n.y + n.h - 7}" text-anchor="end">${esc(outcome)}</text>`;
       const rx = n.kind === 'start' || n.kind === 'end' ? 18 : 3;
       return (
-        `<g class="node ${cls}"><title>${esc(n.id)}: ${esc(n.detail)}${reach === undefined ? '' : ` (reach ${pct(reach)})`}</title>` +
+        `<g class="node ${cls}" data-node="${esc(n.id)}"><title>${esc(n.id)}: ${esc(n.detail)}${reach === undefined ? '' : ` (reach ${pct(reach)})`}</title>` +
         `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}"/>` +
         `<text class="id" x="${n.x + 8}" y="${n.y + 18}">${esc(clip(n.id, reach === undefined ? 19 : 14))}</text>` +
         `<text class="detail" x="${n.x + 8}" y="${n.y + 35}">${esc(clip(n.detail, outcome === undefined ? 24 : 18))}</text>` +
@@ -1677,7 +1678,7 @@ function playHeader(s: SeasonSession): string {
           : 'Season complete';
   const rows = seasonStandings(s.state);
   const row = rows.find((r) => r.tavern === me);
-  const rec = row === undefined || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip">${ordinal(row.rank)} of ${rows.length} · ${row.points} loot</span>`;
+  const rec = row === undefined || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip" data-spoiler>${ordinal(row.rank)} of ${rows.length} · ${row.points} loot</span>`;
   // Abandoning a season takes a second click: one stray press must not throw away a draft and weeks of results.
   const reset = play.confirmReset
     ? `<span class="small" role="alert">Abandon this season? Your draft and results will be lost.</span>` +
@@ -1941,16 +1942,20 @@ function renderPlayResult(s: SeasonSession, week: number): string {
   const waivers = s.events
     .flatMap((e) => (e.type === 'waiver.resolved' && e.payload.week === week ? e.payload.outcomes : []))
     .filter((o) => claimed.get(o.claim)?.tavern === me);
+  // The week reveal (fx.ts revealWeek) plays the run back node by node and keeps everything marked data-spoiler, and
+  // every section after this card, out of sight until it ends. Without it (a reload, reduced motion) all shows at once.
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week} result</h2><span class="small">${headline}</span></div>` +
+    `<section class="card week-result"${res === undefined ? '' : ` data-path="${esc(JSON.stringify(res.run.path))}"`} tabindex="-1">` +
+    `<div class="row" style="justify-content:space-between"><h2>Week ${week} result</h2><span class="small" data-spoiler>${headline}</span></div>` +
     (res === undefined
       ? '<p class="muted">You fielded no lineup and scored 0.</p>'
       : graphSvg(layouts.get(week)!, { path: res.run.path, outcomes: outcomesOf(res.run) }) +
-        `<details><summary>Your roll log</summary>${rollLog(mission, res.run, homeTavern(s.state, week) === me)}</details>`) +
-    (others === '' ? '' : `<h3>This week's table</h3><div class="scroll"><table><tbody>${others}</tbody></table></div>`) +
+        taleHtml(mission, res.run) +
+        `<details data-spoiler><summary>Your roll log</summary>${rollLog(mission, res.run, homeTavern(s.state, week) === me)}</details>`) +
+    (others === '' ? '' : `<div class="stack" data-spoiler><h3>This week's table</h3><div class="scroll"><table><tbody>${others}</tbody></table></div></div>`) +
     (waivers.length === 0
       ? ''
-      : `<p class="small">Your claims: ${waivers
+      : `<p class="small" data-spoiler>Your claims: ${waivers
           .map((o) => {
             const c = claimed.get(o.claim);
             const what = c === undefined ? '' : `+${esc(charName(c.add))}${c.drop === null ? '' : ` −${esc(charName(c.drop))}`}: `;
@@ -1959,6 +1964,61 @@ function renderPlayResult(s: SeasonSession, week: number): string {
           .join('; ')}</p>`) +
     `</section>`
   );
+}
+
+/**
+ * The scrying ball's account of a run: one line per check or battle in path order, then how it ended, beside the loot
+ * carried. Each line carries the loot banked so far (`data-total`) for the reveal's counter; the outcome sits in
+ * `.outcome` and the die in `[data-roll]`, so the reveal can roll the die and hold the outcome back.
+ */
+function taleHtml(mission: Mission, run: RunResult): string {
+  const byId = new Map(mission.nodes.map((n) => [n.id, n]));
+  const steps = taleSteps(mission, run);
+  const banked = steps.at(-1)?.total ?? 0;
+  const lines = steps.flatMap(({ node: id, record: r, bank, total }) => {
+    if (r === null) return [];
+    const node = byId.get(id);
+    const loot = bank > 0 ? ` <span class="tag brass" data-bank>+${bank} loot</span>` : '';
+    const attrs = `data-node="${esc(id)}" data-total="${total}"`;
+    if (r.kind === 'check') {
+      const sum = r.d20 + r.modifier;
+      const gated = node?.kind === 'check' && node.check.requires !== undefined && sum >= r.dc && r.outcome === 'fail';
+      const what = node?.kind === 'check' ? checkLabel(node.check) : id;
+      const edge = r.advantage ? ' <span class="tag brass">adv</span>' : r.disadvantage ? ' <span class="tag bad" title="Hexed: the lower of two d20s">dis</span>' : '';
+      return [
+        `<li ${attrs} data-kind="check"><b>${esc(what)}</b>: ${esc(charName(r.actor))} rolls ` +
+          `<span class="die ${r.d20 === 20 ? 'hi' : r.d20 === 1 ? 'lo' : ''}" data-roll="d20">${r.d20}</span>${edge} ` +
+          `<span class="outcome">${signed(r.modifier)} = ${sum}: <span class="${r.outcome}">${r.outcome}</span>${gated ? ' <span class="tag bad">gate</span>' : ''}${loot}</span></li>`,
+      ];
+    }
+    const foes = node?.kind === 'battle' ? node.encounter.creatures.map((c) => `${c.count}× ${c.ref}`).join(', ') : id;
+    return [
+      `<li ${attrs} data-kind="battle"><b>Battle</b> with ${esc(foes)}: needs under ${r.pWin.toFixed(3)}, the ball shows ` +
+        `<span class="die" data-roll="unit">${r.roll.toFixed(3)}</span> <span class="outcome"><span class="${r.outcome === 'win' ? 'pass' : 'fail'}">${r.outcome === 'win' ? 'won' : 'lost'}</span>${loot}</span></li>`,
+    ];
+  });
+  if (run.retreatedBefore !== null) {
+    lines.push(`<li data-tail="retreat" data-total="${run.loot}">The party thinks better of <b>${esc(run.retreatedBefore)}</b> and turns for home with ${run.loot} loot.</li>`);
+  }
+  if (run.dnf) {
+    lines.push(`<li data-tail="dnf" data-total="0"><span class="fail">Beaten.</span> The party flees, dropping all ${banked} loot.</li>`);
+    if (run.injury !== null) lines.push(`<li data-tail="injury" data-total="0">${esc(charName(run.injury.character))} limps home hurt and sits out next week.</li>`);
+  } else if (run.retreatedBefore === null) {
+    lines.push(`<li data-tail="home" data-total="${run.loot}">Home with ${run.loot} loot.</li>`);
+  }
+  return (
+    `<div class="tale-box"><div class="row" style="justify-content:space-between"><span class="label">The scrying ball</span>` +
+    `<div class="row"><span class="small">loot carried <b class="num loot-count" data-loot="${run.loot}">${run.loot}</b></span>` +
+    `<button type="button" class="small" data-reveal-skip title="Show the result now (Esc)">Skip</button>` +
+    `<button type="button" class="small" data-action="play-replay" data-after-reveal>Watch again</button></div></div>` +
+    `<ol class="tale" aria-live="polite">${lines.join('')}</ol></div>`
+  );
+}
+
+/** The week reveal: your run plays back over the result card. */
+function revealMyWeek(): void {
+  const card = panel.querySelector<HTMLElement>('.week-result[data-path]');
+  if (card !== null) revealWeek(card);
 }
 
 function renderPlayStandings(s: SeasonSession): string {
@@ -2072,9 +2132,14 @@ function playClick(action: string, id: string | undefined): boolean {
       const moves: PlayMove[] = lineup === null || same || !legal ? [] : [{ t: 'lineup', starters: [...lineup.starters], retreat: lineup.retreat }];
       playMoves([...moves, { t: 'week' }], () => {
         play.played = stage.week;
+        pendingFx = revealMyWeek;
       });
       return true;
     }
+    case 'play-replay':
+      pendingFx = revealMyWeek;
+      renderTab();
+      return true;
   }
   return false;
 }

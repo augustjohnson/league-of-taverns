@@ -127,9 +127,12 @@ reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
 Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
 your tavern raises its banner with one burst of party.js sparkles (bundled)
-and micron's swing (its CSS vendored into `page.html` with its MIT notice).
-Each plays once after the render its move caused, and never under
-`prefers-reduced-motion`.
+and micron's swing (its CSS vendored into `page.html` with its MIT notice),
+and playing a week plays your run back node by node in the scrying ball:
+dice tumble before they settle, the loot counter climbs, and a DNF drains it
+to 0. The result card holds the whole result and the reveal only holds pieces
+back, so Skip (or Esc), a reload and `prefers-reduced-motion` all show the
+same thing at once. Each moment plays once after the render its move caused.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI
 uses, so a seed gives the same season, byte for byte: the engine avoids
 `Math.exp`/`Math.log` (not bit-identical across JS engines) in favor of

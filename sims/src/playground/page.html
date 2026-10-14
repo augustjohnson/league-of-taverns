@@ -324,6 +324,28 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
   .banner-card.raised, .banner-card.raised *, [class*="mjs-"] { animation: none !important; }
 }
 
+/* The week reveal (fx.ts revealWeek): the scrying ball plays your run back. While the card is .revealing, the path,
+   the outcomes, everything marked data-spoiler and every section after the card stay hidden; .shown brings each piece
+   in as the run reaches it, and .revealed fades the rest in at the end. */
+.tale-box { display: grid; gap: 6px; }
+.tale { margin: 0; padding-left: 1.6em; display: grid; gap: 5px; font-size: 13px; }
+.tale .die { margin-inline: 2px; }
+.week-result:not(.revealing) [data-reveal-skip], .week-result.revealing [data-after-reveal] { display: none; }
+.panel:has(.week-result.revealing) [data-spoiler], .week-result.revealing ~ * { display: none !important; }
+.week-result.revealing .tale > li:not(.shown) { display: none; }
+.week-result.revealing .tale > li.shown { animation: banner-rise 0.3s ease-out both; }
+.tale li.rolling .outcome { visibility: hidden; }
+.tale .die.rolling { border-color: var(--brass); color: var(--ink); }
+.week-result.revealing .graph .edge.on:not(.shown) { stroke: var(--muted); stroke-width: 1.3; opacity: 0.55; }
+.week-result.revealing .graph .elabel.on:not(.shown) { fill: var(--muted); }
+.week-result.revealing .graph .node:not(.shown) rect { stroke: var(--line); stroke-width: 1.2; fill: var(--node); }
+.week-result.revealing .graph .node.battle:not(.shown) rect { stroke: var(--muted); }
+.week-result.revealing .graph .node:not(.shown) .out { opacity: 0; }
+.week-result.revealing .graph .node.current rect { stroke: var(--brass); stroke-width: 2.4; animation: scry 0.8s ease-in-out infinite alternate; }
+@keyframes scry { from { stroke-opacity: 1; } to { stroke-opacity: 0.3; } }
+.panel:has(.week-result.revealed) [data-spoiler], .week-result.revealed ~ * { animation: banner-rise 0.45s ease-out both; }
+.week-result:focus { outline: none; }
+
 /* Vendored: micron 1.1.6 (https://github.com/webkul/micron), its CSS only; fx.ts applies the interactions.
 MIT License
 

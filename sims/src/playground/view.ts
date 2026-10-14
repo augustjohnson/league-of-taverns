@@ -15,9 +15,11 @@ import type {
   Mission,
   MissionNode,
   Modifier,
+  NodeRecord,
   Party,
   RetreatOrder,
   RunOptions,
+  RunResult,
   Skill,
 } from '@league-of-taverns/engine';
 import type { GodChrome } from '@league-of-taverns/scripts/lib/god-schema';
@@ -431,6 +433,46 @@ const SEED_NOUNS = ['ale', 'anvil', 'barrel', 'candle', 'flagon', 'goblet', 'hea
 export function seedWords(rand: () => number): string {
   const pick = <T>(list: ReadonlyArray<T>): T => list[Math.floor(rand() * list.length)]!;
   return `${pick(SEED_ADJECTIVES)}-${pick(SEED_NOUNS)}-${Math.floor(rand() * 100)}`;
+}
+
+// ── the week reveal ────────────────────────────────────────────────────────
+
+/** One node of a run, in path order, as the week reveal plays it. */
+export interface TaleStep {
+  readonly node: string;
+  /** The node before it on the path, null for the first. */
+  readonly from: string | null;
+  /** The check or battle rolled here, null for a node with no roll (start, end). */
+  readonly record: NodeRecord | null;
+  /** Loot this node banked: a passed check's `loot`, a won battle's bounty, else 0. */
+  readonly bank: number;
+  /** Loot banked so far, this node included. A DNF loses it all afterwards (D-54). */
+  readonly total: number;
+}
+
+/**
+ * The steps of a run in path order, with the loot banked along the way. The
+ * last step's `total` is `run.loot` unless the run ended in a DNF, which
+ * carries nothing home.
+ */
+export function taleSteps(mission: Mission, run: RunResult): ReadonlyArray<TaleStep> {
+  const nodes = new Map(mission.nodes.map((n) => [n.id, n]));
+  const records = new Map(run.nodes.map((r) => [r.node, r]));
+  let total = 0;
+  return run.path.map((id, i) => {
+    const node = nodes.get(id);
+    const record = records.get(id) ?? null;
+    const bank =
+      record === null || node === undefined
+        ? 0
+        : record.kind === 'check' && node.kind === 'check' && record.outcome === 'pass'
+          ? node.loot
+          : record.kind === 'battle' && node.kind === 'battle' && record.outcome === 'win'
+            ? (node.loot ?? 0)
+            : 0;
+    total += bank;
+    return { node: id, from: i === 0 ? null : run.path[i - 1]!, record, bank, total };
+  });
 }
 
 // ── banners ────────────────────────────────────────────────────────────────
