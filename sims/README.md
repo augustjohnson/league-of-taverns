@@ -133,7 +133,10 @@ dice tumble before they settle, the loot counter climbs, and a DNF drains it
 to 0. The reveal ends in a moment sized to the week (`weekOutcome`): confetti
 in your banner's colours for topping it, sparkles for beating the projection,
 a breath out for turning back, a dimmed run after a DNF, and nothing for a
-quiet week. The result card holds the whole result and the reveal only holds pieces
+quiet week. A hex takes a second click to declare (it is public and final),
+then lands in the list in your colours with a jolt and a few embers; a rival's
+hex on you opens that week's reveal in the rival's colours before the party
+sets out. The result card holds the whole result and the reveal only holds pieces
 back, so Skip (or Esc), a reload and `prefers-reduced-motion` all show the
 same thing at once. Each moment plays once after the render its move caused.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI

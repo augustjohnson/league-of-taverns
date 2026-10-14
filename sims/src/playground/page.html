@@ -345,6 +345,16 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 @keyframes scry { from { stroke-opacity: 1; } to { stroke-opacity: 0.3; } }
 .panel:has(.week-result.revealed) [data-spoiler], .week-result.revealed ~ * { animation: banner-rise 0.45s ease-out both; }
 .week-result:focus { outline: none; }
+/* Hexes (fx.ts layCurse, and the curse that opens a week's reveal): a hex involving you wears a banner, yours when you
+   laid it and the rival's when it fell on you. The ground stays plain behind the text; the colour is the edge and ink. */
+.hexes { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.curse[data-banner] { background: var(--banner-bg); border-left: 4px solid var(--banner-line); border-radius: var(--radius); padding: 3px 8px; color: var(--banner-ink); }
+.curse[data-banner] b { color: var(--banner-ink); }
+.curse-confirm[data-banner] { background: var(--banner-bg); border: 1px solid var(--banner-line); border-radius: var(--radius); padding: 8px 10px; }
+.curse.laid { animation: banner-glow 1.1s ease-out both; }
+/* Not a list item, so the steps below still count from 1. */
+.tale > li.curse { display: block; margin-left: -1.6em; }
+
 /* What a week leaves behind (fx.ts weekMoment): after a DNF the run dims except where it ended; after a retreat the
    loot kept is marked. Static, so a reload shows them; they arrive with the end of the reveal. */
 .week-result[data-outcome="dnf"]:not(.revealing) .graph :is(.edge, .elabel, .node:not(.lost)) { opacity: 0.4; transition: opacity 1.2s ease-out; }

@@ -59,8 +59,9 @@ import {
   type LuckSeason,
   type TitleOddsPoint,
 } from '../reports';
+import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInputFromData, type PlaygroundData } from './data';
-import { raiseBanner, revealWeek } from './fx';
+import { layCurse, raiseBanner, revealWeek } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -1450,6 +1451,8 @@ const play = {
   moves: [] as PlayMove[],
   /** True while "New season" waits for a second, confirming click. */
   confirmReset: false,
+  /** The hex form is asking "are you sure?" (a hex is public and final). */
+  confirmHex: false,
   draftSort: 'value' as 'value' | 'cr',
   filter: '',
   /** The lineup builder: starters in lineup order, and the retreat order. */
@@ -1479,7 +1482,7 @@ function startPlay(): void {
   play.notice = null;
   try {
     const session = newSession(play.manager, seed);
-    Object.assign(play, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', played: null, confirmReset: false });
+    Object.assign(play, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', played: null, confirmReset: false, confirmHex: false });
     savePlay();
   } catch (e) {
     play.error = e instanceof Error ? e.message : String(e);
@@ -1887,30 +1890,49 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   );
 }
 
-/** Every hex declared so far, and the person's hex form while they still hold it (D-52). */
+const ABILITY_NAMES: Readonly<Record<Ability, string>> = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+
+/**
+ * Every hex declared so far, and the person's hex form while they still hold it (D-52). A hex is public at once and
+ * can't be withdrawn, so declaring takes a second click. Rows wear a banner only when they involve you: your own hex
+ * in your colours, a rival's hex on you in theirs.
+ */
 function renderPlayHex(s: SeasonSession, week: number): string {
   const me = s.humanTavern!;
   const declared = s.state.hexes;
   const list =
     declared.length === 0
       ? '<p class="muted small">No hexes declared yet.</p>'
-      : `<ul class="small">${declared
-          .map((h) => `<li>${h.tavern === me ? '<b>You</b>' : esc(tavernName(h.tavern))} hexed ${h.target === me ? '<b>you</b>' : esc(tavernName(h.target))}: <b>${h.ability}</b>, week ${h.week}</li>`)
+      : `<ul class="hexes small">${declared
+          .map((h) => {
+            const by = h.tavern === me ? me : h.target === me ? h.tavern : null;
+            const flag = by === null || bannerOf(by) === null ? '' : '<i class="flag" aria-hidden="true"></i> ';
+            return (
+              `<li class="${by === null ? '' : 'curse'}"${by === null ? '' : ` data-hex="${esc(`${h.tavern}>${h.target}>${h.week}`)}"${bannerAttr(by)}`}>${flag}` +
+              `${h.tavern === me ? '<b>You</b>' : esc(tavernName(h.tavern))} hexed ${h.target === me ? '<b>you</b>' : esc(tavernName(h.target))}: <b>${h.ability}</b>, week ${h.week}</li>`
+            );
+          })
           .join('')}</ul>`;
   const used = declared.some((h) => h.tavern === me);
   const rivals = s.taverns.filter((t) => t !== me);
   const weeks = WEEKS.filter((w) => w >= week);
+  const target = play.hexTarget !== '' && rivals.includes(play.hexTarget) ? play.hexTarget : rivals[0]!;
+  const hexWeek = Math.max(play.hexWeek, week);
   const form = used
     ? '<p class="small muted">You have used your hex this season.</p>'
-    : `<div class="row"><label class="label" for="play-hex-target">Rival</label><select id="play-hex-target" data-action="play-hex-target">${rivals
-        .map((t) => `<option value="${esc(t)}" ${t === play.hexTarget ? 'selected' : ''}>${esc(tavernName(t))}</option>`)
-        .join('')}</select>` +
-      `<label class="label" for="play-hex-ability">Ability</label><select id="play-hex-ability" data-action="play-hex-ability">${ABILITIES.map((a) => `<option value="${a}" ${a === play.hexAbility ? 'selected' : ''}>${a}</option>`).join('')}</select>` +
-      `<label class="label" for="play-hex-week">Week</label><select id="play-hex-week" data-action="play-hex-week">${weeks
-        .map((w) => `<option value="${w}" ${w === play.hexWeek ? 'selected' : ''}>${w}: ${esc(missionOf(w).id)}</option>`)
-        .join('')}</select>` +
-      `<button type="button" data-action="play-hex">Declare hex</button></div>` +
-      `<p class="hint">Once a season: that week the rival has disadvantage on every check and save using the ability. It is public at once and can't be withdrawn, and only the first hex on a rival in a week counts.</p>`;
+    : play.confirmHex
+      ? `<div class="row curse-confirm"${bannerAttr(me)} role="alert"><span>Curse <b>${esc(tavernName(target))}</b>: disadvantage on every ${esc(ABILITY_NAMES[play.hexAbility])} check and save in week ${hexWeek}? ` +
+        `Everyone sees it at once, and it can't be withdrawn.</span>` +
+        `<button type="button" class="primary" data-action="play-hex-confirm">Lay the curse</button><button type="button" data-action="play-hex-cancel">Not yet</button></div>`
+      : `<div class="row"><label class="label" for="play-hex-target">Rival</label><select id="play-hex-target" data-action="play-hex-target">${rivals
+          .map((t) => `<option value="${esc(t)}" ${t === play.hexTarget ? 'selected' : ''}>${esc(tavernName(t))}</option>`)
+          .join('')}</select>` +
+        `<label class="label" for="play-hex-ability">Ability</label><select id="play-hex-ability" data-action="play-hex-ability">${ABILITIES.map((a) => `<option value="${a}" ${a === play.hexAbility ? 'selected' : ''}>${a}</option>`).join('')}</select>` +
+        `<label class="label" for="play-hex-week">Week</label><select id="play-hex-week" data-action="play-hex-week">${weeks
+          .map((w) => `<option value="${w}" ${w === play.hexWeek ? 'selected' : ''}>${w}: ${esc(missionOf(w).id)}</option>`)
+          .join('')}</select>` +
+        `<button type="button" data-action="play-hex">Declare hex…</button></div>` +
+        `<p class="hint">Once a season: that week the rival has disadvantage on every check and save using the ability. It is public at once and can't be withdrawn, and only the first hex on a rival in a week counts.</p>`;
   return `<section class="card"><h2>Hexes</h2>${list}${form}</section>`;
 }
 
@@ -1955,7 +1977,7 @@ function renderPlayResult(s: SeasonSession, week: number): string {
     (res === undefined
       ? '<p class="muted">You fielded no lineup and scored 0.</p>'
       : graphSvg(layouts.get(week)!, { path: res.run.path, outcomes: outcomesOf(res.run) }) +
-        taleHtml(mission, res.run) +
+        taleHtml(mission, res.run, curseOn(s, me, week)) +
         `<details data-spoiler><summary>Your roll log</summary>${rollLog(mission, res.run, homeTavern(s.state, week) === me)}</details>`) +
     (others === '' ? '' : `<div class="stack" data-spoiler><h3>This week's table</h3><div class="scroll"><table><tbody>${others}</tbody></table></div></div>`) +
     (waivers.length === 0
@@ -1976,10 +1998,19 @@ function renderPlayResult(s: SeasonSession, week: number): string {
  * carried. Each line carries the loot banked so far (`data-total`) for the reveal's counter; the outcome sits in
  * `.outcome` and the die in `[data-roll]`, so the reveal can roll the die and hold the outcome back.
  */
-function taleHtml(mission: Mission, run: RunResult): string {
+function taleHtml(mission: Mission, run: RunResult, curse: { readonly by: string; readonly ability: Ability } | null = null): string {
   const byId = new Map(mission.nodes.map((n) => [n.id, n]));
   const steps = taleSteps(mission, run);
   const banked = steps.at(-1)?.total ?? 0;
+  // A rival's hex opens the tale, in the rival's colours: the curse falls before the party sets out.
+  const head =
+    curse === null
+      ? []
+      : [
+          `<li data-head="curse" class="curse"${bannerAttr(curse.by)}>${bannerOf(curse.by) === null ? '' : '<i class="flag" aria-hidden="true"></i> '}` +
+            `<b>${esc(godOf.has(curse.by) ? godName(godOf.get(curse.by)!) : tavernName(curse.by))}</b>'s curse falls on your party, from <b>${esc(tavernName(curse.by))}</b>: ` +
+            `disadvantage on every ${esc(ABILITY_NAMES[curse.ability])} check and save.</li>`,
+        ];
   const lines = steps.flatMap(({ node: id, record: r, bank, total }) => {
     if (r === null) return [];
     const node = byId.get(id);
@@ -2016,16 +2047,31 @@ function taleHtml(mission: Mission, run: RunResult): string {
     `<div class="row"><span class="small">loot carried <b class="num loot-count" data-loot="${run.loot}">${run.loot}</b></span>` +
     `<button type="button" class="small" data-reveal-skip title="Show the result now (Esc)">Skip</button>` +
     `<button type="button" class="small" data-action="play-replay" data-after-reveal>Watch again</button></div></div>` +
-    `<ol class="tale" aria-live="polite">${lines.join('')}</ol></div>`
+    `<ol class="tale" aria-live="polite">${[...head, ...lines].join('')}</ol></div>`
   );
+}
+
+/** The hex that counted against `tavern` in `week` (the first declared, D-52), and who laid it. */
+function curseOn(s: SeasonSession, tavern: string, week: number): { readonly by: string; readonly ability: Ability } | null {
+  const hex = s.state.hexes.find((h) => h.target === tavern && h.week === week);
+  return hex === undefined ? null : { by: hex.tavern, ability: hex.ability };
+}
+
+/** The hex moment: your declared hex lands in the list, in your colours. */
+function layMyCurse(key: string): void {
+  layCurse(panel.querySelector<HTMLElement>(`.hexes [data-hex="${CSS.escape(key)}"]`), bannerColours(play.session?.humanTavern ?? null));
+}
+
+/** A tavern's banner colours for an effect, if it has a banner. */
+function bannerColours(tavern: string | null): Banner | undefined {
+  const god = tavern === null ? null : bannerOf(tavern);
+  return god === null ? undefined : data.gods[god]!.banner;
 }
 
 /** The week reveal: your run plays back over the result card, ending in a moment the size of the week (fx.ts). */
 function revealMyWeek(): void {
   const card = panel.querySelector<HTMLElement>('.week-result[data-path]');
-  const me = play.session?.humanTavern;
-  const god = me === undefined || me === null ? null : bannerOf(me);
-  if (card !== null) revealWeek(card, god === null ? undefined : data.gods[god]!.banner);
+  if (card !== null) revealWeek(card, bannerColours(play.session?.humanTavern ?? null));
 }
 
 function renderPlayStandings(s: SeasonSession): string {
@@ -2056,7 +2102,7 @@ function renderPlayStandings(s: SeasonSession): string {
 }
 
 function resetPlay(): void {
-  Object.assign(play, { session: null, error: null, notice: null, seed: '', moves: [], confirmReset: false });
+  Object.assign(play, { session: null, error: null, notice: null, seed: '', moves: [], confirmReset: false, confirmHex: false });
   storageRemove(PLAY_KEY);
 }
 
@@ -2106,12 +2152,23 @@ function playClick(action: string, id: string | undefined): boolean {
         play.retreat = lineup.retreat;
       });
       return true;
-    case 'play-hex': {
+    case 'play-hex':
+      play.confirmHex = true;
+      renderTab();
+      return true;
+    case 'play-hex-cancel':
+      play.confirmHex = false;
+      renderTab();
+      return true;
+    case 'play-hex-confirm': {
       const s = play.session;
       const stage = s?.stage;
+      play.confirmHex = false;
       if (s === null || stage?.kind !== 'week') return true;
-      const target = play.hexTarget !== '' && s.taverns.includes(play.hexTarget) ? play.hexTarget : s.taverns.find((t) => t !== s.humanTavern)!;
-      playMoves([{ t: 'hex', target, ability: play.hexAbility, week: Math.max(play.hexWeek, stage.week) }]);
+      const rivals = s.taverns.filter((t) => t !== s.humanTavern);
+      const target = play.hexTarget !== '' && rivals.includes(play.hexTarget) ? play.hexTarget : rivals[0]!;
+      const week = Math.max(play.hexWeek, stage.week);
+      playMoves([{ t: 'hex', target, ability: play.hexAbility, week }], () => (pendingFx = () => layMyCurse(`${s.humanTavern}>${target}>${week}`)));
       return true;
     }
     case 'play-claim':

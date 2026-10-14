@@ -79,7 +79,7 @@ export function raiseBanner(card: HTMLElement | null, banner: Banner): void {
 }
 
 /** Milliseconds for each beat of the week reveal: a node with no roll, a check's roll, a battle's, and an ending line. */
-const BEAT = { step: 380, check: 800, battle: 1400, tail: 900, count: 450 } as const;
+const BEAT = { step: 380, check: 800, battle: 1400, tail: 900, count: 450, curse: 1500 } as const;
 const BRASS = Color.fromHex('#d5aa4c');
 
 /**
@@ -191,6 +191,13 @@ export function revealWeek(card: HTMLElement, banner?: Banner): void {
   card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 
   void (async () => {
+    // A rival's hex falls first, in their colours, and the run waits a beat under it.
+    const curse = card.querySelector<HTMLElement>('.tale [data-head="curse"]');
+    if (curse !== null) {
+      curse.classList.add('shown');
+      micron(curse, 'flicker', { duration: 0.8, delay: 0.2 });
+      await sleep(BEAT.curse);
+    }
     let previous: Element | null = null;
     for (const [i, id] of path.entries()) {
       if (skipped || !card.isConnected) break;
@@ -230,6 +237,24 @@ export function revealWeek(card: HTMLElement, banner?: Banner): void {
     }
     finish();
   })();
+}
+
+/**
+ * Declaring your hex: spite, once a season. The new hex in the list jolts
+ * (micron's jerk) and throws a few embers in your banner's mark. A cheer,
+ * kept small: a curse is mischief, not a party.
+ */
+export function layCurse(row: HTMLElement | null, banner?: Banner): void {
+  if (row === null || reducedMotion()) return;
+  row.classList.add('laid');
+  micron(row, 'jerk', { duration: 0.6 });
+  sparkles(row.querySelector<HTMLElement>('.flag') ?? row, {
+    count: variation.range(10, 14),
+    size: variation.range(0.4, 0.8),
+    speed: variation.range(50, 120),
+    color: Color.fromHex(banner?.mark ?? '#a8352a'),
+    shapes: 'circle',
+  });
 }
 
 /**
