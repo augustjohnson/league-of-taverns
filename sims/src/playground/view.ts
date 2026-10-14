@@ -498,6 +498,15 @@ export function weekOutcome(week: {
   return 'quiet';
 }
 
+/** A tavern's best week of a season: the most points, the earliest on a tie, and whether it topped that week. Null with no weeks. */
+export function bestWeek(
+  weeks: ReadonlyArray<{ readonly week: number; readonly points: number; readonly rank: number }>,
+): { readonly week: number; readonly points: number; readonly topped: boolean } | null {
+  let best: { week: number; points: number; rank: number } | null = null;
+  for (const w of weeks) if (best === null || w.points > best.points || (w.points === best.points && w.week < best.week)) best = w;
+  return best === null ? null : { week: best.week, points: best.points, topped: best.rank === 1 && best.points > 0 };
+}
+
 // ── banners ────────────────────────────────────────────────────────────────
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

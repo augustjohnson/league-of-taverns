@@ -355,6 +355,13 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 /* Not a list item, so the steps below still count from 1. */
 .tale > li.curse { display: block; margin-left: -1.6em; }
 
+/* The season's end (fx.ts crownChampion, hailChampion). A champion's final card flies their banner with a taller
+   pennant; otherwise the champion line wears the champion's banner on its flag and ink only. */
+.season-final.champion h2 { font-size: 1.8rem; }
+.season-final.champion .pennant { height: 30px; }
+.champ-line[data-banner] b { color: var(--banner-ink); }
+.champ-line .flag { transform-origin: center top; }
+
 /* What a week leaves behind (fx.ts weekMoment): after a DNF the run dims except where it ended; after a retreat the
    loot kept is marked. Static, so a reload shows them; they arrive with the end of the reveal. */
 .week-result[data-outcome="dnf"]:not(.revealing) .graph :is(.edge, .elabel, .node:not(.lost)) { opacity: 0.4; transition: opacity 1.2s ease-out; }

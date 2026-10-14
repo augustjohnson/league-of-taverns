@@ -9,7 +9,7 @@
  * earns. A week's result picks its tier by how it went (`weekMoment`).
  * The CSS half is page.html § Moments, with micron's CSS vendored below it.
  */
-import { Color, confetti, settings, sparkles, variation } from 'party-js';
+import { Color, Rect, confetti, settings, sparkles, variation } from 'party-js';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 
 // party.js's own default, set here so it holds even if the default changes: it must be set before the first effect.
@@ -93,9 +93,10 @@ const BRASS = Color.fromHex('#d5aa4c');
  *
  * The card already holds the whole result: this only holds pieces back and
  * brings them in, so a reload, a skip or reduced motion shows the same thing.
- * When it ends, skipped or not, the week's moment plays in `banner`'s colours.
+ * When it ends, skipped or not, the week's moment plays in `banner`'s colours,
+ * or `finale` in its place (the last week ends the season).
  */
-export function revealWeek(card: HTMLElement, banner?: Banner): void {
+export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => void): void {
   if (reducedMotion()) return;
   let path: ReadonlyArray<string>;
   try {
@@ -178,7 +179,8 @@ export function revealWeek(card: HTMLElement, banner?: Banner): void {
     card.classList.remove('revealing');
     card.classList.add('revealed');
     if (hadFocus) card.focus({ preventScroll: true });
-    weekMoment(card, banner);
+    if (finale === undefined) weekMoment(card, banner);
+    else finale();
   };
 
   card.classList.add('revealing');
@@ -286,4 +288,51 @@ export function weekMoment(card: HTMLElement, banner?: Banner): void {
   } else if (outcome === 'retreat') {
     micron(counter, 'fade', { duration: 0.9 });
   }
+}
+
+/**
+ * The season ends and you won: the fanfare, the only full-screen confetti in
+ * the app. Your banner goes up over the final card (the `.raised`
+ * animations), its title tadas, and two waves of confetti in your banner's
+ * colours rise from the bottom of the screen, then one from the card.
+ */
+export function crownChampion(card: HTMLElement, banner?: Banner): void {
+  if (reducedMotion() || !card.isConnected) return;
+  card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  card.classList.add('raised');
+  micron(card.querySelector('h2'), 'tada', { duration: 1, delay: 0.4 });
+  const colours = (banner === undefined ? ['#d5aa4c', '#24704a', '#ecdfb9'] : [banner.mark, banner.mark, banner.charge, banner.field]).map((hex) => Color.fromHex(hex));
+  const wave = (count: number): void => {
+    // Speeds to clear the screen's height against party.js's gravity (800 px/s²).
+    const lift = Math.sqrt(2 * 800 * window.innerHeight);
+    confetti(new Rect(0, window.innerHeight, window.innerWidth, 1), {
+      count,
+      spread: variation.range(20, 30),
+      speed: variation.range(0.75 * lift, 1.05 * lift),
+      size: variation.range(0.8, 1.3),
+      color: colours,
+    });
+  };
+  window.setTimeout(() => wave(90), 500);
+  window.setTimeout(() => wave(70), 1300);
+  window.setTimeout(() => {
+    if (card.isConnected) confetti(card.querySelector<HTMLElement>('h2') ?? card, { count: variation.range(40, 55), color: colours });
+  }, 2100);
+}
+
+/**
+ * The season ends and a rival won: no fanfare for you. The champion's flag
+ * swings and throws a small burst in their colours, and your finish line
+ * nods. The champion's colours show because they won the league, which acts
+ * on everyone.
+ */
+export function hailChampion(card: HTMLElement, banner?: Banner): void {
+  if (reducedMotion() || !card.isConnected) return;
+  card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  const flag = card.querySelector<HTMLElement>('.champ-line .flag');
+  micron(flag, 'swing', { duration: 1.1, timing: 'ease-out' });
+  if (flag !== null && banner !== undefined) {
+    sparkles(flag, { count: variation.range(12, 18), size: variation.range(0.5, 0.9), color: [banner.mark, banner.charge].map((hex) => Color.fromHex(hex)) });
+  }
+  micron(card.querySelector('.finish'), 'fade', { duration: 0.9, delay: 0.6 });
 }

@@ -136,7 +136,11 @@ a breath out for turning back, a dimmed run after a DNF, and nothing for a
 quiet week. A hex takes a second click to declare (it is public and final),
 then lands in the list in your colours with a jolt and a few embers; a rival's
 hex on you opens that week's reveal in the rival's colours before the party
-sets out. The result card holds the whole result and the reveal only holds pieces
+sets out. The last week's reveal ends the season: if you won, your banner
+goes up over the final card and the only full-screen confetti in the page
+rises in its colours; if not, you get your week's moment, the champion's flag
+swings in theirs, and the card gives your finish and your best week. The
+result card holds the whole result and the reveal only holds pieces
 back, so Skip (or Esc), a reload and `prefers-reduced-motion` all show the
 same thing at once. Each moment plays once after the render its move caused.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI

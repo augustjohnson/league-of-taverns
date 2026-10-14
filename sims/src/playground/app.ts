@@ -61,7 +61,7 @@ import {
 } from '../reports';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInputFromData, type PlaygroundData } from './data';
-import { layCurse, raiseBanner, revealWeek } from './fx';
+import { crownChampion, hailChampion, layCurse, raiseBanner, revealWeek, weekMoment } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -87,6 +87,7 @@ import {
   scoreHistogram,
   seedWords,
   signed,
+  bestWeek,
   taleSteps,
   weekOutcome,
   topSkills,
@@ -2071,7 +2072,25 @@ function bannerColours(tavern: string | null): Banner | undefined {
 /** The week reveal: your run plays back over the result card, ending in a moment the size of the week (fx.ts). */
 function revealMyWeek(): void {
   const card = panel.querySelector<HTMLElement>('.week-result[data-path]');
-  if (card !== null) revealWeek(card, bannerColours(play.session?.humanTavern ?? null));
+  if (card === null) return;
+  const s = play.session;
+  const me = s?.humanTavern ?? null;
+  const mine = bannerColours(me);
+  // The last week's reveal ends the season: its fanfare takes the place of the week's own moment if you won.
+  const final = panel.querySelector<HTMLElement>('.season-final');
+  if (s === null || s.stage.kind !== 'complete' || final === null) {
+    revealWeek(card, mine);
+    return;
+  }
+  const champs = seasonStandings(s.state).filter((r) => r.rank === 1).map((r) => r.tavern);
+  revealWeek(card, mine, () => {
+    if (me !== null && champs.includes(me)) {
+      crownChampion(final, mine);
+      return;
+    }
+    weekMoment(card, mine);
+    window.setTimeout(() => hailChampion(final, bannerColours(champs[0] ?? null)), 1200);
+  });
 }
 
 function renderPlayStandings(s: SeasonSession): string {
@@ -2086,17 +2105,44 @@ function renderPlayStandings(s: SeasonSession): string {
         `<td><span class="tag ${r.tavern === me ? (bannerOf(me) === null ? 'brass' : 'banner') : ''}">${r.tavern === me ? 'you' : esc(botOf(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
+  const table =
+    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">loot</th></tr></thead><tbody>${body}</tbody></table></div>` +
+    (done ? '<p class="hint">The season is loaded into the other tabs: Standings, Weeks, Draft board, Pool and Event log.</p>' : '');
+  if (!done) return `<section class="card"><h2>Standings</h2>${table}</section>`;
+
+  // The season's end (fx.ts crownChampion / hailChampion play over this card when the last week's reveal ends).
   const champs = rows.filter((r) => r.rank === 1).map((r) => r.tavern);
   const mine = rows.find((r) => r.tavern === me);
-  const banner = !done
-    ? ''
-    : mine?.rank === 1
-      ? `<p><span class="chip ok"><span class="dot"></span>Champions!</span> ${esc(tavernName(me))} ${champs.length === 1 ? 'wins the season' : 'shares the title'}.</p>`
-      : `<p>${champs.map((t) => esc(tavernName(t))).join(' and ')} ${champs.length === 1 ? 'wins' : 'share'} the season. You finish ${ordinal(mine?.rank ?? rows.length)}.</p>`;
+  const godLine = (tavern: string): string => {
+    const god = godOf.get(tavern);
+    return god === undefined ? '' : ` under the banner of <b>${esc(godName(god))}</b>`;
+  };
+  if (mine?.rank === 1) {
+    const chrome = bannerColours(me) === undefined ? undefined : data.gods[godOf.get(me)!];
+    return (
+      `<section class="card season-final champion${chrome === undefined ? '' : ' banner-card'}"${bannerAttr(me)}>${chrome === undefined ? '' : '<div class="pennant" aria-hidden="true"></div>'}` +
+      `<h2>${champs.length === 1 ? 'Champions of the League' : 'Co-champions of the League'}</h2>` +
+      `<p class="banner-call">${esc(tavernName(me))} ${champs.length === 1 ? 'takes the season' : 'shares the title'} with ${num(mine.points)} loot${godLine(me)}.</p>` +
+      table +
+      `</section>`
+    );
+  }
+  const weeks = [...s.state.finalizedWeeks].flatMap((week) => {
+    const row = standings([], weekResults(s.state, week)).find((r) => r.tavern === me);
+    return row === undefined ? [] : [{ week, points: row.points, rank: row.rank }];
+  });
+  const best = bestWeek(weeks);
+  const champLine = champs
+    .map((t) => `<span class="champ-line"${bannerAttr(t)}>${bannerOf(t) === null ? '' : '<i class="flag" aria-hidden="true"></i> '}<b>${esc(tavernName(t))}</b>${godLine(t)}</span>`)
+    .join(' and ');
   return (
-    `<section class="card"><h2>${done ? 'Final standings' : 'Standings'}</h2>${banner}` +
-    `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>manager</th><th class="n">loot</th></tr></thead><tbody>${body}</tbody></table></div>` +
-    (done ? '<p class="hint">The season is loaded into the other tabs: Standings, Weeks, Draft board, Pool and Event log.</p>' : '') +
+    `<section class="card season-final">` +
+    `<h2>Final standings</h2>` +
+    `<p>${champLine} ${champs.length === 1 ? 'wins' : 'share'} the season.</p>` +
+    `<p class="finish">You finish <b>${ordinal(mine?.rank ?? rows.length)} of ${rows.length}</b> with ${num(mine?.points ?? 0)} loot.` +
+    (best === null || best.points === 0 ? '' : ` Your best week was week ${best.week}: ${num(best.points)} loot${best.topped ? ', and you topped it' : ''}.`) +
+    `</p>` +
+    table +
     `</section>`
   );
 }

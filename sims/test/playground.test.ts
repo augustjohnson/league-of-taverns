@@ -10,6 +10,7 @@ import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-b
 import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
 import {
   bannerCss,
+  bestWeek,
   bannerGods,
   draftBoard,
   formatCr,
@@ -211,6 +212,14 @@ describe('week outcomes', () => {
 
   it('does not crown a week where every tavern scored nothing', () => {
     expect(weekOutcome({ ...week, rank: 1, points: 0, projected: 0 })).toBe('quiet');
+  });
+});
+
+describe('season finish', () => {
+  it('finds the best week: the most points, the earliest on a tie, and whether it topped the week', () => {
+    expect(bestWeek([])).toBeNull();
+    expect(bestWeek([{ week: 1, points: 40, rank: 3 }, { week: 2, points: 90, rank: 1 }, { week: 3, points: 90, rank: 2 }])).toEqual({ week: 2, points: 90, topped: true });
+    expect(bestWeek([{ week: 4, points: 0, rank: 1 }])).toEqual({ week: 4, points: 0, topped: false });
   });
 });
 
