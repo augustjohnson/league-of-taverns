@@ -43,7 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
-- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7, T5.8, T6.6, T4.8, T4.9, T6.7, T4.10.
 
 ## Phase 1 starting set (historical)
 
@@ -293,7 +293,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   gone.
 - **Depends:** T4.2, T4.4.
 
-#### T4.10 Tavern pick + 6-tavern cap · S
+#### T4.10 Tavern pick + 6-tavern cap · M (done 2026-10-13)
 - **Goal:** `tavern.chosen` before the first `draft.pick`, in reverse draft
   order (D-52); `managers.yaml` lists managers apart from taverns; at most 6
   taverns (D-01).
@@ -634,7 +634,7 @@ Owns `scripts/src/{run-week,seal,reveal,offseason,publish}.ts`.
 
 #### T10.5 Season bootstrap · S
 - **Goal:** produce `season.created`, `character.pooled` × N and
-  `tavern.joined` × N from the season files.
+  `manager.joined` × N from the season files (taverns are in `season.created`).
 - **Acceptance:** idempotent refusal if the season already exists; config
   sha256 recorded; requires `lock-check` to pass.
 - **Depends:** T3.4, T8.4, T2.4.

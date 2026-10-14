@@ -26,7 +26,9 @@ draft takes 42 characters, which leaves about 22 free agents from a pool of
 is always 6 weeks. *Note:* with exclusive ownership, a pool of 64 and a
 roster of 7, at most 9 taverns fit (63 characters), and waivers only work if
 some characters go undrafted. Size the pool to about taverns × 7 + 10.
-*Blocks:* nothing (T4.1 implements exclusive).
+*Blocks:* nothing (T4.1 implements exclusive). The 6-tavern cap is built
+(T4.10): `MAX_TAVERNS`, enforced by `season.created`, `manager.joined` and
+the loaders.
 
 **D-02 Draft format: DEFAULTED.** Snake vs auction (CR as salary suggests an
 auction could work) vs linear. *Default:* snake, seeded order. Reconfirmed
@@ -358,7 +360,10 @@ starter's CR, instead of scoring 0?
   captain or the most expensive starter, or letting the manager choose.
 - *Blocks:* T6.7.
 
-**D-52 Taverns, gods, boons and hexes: DECIDED (2026-10-13).** Not built yet.
+**D-52 Taverns, gods, boons and hexes: DECIDED (2026-10-13).** The tavern
+pick is built (2026-10-13, T4.10): `manager.joined`, `tavern.chosen`,
+taverns with their gods in `schedule.yaml`, and bots choosing at random.
+Boons and hexes are not built yet.
 The only custom concepts on top of draft, monsters and missions. Each one
 sits at its own level of play and borrows from D&D.
 - **The god chooses the tavern.** Each tavern is already blessed by one god,

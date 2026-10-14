@@ -21,6 +21,7 @@ export {
   maxCrLineup,
   projectionLineup,
   randomDraft,
+  randomTavern,
   skillCoverageDraft,
   valueDraft,
 } from './strategies';

@@ -1,23 +1,18 @@
 # Mock season schedule: one environment per week, so each mission in
 # missions/ maps to exactly one week by its environment.
 #
-# Sponsors: six gods, one per tavern, each setting one week (D-48), so every
-# tavern gets exactly one home week.
+# Taverns (D-52): six taverns, each already blessed by one god. Managers
+# choose a tavern, never a god. Each god sets one week (D-48), so every tavern
+# has exactly one god's week.
 
 season: mock-season
-sponsors:
-  - id: the-thorn-mother
-    tavern: the-rusty-tankard
-  - id: the-drowned-lord
-    tavern: the-gilded-flagon
-  - id: the-storm-crow
-    tavern: the-sleeping-giant
-  - id: the-bog-king
-    tavern: the-drowned-rat
-  - id: the-deep-miner
-    tavern: the-crooked-candle
-  - id: the-lamplighter
-    tavern: the-last-lantern
+taverns:
+  - { id: the-rusty-tankard, name: The Rusty Tankard, god: the-thorn-mother }
+  - { id: the-gilded-flagon, name: The Gilded Flagon, god: the-drowned-lord }
+  - { id: the-sleeping-giant, name: The Sleeping Giant, god: the-storm-crow }
+  - { id: the-drowned-rat, name: The Drowned Rat, god: the-bog-king }
+  - { id: the-crooked-candle, name: The Crooked Candle, god: the-deep-miner }
+  - { id: the-last-lantern, name: The Last Lantern, god: the-lamplighter }
 weeks:
   - week: 1
     title: The Thornwood Trail

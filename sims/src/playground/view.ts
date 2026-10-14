@@ -378,8 +378,10 @@ export function eventSummary(event: LeagueEvent): string {
       return `${event.payload.config.id}: ${event.payload.config.weeks} weeks, B = ${formatCr(event.payload.config.budget.partyCr)}`;
     case 'character.pooled':
       return `${event.payload.character} (${event.payload.base}, CR ${formatCr(event.payload.cr)})${event.payload.modifiers.length > 0 ? ` +${event.payload.modifiers.length} mod` : ''}`;
-    case 'tavern.joined':
-      return `${event.payload.tavern} (${'bot' in event.payload.manager ? event.payload.manager.bot : event.payload.manager.login})`;
+    case 'manager.joined':
+      return `${event.payload.manager} (${'bot' in event.payload.account ? event.payload.account.bot : event.payload.account.login})`;
+    case 'tavern.chosen':
+      return `${event.payload.manager} chooses ${event.payload.tavern}`;
     case 'draft.pick':
       return `#${event.payload.pick + 1} ${event.payload.tavern} takes ${event.payload.character}`;
     case 'lineup.set':

@@ -120,7 +120,7 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
     checked: {
       season: config.id,
       characters: loaded.pool.characters.length,
-      taverns: loaded.managers.taverns.length,
+      taverns: schedule.taverns.length,
       weeks: schedule.weeks.length,
       missions,
     },

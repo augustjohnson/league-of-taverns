@@ -108,7 +108,8 @@ const charName = (id: string): string => data.names[id] ?? id;
 const charNames = (ids: ReadonlyArray<string>): string => ids.map((id) => esc(charName(id))).join(', ');
 const tavernById = new Map(input.taverns.map((t) => [t.id, t]));
 const tavernName = (id: string): string => tavernById.get(id)?.name ?? id;
-const botOf = (id: string): string => run?.result.summary.taverns.find((t) => t.tavern === id)?.bot ?? tavernById.get(id)?.bot ?? '?';
+const botOf = (id: string): string => run?.result.summary.taverns.find((t) => t.tavern === id)?.bot ?? '?';
+const managerBot = (id: string): string => input.managers.find((m) => m.id === id)?.bot ?? '?';
 const layouts = new Map<number, GraphLayout>(WEEKS.map((w) => [w, layoutMission(missionOf(w))]));
 
 function missionOf(week: number): Mission {
@@ -538,7 +539,7 @@ function reportsOf(r: Run): Reports {
   return rep;
 }
 
-/** Each tavern's series colour (`--s1`…`--s8`), fixed by managers-file order so it never follows rank. */
+/** Each tavern's series colour (`--s1`…`--s8`), fixed by package order so it never follows rank. */
 function seriesVar(tavern: string): string {
   const i = input.taverns.findIndex((t) => t.id === tavern);
   return `var(--s${(i < 0 ? 0 : i % 8) + 1})`;
@@ -1301,7 +1302,7 @@ function renderBatch(): string {
       `</tbody></table></div>` +
       `<p>Best-projected tavern topped its week ${num(`${bp.tops}/${bp.weeks}`)} times (${num(pct(bp.share))}).</p>` +
       `<p>DNF rate: ${num(pct(totals.dnfRate))} of mission runs; tavern-weeks with no lineup: ${num(totals.noLineupWeeks)}.</p>` +
-      `<p>Titles by seat: ${Object.entries(totals.titlesByTavern)
+      `<p>Titles by tavern: ${Object.entries(totals.titlesByTavern)
         .map(([t, n]) => `${esc(tavernName(t))} ${num(Number.isInteger(n) ? n : n.toFixed(1))}`)
         .join(', ')}</p>` +
       `<p class="hint">${totals.runs} seasons from seed ${esc(b.seed)} in ${(b.ms / 1000).toFixed(2)} s (${(b.ms / totals.runs).toFixed(1)} ms/season, luck included). Same as <span class="mono">mock-season -- --runs ${totals.runs} --seed ${esc(b.seed)}</span>.</p>` +
@@ -1367,6 +1368,7 @@ function startBatch(): void {
 
 /** One of the person's moves. A season is its seed, its tavern and these, replayed in order, so it can be saved and restored. */
 type PlayMove =
+  | { readonly t: 'tavern'; readonly id: string }
   | { readonly t: 'draft'; readonly id: string }
   | { readonly t: 'lineup'; readonly starters: ReadonlyArray<string>; readonly retreat: RetreatOrder }
   | { readonly t: 'claim'; readonly add: string; readonly drop: string | null }
@@ -1376,7 +1378,7 @@ interface SavedPlay {
   readonly v: 1;
   /** The season package and engine the moves were made against; anything else would replay differently. */
   readonly fingerprint: string;
-  readonly tavern: string;
+  readonly manager: string;
   readonly seed: string;
   readonly moves: ReadonlyArray<PlayMove>;
 }
@@ -1386,7 +1388,8 @@ const PLAY_FINGERPRINT = `${data.version}:${config.id}:${data.configSha256}:${in
 
 const play = {
   session: null as SeasonSession | null,
-  tavern: input.taverns[0]?.id ?? '',
+  /** The manager seat the person takes; its bot stays on as the advisor. */
+  manager: input.managers[0]?.id ?? '',
   seed: '',
   error: null as string | null,
   /** A note about the saved season (restored, or could not be). */
@@ -1408,8 +1411,8 @@ const play = {
   played: null as number | null,
 };
 
-function newSession(tavern: string, seed: string): SeasonSession {
-  const session = new SeasonSession(input, { seed, human: { tavern, login: 'you', githubId: 1 } });
+function newSession(manager: string, seed: string): SeasonSession {
+  const session = new SeasonSession(input, { seed, human: { manager, login: 'you', githubId: 1 } });
   session.advanceDraft();
   return session;
 }
@@ -1419,7 +1422,7 @@ function startPlay(): void {
   play.error = null;
   play.notice = null;
   try {
-    const session = newSession(play.tavern, seed);
+    const session = newSession(play.manager, seed);
     Object.assign(play, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', played: null, confirmReset: false });
     savePlay();
   } catch (e) {
@@ -1430,6 +1433,10 @@ function startPlay(): void {
 
 function applyMove(s: SeasonSession, m: PlayMove): void {
   switch (m.t) {
+    case 'tavern':
+      s.chooseTavern(m.id);
+      s.advanceDraft();
+      break;
     case 'draft':
       s.draftPick(m.id);
       s.advanceDraft();
@@ -1453,7 +1460,7 @@ function applyMove(s: SeasonSession, m: PlayMove): void {
 function savePlay(): void {
   const s = play.session;
   if (s === null) return;
-  const saved: SavedPlay = { v: 1, fingerprint: PLAY_FINGERPRINT, tavern: s.human!.tavern, seed: s.seed, moves: play.moves };
+  const saved: SavedPlay = { v: 1, fingerprint: PLAY_FINGERPRINT, manager: s.human!.manager, seed: s.seed, moves: play.moves };
   storageSet(PLAY_KEY, JSON.stringify(saved));
 }
 
@@ -1464,10 +1471,10 @@ function restorePlay(): void {
   try {
     const saved = JSON.parse(raw) as SavedPlay;
     if (saved.v !== 1 || saved.fingerprint !== PLAY_FINGERPRINT) throw new Error('it was played against another version of the season or engine');
-    const session = newSession(saved.tavern, saved.seed);
+    const session = newSession(saved.manager, saved.seed);
     for (const m of saved.moves) applyMove(session, m);
     const weeks = saved.moves.filter((m) => m.t === 'week').length;
-    Object.assign(play, { session, tavern: saved.tavern, seed: saved.seed, moves: [...saved.moves], played: weeks === 0 ? null : weeks });
+    Object.assign(play, { session, manager: saved.manager, seed: saved.seed, moves: [...saved.moves], played: weeks === 0 ? null : weeks });
     play.notice = session.stage.kind === 'complete' ? null : 'Picked up your season where you left it.';
   } catch (e) {
     storageRemove(PLAY_KEY);
@@ -1521,7 +1528,7 @@ function openPlayed(s: SeasonSession): void {
 }
 
 function myRoster(s: SeasonSession): ReadonlyArray<string> {
-  return s.state.taverns.get(s.human!.tavern)?.roster ?? [];
+  return s.state.taverns.get(s.humanTavern!)?.roster ?? [];
 }
 
 /** Point the builder at the next week: the submitted lineup, else last week's, else the advisor's. Drops anyone no longer on the roster. */
@@ -1529,7 +1536,7 @@ function syncBuilder(s: SeasonSession, week: number): void {
   const roster = new Set(myRoster(s));
   if (play.builderWeek !== week) {
     play.builderWeek = week;
-    const me = s.human!.tavern;
+    const me = s.humanTavern!;
     const lineup = s.pendingLineup() ?? s.state.lockedLineups.get(week - 1)?.find((l) => l.tavern === me)?.lineup ?? s.suggestLineup();
     play.picks = lineup === null ? [] : [...lineup.starters];
     play.retreat = lineup?.retreat ?? 'never';
@@ -1573,6 +1580,7 @@ function renderPlay(): string {
     (play.notice === null ? '' : `<p class="hint" role="status">${esc(play.notice)}</p>`);
   if (s === null) return err + renderPlaySetup();
   const stage = s.stage;
+  if (stage.kind === 'tavern') return playHeader(s) + err + renderPlayTavernPick(s);
   if (stage.kind === 'draft') return playHeader(s) + err + renderPlayDraft(s, stage.pick);
   if (stage.kind === 'week') syncBuilder(s, stage.week);
   return (
@@ -1585,25 +1593,31 @@ function renderPlay(): string {
 }
 
 function renderPlaySetup(): string {
-  const options = input.taverns.map((t) => `<option value="${esc(t.id)}" ${t.id === play.tavern ? 'selected' : ''}>${esc(t.name)} (advisor: ${esc(t.bot)})</option>`).join('');
+  const options = input.managers.map((m) => `<option value="${esc(m.id)}" ${m.id === play.manager ? 'selected' : ''}>${esc(m.id)} (advisor: ${esc(m.bot)})</option>`).join('');
   return (
     `<section class="card"><h2>Play vs bots</h2>` +
-    `<p>Manage one tavern yourself against ${input.taverns.length - 1} bot taverns. Draft when you are on the clock, then before each week set a lineup and make waiver claims, and play the week. ` +
+    `<p>Manage one tavern yourself against ${input.managers.length - 1} bots. Before the draft, everyone chooses a tavern in reverse draft order. Then draft when you are on the clock, and before each week set a lineup and make waiver claims, and play the week. ` +
     `Every move goes through the engine's reducers, so an illegal one is refused with the engine's reason.</p>` +
-    `<div class="row"><label class="label" for="play-tavern">Your tavern</label><select id="play-tavern" data-action="play-tavern">${options}</select>` +
+    `<div class="row"><label class="label" for="play-tavern">Your seat</label><select id="play-tavern" data-action="play-tavern">${options}</select>` +
     `<label class="label" for="play-seed">Seed</label><input type="text" id="play-seed" data-action="play-seed" placeholder="random" value="${esc(play.seed)}" spellcheck="false" autocomplete="off">` +
     `<button type="button" class="primary" data-action="play-start">Start season</button></div>` +
-    `<p class="hint">Your tavern's bot stays on as your advisor and can suggest a pick, a lineup or waiver claims. The seed drives the draft order, the bots and the dice, so the same seed and the same moves give the same season. ` +
+    `<p class="hint">Your seat's bot stays on as your advisor and can suggest a pick, a lineup or waiver claims. The seed drives the draft order, the bots and the dice, so the same seed and the same moves give the same season. ` +
     `Your season is saved in this browser as you play, and when it ends it loads into the other tabs.</p></section>`
   );
 }
 
 function playHeader(s: SeasonSession): string {
-  const me = s.human!.tavern;
+  const me = s.humanTavern;
   const stage = s.stage;
-  const total = config.draft.rounds * input.taverns.length;
+  const total = config.draft.rounds * s.state.managers.size;
   const where =
-    stage.kind === 'draft' ? `Draft, pick ${stage.pick + 1} of ${total}` : stage.kind === 'week' ? `Week ${stage.week} of ${config.weeks}` : 'Season complete';
+    stage.kind === 'tavern'
+      ? `Tavern pick, ${s.state.taverns.size + 1} of ${s.state.managers.size}`
+      : stage.kind === 'draft'
+        ? `Draft, pick ${stage.pick + 1} of ${total}`
+        : stage.kind === 'week'
+          ? `Week ${stage.week} of ${config.weeks}`
+          : 'Season complete';
   const rows = seasonStandings(s.state);
   const row = rows.find((r) => r.tavern === me);
   const rec = row === undefined || s.state.finalizedWeeks.size === 0 ? '' : `<span class="chip">${ordinal(row.rank)} of ${rows.length} · ${row.points} loot</span>`;
@@ -1613,7 +1627,7 @@ function playHeader(s: SeasonSession): string {
       `<button type="button" class="small" data-action="play-reset-confirm">Abandon season</button><button type="button" class="primary small" data-action="play-reset-cancel">Keep playing</button>`
     : `<button type="button" data-action="play-reset">New season</button>`;
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><div class="row"><h2>${esc(tavernName(me))}</h2><span class="tag brass">you</span>` +
+    `<section class="card"><div class="row" style="justify-content:space-between"><div class="row"><h2>${me === null ? 'No tavern yet' : esc(tavernName(me))}</h2><span class="tag brass">you</span>` +
     `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}${reset}</div></div></section>`
   );
 }
@@ -1623,9 +1637,38 @@ function ordinal(n: number): string {
   return `${n}${tail}`;
 }
 
+/** The tavern pick (D-52): every tavern is already blessed by its god; you choose a tavern, not a god. */
+function renderPlayTavernPick(s: SeasonSession): string {
+  const open = new Set(s.openTaverns());
+  const advice = s.suggestTavern();
+  const weekOf = (tavern: string): number | null => {
+    const god = s.state.sponsors.find((sp) => sp.tavern === tavern)?.id;
+    return s.state.schedule.find((w) => w.sponsor === god)?.week ?? null;
+  };
+  const rows = input.taverns
+    .map((t) => {
+      const owner = s.state.taverns.get(t.id)?.managerId;
+      const god = s.state.sponsors.find((sp) => sp.tavern === t.id)?.id ?? '—';
+      const week = weekOf(t.id);
+      const action = open.has(t.id)
+        ? `<button type="button" class="${t.id === advice ? 'primary ' : ''}small" data-action="play-tavern-pick" data-id="${esc(t.id)}">Choose</button>`
+        : `<span class="muted small">${esc(owner ?? '')}</span>`;
+      return `<tr class="${open.has(t.id) ? '' : 'muted'}"><td>${action}</td><td><b>${esc(t.name)}</b></td><td class="small">${esc(god)}</td><td class="n small">${week ?? '—'}</td></tr>`;
+    })
+    .join('');
+  const order = [...s.state.draft.managerOrder];
+  return (
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Choose your tavern</h2><span class="muted small">reverse draft order: whoever drafts last chooses first</span></div>` +
+    `<p class="small">Every tavern is already blessed by one god, who sets one week's mission. Boons and hexes come later (D-52); for now the taverns differ only in their god's week.</p>` +
+    `<div class="scroll"><table><thead><tr><th></th><th>tavern</th><th>god</th><th class="n">god's week</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+    (order.length === 0 ? '' : `<p class="hint">Draft order: ${order.map((m) => esc(m === s.human?.manager ? 'you' : m)).join(' → ')}.</p>`) +
+    `</section>`
+  );
+}
+
 function renderPlayDraft(s: SeasonSession, pick: number): string {
-  const me = s.human!.tavern;
-  const n = input.taverns.length;
+  const me = s.humanTavern!;
+  const n = s.state.managers.size;
   const picks = s.events.flatMap((e) => (e.type === 'draft.pick' ? [e.payload] : []));
   const mine = myRoster(s);
   const since = picks.slice(picks.map((p) => p.tavern).lastIndexOf(me) + 1);
@@ -1658,7 +1701,7 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
   return (
     `<section class="card"><div class="row" style="justify-content:space-between"><h2>You are on the clock</h2><span class="muted small">pick #${pick + 1}, round ${Math.floor(pick / n) + 1} of ${config.draft.rounds}</span></div>` +
     (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(charName(p.character))}</b>`).join('; ')}.</p>`) +
-    `<p class="small">Advisor (${esc(tavernById.get(me)?.bot ?? '?')}) suggests <b>${esc(charName(advice))}</b> <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
+    `<p class="small">Advisor (${esc(managerBot(s.human!.manager))}) suggests <b>${esc(charName(advice))}</b> <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
     `<button type="button" class="primary small" data-action="play-draft" data-id="${esc(advice)}">Take it</button></p>` +
     `<div class="cols"><div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
     (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<ul class="stack" style="list-style:none;margin:0;padding:0">${mine.map((id) => `<li>${charLabel(id)}</li>`).join('')}</ul>`) +
@@ -1674,7 +1717,7 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
 }
 
 function renderPlayWeek(s: SeasonSession, week: number): string {
-  const me = s.human!.tavern;
+  const me = s.humanTavern!;
   const mission = missionOf(week);
   const roster = myRoster(s);
   const lineup = builderLineup();
@@ -1767,12 +1810,12 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
 function homeLine(s: SeasonSession, week: number): string {
   const home = homeTavern(s.state, week);
   if (home === null) return 'no sponsor this week';
-  if (home === s.human!.tavern) return `<b>your home week</b>: loot × ${config.scoring.homeBonus}`;
+  if (home === s.humanTavern!) return `<b>your home week</b>: loot × ${config.scoring.homeBonus}`;
   return `home week for <b>${esc(tavernName(home))}</b> (× ${config.scoring.homeBonus})`;
 }
 
 function renderPlayResult(s: SeasonSession, week: number): string {
-  const me = s.human!.tavern;
+  const me = s.humanTavern!;
   const results = new Map(weekResults(s.state, week).map((r) => [r.tavern, r]));
   const table = standings([], [...results.values()]);
   const res = s.state.results.get(week)?.get(me);
@@ -1813,7 +1856,7 @@ function renderPlayResult(s: SeasonSession, week: number): string {
 }
 
 function renderPlayStandings(s: SeasonSession): string {
-  const me = s.human!.tavern;
+  const me = s.humanTavern!;
   const rows = seasonStandings(s.state);
   if (s.state.finalizedWeeks.size === 0) return '';
   const done = s.stage.kind === 'complete';
@@ -1863,6 +1906,9 @@ function playClick(action: string, id: string | undefined): boolean {
       play.confirmReset = false;
       renderTab();
       return true;
+    case 'play-tavern-pick':
+      if (id !== undefined) playMoves([{ t: 'tavern', id }]);
+      return true;
     case 'play-draft':
       if (id !== undefined) playMoves([{ t: 'draft', id }]);
       return true;
@@ -1907,7 +1953,7 @@ function playClick(action: string, id: string | undefined): boolean {
       const same =
         pending !== null && lineup !== null && pending.starters.join() === lineup.starters.join() && retreatValue(pending.retreat) === retreatValue(lineup.retreat);
       const unavailable = injuredFor(s.state, stage.week);
-      const legal = lineup !== null && validateLineup(lineup, { tavern: s.human!.tavern, characters: myRoster(s) }, crOf, config, { unavailable }).length === 0;
+      const legal = lineup !== null && validateLineup(lineup, { tavern: s.humanTavern!, characters: myRoster(s) }, crOf, config, { unavailable }).length === 0;
       const moves: PlayMove[] = lineup === null || same || !legal ? [] : [{ t: 'lineup', starters: [...lineup.starters], retreat: lineup.retreat }];
       playMoves([...moves, { t: 'week' }], () => {
         play.played = stage.week;
@@ -2013,7 +2059,7 @@ panel.addEventListener('change', (ev) => {
   const target = ev.target as HTMLInputElement | HTMLSelectElement;
   switch (target.dataset.action) {
     case 'play-tavern':
-      play.tavern = target.value;
+      play.manager = target.value;
       break;
     case 'play-add':
       play.add = target.value;
@@ -2150,7 +2196,7 @@ $('theme').addEventListener('click', () => {
 // ── boot ───────────────────────────────────────────────────────────────────
 
 $('subtitle').innerHTML =
-  `Playground · <b>${esc(config.id)}</b> · ${config.weeks} weeks · ${input.taverns.length} bot taverns · ${poolIds.length} pooled · ` +
+  `Playground · <b>${esc(config.id)}</b> · ${config.weeks} weeks · ${input.managers.length} bots · ${poolIds.length} pooled · ` +
   `party budget CR ${formatCrTotal(BUDGET)} · engine ${esc(input.engineVersion)} · ${esc(input.battleModel.id)}`;
 const savedTab = storageGet('lot-playground-tab');
 if (savedTab !== null && (TABS as ReadonlyArray<string>).includes(savedTab)) tab = savedTab as Tab;

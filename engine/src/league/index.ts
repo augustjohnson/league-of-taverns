@@ -33,7 +33,8 @@ export interface SeasonConfig {
   readonly draft: {
     readonly format: 'snake';
     readonly rounds: number;
-    readonly order: { readonly mode: 'seeded' } | { readonly mode: 'manual'; readonly taverns: ReadonlyArray<string> };
+    /** Over managers: the seeded shuffle, or a manual list of manager ids. Taverns are then chosen in reverse (D-52). */
+    readonly order: { readonly mode: 'seeded' } | { readonly mode: 'manual'; readonly managers: ReadonlyArray<string> };
     readonly pickWindowHours: number;
     readonly onTimeout: 'autopick' | 'skip' | 'wait';
   };
@@ -70,6 +71,9 @@ export interface SeasonConfig {
     readonly maxModifierChangePoints: number;
   };
 }
+
+/** The most taverns, and so managers, a league can have (D-01). A season is one week per tavern (D-48). */
+export const MAX_TAVERNS = 6;
 
 /** A god from the GM's season package and the tavern it sponsors (D-44). Names and voice are chrome. */
 export interface Sponsor {

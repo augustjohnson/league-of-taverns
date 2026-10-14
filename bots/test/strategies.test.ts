@@ -126,7 +126,7 @@ function stateOf(
   extra: { readonly locked?: ReadonlyArray<number>; readonly finalized?: ReadonlyArray<number> } = {},
 ): LeagueState {
   const taverns = new Map(
-    Object.entries(rosters).map(([id, roster]) => [id, { id, name: id, manager: { bot: 'test' }, roster }] as const),
+    Object.entries(rosters).map(([id, roster]) => [id, { id, name: id, managerId: `m-${id}`, manager: { bot: 'test' }, roster }] as const),
   );
   const owner = new Map<string, string>();
   for (const [tavern, roster] of Object.entries(rosters)) for (const id of roster) owner.set(id, tavern);
@@ -139,7 +139,7 @@ function stateOf(
     pool: pool.entries,
     taverns,
     owner,
-    draft: { order: Object.keys(rosters), picks: owner.size, complete: false },
+    draft: { managerOrder: Object.keys(rosters).map((id) => `m-${id}`), order: Object.keys(rosters), picks: owner.size, complete: false },
     pendingLineups: new Map(),
     lockedLineups: new Map((extra.locked ?? []).map((w) => [w, []] as const)),
     waivers: { pending: [], priority: Object.keys(rosters), resolvedWeeks: new Set() },

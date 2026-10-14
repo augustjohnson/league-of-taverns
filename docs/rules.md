@@ -11,9 +11,11 @@
   has a **sponsor** (a god), and each week is one sponsor's mission
   ([lore.md](lore.md)).
 - Each **manager** runs one **tavern**. Managers are listed in
-  `managers.yaml` and identified by GitHub account. A league has at most
-  **6 taverns** **[D-01]**, so a season is 6 weeks.
-- **Gods, boons and hexes** **[D-52, not built yet]:** every tavern is
+  `managers.yaml` and identified by GitHub account; the season's taverns
+  and their gods are in `schedule.yaml`. A league has at most **6 taverns**
+  **[D-01]**, so a season is 6 weeks.
+- **Gods, boons and hexes** **[D-52; the tavern pick is built, boons and
+  hexes not yet]:** every tavern is
   already blessed by one god, and the pairing never changes. The god gives
   its tavern:
   - a **boon**, which bends one rule for that tavern (the list is being
@@ -61,9 +63,10 @@
   `value` bot strategy **[OPEN D-26]**.
 - Keepers from last season (§12) are placed before the draft and cost the
   tavern a pick **[OPEN D-11]**.
-- **Tavern pick** **[D-52, not built yet]:** before the draft, managers
-  choose taverns (each with its god, boon and hex) in **reverse** draft
-  order. The manager who drafts monsters last chooses a tavern first.
+- **Tavern pick** **[D-52]:** before the draft, managers choose taverns
+  (each with its god, boon and hex) in **reverse** draft order. The manager
+  who drafts monsters last chooses a tavern first. The draft order is a
+  seeded shuffle of the managers, so it is fixed before the tavern pick.
 
 ## 5. Lineups and the budget
 

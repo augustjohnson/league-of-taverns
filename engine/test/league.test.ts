@@ -74,15 +74,15 @@ describe('draftOrder', () => {
 
   it('manual mode returns the configured permutation without drawing', () => {
     const rng = fakeRng([0.5]);
-    const config = makeConfig({ order: { mode: 'manual', taverns: ['c', 'a', 'd', 'b'] } });
+    const config = makeConfig({ order: { mode: 'manual', managers: ['c', 'a', 'd', 'b'] } });
     expect(draftOrder(four, config, rng)).toEqual(['c', 'a', 'd', 'b']);
     expect(rng.draws).toBe(0);
   });
 
-  it('manual mode rejects lists that are not a permutation of the taverns', () => {
-    const manual = (list: string[]) => () => draftOrder(four, makeConfig({ order: { mode: 'manual', taverns: list } }), fakeRng([0]));
+  it('manual mode rejects lists that are not a permutation of the managers', () => {
+    const manual = (list: string[]) => () => draftOrder(four, makeConfig({ order: { mode: 'manual', managers: list } }), fakeRng([0]));
     expect(manual(['a', 'b', 'c'])).toThrow(/missing.*"d"/);
-    expect(manual(['a', 'b', 'c', 'd', 'e'])).toThrow(/unknown tavern "e"/);
+    expect(manual(['a', 'b', 'c', 'd', 'e'])).toThrow(/unknown manager "e"/);
     expect(manual(['a', 'b', 'c', 'c'])).toThrow(/"c" more than once/);
   });
 

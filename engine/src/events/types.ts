@@ -34,6 +34,9 @@ export type Actor =
   | { readonly kind: 'system'; readonly workflow: string }
   | { readonly kind: 'bot'; readonly strategy: string };
 
+/** Who a manager is: a GitHub account, or a bot strategy in sims. */
+export type ManagerAccount = { readonly githubId: number; readonly login: string } | { readonly bot: string };
+
 export interface EventSource {
   readonly issue?: number;
   readonly comment?: number;
@@ -57,6 +60,11 @@ export interface PayloadByType {
     }>;
     /** The gods of the GM's season package and the tavern each sponsors (D-44). */
     readonly sponsors: ReadonlyArray<Sponsor>;
+    /**
+     * The season's taverns, each already blessed by one god (D-52). Managers
+     * choose among them (`tavern.chosen`). At most `MAX_TAVERNS` (D-01).
+     */
+    readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
   };
   'character.pooled': {
     readonly character: string;
@@ -64,10 +72,16 @@ export interface PayloadByType {
     readonly cr: CrEighths;
     readonly modifiers: ReadonlyArray<Modifier>;
   };
-  'tavern.joined': {
+  /** A manager joins the league. They choose a tavern later, in reverse draft order (D-52). */
+  'manager.joined': {
+    /** The manager's id in managers.yaml (kebab-case), stable for the season. */
+    readonly manager: string;
+    readonly account: ManagerAccount;
+  };
+  /** A manager takes one of the season's taverns, with its god, boon and hex (D-52). */
+  'tavern.chosen': {
+    readonly manager: string;
     readonly tavern: string;
-    readonly name: string;
-    readonly manager: { readonly githubId: number; readonly login: string } | { readonly bot: string };
   };
   'character.retained': {
     readonly tavern: string;

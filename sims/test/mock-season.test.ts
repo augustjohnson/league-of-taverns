@@ -25,9 +25,11 @@ describe('one seeded mock season', () => {
     const types = sim1.events.map((e) => e.type);
     const firstOf = (t: string): number => types.indexOf(t as (typeof types)[number]);
     expect(types.filter((t) => t === 'character.pooled')).toHaveLength(input.pool.length);
-    expect(types.filter((t) => t === 'tavern.joined')).toHaveLength(input.taverns.length);
-    expect(firstOf('tavern.joined')).toBeGreaterThan(types.lastIndexOf('character.pooled'));
-    expect(firstOf('draft.pick')).toBeGreaterThan(types.lastIndexOf('tavern.joined'));
+    expect(types.filter((t) => t === 'manager.joined')).toHaveLength(input.managers.length);
+    expect(types.filter((t) => t === 'tavern.chosen')).toHaveLength(input.managers.length);
+    expect(firstOf('manager.joined')).toBeGreaterThan(types.lastIndexOf('character.pooled'));
+    expect(firstOf('tavern.chosen')).toBeGreaterThan(types.lastIndexOf('manager.joined'));
+    expect(firstOf('draft.pick')).toBeGreaterThan(types.lastIndexOf('tavern.chosen'));
     expect(firstOf('lineup.set')).toBeGreaterThan(types.lastIndexOf('draft.pick'));
     expect(types.filter((t) => t === 'week.finalized')).toHaveLength(6);
     expect(types.filter((t) => t === 'waiver.resolved')).toHaveLength(5);
@@ -93,21 +95,26 @@ describe('one seeded mock season', () => {
   });
 
   it('refuses a lineup with last week\'s injured starter', () => {
-    const resolved = sim1.events.find((e) => e.type === 'mission.resolved' && e.payload.run.injury !== null && e.payload.week < 6);
-    if (resolved?.type !== 'mission.resolved') throw new Error('expected an injury before the last week');
-    const { week, run } = resolved.payload;
-    // The state just after that week's waivers: the next week's lineups are open.
-    const cut = sim1.events.findIndex((e) => e.type === 'waiver.resolved' && e.payload.week === week);
-    const before = replay(sim1.events.slice(0, cut + 1));
-    const owner = before.owner.get(run.injury!.character)!;
-    const others = before.taverns.get(owner)!.roster.filter((id) => id !== run.injury!.character).slice(0, 3);
-    const bad = { ...sim1.events[cut]!, seq: cut + 2, type: 'lineup.set', payload: { tavern: owner, week: week + 1, lineup: { starters: [run.injury!.character, ...others], retreat: 'never' } } };
+    // An injury before the last week whose character is still on a roster after that week's waivers.
+    const found = sim1.events.flatMap((e) => {
+      if (e.type !== 'mission.resolved' || e.payload.run.injury === null || e.payload.week >= 6) return [];
+      const { week, run } = e.payload;
+      // The state just after that week's waivers: the next week's lineups are open.
+      const cut = sim1.events.findIndex((x) => x.type === 'waiver.resolved' && x.payload.week === week);
+      const before = replay(sim1.events.slice(0, cut + 1));
+      const owner = before.owner.get(run.injury!.character);
+      return owner === undefined ? [] : [{ week, character: run.injury!.character, cut, before, owner }];
+    })[0];
+    if (found === undefined) throw new Error('expected a kept injured character before the last week');
+    const { week, character, cut, before, owner } = found;
+    const others = before.taverns.get(owner)!.roster.filter((id) => id !== character).slice(0, 3);
+    const bad = { ...sim1.events[cut]!, seq: cut + 2, type: 'lineup.set', payload: { tavern: owner, week: week + 1, lineup: { starters: [character, ...others], retreat: 'never' } } };
     expect(() => replay([...sim1.events.slice(0, cut + 1), bad as (typeof sim1.events)[number]])).toThrow(/lineup\.injured/);
   });
 
   it('pins the sim-1 champion', () => {
-    expect(sim1.summary.champions).toEqual([{ tavern: 'the-rusty-tankard', bot: 'random' }]);
-    expect(sim1.summary.standings[0]!.tavern).toBe('the-rusty-tankard');
+    expect(sim1.summary.champions).toEqual([{ tavern: 'the-drowned-rat', bot: 'cr-greedy' }]);
+    expect(sim1.summary.standings[0]!.tavern).toBe('the-drowned-rat');
   });
 });
 

@@ -2,15 +2,15 @@
 # lineups from this. Part of the GM's season package, copied into season.created.
 # `commitment` is the sha256 of the sealed mission, filled in by scripts/seal (D-08).
 #
-# Sponsors (D-44, D-48, D-52): each god backs one tavern and sets at most one
-# week's mission. There is no home bonus in Season 1 (D-47: scoring.homeBonus
-# is 1). `sponsor: null` is an unsponsored week. A god's name and voice are
-# chrome; only the id and tavern are mechanical. Boons and hexes are D-52.
+# Taverns (D-44, D-48, D-52): each tavern is already blessed by one god, who
+# sets at most one week's mission. Managers choose taverns, never gods, in
+# reverse draft order. There is no home bonus in Season 1 (D-47:
+# scoring.homeBonus is 1). `sponsor: null` is an unsponsored week; a week's
+# `sponsor` names a god. A god's name and voice are chrome.
 
 season: season-01
-sponsors:
-  - id: the-drowned-saint
-    tavern: the-gilded-flagon
+taverns:                            # D-52: each tavern is already blessed by one god; at most 6 (D-01)
+  - { id: the-gilded-flagon, name: The Gilded Flagon, god: the-drowned-saint }
 weeks:
   - week: 1
     title: The Drowned Toll

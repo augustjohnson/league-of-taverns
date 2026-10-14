@@ -88,6 +88,7 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
     engineVersion: '0.0.0',
     schedule: [{ week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded toll road.', commitment: null, sponsor: 'the-drowned-saint' }],
     sponsors: [{ id: 'the-drowned-saint', tavern: 'the-gilded-flagon' }],
+    taverns: [{ id: 'the-gilded-flagon', name: 'The Gilded Flagon' }],
   }),
   'character.pooled': envelope('character.pooled', 2, commissioner, {
     character: 'bruno-the-bruiser',
@@ -103,11 +104,8 @@ const fixtures: { readonly [T in EventType]: EventOf<T> } = {
       { kind: 'trait', trait: 'thick-skull' },
     ],
   }),
-  'tavern.joined': envelope('tavern.joined', 3, commissioner, {
-    tavern: 'the-gilded-flagon',
-    name: 'The Gilded Flagon',
-    manager: { githubId: 1234, login: 'someone' },
-  }),
+  'manager.joined': envelope('manager.joined', 3, commissioner, { manager: 'someone', account: { githubId: 1234, login: 'someone' } }),
+  'tavern.chosen': envelope('tavern.chosen', 3, manager, { manager: 'someone', tavern: 'the-gilded-flagon' }),
   'character.retained': {
     ...envelope('character.retained', 4, commissioner, {
       tavern: 'the-gilded-flagon',
@@ -198,8 +196,8 @@ function reverseKeys(value: unknown): unknown {
 
 describe('events', () => {
   it('has one fixture for every event type', () => {
-    expect(allEvents).toHaveLength(17);
-    expect(new Set(allEvents.map((event) => event.type)).size).toBe(17);
+    expect(allEvents).toHaveLength(18);
+    expect(new Set(allEvents.map((event) => event.type)).size).toBe(18);
   });
 
   it.each(Object.entries(fixtures))('parseLog(serializeEvent(e)) round-trips %s', (_type, event) => {
@@ -235,7 +233,7 @@ describe('events', () => {
   it('lineHash is sha256 hex of the UTF-8 line', () => {
     expect(lineHash('')).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
     expect(lineHash('abc')).toBe(HASH);
-    const line = serializeEvent({ ...fixtures['tavern.joined'], payload: { ...fixtures['tavern.joined'].payload, name: 'Le Café Brûlé 🍺' } });
+    const line = serializeEvent({ ...fixtures['season.created'], payload: { ...fixtures['season.created'].payload, taverns: [{ id: 'le-cafe', name: 'Le Café Brûlé 🍺' }] } });
     expect(lineHash(line)).toBe(createHash('sha256').update(line, 'utf8').digest('hex'));
   });
 
@@ -246,7 +244,7 @@ describe('events', () => {
 
   it('reports the line number and field path of a schema violation', () => {
     const broken = { ...fixtures['lineup.set'], payload: { ...fixtures['lineup.set'].payload, lineup: { starters: ['bruno-the-bruiser', 'a', 'b'], retreat: 'never' } } };
-    const ndjson = [serializeEvent(fixtures['season.created']), serializeEvent(fixtures['tavern.joined']), JSON.stringify(broken)].join('\n');
+    const ndjson = [serializeEvent(fixtures['season.created']), serializeEvent(fixtures['manager.joined']), JSON.stringify(broken)].join('\n');
     let caught: unknown;
     try {
       parseLog(ndjson);
@@ -348,9 +346,9 @@ describe('replay and verification', () => {
   });
 
   it('detects an edited line at the line after it, even a whitespace-only edit', () => {
-    const k = log.events.findIndex((e) => e.type === 'tavern.joined');
+    const k = log.events.findIndex((e) => e.type === 'manager.joined');
     const renamed = [...log.lines];
-    renamed[k] = log.lines[k]!.replace('"name":"the-gilded-flagon"', '"name":"The Gilded Flagon"');
+    renamed[k] = log.lines[k]!.replace('"login":"manager-0"', '"login":"Manager-0"');
     expect(renamed[k]).not.toBe(log.lines[k]);
     expect(replayError(ndjson(renamed))).toMatchObject({ line: k + 2, code: 'chain.prev_mismatch' });
 

@@ -1,4 +1,5 @@
 import type { BaseStats, BattleModel, CrEighths, EffectiveStats, LeagueState, Lineup, Mission, Rng } from '@league-of-taverns/engine';
+import type { TavernStrategy } from './strategies/tavern';
 
 /**
  * What a bot is allowed to know: exactly what a human manager could see.
@@ -92,6 +93,7 @@ export interface WaiverStrategy {
 /** A full bot manager: one strategy per decision. Named combinations live in ./strategies. */
 export interface BotManager {
   readonly id: string;
+  readonly tavern: TavernStrategy;
   readonly draft: DraftStrategy;
   readonly lineup: LineupStrategy;
   readonly waivers: WaiverStrategy;

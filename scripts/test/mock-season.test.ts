@@ -32,12 +32,13 @@ describe('mock season config, managers and schedule', () => {
     expect(config.budget.partyCr).toBe(96);
     expect(config.roster.size).toBe(7);
     expect(spellcasters).toEqual({ maxInPool: 0, maxPerEncounter: 0 });
-    expect(managers.taverns).toHaveLength(6);
+    expect(managers.managers).toHaveLength(6);
+    expect(schedule.taverns).toHaveLength(6);
     expect(managers.commissioner.login).toBeTruthy();
   });
 
   it('seats only bots, covering every strategy', () => {
-    const bots = managers.taverns.map((t) => ('bot' in t.manager ? t.manager.bot : null));
+    const bots = managers.managers.map((m) => ('bot' in m.account ? m.account.bot : null));
     expect(bots).not.toContain(null);
     expect(new Set(bots)).toEqual(new Set(['random', 'cr-greedy', 'skill-coverage', 'value']));
   });
@@ -47,16 +48,17 @@ describe('mock season config, managers and schedule', () => {
     expect(new Set(schedule.weeks.map((w) => w.environment)).size).toBe(6);
   });
 
-  it('gives every tavern exactly one home week (D-48)', () => {
+  it('gives every tavern a god, and every god exactly one week (D-48, D-52)', () => {
     const homeOf = new Map(schedule.sponsors.map((s) => [s.id, s.tavern]));
     const homes = schedule.weeks.map((w) => homeOf.get(w.sponsor!));
-    expect(homes.sort()).toEqual(managers.taverns.map((t) => t.id).sort());
+    expect(homes.sort()).toEqual(schedule.taverns.map((t) => t.id).sort());
+    expect(schedule.sponsors).toEqual(schedule.taverns.map((t) => ({ id: t.god, tavern: t.id })));
   });
 });
 
 describe('mock season pool', () => {
   it('has enough characters to fill every roster, with spares', () => {
-    expect(pool.characters.length).toBeGreaterThanOrEqual(managers.taverns.length * config.roster.size + 4);
+    expect(pool.characters.length).toBeGreaterThanOrEqual(managers.managers.length * config.roster.size + 4);
     expect(pool.characters.every((c) => c.ref.id === `mock-${c.ref.base}`)).toBe(true);
   });
 

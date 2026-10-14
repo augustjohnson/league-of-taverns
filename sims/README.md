@@ -39,7 +39,7 @@ titles, mean points, week-top and DNF rates per bot, and how often the
 best-projected tavern topped its week), plus a table on the console.
 
 Each season is built event by event through the engine's `applyEvent`
-(`season.created` → `character.pooled` → `tavern.joined` → draft →
+(`season.created` → `character.pooled` → `manager.joined` → `tavern.chosen` → draft →
 per week `lineup.set` / `lineup.locked` / `mission.revealed` /
 `mission.resolved` / `week.finalized` → waivers between weeks), then replayed
 from its NDJSON with `replayLog` and audited with `verifyResolutions`. Any

@@ -117,7 +117,7 @@ export const seasonConfigSchema = z.strictObject({
     rounds: z.number().int().positive(),
     order: z.discriminatedUnion('mode', [
       z.strictObject({ mode: z.literal('seeded') }),
-      z.strictObject({ mode: z.literal('manual'), taverns: z.array(kebabIdSchema) }),
+      z.strictObject({ mode: z.literal('manual'), managers: z.array(kebabIdSchema) }),
     ]),
     pickWindowHours: z.number().positive(),
     onTimeout: z.enum(['autopick', 'skip', 'wait']),
@@ -174,6 +174,7 @@ export const payloadSchemas = {
       }),
     ),
     sponsors: z.array(z.strictObject({ id: kebabIdSchema, tavern: kebabIdSchema })),
+    taverns: z.array(z.strictObject({ id: kebabIdSchema, name: text })),
   }),
   'character.pooled': z.strictObject({
     character: kebabIdSchema,
@@ -181,11 +182,11 @@ export const payloadSchemas = {
     cr: crEighthsSchema,
     modifiers: z.array(modifierSchema),
   }),
-  'tavern.joined': z.strictObject({
-    tavern: kebabIdSchema,
-    name: text,
-    manager: z.union([z.strictObject({ githubId, login: text }), z.strictObject({ bot: text })]),
+  'manager.joined': z.strictObject({
+    manager: kebabIdSchema,
+    account: z.union([z.strictObject({ githubId, login: text }), z.strictObject({ bot: text })]),
   }),
+  'tavern.chosen': z.strictObject({ manager: kebabIdSchema, tavern: kebabIdSchema }),
   'character.retained': z.strictObject({
     tavern: kebabIdSchema,
     character: kebabIdSchema,
@@ -292,7 +293,8 @@ function envelope<T extends EventType>(type: T) {
 export const eventSchema = z.discriminatedUnion('type', [
   envelope('season.created'),
   envelope('character.pooled'),
-  envelope('tavern.joined'),
+  envelope('manager.joined'),
+  envelope('tavern.chosen'),
   envelope('character.retained'),
   envelope('draft.pick'),
   envelope('lineup.set'),

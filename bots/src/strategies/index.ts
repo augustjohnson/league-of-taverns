@@ -22,17 +22,24 @@
  * - `best-available`: claim the free agent that most improves the lineup
  *   strategy's own score for next week, dropping the worst bench player.
  *
+ * Tavern pick (./tavern.ts):
+ * - `random`: a seeded uniform choice among the open taverns (D-52), until
+ *   boons give taverns something to choose between.
+ *
  * Every strategy is deterministic given the view: all randomness comes from
  * `view.rng`, never `Math.random`.
  */
 import type { BotManager } from '../types';
 import { DRAFT_STRATEGIES } from './draft';
 import { LINEUP_STRATEGIES } from './lineup';
+import { randomTavern } from './tavern';
 import { bestAvailable } from './waivers';
 
 export { DRAFT_STRATEGIES, crGreedyDraft, keepsLineupPossible, randomDraft, skillCoverageDraft, valueDraft } from './draft';
 export { ENVIRONMENT_FOE_RATIO, LINEUP_STRATEGIES, environmentFitLineup, maxCrLineup, projectionLineup } from './lineup';
 export { MAX_FALLBACK_CLAIMS, bestAvailable } from './waivers';
+export { randomTavern } from './tavern';
+export type { TavernStrategy } from './tavern';
 
 /**
  * Bot managers. The first four pair a draft idea with the `projection`
@@ -44,7 +51,7 @@ export const BOT_IDS = ['random', 'cr-greedy', 'skill-coverage', 'value', 'proje
 export type BotId = (typeof BOT_IDS)[number];
 
 function manager(id: BotId, draft: BotManager['draft'], lineup: BotManager['lineup']): BotManager {
-  return { id, draft, lineup, waivers: bestAvailable(lineup) };
+  return { id, tavern: randomTavern, draft, lineup, waivers: bestAvailable(lineup) };
 }
 
 const MANAGERS: Readonly<Record<BotId, BotManager>> = {

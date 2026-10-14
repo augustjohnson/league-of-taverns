@@ -199,34 +199,36 @@ export function snakePickOwner(order: ReadonlyArray<string>, pickNumber: number)
 }
 
 /**
- * Initial draft order from config: a Fisher–Yates shuffle of the taverns
+ * Initial draft order from config: a Fisher–Yates shuffle of the managers
  * driven by `rng`, or the manual list. Callers pass
  * `rngFor(draftOrderSeed(season), 'order')`, and tests pass a fixed fake.
  * Taking `rng` as a parameter keeps this independent of the RNG implementation.
+ * Taverns are chosen in the reverse of this order (D-52), and the snake draft
+ * runs in it.
  *
- * Seeded mode draws exactly `taverns.length - 1` values. Manual mode draws
- * none and throws unless the list is a permutation of `taverns`. The input is
- * never mutated.
+ * Seeded mode draws exactly `managers.length - 1` values. Manual mode draws
+ * none and throws unless the list is a permutation of `managers`. The input
+ * is never mutated.
  */
-export function draftOrder(taverns: ReadonlyArray<string>, config: SeasonConfig, rng: Rng): ReadonlyArray<string> {
-  const unique = new Set(taverns);
-  if (unique.size !== taverns.length) throw new Error('draftOrder: taverns contain duplicates');
+export function draftOrder(managers: ReadonlyArray<string>, config: SeasonConfig, rng: Rng): ReadonlyArray<string> {
+  const unique = new Set(managers);
+  if (unique.size !== managers.length) throw new Error('draftOrder: managers contain duplicates');
 
   const order = config.draft.order;
   if (order.mode === 'manual') {
-    const manual = order.taverns;
+    const manual = order.managers;
     const seen = new Set<string>();
-    for (const t of manual) {
-      if (!unique.has(t)) throw new Error(`draftOrder: manual order names unknown tavern "${t}"`);
-      if (seen.has(t)) throw new Error(`draftOrder: manual order lists tavern "${t}" more than once`);
-      seen.add(t);
+    for (const m of manual) {
+      if (!unique.has(m)) throw new Error(`draftOrder: manual order names unknown manager "${m}"`);
+      if (seen.has(m)) throw new Error(`draftOrder: manual order lists manager "${m}" more than once`);
+      seen.add(m);
     }
-    const missing = taverns.filter((t) => !seen.has(t));
-    if (missing.length > 0) throw new Error(`draftOrder: manual order is missing tavern(s) ${missing.map((t) => `"${t}"`).join(', ')}`);
+    const missing = managers.filter((m) => !seen.has(m));
+    if (missing.length > 0) throw new Error(`draftOrder: manual order is missing manager(s) ${missing.map((m) => `"${m}"`).join(', ')}`);
     return [...manual];
   }
 
-  const shuffled = [...taverns];
+  const shuffled = [...managers];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     const tmp = shuffled[i]!;

@@ -253,20 +253,19 @@ The annotated example in the file is the reference. Key groups:
 The config is copied into `season.created`. From then on the **event's copy**
 governs, and CI flags later edits to the file.
 
-`managers.yaml`: `commissioner`, `gm`, and `taverns: [{ id, name, manager: { login, githubId } | { bot } }]`.
+`managers.yaml`: `commissioner`, `gm`, and `managers: [{ id, account: { login, githubId } | { bot } }]`, at most 6 (D-01). Managers have no tavern until the tavern pick.
 
-`schedule.yaml`: `season`, `sponsors: [{ id, tavern }]`, `weeks: [{ week, title, environment, theme, keywords, commitment, sponsor }]`.
+`schedule.yaml`: `season`, `taverns: [{ id, name, god }]` (at most 6, D-01; each tavern already blessed by its god, D-52), `weeks: [{ week, title, environment, theme, keywords, commitment, sponsor }]`. The loader derives `sponsors: [{ id: god, tavern }]` from `taverns`.
 `keywords` (planned, D-42) is a list of short strings naming what the mission
 tests, such as `survival`, `con save` or `lizardfolk fight`. `lock-check`
 rejects a keyword that names nothing in the selected mission.
-`sponsor` is a sponsor id or null. Each sponsor backs one tavern (in
-`managers.yaml`) and sets at most one week (D-48). On that week the tavern's
-points are × `scoring.homeBonus` (D-47; Season 1 sets 1, so nothing). A god's
-name and voice are chrome. Planned (D-52): each sponsor carries a `boon` (an id
-from a closed boon registry), and the tavern–god pairing becomes permanent, so
-it moves out of the per-season schedule into a league-level file.
-`managers.yaml` then lists managers without taverns, and the tavern pick
-(below) binds them. At most 6 taverns (D-01).
+`sponsor` is a god's id or null. Each god blesses one tavern and sets at most
+one week (D-48). On that week the tavern's points are × `scoring.homeBonus`
+(D-47; Season 1 sets 1, so nothing). A god's name and voice are chrome.
+Planned (D-52): each tavern carries a `boon` (an id from a closed boon
+registry), and the tavern–god pairing becomes permanent across seasons, so it
+may move out of the per-season schedule into a league-level file. A tavern
+nobody chooses sits the season out; its god's week is still played.
 
 ---
 
@@ -297,14 +296,14 @@ it moves out of the per-season schedule into a league-level file.
 
 | Type | Actor | Payload | Preconditions (reducer rejects otherwise) |
 |---|---|---|---|
-| `season.created` | commissioner | `config`, `configSha256`, `engineVersion`, `schedule[{week,title,environment,theme,commitment,sponsor}]`, `sponsors[{id,tavern}]` | first event, and only once; sponsors pass `validateSponsors` |
+| `season.created` | commissioner | `config`, `configSha256`, `engineVersion`, `schedule[{week,title,environment,theme,commitment,sponsor}]`, `sponsors[{id,tavern}]`, `taverns[{id,name}]` | first event, and only once; sponsors pass `validateSponsors`; at most 6 taverns (D-01), unique, and every sponsor's tavern among them |
 | `character.pooled` | commissioner | `character`, `base`, `cr`, `modifiers` | phase `preseason`, id not already pooled, modifiers within budget |
-| `tavern.joined` | commissioner | `tavern`, `name`, `manager` | phase `preseason`, tavern id unique, manager not already in a tavern |
+| `manager.joined` | commissioner | `manager`, `account` (`{githubId, login}` or `{bot}`) | phase `preseason`, the tavern pick not started, manager id unique, GitHub account not already in the league, at most min(6, taverns) managers (D-01) |
+| `tavern.chosen` | manager | `manager`, `tavern` | before the first draft pick; the manager is on the clock in reverse draft order (the first choice freezes the draft order over the joined managers); the tavern is one of the season's and unclaimed (D-52) |
 | `character.retained` | commissioner | `tavern`, `character`, `fromSeason`, `basis`, `costRound` | before the first pick, character pooled and unowned, tavern within its keeper limit |
-| `draft.pick` | manager / system (autopick) | `pick`, `tavern`, `character`, `auto` | `pick` = number of prior picks, `tavern` is on the clock, character pooled and unowned, roster not full. The first pick freezes the tavern list and order |
+| `draft.pick` | manager / system (autopick) | `pick`, `tavern`, `character`, `auto` | `pick` = number of prior picks, `tavern` is on the clock, character pooled and unowned, roster not full. The first pick needs every manager to have chosen a tavern, and freezes the snake order as their taverns in draft order |
 | `lineup.set` | manager | `tavern`, `week`, `lineup{starters[4], retreat}`, where `retreat` is `never` \| `avoid_battles` \| `{ bank: N }` (D-12, D-49) | draft complete, week not locked, lineup legal (§ Roster) |
 | `lineup.locked` | system | `week`, `lineups[{tavern, lineup, source}]` | week not already locked, previous week finalized, one entry per tavern, each lineup legal |
-| `tavern.chosen` (planned, D-52) | manager | `tavern`, `manager` | phase `preseason`, the manager is on the clock in reverse draft order, the tavern is unclaimed |
 | `hex.declared` (planned, D-52) | manager | `tavern`, `target`, `ability`, `week` | target is another tavern, the week isn't locked, the tavern hasn't hexed this season, the target has no hex that week |
 | `waiver.claimed` | manager | `claim`, `tavern`, `add`, `drop` | draft complete, `add` is a free agent now, `drop` is on the roster |
 | `waiver.resolved` | system | `week`, `outcomes[{claim, awarded, reason}]`, `priorityAfter` | week finalized, outcomes cover every pending claim and match `resolveWaivers` |
@@ -356,9 +355,10 @@ State shape: `LeagueState` in `engine/src/events/state.ts`.
 |---|---|
 | `season.created` | set `config`, `schedule`, `sponsors` and phase `preseason` |
 | `character.pooled` | add to `pool` |
-| `tavern.joined` | add to `taverns` with an empty roster |
+| `manager.joined` | add to `managers` with no tavern |
+| `tavern.chosen` | on the first choice, freeze `draft.managerOrder`. Set the manager's tavern, and add the tavern to `taverns` (name from `season.created`) with an empty roster |
 | `character.retained` | `owner[character] = tavern`, append to the roster, record the forfeited round |
-| `draft.pick` | on the first pick, freeze `draft.order` (from config + joined taverns). Set `owner`, append to the roster, `draft.picks++`. After the last pick, set `complete` and phase `regular`, and seed waiver priority from reverse draft order |
+| `draft.pick` | on the first pick, freeze `draft.order` (the managers' taverns in `draft.managerOrder`). Set `owner`, append to the roster, `draft.picks++`. After the last pick, set `complete` and phase `regular`, and seed waiver priority from reverse draft order |
 | `lineup.set` | `pendingLineups[week][tavern] = lineup` (replaces earlier) |
 | `lineup.locked` | `lockedLineups[week] = lineups`, clear `pendingLineups[week]` |
 | `waiver.claimed` | append to `waivers.pending` |
