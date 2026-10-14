@@ -79,7 +79,7 @@ The tabs:
   tavern and a seed and start; draft when you are on the clock (free agents
   as cards or a table, sorted by the bots' `valueOf` rating, the advisor's pick
   marked; portraits on your roster, the free agents and the board), then
-  before each week set a lineup (starters and bench grouped, with
+  before each week set a lineup (starters and bench as two decks of cards, with
   `validateLineup`, the projection and the mission graph live) and make waiver
   claims, and press Play week, which locks in the lineup on screen (it stays
   disabled while that lineup is illegal). The bots draft, set lineups and
@@ -138,7 +138,10 @@ name, epithet and CR, the art (the portrait's face crop over a blurred copy
 of the portrait; a silhouette for a character without one), the
 monster line with its size in words, AC, HP, speed and best skills. Free
 agents are neutral; your roster wears your banner, and a drafted card turns
-over into it. A Show control swaps the free agents back to the table. When
+over into it. A Show control swaps the free agents back to the table. The
+lineup builder deals your roster the same way: starters wear your banner,
+the bench is neutral (an injured character greyed out), and Start turns a
+card over into your colours. When
 the clock comes back to you after a pick, the draft card glows once and its
 heading bounces. In the lineup builder the CR meter jellies when a starter
 still fits the budget and shakes when one doesn't; the engine's reason shows

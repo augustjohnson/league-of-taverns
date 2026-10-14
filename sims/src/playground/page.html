@@ -274,8 +274,6 @@ svg.odds .hit:hover { fill: color-mix(in srgb, var(--brass) 10%, transparent); }
 /* Small buttons stay big enough to hit */
 button.small { padding: 4px 10px; font-size: 12.5px; min-height: 28px; }
 /* Lineup builder: starters and bench as two labelled groups */
-tr.group td { background: var(--sunken); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; padding-block: 4px; }
-tr.group td b { color: var(--ink); }
 tr.advised td { background: var(--brass-soft); }
 td.skills { white-space: normal; min-width: 11em; }
 td.flow { white-space: normal; }
@@ -333,6 +331,8 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
   box-shadow: 0 6px 14px -9px rgba(0, 0, 0, 0.45); }
 .lcard.themed { --frame: var(--banner-pattern), var(--banner-ground); --frame-edge: var(--banner-line); --face: var(--banner-bg); --accent: var(--banner-line); --accent-ink: var(--banner-ink); }
 .lcard.advised { outline: 2px solid var(--brass); outline-offset: 2px; }
+/* A character who can't play this week (injured): greyed, the foot's tag left clear. */
+.lcard.dim > :not(.card-foot) { opacity: 0.5; filter: grayscale(0.8); }
 .lcard > * { background: var(--face); border-radius: 4px; min-width: 0; }
 .lcard header { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; padding: 4px 6px; height: 54px; }
 .lcard .who { display: grid; min-width: 0; line-height: 1.15; }
