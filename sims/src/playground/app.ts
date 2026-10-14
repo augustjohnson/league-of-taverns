@@ -61,7 +61,7 @@ import {
 } from '../reports';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInputFromData, type PlaygroundData } from './data';
-import { crownChampion, hailChampion, layCurse, raiseBanner, revealWeek, turnCard, weekMoment } from './fx';
+import { clockBack, crownChampion, hailChampion, layCurse, nodMeter, raiseBanner, revealWeek, turnCard, weekMoment } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -1823,7 +1823,7 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     )
     .join('');
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>You are on the clock</h2><span class="muted small">pick #${pick + 1}, round ${Math.floor(pick / n) + 1} of ${config.draft.rounds}</span></div>` +
+    `<section class="card" id="play-clock"><div class="row" style="justify-content:space-between"><h2>You are on the clock</h2><span class="muted small">pick #${pick + 1}, round ${Math.floor(pick / n) + 1} of ${config.draft.rounds}</span></div>` +
     (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(charName(p.character))}</b>`).join('; ')}.</p>`) +
     `<p class="small">Advisor (${esc(managerBot(s.human!.manager))}) suggests <b>${esc(charName(advice))}</b> <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
     `<button type="button" class="primary small" data-action="play-draft" data-id="${esc(advice)}">Take it</button></p>` +
@@ -1879,7 +1879,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     (bench.map(rosterRow).join('') || '<tr><td colspan="7" class="muted">Nobody on the bench.</td></tr>');
 
   const lineupCardHtml =
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · ${homeLine(s, week)}</span></div>` +
+    `<section class="card" id="play-lineup"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · ${homeLine(s, week)}</span></div>` +
     keywordsLine(week) +
     `<div class="scroll"><table><thead><tr>${CHAR_HEAD}<th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` +
     `<p class="small">CR total ${num(formatCrTotal(total))} of ${num(formatCrTotal(BUDGET))}</p>${crMeter(total)}` +
@@ -2221,11 +2221,20 @@ function playClick(action: string, id: string | undefined): boolean {
       return true;
     case 'play-draft':
       // The drafted card turns over into your colours once it lands in your roster.
-      if (id !== undefined) playMoves([{ t: 'draft', id }], () => (pendingFx = () => turnCard(panel.querySelector<HTMLElement>(`#play-roster [data-card="${CSS.escape(id)}"]`))));
+      if (id !== undefined) {
+        playMoves([{ t: 'draft', id }], () => {
+          pendingFx = () => {
+            turnCard(panel.querySelector<HTMLElement>(`#play-roster [data-card="${CSS.escape(id)}"]`));
+            clockBack(panel.querySelector<HTMLElement>('#play-clock'));
+          };
+        });
+      }
       return true;
     case 'play-lu-add':
       if (id !== undefined && play.picks.length < config.roster.starters && !play.picks.includes(id)) {
         play.picks.push(id);
+        const over = play.picks.reduce((t, p) => t + crOf(p), 0) > BUDGET;
+        pendingFx = () => nodMeter(panel.querySelector('#play-lineup .meter'), over ? 'over' : 'fits');
         renderTab();
       }
       return true;
@@ -2241,6 +2250,7 @@ function playClick(action: string, id: string | undefined): boolean {
         if (lineup === null) throw new Error('The advisor finds no legal lineup on this roster.');
         play.picks = [...lineup.starters];
         play.retreat = lineup.retreat;
+        pendingFx = () => nodMeter(panel.querySelector('#play-lineup .meter'), 'fits');
       });
       return true;
     case 'play-hex':

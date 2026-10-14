@@ -355,3 +355,28 @@ export function turnCard(card: HTMLElement | null): void {
     window.setTimeout(() => card.classList.remove('turning-in'), 340);
   }, 230);
 }
+
+/**
+ * The clock comes back to you: once your pick has turned over, the bots have
+ * picked and it is your turn again, so the draft card glows once and its
+ * heading bounces. A nod, after each of your picks only; bot picks stay
+ * quiet. The playground's bots pick at once, so a pulse that ran the whole
+ * time you are on the clock would run the whole draft and mean nothing.
+ */
+export function clockBack(card: HTMLElement | null): void {
+  if (card === null || reducedMotion()) return;
+  window.setTimeout(() => {
+    if (!card.isConnected) return;
+    card.classList.add('clock-back');
+    micron(card.querySelector('h2'), 'bounce', { duration: 0.6 });
+  }, 600);
+}
+
+/**
+ * The CR meter answers a change to the lineup: a jelly when it still fits the
+ * budget, a shake when it no longer does. Only the meter moves; the engine's
+ * reason shows below it as before. A nod.
+ */
+export function nodMeter(meter: Element | null, result: 'fits' | 'over'): void {
+  micron(meter, result === 'over' ? 'shake' : 'jelly', { duration: result === 'over' ? 0.5 : 0.45 });
+}

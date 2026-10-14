@@ -129,7 +129,11 @@ In the draft, characters show as cards (`charCard` in `src/playground/app.ts`):
 name and CR, the art (a silhouette until portraits reach the page), the
 monster line with its size in words, AC, HP, speed and best skills. Free
 agents are neutral; your roster wears your banner, and a drafted card turns
-over into it. A Show control swaps the free agents back to the table.
+over into it. A Show control swaps the free agents back to the table. When
+the clock comes back to you after a pick, the draft card glows once and its
+heading bounces. In the lineup builder the CR meter jellies when a starter
+still fits the budget and shakes when one doesn't; the engine's reason shows
+below it as before.
 
 Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
 your tavern raises its banner with one burst of party.js sparkles (bundled)
