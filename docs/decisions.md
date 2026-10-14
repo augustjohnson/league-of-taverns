@@ -360,6 +360,10 @@ sits at its own level of play and borrows from D&D.
   | See the mission before the lineup | week | *Augury* | Needs missions hidden until the lock: reopens D-42 and D-08 (see D-42) |
   | A recruit joins the party | week | a familiar, a hireling | A random undrafted monster of CR 1/2 or less joins as a fifth member. Outside B? Same recruit all season, or a new one each week? |
   | Advantage on checks | week | *Bless*, *Guidance* | Needs a scope: one ability score all season, or every check for one chosen mission |
+  | Shared blessing | week | *Bless* (several targets) | Each mission, you and one other tavern of your choice get advantage on a named check. The first reason to cooperate; watch for two taverns trading it all season (kingmaking). "Named check": one check node in that week's mission, or a skill? |
+  | Double battle bounty | mission | | Battle loot (D-50) ×2 for this tavern. Changes decisions: fight where others turn back. Strength depends on bounty sizes, not set yet |
+  | Double check loot | mission | | As written, close to ×2 on the score, since checks hold most of the haul. Like the dropped home bonus, a multiplier that never changes which lineup is best. Scale it down: one doubled check per mission? |
+  | Paid retreat | mission | | "Retreating still gets half the gold." Turning back already keeps all banked loot (D-49), so this needs defining: half the loot left on the path? Or retreat costs something by default and this boon removes the cost? |
 
   The list is open: these are candidates, and more can be added. A season
   uses six, one per tavern. Whether each boon is passive or has limited uses,
