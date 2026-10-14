@@ -1681,9 +1681,13 @@ const SILHOUETTE =
  * A character card: name, epithet and CR across the top, the art (the portrait's face crop over a blurred copy of the
  * portrait, or a silhouette for a character without one), the monster
  * line with its size in words ("Ape · Medium beast"), AC, HP and speed, and the best skills. Neutral until a tavern
- * owns the character; then it wears that tavern's banner. `foot` is the card's action or note.
+ * owns the character; then it wears that tavern's banner. `foot` is the card's action or note; `dim` greys out a
+ * character who can't play (injured).
  */
-function charCard(id: string, { owner = null, foot = '', advised = false }: { owner?: string | null; foot?: string; advised?: boolean } = {}): string {
+function charCard(
+  id: string,
+  { owner = null, foot = '', advised = false, dim = false }: { owner?: string | null; foot?: string; advised?: boolean; dim?: boolean } = {},
+): string {
   const st = input.statsOf(id);
   const themed = owner !== null && bannerOf(owner) !== null;
   const speeds = Object.entries(st.speeds).filter(([k]) => k !== 'walk');
@@ -1692,7 +1696,7 @@ function charCard(id: string, { owner = null, foot = '', advised = false }: { ow
   const epithet = chromeOf(id)?.epithet;
   const face = chromeOf(id)?.face !== undefined;
   return (
-    `<article class="lcard ${themed ? 'themed' : 'neutral'}${advised ? ' advised' : ''}" data-card="${esc(id)}"${themed ? bannerAttr(owner) : ''}>` +
+    `<article class="lcard ${themed ? 'themed' : 'neutral'}${advised ? ' advised' : ''}${dim ? ' dim' : ''}" data-card="${esc(id)}"${themed ? bannerAttr(owner) : ''}>` +
     `<header><div class="who"><b>${esc(charName(id))}</b>${epithet === undefined ? '' : `<span>${esc(epithet)}</span>`}</div><span class="cr" title="Challenge rating">${formatCr(crOf(id))}</span></header>` +
     (face
       ? `<div class="art has-face" data-art="${esc(id)}"><span class="face" role="img" aria-label="${esc(charName(id))}"></span></div>`
@@ -1906,31 +1910,35 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   // With no legal lineup on the roster at all, the week can still be played (and scores 0).
   const stuck = !legal && s.suggestLineup() === null;
 
-  // Starters (in lineup order) and the bench as two labelled groups, so where someone sits never hangs on a button's label.
+  // Starters (in lineup order) and the bench as two labelled decks, so where someone sits never hangs on a button's
+  // label. Starters wear your banner; the bench is neutral, and Start turns a card over into your colours.
   const starters = play.picks.filter((id) => roster.includes(id));
   const bench = roster.filter((id) => !play.picks.includes(id));
   const full = play.picks.length >= config.roster.starters;
-  const rosterRow = (id: string): string => {
-    const on = play.picks.includes(id);
-    const btn = on
-      ? `<button type="button" class="small" data-action="play-lu-remove" data-id="${esc(id)}" aria-label="Move ${esc(charName(id))} to the bench">Bench</button>`
-      : hurt.has(id)
-        ? '<span class="tag bad" title="Hurt in last week\'s DNF: can\'t start this week (D-51)">injured</span>'
-        : `<button type="button" class="small" data-action="play-lu-add" data-id="${esc(id)}" ${full ? 'disabled title="Bench a starter first"' : ''}>Start</button>`;
-    const slot = on ? `<span class="small muted">${play.picks.indexOf(id) + 1}</span>` : '';
-    return charRow(id, btn, `<td>${slot}</td>`).replace('<tr>', `<tr class="${on ? 'sel' : ''}">`);
-  };
-  const groupRow = (label: string): string => `<tr class="group"><td colspan="8">${label}</td></tr>`;
-  const rosterRows =
-    groupRow(`Starting · <b>${starters.length} of ${config.roster.starters}</b>`) +
-    (starters.map(rosterRow).join('') || '<tr><td colspan="8" class="muted">Nobody yet: press Start on the bench below.</td></tr>') +
-    groupRow(`Bench · <b>${bench.length}</b>`) +
-    (bench.map(rosterRow).join('') || '<tr><td colspan="8" class="muted">Nobody on the bench.</td></tr>');
+  const starterCard = (id: string): string =>
+    charCard(id, {
+      owner: me,
+      foot:
+        `<span class="small muted">#${play.picks.indexOf(id) + 1}</span>` +
+        `<button type="button" class="small" data-action="play-lu-remove" data-id="${esc(id)}" aria-label="Move ${esc(charName(id))} to the bench">Bench</button>`,
+    });
+  const benchCard = (id: string): string =>
+    hurt.has(id)
+      ? charCard(id, { dim: true, foot: '<span class="tag bad" title="Hurt in last week\'s DNF: can\'t start this week (D-51)">injured</span>' })
+      : charCard(id, {
+          foot: `<button type="button" class="small" data-action="play-lu-add" data-id="${esc(id)}" aria-label="Start ${esc(charName(id))}" ${full ? 'disabled title="Bench a starter first"' : ''}>Start</button>`,
+        });
+  const rosterDecks =
+    `<div class="stack"><span class="label">Starting · <b>${starters.length} of ${config.roster.starters}</b></span>` +
+    (starters.length === 0 ? '<p class="muted small">Nobody yet: press Start on the bench below.</p>' : `<div class="deck" id="play-starters">${starters.map(starterCard).join('')}</div>`) +
+    `</div><div class="stack"><span class="label">Bench · <b>${bench.length}</b></span>` +
+    (bench.length === 0 ? '<p class="muted small">Nobody on the bench.</p>' : `<div class="deck" id="play-bench">${bench.map(benchCard).join('')}</div>`) +
+    `</div>`;
 
   const lineupCardHtml =
     `<section class="card" id="play-lineup"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · ${homeLine(s, week)}</span></div>` +
     keywordsLine(week) +
-    `<div class="scroll"><table><thead><tr>${CHAR_HEAD}<th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` +
+    rosterDecks +
     `<p class="small">CR total ${num(formatCrTotal(total))} of ${num(formatCrTotal(BUDGET))}</p>${crMeter(total)}` +
     `<div class="row">${retreatSelect('play-retreat', 'play-retreat', play.retreat)}</div>` +
     (lineup === null ? '' : violations.length === 0 ? '<p class="okline">Legal lineup</p>' : violationList(violations)) +
@@ -2299,7 +2307,11 @@ function playClick(action: string, id: string | undefined): boolean {
       if (id !== undefined && play.picks.length < config.roster.starters && !play.picks.includes(id)) {
         play.picks.push(id);
         const over = play.picks.reduce((t, p) => t + crOf(p), 0) > BUDGET;
-        pendingFx = () => nodMeter(panel.querySelector('#play-lineup .meter'), over ? 'over' : 'fits');
+        // The starter's card turns over into your colours as it joins the starting deck.
+        pendingFx = () => {
+          turnCard(panel.querySelector<HTMLElement>(`#play-starters [data-card="${CSS.escape(id)}"]`));
+          nodMeter(panel.querySelector('#play-lineup .meter'), over ? 'over' : 'fits');
+        };
         renderTab();
       }
       return true;
@@ -2313,9 +2325,13 @@ function playClick(action: string, id: string | undefined): boolean {
       playAct((s) => {
         const lineup = s.suggestLineup();
         if (lineup === null) throw new Error('The advisor finds no legal lineup on this roster.');
+        const added = lineup.starters.filter((p) => !play.picks.includes(p));
         play.picks = [...lineup.starters];
         play.retreat = lineup.retreat;
-        pendingFx = () => nodMeter(panel.querySelector('#play-lineup .meter'), 'fits');
+        pendingFx = () => {
+          for (const p of added) turnCard(panel.querySelector<HTMLElement>(`#play-starters [data-card="${CSS.escape(p)}"]`));
+          nodMeter(panel.querySelector('#play-lineup .meter'), 'fits');
+        };
       });
       return true;
     case 'play-hex':
