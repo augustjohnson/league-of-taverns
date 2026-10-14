@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Nell Malone
   epithet: the Lightweight
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Cannot hold her drink. It passes straight through. Orders another.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: yellowed skeleton with a cracked skull patched with a copper plate and beer foam dripping through its ribcage, (cheerful hollow grin:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 119581666
+    imported: nell-malone-s702.png
   height: 5.5

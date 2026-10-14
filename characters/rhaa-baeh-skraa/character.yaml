@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Rhaa-Bǣh-Skʀaa
   epithet: No Consensus
+  pronouns: { subject: they, object: them, possessive: their }
   tagline: Three heads. No agreement yet on direction, dinner or a name.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: chimera with a tawny lion head, a white goat head with a broken horn and a red dragon head, all glaring at each other, (three heads bickering:1.3)
     bodyPlan: multihead
     path: portrait.png
-    imported: the-committee-gemini-2.png
+    imported: rhaa-baeh-skraa-gemini-1.webp
   height: 8

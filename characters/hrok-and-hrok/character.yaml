@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Hrök and Hrøk
   epithet: the Coworkers
+  pronouns: { subject: they, object: them, possessive: their }
   tagline: Two heads, one body, and a twenty-year argument about whose turn it is to scratch.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: (one giant with exactly two heads on one body:1.4), grey-skinned ettin, one bald head with an eyepatch and one with a ginger beard, turned toward each other mid-argument, (both heads yelling:1.3)
     bodyPlan: multihead
     path: portrait.png
-    seed: 706267457
+    imported: hrok-and-hrok-gemini-1.webp
   height: 13

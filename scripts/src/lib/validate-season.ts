@@ -18,8 +18,8 @@
  *   against the mission actually selected for each week.
  * - Images (D-10): pooled characters' portraits and the season's mission
  *   covers are the style's size and palette (./images/check.ts).
- * - Gods (D-52): every tavern's god has a gods/<id>/god.yaml beside the
- *   season's characters/, and no two gods in the season share a banner
+ * - Gods (D-52): every tavern's god has a gods/<id>/god.yaml (in the season's
+ *   own gods/ folder if it keeps one, else beside its characters/), and no two gods in the season share a banner
  *   `mark`, so every tavern keeps its own colour.
  *
  * Not yet: chrome coverage and lints (T8.x).
@@ -32,7 +32,7 @@ import { creatureSize } from './images/style';
 import { ValidationFailure } from './main';
 import { REPO_ROOT, displayPath, loadGodChrome, loadMission } from './repo';
 import type { RepoRoot } from './repo';
-import { charactersRootDir, isSpellcaster, loadSeason, missionFiles, snapshotCrIndex } from './season';
+import { godsRootDir, isSpellcaster, loadSeason, missionFiles, snapshotCrIndex } from './season';
 import type { LoadedSeason, MissionStatus, SeasonSource } from './season';
 
 export interface SeasonReport {
@@ -134,7 +134,7 @@ export function validateSeason(season: SeasonSource, root: RepoRoot = REPO_ROOT)
   });
   issues.push(...checkSeasonImages(season, portraits, root));
 
-  const godsRoot = charactersRootDir(season, root);
+  const godsRoot = godsRootDir(season, root);
   const markOwner = new Map<string, string>();
   for (const { god } of schedule.taverns) {
     try {

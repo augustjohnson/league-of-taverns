@@ -227,6 +227,22 @@ textarea#ndjson-fallback { width: 100%; height: 160px; font: 11px var(--font-num
 .draft .ch { font-weight: 600; }
 .draft td.hot { box-shadow: inset 0 0 0 2px var(--brass); }
 
+/* Portraits: a painted figure on a transparent ground, feet on the frame's floor. */
+.pt { display: inline-block; flex: none; vertical-align: middle; object-fit: contain; object-position: 50% 100%; background: var(--sunken); border: 1px solid var(--line); border-radius: var(--radius); }
+.pt.sm { width: 28px; height: 28px; }
+.pt.md { width: 44px; height: 44px; }
+.pt.lg { width: 80px; height: 80px; }
+.pt.none { display: inline-grid; place-items: center; font-family: var(--font-display); color: var(--muted); }
+.pt.sm.none { font-size: 15px; }
+.pt.md.none { font-size: 22px; }
+.pt.lg.none { font-size: 38px; }
+td.pt-cell { width: 1%; padding-block: 3px; }
+.face { display: inline-flex; align-items: center; gap: 8px; }
+.faces { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.faces .face { gap: 5px; }
+.advice { display: flex; gap: 12px; align-items: flex-start; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--node); }
+.advice .tagline { font-style: italic; color: var(--muted); }
+
 .pick-list { display: grid; gap: 6px; }
 .slot { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--node); }
 .slot.empty { border-style: dashed; color: var(--muted); }

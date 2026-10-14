@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Herb
   epithet: the Speed Bump
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Cannot stop or turn. Has not been asked to do either.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: grey rhinoceros with a chipped horn with a dented iron cooking pot stuck on his horn, (determined charging glare:1.3)

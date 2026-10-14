@@ -1,5 +1,0 @@
-id: mock-plesiosaurus
-base: plesiosaurus
-status: active
-chrome:
-  name: Mock Plesiosaurus

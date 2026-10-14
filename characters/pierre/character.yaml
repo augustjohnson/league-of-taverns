@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Pierre
   epithet: Probably a Hat
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Hangs on hat racks. Is hurt when nobody tries him on.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: black squid-like darkmantle draped over a head like a floppy beret, one tentacle tip curled, (shifty eyes peeking out:1.3)
     bodyPlan: blob
     path: portrait.png
-    seed: 990782594
+    imported: pierre-gemini-1.webp
   height: 1.5

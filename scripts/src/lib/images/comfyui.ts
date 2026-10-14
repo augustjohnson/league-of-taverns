@@ -28,26 +28,36 @@ export interface RenderRequest {
 
 type Graph = Record<string, { readonly class_type: string; readonly inputs: Record<string, unknown> }>;
 
-/** The ComfyUI API-format graph for one render: SDXL + LoRA, then BiRefNet when the kind wants a cutout. */
+/**
+ * The ComfyUI API-format graph for one render: SDXL (plus the pixel-art LoRA
+ * in pixel mode), then BiRefNet when the kind wants a cutout.
+ */
 export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
   const { model } = style;
   const kind = style[request.kind];
   const shape = request.size === undefined ? undefined : { size: request.size, ...(request.bodyPlan === undefined ? {} : { plan: request.bodyPlan }), ...(request.heightFt === undefined ? {} : { heightFt: request.heightFt }) };
   const render = renderSize(style, request.kind, shape);
+  const pixel = style.mode === 'pixel';
+  // Model and CLIP come through the LoRA in pixel mode, straight from the checkpoint when painted.
+  const weights = pixel ? 'lora' : 'checkpoint';
   const graph: Graph = {
     checkpoint: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: model.checkpoint } },
-    lora: {
-      class_type: 'LoraLoader',
-      inputs: {
-        lora_name: model.lora,
-        strength_model: model.loraStrength,
-        strength_clip: model.loraStrength,
-        model: ['checkpoint', 0],
-        clip: ['checkpoint', 1],
-      },
-    },
-    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(style, request.kind, request.subject, shape), clip: ['lora', 1] } },
-    negative: { class_type: 'CLIPTextEncode', inputs: { text: negativePrompt(style, request.kind, request.bodyPlan), clip: ['lora', 1] } },
+    ...(pixel
+      ? {
+          lora: {
+            class_type: 'LoraLoader',
+            inputs: {
+              lora_name: model.lora,
+              strength_model: model.loraStrength,
+              strength_clip: model.loraStrength,
+              model: ['checkpoint', 0],
+              clip: ['checkpoint', 1],
+            },
+          },
+        }
+      : {}),
+    positive: { class_type: 'CLIPTextEncode', inputs: { text: positivePrompt(style, request.kind, request.subject, shape), clip: [weights, 1] } },
+    negative: { class_type: 'CLIPTextEncode', inputs: { text: negativePrompt(style, request.kind, request.bodyPlan, request.subject), clip: [weights, 1] } },
     latent: { class_type: 'EmptyLatentImage', inputs: { width: render.width, height: render.height, batch_size: 1 } },
     sample: {
       class_type: 'KSampler',
@@ -58,7 +68,7 @@ export function renderGraph(style: ImageStyle, request: RenderRequest): Graph {
         sampler_name: model.sampler,
         scheduler: model.scheduler,
         denoise: 1,
-        model: ['lora', 0],
+        model: [weights, 0],
         positive: ['positive', 0],
         negative: ['negative', 0],
         latent_image: ['latent', 0],
@@ -90,7 +100,7 @@ export class ComfyUi {
   async checkReady(style: ImageStyle): Promise<void> {
     const needs: ReadonlyArray<readonly [string, string]> = [
       ['checkpoints', style.model.checkpoint],
-      ['loras', style.model.lora],
+      ...(style.mode === 'pixel' ? [['loras', style.model.lora] as const] : []),
       ...(style.portrait.cutout || style.cover.cutout ? [['background_removal', style.model.backgroundRemoval] as const] : []),
     ];
     const missing: string[] = [];

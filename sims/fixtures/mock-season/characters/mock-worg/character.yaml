@@ -1,5 +1,0 @@
-id: mock-worg
-base: worg
-status: active
-chrome:
-  name: Mock Worg

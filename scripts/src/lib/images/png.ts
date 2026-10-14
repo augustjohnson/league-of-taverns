@@ -3,7 +3,8 @@
  *
  * Reads 8-bit, non-interlaced greyscale, RGB, RGBA and palette images, which
  * covers ComfyUI output and our own files. Writes palette (indexed) PNGs with
- * a tRNS chunk, so a 112×144 sprite in 64 colours stays a few KB.
+ * a tRNS chunk, so a 112×144 sprite in 64 colours stays a few KB, and
+ * filtered true-colour PNGs for full-resolution paintings.
  */
 import { crc32, deflateSync, inflateSync } from 'node:zlib';
 
@@ -181,16 +182,61 @@ export function encodeIndexedPng(image: IndexedImage): Buffer {
   ]);
 }
 
-/** Plain RGBA PNG, every row unfiltered. For staging prepared renders, not for committed sprites. */
+/**
+ * A true-colour PNG: RGB when every pixel is opaque, else RGBA. Each row gets
+ * the filter that leaves the smallest sum of residuals (the usual heuristic),
+ * which is what keeps a full-resolution painting near 1 MB.
+ */
 export function encodeRgbaPng(image: RgbaImage): Buffer {
   const { width, height, data } = image;
+  let opaque = true;
+  for (let i = 3; i < data.length && opaque; i += 4) opaque = data[i] === 255;
+  const bpp = opaque ? 3 : 4;
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr.set([8, 6, 0, 0, 0], 8);
-  const raw = Buffer.alloc(height * (width * 4 + 1));
-  for (let y = 0; y < height; y++) raw.set(data.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);
-  return Buffer.concat([SIGNATURE, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 6 })), chunk('IEND', Buffer.alloc(0))]);
+  ihdr.set([8, opaque ? 2 : 6, 0, 0, 0], 8);
+  const stride = width * bpp;
+  const raw = Buffer.alloc(height * (stride + 1));
+  let previous = new Uint8Array(stride);
+  const row = new Uint8Array(stride);
+  const trial = new Uint8Array(stride);
+  const best = new Uint8Array(stride);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) for (let c = 0; c < bpp; c++) row[x * bpp + c] = data[(y * width + x) * 4 + c]!;
+    let bestType = 0;
+    let bestCost = Infinity;
+    for (let type = 0; type < 5; type++) {
+      let cost = 0;
+      for (let i = 0; i < stride; i++) {
+        const left = i >= bpp ? row[i - bpp]! : 0;
+        const up = previous[i]!;
+        const upLeft = i >= bpp ? previous[i - bpp]! : 0;
+        const predicted = type === 0 ? 0 : type === 1 ? left : type === 2 ? up : type === 3 ? (left + up) >> 1 : paeth(left, up, upLeft);
+        const residual = (row[i]! - predicted) & 0xff;
+        trial[i] = residual;
+        cost += residual < 128 ? residual : 256 - residual;
+      }
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestType = type;
+        best.set(trial);
+      }
+    }
+    const at = y * (stride + 1);
+    raw[at] = bestType;
+    raw.set(best, at + 1);
+    previous = Uint8Array.from(row);
+  }
+  return Buffer.concat([SIGNATURE, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
+}
+
+function paeth(a: number, b: number, c: number): number {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 }
 
 function chunk(type: string, body: Buffer): Buffer {

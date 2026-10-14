@@ -1,7 +1,8 @@
 /**
  * Build the browser playground: one self-contained HTML file.
  *
- * 1. Load the mock season in Node with the scripts loaders (./load.ts).
+ * 1. Load the mock season in Node with the scripts loaders (./load.ts), and
+ *    each pooled character's chrome, with a thumbnail of its portrait.
  * 2. Serialize what the page needs (./playground/data.ts).
  * 3. Bundle ./playground/app.ts with esbuild as a minified browser IIFE.
  * 4. Inline the data and the bundle into ./playground/page.html as one
@@ -11,15 +12,43 @@
  * added at publish time), and it opens fine straight from disk too.
  * ./build-playground.ts is the CLI.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { webImage } from '@league-of-taverns/scripts/lib/images/postprocess';
+import { decodePng, encodeIndexedPng } from '@league-of-taverns/scripts/lib/images/png';
 import { build } from 'esbuild';
 import { REPO_ROOT, loadCharacterChrome, loadGodChrome, rootDir } from '@league-of-taverns/scripts/lib/repo';
-import { DEFAULT_SEASON_DIR, loadMockSeasonParts } from './load';
-import { serializeSeason, type PlaygroundData } from './playground/data';
+import { DEFAULT_SEASON_DIR, charactersRootOf, loadMockSeasonParts } from './load';
+import { serializeSeason, type PlaygroundChrome, type PlaygroundData } from './playground/data';
 
 const PLAYGROUND_SRC = join(dirname(fileURLToPath(import.meta.url)), 'playground');
+
+/** Portrait thumbnails: longest side (twice the largest frame the page draws, 80 px) and colour budget. */
+const THUMB = { longSide: 160, colors: 256 } as const;
+
+/**
+ * Chrome for each character in `ids`, read from `<charactersRoot>/characters/<id>/`,
+ * with the painted portrait (when it has one) cut down to a thumbnail
+ * (docs/images.md § Post-processing).
+ */
+export function playgroundChrome(ids: ReadonlyArray<string>, charactersRoot: string): Record<string, PlaygroundChrome> {
+  const out: Record<string, PlaygroundChrome> = {};
+  for (const id of ids) {
+    const { name, epithet, tagline, portrait } = loadCharacterChrome(id, charactersRoot);
+    const thumb =
+      portrait?.path === undefined
+        ? undefined
+        : encodeIndexedPng(webImage(decodePng(readFileSync(join(charactersRoot, 'characters', id, portrait.path))), THUMB.longSide, THUMB.colors));
+    out[id] = {
+      name,
+      ...(epithet === undefined ? {} : { epithet }),
+      ...(tagline === undefined ? {} : { tagline }),
+      ...(thumb === undefined ? {} : { portrait: `data:image/png;base64,${thumb.toString('base64')}` }),
+    };
+  }
+  return out;
+}
 
 /** Bundle the page script: app.ts with the engine and bots, as a minified IIFE for browsers. */
 export async function bundleApp(): Promise<string> {
@@ -74,12 +103,16 @@ export function renderPage(template: string, data: PlaygroundData, bundle: strin
 /** Load the season in `dir`, bundle the app and return the page. */
 export async function buildPlaygroundHtml(dir: string = DEFAULT_SEASON_DIR): Promise<{ readonly html: string; readonly data: PlaygroundData }> {
   const parts = loadMockSeasonParts(dir);
-  // The season folder keeps its own characters/ and gods/ (load.ts): read each pooled character's chrome name and each
-  // sponsoring god's chrome there, for display only.
-  const charactersRoot = resolve(rootDir(REPO_ROOT), dir);
-  const names = Object.fromEntries(parts.pool.map(({ character }) => [character.ref.id, loadCharacterChrome(character.ref.id, charactersRoot).name]));
-  const gods = Object.fromEntries(parts.sponsors.map(({ id }) => [id, loadGodChrome(id, charactersRoot)]));
-  const data = serializeSeason(parts, dir, names, gods);
+  const chrome = playgroundChrome(
+    parts.pool.map((p) => p.character.ref.id),
+    charactersRootOf(dir),
+  );
+  // Each sponsoring god's chrome (name, call, banner), from the season's own gods/ when it keeps one (the mock
+  // season does), else beside its characters, for display only.
+  const seasonDir = resolve(rootDir(REPO_ROOT), dir);
+  const godsRoot = existsSync(join(seasonDir, 'gods')) ? seasonDir : charactersRootOf(dir);
+  const gods = Object.fromEntries(parts.sponsors.map(({ id }) => [id, loadGodChrome(id, godsRoot)]));
+  const data = serializeSeason(parts, dir, chrome, gods);
   const template = readFileSync(join(PLAYGROUND_SRC, 'page.html'), 'utf8');
   const html = renderPage(template, data, await bundleApp());
   return { html, data };

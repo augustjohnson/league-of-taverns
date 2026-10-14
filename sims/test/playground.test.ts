@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { projectMission, replayLog, rngFor } from '@league-of-taverns/engine';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { deepEqual } from '../src/deep-equal';
 import { loadMockSeason, loadMockSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
@@ -77,7 +77,7 @@ describe('deepEqual (the replay self-check)', () => {
     expect(deepEqual(replayed, sim1.state)).toBe(true);
     expect(isDeepStrictEqual(replayed, sim1.state)).toBe(true);
     const owner = new Map(sim1.state.owner);
-    owner.set('mock-ape', 'someone-else');
+    owner.set('professor-albright', 'someone-else');
     const tampered = { ...sim1.state, owner };
     expect(deepEqual(tampered, sim1.state)).toBe(false);
     expect(isDeepStrictEqual(tampered, sim1.state)).toBe(false);
@@ -128,7 +128,7 @@ describe('view helpers', () => {
 
   it('bins sampled scores onto the projected support, and the sample mean converges to the projection', () => {
     expect(scoreHistogram([0, 0.5, 0.5, 1, 0.3], [0, 0.5, 1])).toEqual({ counts: [1, 2, 1], other: 1 });
-    const party = partyFrom(['mock-griffon', 'mock-ogre', 'mock-wolf', 'mock-goblin'], nodeInput.statsOf);
+    const party = partyFrom(['krrth', 'bruno-the-bruiser', 'doug', 'gizzik'], nodeInput.statsOf);
     const projection = projectMission(party, mission, nodeInput.baseOf, nodeInput.battleModel);
     const sample = sampleMission(party, mission, nodeInput.baseOf, nodeInput.battleModel, 4000, 'test-seed');
     expect(sample.scores).toHaveLength(4000);
@@ -165,7 +165,7 @@ describe('view helpers', () => {
     expect([0, 1, 0.5, 2 / 3, 0.8, 3 / 7].map(scoreFraction)).toEqual(['0', '1', '1/2', '2/3', '4/5', '3/7']);
     expect([0, 2, 30, 58, 96, 100].map(formatCrTotal)).toEqual(['0', '0.25', '3.75', '7.25', '12', '12.5']);
     expect(['awarded', 'add_unavailable', 'roster_full', 'something_new'].map(waiverReasonLabel)).toEqual(['awarded', 'already taken', 'roster full', 'something new']);
-    const skills = topSkills(nodeInput.statsOf('mock-goblin'));
+    const skills = topSkills(nodeInput.statsOf('gizzik'));
     expect(skills).toHaveLength(3);
     expect(skills[0]!.modifier).toBeGreaterThanOrEqual(skills[2]!.modifier);
     const rand = rngFor('seed-words', 'test');
@@ -270,11 +270,15 @@ describe('banner stylesheet', () => {
 
 describe('playground build', () => {
   const dir = mkdtempSync(join(tmpdir(), 'lot-playground-'));
+  const out = join(dir, 'index.html');
+  let page: Awaited<ReturnType<typeof writePlayground>>;
+  beforeAll(async () => {
+    page = await writePlayground(out);
+  }, 60_000);
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('writes one self-contained Artifact body', async () => {
-    const out = join(dir, 'index.html');
-    const { bytes, data: built } = await writePlayground(out);
+  it('writes one self-contained Artifact body', () => {
+    const { bytes, data: built } = page;
     // Every sponsoring god's chrome rides along for the banners.
     expect(Object.keys(built.gods).sort()).toEqual(parts.sponsors.map((sp) => sp.id).sort());
     expect(bannerGods(built.gods).size).toBe(parts.sponsors.length);
@@ -290,7 +294,21 @@ describe('playground build', () => {
     expect(html).not.toMatch(/\bfetch\(/);
     expect(html).toMatch(/^[\t\n\r -~]*$/);
     expect(bytes).toBeLessThan(2 * 1024 * 1024);
-  }, 60_000);
+  });
+
+  it("carries each pooled character's name and a portrait thumbnail, and nothing the engine reads", () => {
+    const built = page.data;
+    const ids = parts.pool.map((p) => p.character.ref.id);
+    expect(Object.keys(built.chrome).sort()).toEqual([...ids].sort());
+    expect(built.chrome['bruno-the-bruiser']).toMatchObject({ name: 'Bruno', epithet: 'the Bruiser' });
+    for (const id of ids) {
+      const uri = built.chrome[id]!.portrait;
+      expect(uri, id).toMatch(/^data:image\/png;base64,/);
+      const png = Buffer.from(uri!.slice(uri!.indexOf(',') + 1), 'base64');
+      expect(Math.max(png.readUInt32BE(16), png.readUInt32BE(20)), id).toBe(160);
+    }
+    expect(runMockSeason(seasonInputFromData(built), { seed: 'sim-1' }).ndjson).toBe(sim1.ndjson);
+  });
 
   it('escapes the inlined JSON so nothing can close the script early', () => {
     expect(scriptSafeJson({ s: '</script><!-- é' })).toBe('{"s":"\\u003c/script>\\u003c!-- \\u00e9"}');

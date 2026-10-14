@@ -1,5 +1,0 @@
-id: mock-goblin
-base: goblin
-status: active
-chrome:
-  name: Mock Goblin

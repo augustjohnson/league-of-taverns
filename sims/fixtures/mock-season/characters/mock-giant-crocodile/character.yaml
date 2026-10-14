@@ -1,5 +1,0 @@
-id: mock-giant-crocodile
-base: giant-crocodile
-status: active
-chrome:
-  name: Mock Giant Crocodile

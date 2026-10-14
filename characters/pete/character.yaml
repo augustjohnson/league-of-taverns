@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Pete
   epithet: Some Assembly Required
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Built from eleven people. Four were left-handed, and it shows.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: grey-skinned stitched flesh golem with mismatched arms, a bolt in his neck and one blue and one brown eye, (bewildered lopsided smile:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 132621708
+    imported: pete-gemini-1.webp
   height: 8

@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Lady Constance Fopsworth
   epithet: the Expense Account
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Invoices the tavern after every fight. Line items include "emotional armour".
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: pale noblewoman in a tall powdered wig with a painted beauty mark, holding a lorgnette, in a lace ruff collar, (nose-in-the-air disdain:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 206012093
+    imported: lady-constance-fopsworth-s701.png
   height: 5.4

@@ -1,5 +1,0 @@
-id: mock-winter-wolf
-base: winter-wolf
-status: active
-chrome:
-  name: Mock Winter Wolf

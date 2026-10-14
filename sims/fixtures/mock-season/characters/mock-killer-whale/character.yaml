@@ -1,5 +1,0 @@
-id: mock-killer-whale
-base: killer-whale
-status: active
-chrome:
-  name: Mock Killer Whale

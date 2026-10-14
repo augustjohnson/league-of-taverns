@@ -1,5 +1,0 @@
-id: mock-centaur
-base: centaur
-status: active
-chrome:
-  name: Mock Centaur

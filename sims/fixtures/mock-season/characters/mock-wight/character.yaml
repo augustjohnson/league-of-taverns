@@ -1,5 +1,0 @@
-id: mock-wight
-base: wight
-status: active
-chrome:
-  name: Mock Wight

@@ -8,7 +8,9 @@ debut: season-01
 chrome:
   name: Mott
   epithet: Patient Zero
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: The first recorded case of four separate illnesses. Maintains he feels fine.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: mangy grey giant rat with bald patches, a torn left ear and a runny red nose, (calm unbothered expression:1.3)

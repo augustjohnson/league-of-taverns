@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Barb
   epithet: the Duchess
+  pronouns: { subject: she, object: her, possessive: her }
   tagline: Controls every tavern bin within forty miles. Accepts tribute in pie crusts.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: black bear with a white chest blaze, a crushed wicker bread basket worn as a crown and crumbs in her fur, (regal calm stare:1.3)
     bodyPlan: beast
     path: portrait.png
-    seed: 995820949
+    imported: barb-s703.png
   height: 6

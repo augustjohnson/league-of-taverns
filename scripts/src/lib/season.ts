@@ -4,13 +4,13 @@
  *
  * - A season is named by id (`seasons/<id>/` under the repo root) or by a
  *   `SeasonLocation`, for fixtures that live elsewhere (the mock season in
- *   sims/fixtures/mock-season/ keeps its own characters/ folder).
+ *   sims/fixtures/mock-season/ pools the repo's own characters).
  * - Every loader collects all the issues it finds and throws one
  *   `ValidationFailure` with a line per issue: `<file>: <field>: <message>`.
  * - Each public loader reads only what it needs. `loadSeason` loads everything
  *   once, for callers that want all of it (validate, sims).
  */
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { BOT_IDS } from '@league-of-taverns/bots';
 import type { BotId } from '@league-of-taverns/bots';
@@ -52,16 +52,19 @@ export interface SeasonLocation {
    * Relative to the root, or absolute. Defaults to the root.
    */
   readonly charactersRoot?: string;
+  /**
+   * Directory whose gods/<id>/god.yaml files the schedule's gods resolve.
+   * Relative to the root, or absolute. Defaults to the season directory if it
+   * has a gods/ folder (a fixture, like the mock season), else `charactersRoot`.
+   */
+  readonly godsRoot?: string;
 }
 
 /** A season id (seasons/<id>/ under the root) or an explicit location. */
 export type SeasonSource = string | SeasonLocation;
 
-/** The mock season used by sims (T5.5). */
-export const MOCK_SEASON: SeasonLocation = {
-  dir: 'sims/fixtures/mock-season',
-  charactersRoot: 'sims/fixtures/mock-season',
-};
+/** The mock season used by sims (T5.5). Its pool is drawn from the repo's own characters/. */
+export const MOCK_SEASON: SeasonLocation = { dir: 'sims/fixtures/mock-season' };
 
 interface SeasonContext {
   readonly root: RepoRoot;
@@ -69,6 +72,8 @@ interface SeasonContext {
   readonly dir: string;
   /** Absolute directory containing characters/. */
   readonly charactersRoot: string;
+  /** Absolute directory containing gods/. */
+  readonly godsRoot: string;
   /** The id the folder implies, when the season was named by id. */
   readonly expectedId?: string;
 }
@@ -79,9 +84,17 @@ function seasonContext(season: SeasonSource, root: RepoRoot): SeasonContext {
     if (!kebabIdSchema.safeParse(season).success) {
       throw new ValidationFailure(`invalid season id ${JSON.stringify(season)}: expected a kebab-case folder name under seasons/`);
     }
-    return { root, dir: join(base, 'seasons', season), charactersRoot: base, expectedId: season };
+    const dir = join(base, 'seasons', season);
+    return { root, dir, charactersRoot: base, godsRoot: ownGods(dir) ?? base, expectedId: season };
   }
-  return { root, dir: resolve(base, season.dir), charactersRoot: resolve(base, season.charactersRoot ?? '.') };
+  const dir = resolve(base, season.dir);
+  const charactersRoot = resolve(base, season.charactersRoot ?? '.');
+  return { root, dir, charactersRoot, godsRoot: season.godsRoot === undefined ? (ownGods(dir) ?? charactersRoot) : resolve(base, season.godsRoot) };
+}
+
+/** `dir` if it keeps its own gods/ folder, else undefined. */
+function ownGods(dir: string): string | undefined {
+  return existsSync(join(dir, 'gods')) ? dir : undefined;
 }
 
 /** Absolute path to the season directory a source names. */
@@ -92,6 +105,11 @@ export function seasonDir(season: SeasonSource, root: RepoRoot = REPO_ROOT): str
 /** Absolute directory whose characters/ folder a source's pool resolves against. */
 export function charactersRootDir(season: SeasonSource, root: RepoRoot = REPO_ROOT): string {
   return seasonContext(season, root).charactersRoot;
+}
+
+/** Absolute directory whose gods/ folder a source's schedule resolves against. */
+export function godsRootDir(season: SeasonSource, root: RepoRoot = REPO_ROOT): string {
+  return seasonContext(season, root).godsRoot;
 }
 
 // ── shared helpers ─────────────────────────────────────────────────────────

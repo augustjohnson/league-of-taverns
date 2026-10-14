@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Gizzik
   epithet: Rookie of the Year
+  pronouns: { subject: he, object: him, possessive: his }
   tagline: Made his own trophy from a bucket. Has not taken it off, including to sleep.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: scrawny green goblin with huge ears, three rings in one ear, a dented tin bucket hung around his neck like a medal, (proud gap-toothed grin:1.3)
     bodyPlan: humanoid
     path: portrait.png
-    seed: 394842368
+    imported: gizzik-s702.png
   height: 3.5

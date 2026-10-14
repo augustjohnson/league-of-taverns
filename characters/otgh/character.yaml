@@ -8,11 +8,13 @@ debut: season-01
 chrome:
   name: Ö'tʰǧh
   epithet: Sanitation
+  pronouns: { subject: they, object: them, possessive: their }
   tagline: Lives in garbage, eats garbage, and is, accurately, the cleanest member of the team.
+  backstory: backstory.md
   portrait:
     status: draft
     prompt: lumpy brown three-legged otyugh with a single eyestalk and a rotten cabbage leaf draped on its head, (proud gap-toothed grin:1.3)
     bodyPlan: beast
     path: portrait.png
-    seed: 727755527
+    imported: otgh-s702.png
   height: 6

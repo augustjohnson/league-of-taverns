@@ -1,5 +1,0 @@
-id: mock-giant-owl
-base: giant-owl
-status: active
-chrome:
-  name: Mock Giant Owl
