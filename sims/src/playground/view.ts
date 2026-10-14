@@ -475,6 +475,29 @@ export function taleSteps(mission: Mission, run: RunResult): ReadonlyArray<TaleS
   });
 }
 
+/**
+ * How a week went for one tavern, which sets the size of its moment (fx.ts
+ * weekMoment). One per week, the first that holds: a DNF (loss), topping the
+ * week (triumph), turning back (relief), beating the scrying ball's own
+ * projection (satisfaction), else quiet, which gets no effect at all so the
+ * others keep meaning something.
+ */
+export type WeekOutcome = 'dnf' | 'top' | 'retreat' | 'good' | 'quiet';
+
+export function weekOutcome(week: {
+  readonly rank: number;
+  readonly points: number;
+  readonly projected: number;
+  readonly dnf: boolean;
+  readonly retreated: boolean;
+}): WeekOutcome {
+  if (week.dnf) return 'dnf';
+  if (week.rank === 1 && week.points > 0) return 'top';
+  if (week.retreated) return 'retreat';
+  if (week.points > week.projected) return 'good';
+  return 'quiet';
+}
+
 // ── banners ────────────────────────────────────────────────────────────────
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

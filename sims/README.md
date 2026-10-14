@@ -130,7 +130,10 @@ your tavern raises its banner with one burst of party.js sparkles (bundled)
 and micron's swing (its CSS vendored into `page.html` with its MIT notice),
 and playing a week plays your run back node by node in the scrying ball:
 dice tumble before they settle, the loot counter climbs, and a DNF drains it
-to 0. The result card holds the whole result and the reveal only holds pieces
+to 0. The reveal ends in a moment sized to the week (`weekOutcome`): confetti
+in your banner's colours for topping it, sparkles for beating the projection,
+a breath out for turning back, a dimmed run after a DNF, and nothing for a
+quiet week. The result card holds the whole result and the reveal only holds pieces
 back, so Skip (or Esc), a reload and `prefers-reduced-motion` all show the
 same thing at once. Each moment plays once after the render its move caused.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI

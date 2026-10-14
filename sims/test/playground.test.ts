@@ -23,6 +23,7 @@ import {
   seedWords,
   taleSteps,
   topSkills,
+  weekOutcome,
   waiverReasonLabel,
 } from '../src/playground/view';
 import { runMockSeason } from '../src/season-runner';
@@ -194,6 +195,22 @@ describe('the week reveal', () => {
     }
     expect(runs).toBeGreaterThan(30);
     expect(dnfs).toBeLessThan(runs);
+  });
+});
+
+describe('week outcomes', () => {
+  const week = { rank: 3, points: 40, projected: 50, dnf: false, retreated: false };
+
+  it('picks one moment per week, the first that holds: DNF, top, retreat, beat the projection, else quiet', () => {
+    expect(weekOutcome(week)).toBe('quiet');
+    expect(weekOutcome({ ...week, points: 51 })).toBe('good');
+    expect(weekOutcome({ ...week, points: 51, retreated: true })).toBe('retreat');
+    expect(weekOutcome({ ...week, rank: 1, retreated: true })).toBe('top');
+    expect(weekOutcome({ ...week, rank: 1, points: 0, dnf: true })).toBe('dnf');
+  });
+
+  it('does not crown a week where every tavern scored nothing', () => {
+    expect(weekOutcome({ ...week, rank: 1, points: 0, projected: 0 })).toBe('quiet');
   });
 });
 

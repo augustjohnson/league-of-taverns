@@ -87,6 +87,7 @@ import {
   seedWords,
   signed,
   taleSteps,
+  weekOutcome,
   topSkills,
   waiverReasonLabel,
   type GraphLayout,
@@ -1938,6 +1939,10 @@ function renderPlayResult(s: SeasonSession, week: number): string {
         `<tr class="${r.tavern === me ? 'sel mine' : ''}"${r.tavern === me ? bannerAttr(me) : ''}><td class="n">${r.rank}</td><td><span class="${r.rank === 1 ? 'win' : ''}">${esc(tavernName(r.tavern))}</span></td><td class="n">${r.points}</td></tr>`,
     )
     .join('');
+  const outcome =
+    mine === undefined || res === undefined
+      ? 'quiet'
+      : weekOutcome({ rank: mine.rank, points: mine.points, projected: results.get(me)?.projected ?? mine.points, dnf: res.run.dnf, retreated: res.run.retreatedBefore !== null });
   const claimed = new Map(s.events.flatMap((e) => (e.type === 'waiver.claimed' ? [[e.payload.claim, e.payload] as const] : [])));
   const waivers = s.events
     .flatMap((e) => (e.type === 'waiver.resolved' && e.payload.week === week ? e.payload.outcomes : []))
@@ -1945,8 +1950,8 @@ function renderPlayResult(s: SeasonSession, week: number): string {
   // The week reveal (fx.ts revealWeek) plays the run back node by node and keeps everything marked data-spoiler, and
   // every section after this card, out of sight until it ends. Without it (a reload, reduced motion) all shows at once.
   return (
-    `<section class="card week-result"${res === undefined ? '' : ` data-path="${esc(JSON.stringify(res.run.path))}"`} tabindex="-1">` +
-    `<div class="row" style="justify-content:space-between"><h2>Week ${week} result</h2><span class="small" data-spoiler>${headline}</span></div>` +
+    `<section class="card week-result"${res === undefined ? '' : ` data-path="${esc(JSON.stringify(res.run.path))}"`} data-outcome="${outcome}" tabindex="-1">` +
+    `<div class="row" style="justify-content:space-between"><h2>Week ${week} result</h2><span class="small" data-spoiler data-headline>${headline}</span></div>` +
     (res === undefined
       ? '<p class="muted">You fielded no lineup and scored 0.</p>'
       : graphSvg(layouts.get(week)!, { path: res.run.path, outcomes: outcomesOf(res.run) }) +
@@ -1998,11 +2003,11 @@ function taleHtml(mission: Mission, run: RunResult): string {
     ];
   });
   if (run.retreatedBefore !== null) {
-    lines.push(`<li data-tail="retreat" data-total="${run.loot}">The party thinks better of <b>${esc(run.retreatedBefore)}</b> and turns for home with ${run.loot} loot.</li>`);
+    lines.push(`<li data-tail="retreat" data-total="${run.loot}">The party thinks better of <b>${esc(run.retreatedBefore)}</b> and turns for home, keeping ${run.loot} loot.</li>`);
   }
   if (run.dnf) {
     lines.push(`<li data-tail="dnf" data-total="0"><span class="fail">Beaten.</span> The party flees, dropping all ${banked} loot.</li>`);
-    if (run.injury !== null) lines.push(`<li data-tail="injury" data-total="0">${esc(charName(run.injury.character))} limps home hurt and sits out next week.</li>`);
+    if (run.injury !== null) lines.push(`<li data-tail="injury" data-total="0"><b data-hurt>${esc(charName(run.injury.character))}</b> limps home hurt and sits out next week.</li>`);
   } else if (run.retreatedBefore === null) {
     lines.push(`<li data-tail="home" data-total="${run.loot}">Home with ${run.loot} loot.</li>`);
   }
@@ -2015,10 +2020,12 @@ function taleHtml(mission: Mission, run: RunResult): string {
   );
 }
 
-/** The week reveal: your run plays back over the result card. */
+/** The week reveal: your run plays back over the result card, ending in a moment the size of the week (fx.ts). */
 function revealMyWeek(): void {
   const card = panel.querySelector<HTMLElement>('.week-result[data-path]');
-  if (card !== null) revealWeek(card);
+  const me = play.session?.humanTavern;
+  const god = me === undefined || me === null ? null : bannerOf(me);
+  if (card !== null) revealWeek(card, god === null ? undefined : data.gods[god]!.banner);
 }
 
 function renderPlayStandings(s: SeasonSession): string {

@@ -5,10 +5,11 @@
  *
  * Effects come in tiers so the big ones stay rare and keep meaning something:
  * a nod (one micron interaction on one element), a cheer (one burst of
- * party.js sparkles) and, kept for the season's end, a fanfare (confetti).
+ * party.js sparkles) and a fanfare (confetti), which only topping a week
+ * earns. A week's result picks its tier by how it went (`weekMoment`).
  * The CSS half is page.html § Moments, with micron's CSS vendored below it.
  */
-import { Color, settings, sparkles, variation } from 'party-js';
+import { Color, confetti, settings, sparkles, variation } from 'party-js';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 
 // party.js's own default, set here so it holds even if the default changes: it must be set before the first effect.
@@ -92,8 +93,9 @@ const BRASS = Color.fromHex('#d5aa4c');
  *
  * The card already holds the whole result: this only holds pieces back and
  * brings them in, so a reload, a skip or reduced motion shows the same thing.
+ * When it ends, skipped or not, the week's moment plays in `banner`'s colours.
  */
-export function revealWeek(card: HTMLElement): void {
+export function revealWeek(card: HTMLElement, banner?: Banner): void {
   if (reducedMotion()) return;
   let path: ReadonlyArray<string>;
   try {
@@ -176,6 +178,7 @@ export function revealWeek(card: HTMLElement): void {
     card.classList.remove('revealing');
     card.classList.add('revealed');
     if (hadFocus) card.focus({ preventScroll: true });
+    weekMoment(card, banner);
   };
 
   card.classList.add('revealing');
@@ -222,8 +225,40 @@ export function revealWeek(card: HTMLElement): void {
       line.classList.add('shown');
       countTo(Number(line.dataset.total));
       if (line.dataset.tail === 'dnf') micron(counter, 'shake', { duration: 0.6 });
+      if (line.dataset.tail === 'injury') micron(line.querySelector('[data-hurt]'), 'flicker', { duration: 0.7 });
       await sleep(BEAT.tail);
     }
     finish();
   })();
+}
+
+/**
+ * The end of a week's reveal, sized to how the week went (`data-outcome`,
+ * from view.ts weekOutcome):
+ *
+ * | outcome | feeling      | effect                                                          |
+ * |---------|--------------|-----------------------------------------------------------------|
+ * | top     | triumph      | confetti from the headline in your banner's colours; it tadas   |
+ * | good    | satisfaction | a few sparkles off the loot counter                             |
+ * | retreat | relief       | the counter breathes out (micron fade); the kept loot is marked |
+ * | dnf     | loss         | (the drain and shake happen in the reveal) the run dims         |
+ * | quiet   | none         | nothing                                                         |
+ *
+ * The marks that stay (the dimmed run, the kept loot) are page.html CSS on
+ * `data-outcome`, so a reload shows them too.
+ */
+export function weekMoment(card: HTMLElement, banner?: Banner): void {
+  if (reducedMotion() || !card.isConnected) return;
+  const outcome = card.dataset.outcome;
+  const counter = card.querySelector('[data-loot]');
+  const colours = (banner === undefined ? ['#d5aa4c', '#24704a'] : [banner.mark, banner.mark, banner.charge, banner.field]).map((hex) => Color.fromHex(hex));
+  if (outcome === 'top') {
+    const headline = card.querySelector<HTMLElement>('[data-headline]');
+    micron(headline, 'tada', { duration: 0.8 });
+    confetti(headline ?? card, { count: variation.range(45, 65), size: variation.range(0.7, 1.1), color: colours });
+  } else if (outcome === 'good' && counter instanceof HTMLElement) {
+    sparkles(counter, { count: variation.range(10, 16), size: variation.range(0.5, 0.9), speed: variation.range(70, 160), color: colours.slice(0, 3) });
+  } else if (outcome === 'retreat') {
+    micron(counter, 'fade', { duration: 0.9 });
+  }
 }

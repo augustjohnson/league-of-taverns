@@ -345,6 +345,11 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 @keyframes scry { from { stroke-opacity: 1; } to { stroke-opacity: 0.3; } }
 .panel:has(.week-result.revealed) [data-spoiler], .week-result.revealed ~ * { animation: banner-rise 0.45s ease-out both; }
 .week-result:focus { outline: none; }
+/* What a week leaves behind (fx.ts weekMoment): after a DNF the run dims except where it ended; after a retreat the
+   loot kept is marked. Static, so a reload shows them; they arrive with the end of the reveal. */
+.week-result[data-outcome="dnf"]:not(.revealing) .graph :is(.edge, .elabel, .node:not(.lost)) { opacity: 0.4; transition: opacity 1.2s ease-out; }
+.week-result[data-outcome="retreat"]:not(.revealing) [data-tail="retreat"] { background: var(--good-soft); border-radius: var(--radius); padding: 2px 6px; transition: background-color 0.8s ease-out; }
+@media (prefers-reduced-motion: reduce) { .week-result .graph *, .week-result [data-tail] { transition: none !important; } }
 
 /* Vendored: micron 1.1.6 (https://github.com/webkul/micron), its CSS only; fx.ts applies the interactions.
 MIT License
