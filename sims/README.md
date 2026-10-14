@@ -125,6 +125,11 @@ only the snapshot records used, each pooled character's chrome name, and each
 sponsoring god's chrome (name, call and banner) for display; chrome never
 reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
+Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
+your tavern raises its banner with one burst of party.js sparkles (bundled)
+and micron's swing (its CSS vendored into `page.html` with its MIT notice).
+Each plays once after the render its move caused, and never under
+`prefers-reduced-motion`.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI
 uses, so a seed gives the same season, byte for byte: the engine avoids
 `Math.exp`/`Math.log` (not bit-identical across JS engines) in favor of

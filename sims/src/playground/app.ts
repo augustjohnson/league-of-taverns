@@ -60,6 +60,7 @@ import {
   type TitleOddsPoint,
 } from '../reports';
 import { seasonInputFromData, type PlaygroundData } from './data';
+import { raiseBanner } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -449,9 +450,15 @@ function markTabs(focus = false): void {
   $('run-error').classList.toggle('off-tab', tab === 'play');
 }
 
+/** A moment (fx.ts) to play once the next render is on screen; set by the move that earns it. */
+let pendingFx: (() => void) | null = null;
+
 function renderTab(): void {
+  const fx = pendingFx;
+  pendingFx = null;
   if (tab === 'play') {
     panel.innerHTML = renderPlay();
+    fx?.();
     return;
   }
   if (tab === 'batch') {
@@ -1685,9 +1692,16 @@ function playHeader(s: SeasonSession): string {
       : `<p class="banner-call"><span class="label">${esc(chrome.name)}</span> ${esc(chrome.call ?? `You fight under the banner of ${chrome.name}.`)}</p>`;
   return (
     `<section class="card${chrome === undefined ? '' : ' banner-card'}"${me === null ? '' : bannerAttr(me)}>${chrome === undefined ? '' : '<div class="pennant" aria-hidden="true"></div>'}` +
-    `<div class="row" style="justify-content:space-between"><div class="row"><h2>${me === null ? 'No tavern yet' : esc(tavernName(me))}</h2><span class="tag ${chrome === undefined ? 'brass' : 'banner'}">you</span>` +
+    `<div class="row" style="justify-content:space-between"><div class="row"><h2>${chrome === undefined ? '' : '<i class="flag" aria-hidden="true"></i> '}${me === null ? 'No tavern yet' : esc(tavernName(me))}</h2><span class="tag ${chrome === undefined ? 'brass' : 'banner'}">you</span>` +
     `<span class="muted small">${esc(where)} · seed ${esc(s.seed)}</span></div><div class="row">${rec}${reset}</div></div>${call}</section>`
   );
+}
+
+/** The tavern-pick moment: your banner goes up over the Play header. */
+function raiseMyBanner(): void {
+  const me = play.session?.humanTavern;
+  const god = me === undefined || me === null ? null : bannerOf(me);
+  if (god !== null) raiseBanner(panel.querySelector<HTMLElement>('.banner-card'), data.gods[god]!.banner);
 }
 
 function ordinal(n: number): string {
@@ -1999,7 +2013,8 @@ function playClick(action: string, id: string | undefined): boolean {
       renderTab();
       return true;
     case 'play-tavern-pick':
-      if (id !== undefined) playMoves([{ t: 'tavern', id }]);
+      // Only once the engine accepts the pick: a refusal skips `after`, so no banner goes up.
+      if (id !== undefined) playMoves([{ t: 'tavern', id }], () => (pendingFx = raiseMyBanner));
       return true;
     case 'play-draft':
       if (id !== undefined) playMoves([{ t: 'draft', id }]);

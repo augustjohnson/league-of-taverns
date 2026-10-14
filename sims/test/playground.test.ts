@@ -206,6 +206,9 @@ describe('playground build', () => {
     expect(html.match(/<script\b/g)).toHaveLength(1);
     expect(html.match(/<style\b/g)).toHaveLength(1);
     expect(html).toContain('var __PLAYGROUND_DATA__=');
+    // micron's CSS is vendored into the one style block, with its MIT notice.
+    expect(html).toContain('.mjs-swing{');
+    expect(html).toContain('Copyright (c) 2018 Webkul');
     expect(html).not.toMatch(/\bfetch\(/);
     expect(html).toMatch(/^[\t\n\r -~]*$/);
     expect(bytes).toBeLessThan(2 * 1024 * 1024);
