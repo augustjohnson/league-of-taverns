@@ -43,6 +43,7 @@ T9.2.
 
 - **Phase 1 merged** (2026-10-10): T0.1, T0.2, T1.1, T2.1, T2.3, T3.1, T3.2, T4.3, T4.6, T5.1.
 - **Phase 2 in progress:** T1.2 → T1.3 → T3.3, T2.2, T4.2 → T4.4, T5.2.
+- **Game flow (D-49 to D-53), in progress on `game-flow-impl`:** T4.7.
 
 ## Phase 1 starting set (historical)
 
@@ -283,7 +284,7 @@ Owns `engine/src/roster/`, `engine/src/league/`.
   tiebreakers (D-14).
 - **Depends:** T0.1.
 
-#### T4.7 Lineup shape: no captain + retreat order · S
+#### T4.7 Lineup shape: no captain + retreat order · S (done 2026-10-13)
 - **Goal:** lineups become `{ starters[4], retreat }` (D-12, D-49): the
   captain field, its tiebreak role and the `{captain}` story token go.
   Carry-over and the D-27 fallback follow the D-49 default.

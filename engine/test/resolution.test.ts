@@ -74,34 +74,22 @@ describe('checkOdds', () => {
   });
 
   describe('best fit and tiebreak (D-15)', () => {
-    it('picks the highest pass chance, even over the captain', () => {
-      const party = partyOf([member('cap', { skills: { stealth: 2 } }), member('b', { skills: { stealth: 5 } })], 'cap');
+    it('picks the highest pass chance, even over an earlier starter', () => {
+      const party = partyOf([member('cap', { skills: { stealth: 2 } }), member('b', { skills: { stealth: 5 } })]);
       expect(checkOdds(party, stealth(14))).toEqual({ actor: 'b', modifier: 5, advantage: false, eligible: true, pPass: 0.6 });
     });
 
-    it('breaks a tie in favour of the captain, wherever it sits in the lineup', () => {
-      const party = partyOf(
-        [member('a', { skills: { stealth: 3 } }), member('b', { skills: { stealth: 3 } }), member('cap', { skills: { stealth: 3 } })],
-        'cap',
-      );
-      expect(checkOdds(party, stealth(12)).actor).toBe('cap');
-    });
-
-    it('then breaks ties in lineup order', () => {
+    it('breaks ties in lineup order (there is no captain, D-12)', () => {
       const party = partyOf(
         [member('cap'), member('b', { skills: { stealth: 3 } }), member('c', { skills: { stealth: 3 } }), member('d', { skills: { stealth: 3 } })],
-        'cap',
       );
       expect(checkOdds(party, stealth(12)).actor).toBe('b');
-      const reordered = partyOf([party.members[0]!, party.members[3]!, party.members[2]!, party.members[1]!], 'cap');
+      const reordered = partyOf([party.members[0]!, party.members[3]!, party.members[2]!, party.members[1]!]);
       expect(checkOdds(reordered, stealth(12)).actor).toBe('d');
     });
 
-    it('prefers advantage over an equal modifier, even over the captain', () => {
-      const party = partyOf(
-        [member('cap', { skills: { stealth: 3 } }), member('b', { skills: { stealth: 3 }, advantages: ['skill:stealth'] })],
-        'cap',
-      );
+    it('prefers advantage over an equal modifier, even over an earlier starter', () => {
+      const party = partyOf([member('cap', { skills: { stealth: 3 } }), member('b', { skills: { stealth: 3 }, advantages: ['skill:stealth'] })]);
       const odds = checkOdds(party, stealth(13));
       expect(odds.actor).toBe('b');
       expect(odds.advantage).toBe(true);
@@ -114,22 +102,14 @@ describe('checkOdds', () => {
       expect(checkOdds(party, stealth(13)).actor).toBe('b');
       // At DC 6 the +5 is certain (1) and beats advantage (0.99).
       expect(checkOdds(party, stealth(6)).actor).toBe('cap');
-      // At DC 4 both are certain, so the tie goes to the captain.
-      const swapped = partyOf([party.members[0]!, party.members[1]!], 'b');
+      // At DC 4 both are certain, so the tie goes to whoever is listed first.
+      const swapped = partyOf([party.members[1]!, party.members[0]!]);
       expect(checkOdds(swapped, stealth(4)).actor).toBe('b');
       expect(checkOdds(party, stealth(4)).actor).toBe('cap');
     });
 
-    it('treats the captain like anyone else when there is no tie (D-12)', () => {
-      const party = partyOf([member('a', { skills: { stealth: 1 } }), member('cap', { skills: { stealth: 0 } })], 'cap');
-      const odds = checkOdds(party, stealth(10));
-      expect(odds.actor).toBe('a');
-      expect(odds.pPass).toBeCloseTo(0.6, 12);
-    });
-
-    it('throws on an empty party or a captain who is not a member', () => {
-      expect(() => checkOdds(partyOf([], 'x'), stealth(10))).toThrow(/no members/);
-      expect(() => checkOdds(partyOf([member('a')], 'x'), stealth(10))).toThrow(/captain "x"/);
+    it('throws on an empty party', () => {
+      expect(() => checkOdds(partyOf([]), stealth(10))).toThrow(/no members/);
     });
   });
 
@@ -140,7 +120,6 @@ describe('checkOdds', () => {
         member('flier', { skills: { stealth: 1 }, speeds: { fly: 40 } }),
         member('swimmer', { skills: { stealth: 4 }, speeds: { swim: 30, fly: 0 } }),
       ],
-      'cap',
     );
 
     it('limits the actor to starters with the speed', () => {

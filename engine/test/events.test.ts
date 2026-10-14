@@ -13,7 +13,7 @@ const HASH = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 const system = { kind: 'system', workflow: 'weekly-run' } as const;
 const manager = { kind: 'manager', githubId: 1234, login: 'someone' } as const;
 const commissioner = { kind: 'commissioner', githubId: 1, login: 'gm' } as const;
-const lineup: Lineup = { captain: 'bruno-the-bruiser', allies: ['moss-hag', 'tin-knight', 'pip-the-sly'] };
+const lineup: Lineup = { starters: ['bruno-the-bruiser', 'moss-hag', 'tin-knight', 'pip-the-sly'], retreat: { bank: 60 } };
 
 const config: SeasonConfig = {
   id: 'season-01',
@@ -243,7 +243,7 @@ describe('events', () => {
   });
 
   it('reports the line number and field path of a schema violation', () => {
-    const broken = { ...fixtures['lineup.set'], payload: { ...fixtures['lineup.set'].payload, lineup: { captain: 'bruno-the-bruiser', allies: ['a', 'b'] } } };
+    const broken = { ...fixtures['lineup.set'], payload: { ...fixtures['lineup.set'].payload, lineup: { starters: ['bruno-the-bruiser', 'a', 'b'], retreat: 'never' } } };
     const ndjson = [serializeEvent(fixtures['season.created']), serializeEvent(fixtures['tavern.joined']), JSON.stringify(broken)].join('\n');
     let caught: unknown;
     try {
@@ -253,8 +253,8 @@ describe('events', () => {
     }
     expect(caught).toBeInstanceOf(LogParseError);
     expect((caught as LogParseError).line).toBe(3);
-    expect((caught as LogParseError).path).toBe('payload.lineup.allies');
-    expect((caught as Error).message).toMatch(/^events line 3: payload\.lineup\.allies: /);
+    expect((caught as LogParseError).path).toBe('payload.lineup.starters');
+    expect((caught as Error).message).toMatch(/^events line 3: payload\.lineup\.starters: /);
   });
 
   it('rejects an unknown event type, a blank line mid-log, and a CR given as a fraction', () => {
@@ -298,7 +298,7 @@ describe('replay and verification', () => {
     return {
       path: lost ? ['start', 'find-path', 'bog'] : ['start', 'find-path', 'bog', 'crossed'],
       nodes: [
-        { node: 'find-path', kind: 'check', actor: resolved.payload.lineup.captain, d20: 2, modifier: 1, dc: 11, advantage: false, outcome: 'fail' },
+        { node: 'find-path', kind: 'check', actor: resolved.payload.lineup.starters[0], d20: 2, modifier: 1, dc: 11, advantage: false, outcome: 'fail' },
         { node: 'bog', kind: 'battle', pWin: 0.6, roll: battle.roll, outcome: battle.outcome },
       ],
       dnf: lost,

@@ -84,7 +84,7 @@ export class ReportContext {
     }
   }
 
-  /** The exact projection of these starters (captain first) on `mission`. Cached; the captain is inert (D-12). */
+  /** The exact projection of these starters on `mission`. Cached by the set of starters, since lineup order never changes a pass chance. */
   project(mission: Mission, starters: ReadonlyArray<string>): Projection {
     const key = `${mission.id}\u0000${[...starters].sort().join('\u0000')}`;
     let p = this.projections.get(key);
@@ -96,7 +96,7 @@ export class ReportContext {
   }
 
   party(starters: ReadonlyArray<string>): Party {
-    return { captain: starters[0]!, members: starters.map(this.input.statsOf) };
+    return { members: starters.map(this.input.statsOf) };
   }
 
   /** True when `week` is `tavern`'s sponsor's week, so its loot carries the home bonus. */
@@ -422,7 +422,7 @@ export function benchReport(ctx: ReportContext): ReadonlyArray<BenchRow> {
         points: sameDice ? runPoints(rerun(ids).score, config.scoring, home) : null,
       });
       const subsets: ReadonlyArray<Subset> = legalSubsets(view, roster);
-      const options = subsets.map((s) => option(startersOf(lineupFrom(view, s))));
+      const options = subsets.map((s) => option(startersOf(lineupFrom(s))));
       const best = (key: (o: BenchOption) => number | null): BenchOption | null => {
         let top: BenchOption | null = null;
         for (const o of options) {
@@ -602,7 +602,7 @@ export function aggregateLuck(seasons: ReadonlyArray<LuckSeason>): LuckAggregate
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function startersOf(lineup: Lineup): ReadonlyArray<string> {
-  return [lineup.captain, ...lineup.allies];
+  return lineup.starters;
 }
 
 function cmp(a: string, b: string): number {

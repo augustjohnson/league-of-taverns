@@ -36,7 +36,7 @@
  * | `tavern.joined` | `tavern.wrong_phase`, `tavern.duplicate`, `tavern.manager_taken` |
  * | `character.retained` | `retain.wrong_phase`, `retain.unknown_tavern`, `retain.not_pooled`, `retain.already_owned`, `retain.over_limit`, `retain.roster_full` |
  * | `draft.pick` | `draft.complete`, `draft.no_taverns`, `draft.sponsor_not_joined`, `draft.bad_order`, `draft.wrong_pick`, `draft.not_on_clock`, `draft.not_pooled`, `draft.already_owned`, `draft.roster_full` |
- * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `duplicate`, `not_owned`, `unknown_character`, `over_budget`) |
+ * | `lineup.set` | `lineup.draft_incomplete`, `lineup.unknown_tavern`, `lineup.bad_week`, `lineup.week_locked`, and `lineup.<code>` for the first `validateLineup` violation (`wrong_size`, `bad_retreat`, `duplicate`, `not_owned`, `unknown_character`, `over_budget`) |
  * | `lineup.locked` | `lock.draft_incomplete`, `lock.bad_week`, `lock.already_locked`, `lock.previous_not_finalized`, `lock.unknown_tavern`, `lock.duplicate_tavern`, `lock.missing_tavern`, `lock.source_mismatch`, `lock.illegal_lineup` |
  * | `waiver.claimed` | `waiver.draft_incomplete`, `waiver.unknown_tavern`, `waiver.duplicate_claim`, `waiver.not_pooled`, `waiver.not_free_agent`, `waiver.drop_not_owned` |
  * | `waiver.resolved` | `waiver.bad_week`, `waiver.week_not_finalized`, `waiver.already_resolved`, `waiver.unknown_claim`, `waiver.duplicate_outcome`, `waiver.missing_outcome`, `waiver.bad_priority`, `waiver.outcome_mismatch` |
@@ -678,7 +678,11 @@ function crOf(state: Pick<LeagueState, 'pool'>): (characterId: string) => CrEigh
 }
 
 function sameLineup(a: Lineup, b: Lineup): boolean {
-  return a.captain === b.captain && a.allies.length === b.allies.length && a.allies.every((ally, i) => ally === b.allies[i]);
+  return a.starters.length === b.starters.length && a.starters.every((id, i) => id === b.starters[i]) && sameRetreat(a.retreat, b.retreat);
+}
+
+function sameRetreat(a: Lineup['retreat'], b: Lineup['retreat']): boolean {
+  return typeof a === 'string' || typeof b === 'string' ? a === b : a.bank === b.bank;
 }
 
 function isPermutation(list: ReadonlyArray<string>, of: ReadonlyArray<string>): boolean {

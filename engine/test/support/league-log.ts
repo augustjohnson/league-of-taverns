@@ -148,7 +148,7 @@ export function bestLineup(state: LeagueState, tavern: string, previous: Lineup 
 /** The recorded `mission.resolved` payload for one tavern's run, built with `runMission` and the week seed. */
 export function resolution(state: LeagueState, week: number, tavern: string, lineup: Lineup): PayloadByType['mission.resolved'] {
   const mission = state.revealed.get(week)!;
-  const ids = [lineup.captain, ...lineup.allies];
+  const ids = lineup.starters;
   // Survival modifier from CR, so lineups differ.
   const party = partyOf(ids.map((id) => member(id, { skills: { survival: state.pool.get(id)!.cr / 4 } })));
   const seed = weekSeed({ season: SEASON, week, tavern });

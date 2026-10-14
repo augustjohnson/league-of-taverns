@@ -18,7 +18,7 @@ budget:
 
 roster:
   size: 7                           # OPEN D-03
-  starters: 4                       # no captain (D-12); the engine still takes 1 captain + 3 allies until T4.7
+  starters: 4                       # four starters, no captain (D-12)
   ownership: exclusive              # OPEN D-01
 
 draft:

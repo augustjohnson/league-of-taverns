@@ -820,7 +820,7 @@ export function runMockSeason(input: SeasonInput, options: RunOptions): MockSeas
 }
 
 function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats): Party {
-  return { captain: lineup.captain, members: [lineup.captain, ...lineup.allies].map(statsOf) };
+  return { members: lineup.starters.map(statsOf) };
 }
 
 // ── summary ────────────────────────────────────────────────────────────────
@@ -857,7 +857,7 @@ function summarize(
           tavern,
           bot: bot(tavern),
           source,
-          starters: lineup === null ? null : [lineup.captain, ...lineup.allies],
+          starters: lineup === null ? null : lineup.starters,
           points: r?.points ?? 0,
           projectedPoints: r?.projectedPoints ?? 0,
           checksPassed: r?.run.checksPassed ?? 0,

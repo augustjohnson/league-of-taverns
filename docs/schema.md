@@ -211,8 +211,8 @@ beat is its DNF ending, so no separate DNF outro is needed. Beats for unknown
 node ids are errors.
 
 **Tokens:** `{actor}` (check beats only), `{battle_creature}` (battle beats
-only), `{captain}`, `{allies}`, `{tavern}` (anywhere). `{captain}` goes
-away with D-12 (no captain). Any other `{…}` is an
+only), `{party}` (the four starters, named together) and `{tavern}`
+(anywhere). There is no `{captain}` (D-12). Any other `{…}` is an
 error. Tokens bind to data at render time and never to new rolls.
 
 **Mechanical-fact lint (T8.3):** no digits, no `DC`, `roll`, `d20`,
@@ -302,7 +302,7 @@ it moves out of the per-season schedule into a league-level file.
 | `tavern.joined` | commissioner | `tavern`, `name`, `manager` | phase `preseason`, tavern id unique, manager not already in a tavern |
 | `character.retained` | commissioner | `tavern`, `character`, `fromSeason`, `basis`, `costRound` | before the first pick, character pooled and unowned, tavern within its keeper limit |
 | `draft.pick` | manager / system (autopick) | `pick`, `tavern`, `character`, `auto` | `pick` = number of prior picks, `tavern` is on the clock, character pooled and unowned, roster not full. The first pick freezes the tavern list and order |
-| `lineup.set` | manager | `tavern`, `week`, `lineup{captain, allies[3]}`. Planned (D-12, D-49): `lineup{starters[4], retreat}`, where `retreat` is `never` \| `avoid_battles` \| `{ bank: N }` | draft complete, week not locked, lineup legal (§ Roster) |
+| `lineup.set` | manager | `tavern`, `week`, `lineup{starters[4], retreat}`, where `retreat` is `never` \| `avoid_battles` \| `{ bank: N }` (D-12, D-49) | draft complete, week not locked, lineup legal (§ Roster) |
 | `lineup.locked` | system | `week`, `lineups[{tavern, lineup, source}]` | week not already locked, previous week finalized, one entry per tavern, each lineup legal |
 | `tavern.chosen` (planned, D-52) | manager | `tavern`, `manager` | phase `preseason`, the manager is on the clock in reverse draft order, the tavern is unclaimed |
 | `hex.declared` (planned, D-52) | manager | `tavern`, `target`, `ability`, `week` | target is another tavern, the week isn't locked, the tavern hasn't hexed this season, the target has no hex that week |

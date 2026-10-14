@@ -17,7 +17,8 @@ import { notImplemented } from '@league-of-taverns/engine';
 
 export type ChromeStatus = 'draft' | 'reviewed' | 'locked';
 
-export const STORY_TOKENS = ['actor', 'captain', 'allies', 'tavern', 'battle_creature'] as const;
+/** `{party}` names the four starters (there is no captain, D-12). */
+export const STORY_TOKENS = ['actor', 'party', 'tavern', 'battle_creature'] as const;
 export type StoryToken = (typeof STORY_TOKENS)[number];
 
 export interface MissionChrome {

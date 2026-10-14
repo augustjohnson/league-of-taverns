@@ -105,8 +105,8 @@ open. The tabs:
   season rank the best same-dice lineups would have reached.
 - **Weeks:** a week's mission as a layered graph; a tavern's locked lineup,
   its path taken and each node's projected reach; the node-by-node roll log.
-- **Lineup lab:** any four characters from the pool or a roster, any captain,
-  any mission: `validateLineup`, CR vs B, `checkOdds` per check, `battleOdds`
+- **Lineup lab:** any four characters from the pool or a roster, any retreat
+  order, any mission: `validateLineup`, CR vs B, `checkOdds` per check, `battleOdds`
   and the `evTtkBreakdown` per battle, the projection and its score
   distribution; Roll once, and Roll 1,000 against the projection.
 - **Draft board, Pool, Event log** (filterable, pretty JSON, Copy

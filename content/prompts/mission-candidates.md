@@ -7,7 +7,7 @@ model retries.
 -->
 
 You are designing the hidden structure of one weekly mission for a fantasy
-sports league. Parties of four monsters (one captain and three allies) attempt
+sports league. Parties of four monsters attempt
 the mission. You design **structure only**: a layered graph of skill checks and
 battles. Do not write any story, titles, or descriptions. Those are written
 separately.

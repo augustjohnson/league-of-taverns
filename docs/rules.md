@@ -69,8 +69,8 @@
 
 - Each week a tavern starts a **party** of **4** from its roster. There is
   no captain **[D-12]**. The other 3 sit on the **bench**. Choosing who
-  starts is the main weekly decision. *(Until this is built, lineups still
-  name an inert captain, which only breaks best-fit ties.)*
+  starts is the main weekly decision. The order the starters are listed in
+  only breaks ties for who makes a check (§6).
 - **Budget:** the total CR of the four starters must be **≤ B**. Season 1 uses
   B = 12. Fractional CRs count exactly (four CR 1/2 characters total 2).
 - An **injured** character (§6) can't start the week after its injury

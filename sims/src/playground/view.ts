@@ -15,6 +15,7 @@ import type {
   MissionNode,
   Modifier,
   Party,
+  RetreatOrder,
   Skill,
 } from '@league-of-taverns/engine';
 import type { Aggregate } from '../season-runner';
@@ -198,9 +199,37 @@ export function sampleMission(
   return { n, scores, dnfs, mean: n === 0 ? 0 : total / n };
 }
 
-/** A party in lineup order: captain first, as the season runner builds it. */
-export function partyFrom(captain: string, allies: ReadonlyArray<string>, statsOf: (id: string) => EffectiveStats): Party {
-  return { captain, members: [captain, ...allies].map(statsOf) };
+/** A party in lineup order, as the season runner builds it. */
+export function partyFrom(starters: ReadonlyArray<string>, statsOf: (id: string) => EffectiveStats): Party {
+  return { members: starters.map(statsOf) };
+}
+
+// ── retreat orders (D-49) ──────────────────────────────────────────────────
+
+/** A retreat order in words. */
+export function retreatLabel(retreat: RetreatOrder): string {
+  if (retreat === 'never') return 'never turn back';
+  if (retreat === 'avoid_battles') return 'avoid every battle';
+  return `turn back with ${retreat.bank}+ loot`;
+}
+
+/** A retreat order as a `<select>` value: `never`, `avoid_battles` or `bank:N`. */
+export function retreatValue(retreat: RetreatOrder): string {
+  return typeof retreat === 'string' ? retreat : `bank:${retreat.bank}`;
+}
+
+/** The inverse of `retreatValue`. Anything unreadable is `never`, the default. */
+export function parseRetreat(value: string): RetreatOrder {
+  if (value === 'avoid_battles') return 'avoid_battles';
+  const bank = /^bank:(\d+)$/.exec(value);
+  return bank === null ? 'never' : { bank: Number(bank[1]) };
+}
+
+/** The retreat orders a picker offers: never, avoid battles, and banking every tenth of the haul in between. */
+export function retreatChoices(haul: number): ReadonlyArray<RetreatOrder> {
+  const banks: RetreatOrder[] = [];
+  for (let n = 1; n < 10; n++) banks.push({ bank: Math.round((n * haul) / 10) });
+  return ['never', ...banks, 'avoid_battles'];
 }
 
 // ── draft board ────────────────────────────────────────────────────────────
@@ -352,7 +381,7 @@ export function eventSummary(event: LeagueEvent): string {
     case 'draft.pick':
       return `#${event.payload.pick + 1} ${event.payload.tavern} takes ${event.payload.character}`;
     case 'lineup.set':
-      return `wk ${event.payload.week} ${event.payload.tavern}: ★${event.payload.lineup.captain}, ${event.payload.lineup.allies.join(', ')}`;
+      return `wk ${event.payload.week} ${event.payload.tavern}: ${event.payload.lineup.starters.join(', ')} (${retreatLabel(event.payload.lineup.retreat)})`;
     case 'lineup.locked':
       return `wk ${event.payload.week}: ${event.payload.lineups.length} lineups (${event.payload.lineups.map((l) => l.source).join(', ')})`;
     case 'mission.revealed':

@@ -122,7 +122,7 @@ describe('view helpers', () => {
 
   it('bins sampled scores onto the projected support, and the sample mean converges to the projection', () => {
     expect(scoreHistogram([0, 0.5, 0.5, 1, 0.3], [0, 0.5, 1])).toEqual({ counts: [1, 2, 1], other: 1 });
-    const party = partyFrom('mock-griffon', ['mock-ogre', 'mock-wolf', 'mock-goblin'], nodeInput.statsOf);
+    const party = partyFrom(['mock-griffon', 'mock-ogre', 'mock-wolf', 'mock-goblin'], nodeInput.statsOf);
     const projection = projectMission(party, mission, nodeInput.baseOf, nodeInput.battleModel);
     const sample = sampleMission(party, mission, nodeInput.baseOf, nodeInput.battleModel, 4000, 'test-seed');
     expect(sample.scores).toHaveLength(4000);
@@ -150,7 +150,7 @@ describe('view helpers', () => {
     expect([...week1.values()].every((roster) => roster.length === 7)).toBe(true);
     for (const entry of sim1.state.lockedLineups.get(3)!) {
       const roster = rostersAtLock(sim1.events, 3).get(entry.tavern)!;
-      if (entry.lineup !== null) for (const id of [entry.lineup.captain, ...entry.lineup.allies]) expect(roster).toContain(id);
+      if (entry.lineup !== null) for (const id of entry.lineup.starters) expect(roster).toContain(id);
     }
   });
 

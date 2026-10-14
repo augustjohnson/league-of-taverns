@@ -14,7 +14,7 @@ pool: pool.yaml
 managers: managers.yaml
 
 budget:
-  partyCr: 12                       # B: captain + 3 allies, total CR ≤ B
+  partyCr: 12                       # B: four starters, total CR ≤ B
   modifierPointsPerCharacter: 3
 
 roster:

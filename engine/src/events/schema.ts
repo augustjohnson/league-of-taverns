@@ -49,10 +49,17 @@ export const modifierSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('trait'), trait: kebabIdSchema }),
 ]);
 
-/** A captain plus exactly three allies. Legality against a roster is T4.2's. */
+/** `never`, `avoid_battles`, or `{ bank: N }` (D-49). */
+export const retreatOrderSchema = z.union([
+  z.literal('never'),
+  z.literal('avoid_battles'),
+  z.strictObject({ bank: z.number().int().nonnegative() }),
+]);
+
+/** Exactly four starters and a retreat order (D-12, D-49). Legality against a roster is T4.2's. */
 export const lineupSchema = z.strictObject({
-  captain: kebabIdSchema,
-  allies: z.tuple([kebabIdSchema, kebabIdSchema, kebabIdSchema]),
+  starters: z.tuple([kebabIdSchema, kebabIdSchema, kebabIdSchema, kebabIdSchema]),
+  retreat: retreatOrderSchema,
 });
 
 const nodeRecordSchema = z.discriminatedUnion('kind', [

@@ -4,26 +4,22 @@
  * lineup returned passes `validateLineup` by construction, and `lineup`
  * re-checks it anyway.
  *
- * The captain is mechanically inert (docs/decisions.md D-12): `checkOdds`
- * uses it only to break ties between equal pass chances, which leaves every
- * pass chance unchanged, and `ev-ttk-v0` ignores it. So a subset's score does
- * not depend on who captains it, and each subset is scored once with the
- * deterministic captain from `lineupFrom`. If D-12 ever gives the captain a
- * role, `projection` should score each captain too (4× the work).
+ * There is no captain (docs/decisions.md D-12), and lineup order only breaks
+ * ties between equal pass chances, which leaves every pass chance unchanged.
+ * So each subset is scored once, in roster order.
  */
 import { projectMission, type EffectiveStats, type Party } from '@league-of-taverns/engine';
 import { checkFit, fitWeights } from '../environment';
 import { referenceFoe } from '../metrics';
 import type { LineupStrategy, PublicView, ScoredLineup } from '../types';
-import { assertLegal, configOf, legalSubsets, lineupFrom, rosterOf, startersOf, type Subset } from '../view';
+import { assertLegal, configOf, legalSubsets, lineupFrom, rosterOf, type Subset } from '../view';
 
 /** Scores closer than this are equal, so float noise never decides a lineup. */
 const EPS = 1e-12;
 
 function partyOf(view: PublicView, subset: Subset): Party {
-  const lineup = lineupFrom(view, subset);
-  const members: EffectiveStats[] = startersOf(lineup).map((id) => view.statsOf(id));
-  return { captain: lineup.captain, members };
+  const members: EffectiveStats[] = subset.ids.map((id) => view.statsOf(id));
+  return { members };
 }
 
 /** Wraps `best` into the `LineupStrategy` contract for the bot's own roster. */
@@ -45,7 +41,7 @@ function strategy(id: string, best: LineupStrategy['best']): LineupStrategy {
 function bestByCr(view: PublicView, roster: ReadonlyArray<string>): ScoredLineup | null {
   let best: Subset | null = null;
   for (const subset of legalSubsets(view, roster)) if (best === null || subset.total > best.total) best = subset;
-  return best === null ? null : { lineup: lineupFrom(view, best), score: best.total };
+  return best === null ? null : { lineup: lineupFrom(best), score: best.total };
 }
 
 /** `max-cr`: spend the most CR possible under B. */
@@ -71,7 +67,7 @@ export const projectionLineup: LineupStrategy = strategy('projection', (view, ro
         (pDnf < best.pDnf - EPS || (pDnf < best.pDnf + EPS && subset.total > best.subset.total)));
     if (better) best = { subset, expected, pDnf };
   }
-  return best === null ? null : { lineup: lineupFrom(view, best.subset), score: best.expected };
+  return best === null ? null : { lineup: lineupFrom(best.subset), score: best.expected };
 });
 
 /** The reference encounter's CR as a fraction of B. */
@@ -95,7 +91,7 @@ export const environmentFitLineup: LineupStrategy = strategy('environment-fit', 
       best = { subset, score };
     }
   }
-  return best === null ? null : { lineup: lineupFrom(view, best.subset), score: best.score };
+  return best === null ? null : { lineup: lineupFrom(best.subset), score: best.score };
 });
 
 export const LINEUP_STRATEGIES = {

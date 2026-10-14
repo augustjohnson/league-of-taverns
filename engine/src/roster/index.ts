@@ -2,8 +2,8 @@
  * Roster rules: ownership, the CR budget, lineups, the draft, waivers and trades.
  *
  * Responsibilities:
- * - Validate a lineup: four distinct characters the tavern owns, one marked
- *   captain, with total CR ≤ B in exact eighths.
+ * - Validate a lineup: four distinct characters the tavern owns, with total
+ *   CR ≤ B in exact eighths, and a retreat order (D-12, D-49).
  * - Produce the snake-draft order and say whose pick it is.
  * - Resolve waiver claims under rolling priority.
  * - Validate trades at proposal time and again at acceptance time.
@@ -17,11 +17,28 @@ import type { SeasonConfig } from '../league';
 import type { Rng } from '../rng';
 import type { CrEighths } from '../vocabulary';
 
+/**
+ * When the party turns back instead of fighting (docs/decisions.md D-49). It
+ * is checked just before each battle:
+ * - `never`: always fight (the default);
+ * - `avoid_battles`: turn back before the first battle;
+ * - `{ bank: N }`: turn back before a battle once at least N loot is banked.
+ *
+ * Turning back ends the mission with the loot banked so far. It is not a DNF.
+ */
+export type RetreatOrder = 'never' | 'avoid_battles' | { readonly bank: number };
+
 export interface Lineup {
-  readonly captain: string;
-  /** Exactly three. Order is significant only as a deterministic tiebreak (docs/decisions.md D-15). */
-  readonly allies: readonly [string, string, string];
+  /**
+   * The four starters. There is no captain (D-12). Order is significant only
+   * as the deterministic best-fit tiebreak (docs/decisions.md D-15).
+   */
+  readonly starters: readonly [string, string, string, string];
+  readonly retreat: RetreatOrder;
 }
+
+/** The default retreat order (D-49): a carried or fallback lineup with none fights every battle. */
+export const DEFAULT_RETREAT: RetreatOrder = 'never';
 
 export interface RosterView {
   readonly tavern: string;
@@ -30,8 +47,23 @@ export interface RosterView {
 
 export type RuleViolation = { readonly code: string; readonly message: string };
 
-/** Allies per party. With the captain, a party is `config.roster.starters` (4). */
-const ALLY_COUNT = 3;
+/** Starters per party: `config.roster.starters`, which the config schema fixes at 4. */
+const STARTER_COUNT = 4;
+
+/** True when `retreat` is a well-formed retreat order: `never`, `avoid_battles`, or `{ bank: N }` with N a whole number ≥ 0. */
+export function isRetreatOrder(retreat: unknown): retreat is RetreatOrder {
+  if (retreat === 'never' || retreat === 'avoid_battles') return true;
+  if (typeof retreat !== 'object' || retreat === null) return false;
+  const bank = (retreat as { readonly bank?: unknown }).bank;
+  return Object.keys(retreat).length === 1 && typeof bank === 'number' && Number.isInteger(bank) && bank >= 0;
+}
+
+/** Whether a party with `banked` loot turns back before a battle under `retreat` (D-49). */
+export function retreatsBeforeBattle(retreat: RetreatOrder, banked: number): boolean {
+  if (retreat === 'never') return false;
+  if (retreat === 'avoid_battles') return true;
+  return banked >= retreat.bank;
+}
 
 /** Human CR form for eighths: 4 → "1/2", 100 → "12 1/2", 96 → "12", 0 → "0". */
 function formatCr(eighths: number): string {
@@ -61,13 +93,13 @@ function knownCr(crOf: (characterId: string) => CrEighths, id: string): number |
 
 /**
  * All reasons a lineup is illegal, empty when legal. Every violation is
- * reported, in this order: `wrong_size`, `duplicate`, `not_owned`,
- * `unknown_character`, `over_budget`.
+ * reported, in this order: `wrong_size`, `bad_retreat`, `duplicate`,
+ * `not_owned`, `unknown_character`, `over_budget`.
  *
- * - `wrong_size`: not exactly one captain id plus three ally ids (checked at
- *   runtime, since lineups arrive from parsed input).
- * - `duplicate`: a character listed twice, including the captain as an ally.
- *   One violation per repeated id.
+ * - `wrong_size`: not exactly four starter ids (checked at runtime, since
+ *   lineups arrive from parsed input).
+ * - `bad_retreat`: `retreat` is not a retreat order (`isRetreatOrder`).
+ * - `duplicate`: a character listed twice. One violation per repeated id.
  * - `not_owned`: a starter is not on `roster`. One per id.
  * - `unknown_character`: `crOf` throws or returns anything but a
  *   non-negative integer. One per id.
@@ -84,28 +116,27 @@ export function validateLineup(
   const violations: RuleViolation[] = [];
 
   // Runtime shape: tolerate anything, since the type can't be trusted for parsed input.
-  const raw = lineup as { readonly captain?: unknown; readonly allies?: unknown };
-  const captain = typeof raw.captain === 'string' && raw.captain.length > 0 ? raw.captain : null;
-  const rawAllies: ReadonlyArray<unknown> = Array.isArray(raw.allies) ? raw.allies : [];
-  const allies = rawAllies.filter((a): a is string => typeof a === 'string' && a.length > 0);
-  if (captain === null || !Array.isArray(raw.allies) || rawAllies.length !== ALLY_COUNT || allies.length !== ALLY_COUNT) {
+  const raw = lineup as { readonly starters?: unknown; readonly retreat?: unknown };
+  const rawStarters: ReadonlyArray<unknown> = Array.isArray(raw.starters) ? raw.starters : [];
+  const starters = rawStarters.filter((a): a is string => typeof a === 'string' && a.length > 0);
+  if (rawStarters.length !== STARTER_COUNT || starters.length !== STARTER_COUNT) {
     violations.push({
       code: 'wrong_size',
-      message:
-        `a lineup is 1 captain + ${ALLY_COUNT} allies; got ${captain === null ? 'no' : '1'} captain ` +
-        `and ${allies.length} valid of ${rawAllies.length} allies`,
+      message: `a lineup is ${STARTER_COUNT} starters; got ${starters.length} valid of ${rawStarters.length}`,
+    });
+  }
+  if (!isRetreatOrder(raw.retreat)) {
+    violations.push({
+      code: 'bad_retreat',
+      message: `retreat must be "never", "avoid_battles" or { bank: N } with N a whole number ≥ 0; got ${JSON.stringify(raw.retreat) ?? 'nothing'}`,
     });
   }
 
-  const starters = captain === null ? allies : [captain, ...allies];
   const distinct = [...new Set(starters)];
 
   for (const id of distinct) {
     const count = starters.filter((s) => s === id).length;
-    if (count > 1) {
-      const asCaptain = id === captain ? ' (captain also listed as an ally)' : '';
-      violations.push({ code: 'duplicate', message: `"${id}" appears ${count} times in the lineup${asCaptain}` });
-    }
+    if (count > 1) violations.push({ code: 'duplicate', message: `"${id}" appears ${count} times in the lineup` });
   }
 
   const owned = new Set(roster.characters);
@@ -419,8 +450,9 @@ export function validateTrade(
  * Fallback: among every 4-character subset of the roster that is a legal
  * lineup, take the one with the highest total CR. Ties go to the subset
  * whose roster indices (roster order is draft order) come first
- * lexicographically. The earliest-drafted member is captain, and the other
- * three are allies in roster order. Returns null when no legal lineup exists.
+ * lexicographically. The starters are listed in roster order, and the
+ * retreat order is the default, `never` (D-49). Returns null when no legal
+ * lineup exists.
  *
  * Pure and deterministic. Inputs are never mutated.
  */
@@ -465,5 +497,5 @@ export function carriedLineup(
   if (best === null) return null;
 
   const [a, b, c, d] = best;
-  return { captain: ids[a]!, allies: [ids[b]!, ids[c]!, ids[d]!] };
+  return { starters: [ids[a]!, ids[b]!, ids[c]!, ids[d]!], retreat: DEFAULT_RETREAT };
 }

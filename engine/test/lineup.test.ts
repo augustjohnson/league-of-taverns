@@ -69,7 +69,7 @@ const flagon = tavern([
   ['nib', 2],
 ]);
 
-const legal: Lineup = { captain: 'bruno-the-bruiser', allies: ['moss-hag', 'tin-knight', 'pip-the-sly'] };
+const legal: Lineup = { starters: ['bruno-the-bruiser', 'moss-hag', 'tin-knight', 'pip-the-sly'], retreat: 'never' };
 
 function codes(lineup: Lineup, t = flagon, c = config): string[] {
   return validateLineup(lineup, t.roster, t.crOf, c).map((v) => v.code);
@@ -88,35 +88,39 @@ describe('validateLineup', () => {
   it('not_owned: a starter is not on the roster', () => {
     // `stranger` has a known CR (it exists in the pool) but belongs to someone else.
     const crOf = (id: string): CrEighths => (id === 'stranger' ? (8 as CrEighths) : flagon.crOf(id));
-    const lineup: Lineup = { captain: 'moss-hag', allies: ['tin-knight', 'pip-the-sly', 'stranger'] };
+    const lineup: Lineup = { starters: ['moss-hag', 'tin-knight', 'pip-the-sly', 'stranger'], retreat: 'never' };
     const violations = validateLineup(lineup, flagon.roster, crOf, config);
     expect(violations.map((v) => v.code)).toEqual(['not_owned']);
     expect(violations[0]!.message).toContain('stranger');
   });
 
-  it('duplicate: the captain repeated as an ally', () => {
-    const lineup: Lineup = { captain: 'wisp', allies: ['wisp', 'nib', 'old-gristle'] };
-    const violations = validateLineup(lineup, flagon.roster, flagon.crOf, config);
+  it('duplicate: the same starter twice', () => {
+    const violations = validateLineup({ starters: ['wisp', 'nib', 'nib', 'old-gristle'], retreat: 'never' }, flagon.roster, flagon.crOf, config);
     expect(violations.map((v) => v.code)).toEqual(['duplicate']);
-    expect(violations[0]!.message).toContain('wisp');
-    expect(violations[0]!.message).toContain('captain');
+    expect(violations[0]!.message).toContain('"nib" appears 2 times');
   });
 
-  it('duplicate: the same ally twice', () => {
-    expect(codes({ captain: 'wisp', allies: ['nib', 'nib', 'old-gristle'] })).toEqual(['duplicate']);
+  it('wrong_size: too few or too many starters, or junk, at runtime', () => {
+    const three = { starters: ['wisp', 'nib', 'old-gristle'], retreat: 'never' } as unknown as Lineup;
+    const five = { starters: ['wisp', 'nib', 'old-gristle', 'pip-the-sly', 'moss-hag'], retreat: 'never' } as unknown as Lineup;
+    const none = { retreat: 'never' } as unknown as Lineup;
+    const junk = { starters: ['wisp', 'nib', 7, 'old-gristle'], retreat: 'never' } as unknown as Lineup;
+    const oldShape = { captain: 'wisp', allies: ['nib', 'old-gristle', 'pip-the-sly'], retreat: 'never' } as unknown as Lineup;
+    expect(codes(three)).toEqual(['wrong_size']);
+    expect(codes(five)).toEqual(['wrong_size']);
+    expect(codes(none)).toEqual(['wrong_size']);
+    expect(codes(junk)).toEqual(['wrong_size']);
+    expect(codes(oldShape)).toEqual(['wrong_size']);
   });
 
-  it('wrong_size: too few or too many allies, or no captain, at runtime', () => {
-    const twoAllies = { captain: 'wisp', allies: ['nib', 'old-gristle'] } as unknown as Lineup;
-    const fourAllies = { captain: 'wisp', allies: ['nib', 'old-gristle', 'pip-the-sly', 'moss-hag'] } as unknown as Lineup;
-    const noCaptain = { allies: ['nib', 'old-gristle', 'pip-the-sly'] } as unknown as Lineup;
-    const noAllies = { captain: 'wisp' } as unknown as Lineup;
-    const junkAlly = { captain: 'wisp', allies: ['nib', 7, 'old-gristle'] } as unknown as Lineup;
-    expect(codes(twoAllies)).toEqual(['wrong_size']);
-    expect(codes(fourAllies)).toEqual(['wrong_size']);
-    expect(codes(noCaptain)).toEqual(['wrong_size']);
-    expect(codes(noAllies)).toEqual(['wrong_size']);
-    expect(codes(junkAlly)).toEqual(['wrong_size']);
+  it('bad_retreat: anything but never, avoid_battles or { bank: N } with N a whole number ≥ 0 (D-49)', () => {
+    const starters = legal.starters;
+    for (const retreat of ['never', 'avoid_battles', { bank: 0 }, { bank: 70 }]) {
+      expect(codes({ starters, retreat } as Lineup)).toEqual([]);
+    }
+    for (const retreat of [undefined, 'always', { bank: -1 }, { bank: 2.5 }, { bank: '40' }, { bank: 40, extra: 1 }, null]) {
+      expect(codes({ starters, retreat } as unknown as Lineup)).toEqual(['bad_retreat']);
+    }
   });
 
   it('over_budget: shows both totals in human CR form', () => {
@@ -126,7 +130,7 @@ describe('validateLineup', () => {
       ['c', 32],
       ['d', 4],
     ]);
-    const violations = validateLineup({ captain: 'a', allies: ['b', 'c', 'd'] }, t.roster, t.crOf, config);
+    const violations = validateLineup({ starters: ['a', 'b', 'c', 'd'], retreat: 'never' }, t.roster, t.crOf, config);
     expect(violations.map((v) => v.code)).toEqual(['over_budget']);
     expect(violations[0]!.message).toContain('12 1/2 > 12');
   });
@@ -137,7 +141,7 @@ describe('validateLineup', () => {
       return flagon.crOf(id);
     };
     const fractional = (id: string): CrEighths => (id === 'nib' ? (0.5 as CrEighths) : flagon.crOf(id));
-    const lineup: Lineup = { captain: 'wisp', allies: ['nib', 'old-gristle', 'pip-the-sly'] };
+    const lineup: Lineup = { starters: ['wisp', 'nib', 'old-gristle', 'pip-the-sly'], retreat: 'never' };
     const fromThrow = validateLineup(lineup, flagon.roster, throws, config);
     expect(fromThrow.map((v) => v.code)).toEqual(['unknown_character']);
     expect(fromThrow[0]!.message).toContain('nib');
@@ -145,18 +149,18 @@ describe('validateLineup', () => {
   });
 
   it('reports every violation together', () => {
-    // Duplicate captain, a non-owned ally, and over budget all at once.
+    // A duplicate starter, a non-owned starter, and over budget all at once.
     const t = tavern([
       ['big', 64],
       ['mid', 16],
       ['stranger', 8],
     ]);
     const roster: RosterView = { tavern: 'x', characters: ['big', 'mid'] };
-    const lineup: Lineup = { captain: 'big', allies: ['big', 'mid', 'stranger'] };
+    const lineup: Lineup = { starters: ['big', 'big', 'mid', 'stranger'], retreat: 'never' };
     expect(validateLineup(lineup, roster, t.crOf, config).map((v) => v.code)).toEqual(['duplicate', 'not_owned', 'over_budget']);
 
     // Wrong size, not owned and unknown together.
-    const short = { captain: 'ghost', allies: ['wisp', 'nib'] } as unknown as Lineup;
+    const short = { starters: ['ghost', 'wisp', 'nib'], retreat: 'never' } as unknown as Lineup;
     expect(codes(short)).toEqual(['wrong_size', 'not_owned', 'unknown_character']);
   });
 
@@ -167,7 +171,7 @@ describe('validateLineup', () => {
       ['rat-c', 1],
       ['rat-d', 1],
     ]);
-    const rats: Lineup = { captain: 'rat-a', allies: ['rat-b', 'rat-c', 'rat-d'] };
+    const rats: Lineup = { starters: ['rat-a', 'rat-b', 'rat-c', 'rat-d'], retreat: 'never' };
     expect(codes(rats, t, configWithBudget(4))).toEqual([]);
     const over = validateLineup(rats, t.roster, t.crOf, configWithBudget(3));
     expect(over.map((v) => v.code)).toEqual(['over_budget']);
@@ -181,7 +185,7 @@ describe('validateLineup', () => {
       ['c', 2],
       ['d', 4],
     ]);
-    const lineup: Lineup = { captain: 'a', allies: ['b', 'c', 'd'] };
+    const lineup: Lineup = { starters: ['a', 'b', 'c', 'd'], retreat: 'never' };
     expect(codes(lineup, t, configWithBudget(8))).toEqual([]);
     expect(codes(lineup, t, configWithBudget(7))).toEqual(['over_budget']);
   });
@@ -189,14 +193,21 @@ describe('validateLineup', () => {
 
 describe('carriedLineup', () => {
   it('returns a still-legal previous lineup as is', () => {
-    const previous: Lineup = { captain: 'nib', allies: ['wisp', 'old-gristle', 'pip-the-sly'] };
+    const previous: Lineup = { starters: ['nib', 'wisp', 'old-gristle', 'pip-the-sly'], retreat: 'never' };
     expect(carriedLineup(previous, flagon.roster, flagon.crOf, config)).toBe(previous);
   });
 
   it('falls back when a starter was traded away', () => {
-    const previous: Lineup = { captain: 'nib', allies: ['wisp', 'old-gristle', 'traded-away'] };
+    const previous: Lineup = { starters: ['nib', 'wisp', 'old-gristle', 'traded-away'], retreat: 'never' };
     // Highest total ≤ 12: 4 + 3 + 3 + 2 = 12, the first four drafted.
     expect(carriedLineup(previous, flagon.roster, flagon.crOf, config)).toEqual(legal);
+  });
+
+  it('keeps a carried lineup\'s retreat order, and the fallback uses never (D-49)', () => {
+    const previous: Lineup = { ...legal, retreat: { bank: 50 } };
+    expect(carriedLineup(previous, flagon.roster, flagon.crOf, config)?.retreat).toEqual({ bank: 50 });
+    const gone: Lineup = { starters: ['nib', 'wisp', 'old-gristle', 'traded-away'], retreat: 'avoid_battles' };
+    expect(carriedLineup(gone, flagon.roster, flagon.crOf, config)?.retreat).toBe('never');
   });
 
   it('falls back when there is no previous lineup', () => {
@@ -207,10 +218,7 @@ describe('carriedLineup', () => {
     const tight = configWithBudget(48);
     // Best ≤ 6 is 5 3/4, reached by 4 + 1 + 1/2 + 1/4 (indices 0,4,5,6) and by
     // 3 + 2 + 1/2 + 1/4 (1,3,5,6 and 2,3,5,6). Index 0 comes first.
-    expect(carriedLineup(legal, flagon.roster, flagon.crOf, tight)).toEqual({
-      captain: 'bruno-the-bruiser',
-      allies: ['old-gristle', 'wisp', 'nib'],
-    });
+    expect(carriedLineup(legal, flagon.roster, flagon.crOf, tight)).toEqual({ starters: ['bruno-the-bruiser', 'old-gristle', 'wisp', 'nib'], retreat: 'never' });
   });
 
   it('returns null when every 4-subset is over budget', () => {
@@ -247,7 +255,7 @@ describe('carriedLineup', () => {
       ['ulm', 24],
       ['tor', 24],
     ]);
-    expect(carriedLineup(null, t.roster, t.crOf, config)).toEqual({ captain: 'zed', allies: ['yew', 'xan', 'wren'] });
+    expect(carriedLineup(null, t.roster, t.crOf, config)).toEqual({ starters: ['zed', 'yew', 'xan', 'wren'], retreat: 'never' });
   });
 
   it('prefers the lexicographically earliest subset by roster index among ties', () => {
@@ -262,12 +270,11 @@ describe('carriedLineup', () => {
       ['r5', 32],
       ['r6', 16],
     ]);
-    expect(carriedLineup(null, t.roster, t.crOf, config)).toEqual({ captain: 'r0', allies: ['r4', 'r5', 'r6'] });
+    expect(carriedLineup(null, t.roster, t.crOf, config)).toEqual({ starters: ['r0', 'r4', 'r5', 'r6'], retreat: 'never' });
   });
 
-  it('makes the earliest-drafted member captain, even when it is not the strongest', () => {
+  it('lists the starters in roster order, even when the first is not the strongest', () => {
     // r0 (CR 8) cannot fit, so the best party is r1..r4 (all CR 3).
-    // The captain is r1, the earliest drafted of the four, although r2..r4 are equal and r1 is no stronger.
     const t = tavern([
       ['r0', 64],
       ['r1', 24],
@@ -278,9 +285,9 @@ describe('carriedLineup', () => {
       ['r6', 8],
     ]);
     const result = carriedLineup(null, t.roster, t.crOf, config);
-    expect(result).toEqual({ captain: 'r1', allies: ['r2', 'r3', 'r4'] });
+    expect(result).toEqual({ starters: ['r1', 'r2', 'r3', 'r4'], retreat: 'never' });
 
-    // A weak first pick still captains when it is in the best party.
+    // A weak first pick still leads the list when it is in the best party.
     const u = tavern([
       ['weak', 2],
       ['s1', 30],
@@ -288,7 +295,7 @@ describe('carriedLineup', () => {
       ['s3', 32],
       ['s4', 40],
     ]);
-    expect(carriedLineup(null, u.roster, u.crOf, config)).toEqual({ captain: 'weak', allies: ['s1', 's2', 's3'] });
+    expect(carriedLineup(null, u.roster, u.crOf, config)).toEqual({ starters: ['weak', 's1', 's2', 's3'], retreat: 'never' });
   });
 
   it('skips characters whose CR is unknown', () => {
@@ -297,23 +304,20 @@ describe('carriedLineup', () => {
       return flagon.crOf(id);
     };
     // Without bruno: 3 + 3 + 2 + 1 = 9.
-    expect(carriedLineup(null, flagon.roster, crOf, config)).toEqual({
-      captain: 'moss-hag',
-      allies: ['tin-knight', 'pip-the-sly', 'old-gristle'],
-    });
+    expect(carriedLineup(null, flagon.roster, crOf, config)).toEqual({ starters: ['moss-hag', 'tin-knight', 'pip-the-sly', 'old-gristle'], retreat: 'never' });
   });
 
   it('is deterministic and does not mutate its inputs', () => {
     const characters = Object.freeze([...flagon.roster.characters]);
     const roster = Object.freeze({ tavern: flagon.roster.tavern, characters });
-    const allies = Object.freeze(['wisp', 'old-gristle', 'gone'] as const);
-    const previous = Object.freeze({ captain: 'nib', allies }) as Lineup;
+    const starters = Object.freeze(['nib', 'wisp', 'old-gristle', 'gone'] as const);
+    const previous = Object.freeze({ starters, retreat: 'never' }) as Lineup;
     const frozenConfig = Object.freeze(config);
     const first = carriedLineup(previous, roster, flagon.crOf, frozenConfig);
     const second = carriedLineup(previous, roster, flagon.crOf, frozenConfig);
     expect(second).toEqual(first);
     expect(first).toEqual(legal);
     expect(characters).toEqual(flagon.roster.characters);
-    expect(previous).toEqual({ captain: 'nib', allies: ['wisp', 'old-gristle', 'gone'] });
+    expect(previous).toEqual({ starters: ['nib', 'wisp', 'old-gristle', 'gone'], retreat: 'never' });
   });
 });

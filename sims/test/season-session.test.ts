@@ -70,7 +70,8 @@ describe('a season with a human seat', () => {
     for (session.advanceDraft(); session.stage.kind === 'draft'; session.advanceDraft()) session.draftPick(session.suggestPick());
     const lineup = session.suggestLineup()!;
     session.setLineup(lineup);
-    const swapped = { captain: lineup.allies[0]!, allies: [lineup.captain, ...lineup.allies.slice(1)] } as unknown as typeof lineup;
+    const [a, b, c, d] = lineup.starters;
+    const swapped: typeof lineup = { starters: [b, a, c, d], retreat: { bank: 50 } };
     session.setLineup(swapped);
     expect(session.pendingLineup()).toEqual(swapped);
     session.playWeek();

@@ -123,8 +123,8 @@ describe('mini-season replay', () => {
 
   it('replaces an earlier lineup.set for the same week', () => {
     const [first, second] = [roster(at.drafted, A), roster(at.drafted, A)].map((r, i) => ({
-      captain: r[i]!,
-      allies: [r[(i + 1) % 5]!, r[(i + 2) % 5]!, r[(i + 3) % 5]!] as const,
+      starters: [r[i]!, r[(i + 1) % 5]!, r[(i + 2) % 5]!, r[(i + 3) % 5]!] as const,
+      retreat: 'never' as const,
     }));
     let s = at.drafted;
     for (const lineup of [first!, second!]) {
@@ -258,7 +258,7 @@ const tinyDraft = (() => {
 
 const lineupA = lockedLineup(at.w1Locked, 1, A);
 const bRoster = roster(at.drafted, B);
-const foreignLineup: Lineup = { captain: bRoster[0]!, allies: [bRoster[1]!, bRoster[2]!, bRoster[3]!] };
+const foreignLineup: Lineup = { starters: [bRoster[0]!, bRoster[1]!, bRoster[2]!, bRoster[3]!], retreat: 'never' };
 const entries = (state: LeagueState, week: number) =>
   TAVERNS.map((tavern) => ({ tavern, lineup: state.pendingLineups.get(week)?.get(tavern) ?? null, source: 'submitted' as const }));
 const w1Entries = entries(at.w1Pending, 1);
@@ -360,7 +360,7 @@ const cases: ReadonlyArray<Case> = [
   ['lineup for a locked week', at.w1Locked, candidate(at.w1Locked, 'lineup.set', { tavern: A, week: 1, lineup: lineupA }), 'lineup.week_locked'],
   ['lineup with characters not owned', at.drafted, candidate(at.drafted, 'lineup.set', { tavern: A, week: 1, lineup: foreignLineup }), 'lineup.not_owned'],
   ['lineup over budget', withConfig(at.drafted, { budget: { partyCr: 8 as CrEighths, modifierPointsPerCharacter: 3 } }), candidate(at.drafted, 'lineup.set', { tavern: B, week: 1, lineup: foreignLineup }), 'lineup.over_budget'],
-  ['captain also an ally', at.drafted, candidate(at.drafted, 'lineup.set', { tavern: B, week: 1, lineup: { captain: bRoster[0]!, allies: [bRoster[0]!, bRoster[1]!, bRoster[2]!] } }), 'lineup.duplicate'],
+  ['a starter listed twice', at.drafted, candidate(at.drafted, 'lineup.set', { tavern: B, week: 1, lineup: { starters: [bRoster[0]!, bRoster[0]!, bRoster[1]!, bRoster[2]!], retreat: 'never' } }), 'lineup.duplicate'],
 
   // lineup.locked
   ['lock before the draft completes', at.drafting, candidate(at.drafting, 'lineup.locked', { week: 1, lineups: [] }), 'lock.draft_incomplete'],
@@ -439,7 +439,8 @@ const cases: ReadonlyArray<Case> = [
   ['result for an unknown tavern', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, tavern: 'nowhere' }), 'resolve.unknown_tavern'],
   ['second result for one tavern', at.w1Resolved, candidate(at.w1Resolved, 'mission.resolved', resultA), 'resolve.duplicate'],
   ['result for a tavern with no lineup', w2Revealed, candidate(w2Revealed, 'mission.resolved', { ...resultA, week: 2, tavern: D, mission: 'mission-w2' }), 'resolve.no_lineup'],
-  ['result with a different lineup', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, lineup: { ...lineupA, captain: lineupA.allies[0], allies: [lineupA.captain, lineupA.allies[1], lineupA.allies[2]] } }), 'resolve.lineup_mismatch'],
+  ['result with a different lineup', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, lineup: { ...lineupA, starters: [lineupA.starters[1], lineupA.starters[0], lineupA.starters[2], lineupA.starters[3]] } }), 'resolve.lineup_mismatch'],
+  ['result with a different retreat order', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', { ...resultA, lineup: { ...lineupA, retreat: { bank: 40 } } }), 'resolve.lineup_mismatch'],
   ['result whose counts disagree with its nodes', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ checksAttempted: resultA.run.checksAttempted + 1 })), 'resolve.counts_mismatch'],
   ['result whose score disagrees with its loot', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ score: resultA.run.score === 0.5 ? 0.25 : 0.5 })), 'resolve.score_mismatch'],
   ['result whose loot disagrees with its nodes', at.w1Revealed, candidate(at.w1Revealed, 'mission.resolved', withRun({ loot: resultA.run.loot + 1 })), 'resolve.score_mismatch'],

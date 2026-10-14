@@ -248,7 +248,7 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
       continue;
     }
 
-    const starters = new Set([lineup.captain, ...lineup.allies]);
+    const starters = new Set(lineup.starters);
     const path: string[] = [];
     let index = 0;
     let passed = 0;

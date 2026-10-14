@@ -36,6 +36,7 @@ import type {
   NodeRecord,
   Party,
   Projection,
+  RetreatOrder,
   RunResult,
 } from '@league-of-taverns/engine';
 import { SeasonSession, aggregate, runMockSeason, runSeed, type MockSeasonResult, type RunSummary } from '../season-runner';
@@ -64,8 +65,12 @@ import {
   formatCrTotal,
   formatModifier,
   layoutMission,
+  parseRetreat,
   partyFrom,
   pct,
+  retreatChoices,
+  retreatLabel,
+  retreatValue,
   rostersAtLock,
   sampleMission,
   sameScore,
@@ -136,7 +141,7 @@ const lab = {
   onlyRoster: false,
   filter: '',
   picks: [] as string[],
-  captain: null as string | null,
+  retreat: 'never' as RetreatOrder,
   roll: null as { seed: string; result: RunResult } | null,
   sample: null as { seed: string; result: SampleResult; ms: number } | null,
   seeded: false,
@@ -751,13 +756,12 @@ function renderBatchLuck(l: LuckAggregate): string {
 
 function lineupCard(lineup: Lineup | null, source: string): string {
   if (lineup === null) return '<p class="muted">No lineup this week: the tavern scores 0.</p>';
-  const ids = [lineup.captain, ...lineup.allies];
+  const ids = lineup.starters;
   const total = ids.reduce((s, id) => s + crOf(id), 0);
-  const items = ids
-    .map((id, i) => `<li>${i === 0 ? '<span class="cap" title="captain">C</span>' : ''}${charLabel(id)}</li>`)
-    .join('');
+  const items = ids.map((id) => `<li>${charLabel(id)}</li>`).join('');
   return (
     `<ul class="stack" style="list-style:none;margin:0;padding:0">${items}</ul>` +
+    `<p class="small">Retreat order: ${esc(retreatLabel(lineup.retreat))}</p>` +
     `<p class="small">CR total ${num(formatCrTotal(total))} of ${num(formatCrTotal(BUDGET))} <span class="tag" title="submitted: set this week; carried: last week's; fallback: the engine's legal default">${esc(source)}</span></p>` +
     crMeter(total)
   );
@@ -788,7 +792,7 @@ function renderWeeks(r: Run): string {
       return (
         `<tr class="click ${tavern === weeksUi.tavern ? 'sel' : ''}" data-action="pick-tavern" data-tavern="${esc(tavern)}">` +
         `<td>${esc(tavernName(tavern))}</td><td><span class="tag">${esc(botOf(tavern))}</span></td><td class="muted">${esc(source)}</td>` +
-        `<td class="wrap-ok small">${lineup === null ? '—' : `<span class="cap" title="captain">C</span>${charNames([lineup.captain, ...lineup.allies])}`}</td>` +
+        `<td class="wrap-ok small">${lineup === null ? '—' : charNames(lineup.starters)}</td>` +
         `<td class="n">${res === undefined ? '—' : `${res.run.checksPassed}/${res.run.checksAttempted}`}</td>` +
         `<td class="n"><b>${res?.points ?? 0}</b></td><td class="n muted">${res === undefined ? '—' : res.projectedPoints.toFixed(1)}</td>` +
         `<td>${res?.run.dnf === true ? '<span class="fail">DNF</span>' : ''}</td></tr>`
@@ -802,7 +806,7 @@ function renderWeeks(r: Run): string {
   if (entry !== undefined) {
     let projection: Projection | null = null;
     if (entry.lineup !== null) {
-      const party = partyFrom(entry.lineup.captain, entry.lineup.allies, input.statsOf);
+      const party = partyFrom(entry.lineup.starters, input.statsOf);
       projection = projectMission(party, mission, input.baseOf, input.battleModel);
     }
     const overlay: Overlay = {
@@ -855,8 +859,8 @@ function loadLocked(): void {
   if (run === null || lab.roster === 'pool') return;
   const entry = run.result.state.lockedLineups.get(lab.week)?.find((l) => l.tavern === lab.roster);
   if (entry?.lineup == null) return;
-  lab.picks = [entry.lineup.captain, ...entry.lineup.allies];
-  lab.captain = entry.lineup.captain;
+  lab.picks = [...entry.lineup.starters];
+  lab.retreat = entry.lineup.retreat;
   lab.roll = null;
   lab.sample = null;
 }
@@ -871,12 +875,16 @@ function labRosterIds(events: ReadonlyArray<LeagueEvent>): { ids: ReadonlyArray<
 
 function labParty(): Party | null {
   if (lab.picks.length === 0) return null;
-  const captain = lab.captain !== null && lab.picks.includes(lab.captain) ? lab.captain : lab.picks[0]!;
-  return partyFrom(
-    captain,
-    lab.picks.filter((p) => p !== captain),
-    input.statsOf,
-  );
+  return partyFrom(lab.picks, input.statsOf);
+}
+
+/** A `<select>` of retreat orders (D-49). */
+function retreatSelect(id: string, action: string, retreat: RetreatOrder): string {
+  const current = retreatValue(retreat);
+  const options = retreatChoices(config.missions.haul)
+    .map((r) => `<option value="${esc(retreatValue(r))}" ${retreatValue(r) === current ? 'selected' : ''}>${esc(retreatLabel(r))}</option>`)
+    .join('');
+  return `<label class="label" for="${id}">Retreat order</label><select id="${id}" data-action="${action}" title="Checked just before each battle: turn back with the loot banked instead of fighting. Turning back is not a DNF.">${options}</select>`;
 }
 
 function renderLab(r: Run): string {
@@ -885,13 +893,13 @@ function renderLab(r: Run): string {
     `<option value="pool" ${lab.roster === 'pool' ? 'selected' : ''}>Whole pool (ownership ignored)</option>` +
     input.taverns.map((t) => `<option value="${esc(t.id)}" ${t.id === lab.roster ? 'selected' : ''}>${esc(t.name)} (roster at week ${lab.week} lock)</option>`).join('');
   return (
-    `<section class="card"><div class="row"><h2>Lineup lab</h2><span class="muted small">Pick any four, mark a captain, and see the engine's odds live.</span></div>` +
+    `<section class="card"><div class="row"><h2>Lineup lab</h2><span class="muted small">Pick any four and a retreat order, and see the engine's odds live.</span></div>` +
     `<div class="row"><label class="label" for="lab-week">Mission</label><select id="lab-week" data-action="lab-week">${weekOptions}</select>` +
     `<label class="label" for="lab-roster">Validate against</label><select id="lab-roster" data-action="lab-roster">${rosterOptions}</select>` +
     `<label class="small"><input type="checkbox" id="lab-only" data-action="lab-only" ${lab.onlyRoster ? 'checked' : ''} ${lab.roster === 'pool' ? 'disabled' : ''}> list only this roster</label>` +
     `<button type="button" data-action="lab-load" ${lab.roster === 'pool' ? 'disabled' : ''}>Load its locked lineup</button>` +
     `<button type="button" data-action="lab-clear">Clear</button></div>` +
-    `<div class="cols"><div class="stack"><span class="label">Party (lineup order)</span><div id="lab-party">${renderLabParty()}</div></div>` +
+    `<div class="cols"><div class="stack"><span class="label">Party (lineup order)</span><div id="lab-party">${renderLabParty()}</div><div class="row">${retreatSelect('lab-retreat', 'lab-retreat', lab.retreat)}</div></div>` +
     `<div class="stack"><div class="row"><span class="label">Candidates</span><input type="text" id="lab-filter" placeholder="Filter by name or skill" value="${esc(lab.filter)}" data-action="lab-filter"></div>` +
     // A picker, so it scrolls on its own, but only up and down: rows are compact and skills wrap, so nothing hides off to the side.
     `<div id="lab-cands" style="max-height:440px;overflow-y:auto;overflow-x:hidden">${renderLabCandidates(r)}</div></div></div></section>` +
@@ -900,13 +908,11 @@ function renderLab(r: Run): string {
 }
 
 function renderLabParty(): string {
-  const captain = labParty()?.captain ?? null;
   const slots = [0, 1, 2, 3].map((i) => {
     const id = lab.picks[i];
-    if (id === undefined) return `<div class="slot empty"><span>${i === 0 ? 'C' : '·'}</span><span class="who">Empty: add from the list</span><span></span><span></span></div>`;
-    const isCap = id === captain;
+    if (id === undefined) return `<div class="slot empty"><span>${i + 1}</span><span class="who">Empty: add from the list</span><span></span><span></span></div>`;
     return (
-      `<div class="slot"><span>${isCap ? '<span class="cap" title="captain">C</span>' : `<button type="button" class="small" data-action="lab-captain" data-id="${esc(id)}" title="Make captain">Captain</button>`}</span>` +
+      `<div class="slot"><span>${i + 1}</span>` +
       `<span class="who">${charLabel(id)}</span>` +
       `<span>${i > 0 ? `<button type="button" class="small" data-action="lab-up" data-id="${esc(id)}" title="Move up the lineup order" aria-label="Move ${esc(charName(id))} up">↑</button>` : ''}</span>` +
       `<button type="button" class="small" data-action="lab-remove" data-id="${esc(id)}">Remove</button></div>`
@@ -990,9 +996,7 @@ function renderLabAnalysis(r: Run): string {
   if (party === null) {
     return `<section class="card"><p class="muted">Add characters to see odds for ${esc(mission.id)}.</p>${graphSvg(layout)}${graphLegend({})}</section>`;
   }
-  const captain = party.captain;
-  const allies = lab.picks.filter((p) => p !== captain);
-  const lineup = { captain, allies } as unknown as Lineup;
+  const lineup = { starters: lab.picks, retreat: lab.retreat } as unknown as Lineup;
   const { ids: rosterIds } = labRosterIds(r.result.events);
   const rosterView = { tavern: lab.roster === 'pool' ? 'the pool' : lab.roster, characters: rosterIds };
   const violations = validateLineup(lineup, rosterView, crOf, config);
@@ -1005,7 +1009,7 @@ function renderLabAnalysis(r: Run): string {
       const o = checkOdds(party, n.check);
       const gate = n.check.requires === undefined ? '<span class="muted">—</span>' : o.eligible ? '<span class="pass">met</span>' : '<span class="fail">unmet: auto-fail</span>';
       return [
-        `<tr><td>${esc(n.id)}</td><td class="small">${esc(checkLabel(n.check))}</td><td>${esc(o.actor)}${o.actor === captain ? ' <span class="cap">C</span>' : ''}</td>` +
+        `<tr><td>${esc(n.id)}</td><td class="small">${esc(checkLabel(n.check))}</td><td>${esc(o.actor)}</td>` +
           `<td class="n">${signed(o.modifier)}</td><td>${o.advantage ? '<span class="tag brass">adv</span>' : ''}</td><td>${gate}</td><td class="n"><b>${pct(o.pPass)}</b></td><td class="n muted">${pct(projection.reach[n.id] ?? 0)}</td></tr>`,
       ];
     })
@@ -1047,7 +1051,7 @@ function renderLabAnalysis(r: Run): string {
   }
 
   return (
-    `<section class="card"><div class="row" style="justify-content:space-between"><h2>${esc(mission.id)}</h2><span class="muted small">captain breaks ties, then lineup order</span></div>` +
+    `<section class="card"><div class="row" style="justify-content:space-between"><h2>${esc(mission.id)}</h2><span class="muted small">lineup order breaks ties</span></div>` +
     (violations.length === 0
       ? `<p class="okline">Legal lineup${lab.roster === 'pool' ? ' (ownership not checked)' : ''}</p>`
       : violationList(violations)) +
@@ -1324,7 +1328,7 @@ function startBatch(): void {
 /** One of the person's moves. A season is its seed, its tavern and these, replayed in order, so it can be saved and restored. */
 type PlayMove =
   | { readonly t: 'draft'; readonly id: string }
-  | { readonly t: 'lineup'; readonly captain: string; readonly allies: ReadonlyArray<string> }
+  | { readonly t: 'lineup'; readonly starters: ReadonlyArray<string>; readonly retreat: RetreatOrder }
   | { readonly t: 'claim'; readonly add: string; readonly drop: string | null }
   | { readonly t: 'week' };
 
@@ -1353,9 +1357,9 @@ const play = {
   confirmReset: false,
   draftSort: 'value' as 'value' | 'cr',
   filter: '',
-  /** The lineup builder, captain first once submitted. */
+  /** The lineup builder: starters in lineup order, and the retreat order. */
   picks: [] as string[],
-  captain: null as string | null,
+  retreat: 'never' as RetreatOrder,
   /** The week the builder was loaded for. */
   builderWeek: 0,
   add: '',
@@ -1376,7 +1380,7 @@ function startPlay(): void {
   play.notice = null;
   try {
     const session = newSession(play.tavern, seed);
-    Object.assign(play, { session, seed, moves: [], filter: '', picks: [], captain: null, builderWeek: 0, add: '', drop: '', played: null, confirmReset: false });
+    Object.assign(play, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', played: null, confirmReset: false });
     savePlay();
   } catch (e) {
     play.error = e instanceof Error ? e.message : String(e);
@@ -1390,9 +1394,13 @@ function applyMove(s: SeasonSession, m: PlayMove): void {
       s.draftPick(m.id);
       s.advanceDraft();
       break;
-    case 'lineup':
-      s.setLineup({ captain: m.captain, allies: m.allies } as unknown as Lineup);
+    case 'lineup': {
+      // Seasons saved before D-12 recorded a captain and three allies, with no retreat order.
+      const old = m as unknown as { readonly captain?: string; readonly allies?: ReadonlyArray<string> };
+      const starters = old.captain !== undefined ? [old.captain, ...(old.allies ?? [])] : m.starters;
+      s.setLineup({ starters, retreat: m.retreat ?? 'never' } as unknown as Lineup);
       break;
+    }
     case 'claim':
       s.claimWaiver(m.add, m.drop);
       break;
@@ -1483,18 +1491,17 @@ function syncBuilder(s: SeasonSession, week: number): void {
     play.builderWeek = week;
     const me = s.human!.tavern;
     const lineup = s.pendingLineup() ?? s.state.lockedLineups.get(week - 1)?.find((l) => l.tavern === me)?.lineup ?? s.suggestLineup();
-    play.picks = lineup === null ? [] : [lineup.captain, ...lineup.allies];
-    play.captain = lineup?.captain ?? null;
+    play.picks = lineup === null ? [] : [...lineup.starters];
+    play.retreat = lineup?.retreat ?? 'never';
   }
   play.picks = play.picks.filter((id) => roster.has(id));
-  if (play.captain === null || !play.picks.includes(play.captain)) play.captain = play.picks[0] ?? null;
   if (!roster.has(play.drop)) play.drop = '';
   if (!freeAgents(s.state).includes(play.add)) play.add = '';
 }
 
 function builderLineup(): Lineup | null {
-  if (play.captain === null) return null;
-  return { captain: play.captain, allies: play.picks.filter((p) => p !== play.captain) } as unknown as Lineup;
+  if (play.picks.length === 0) return null;
+  return { starters: play.picks, retreat: play.retreat } as unknown as Lineup;
 }
 
 function charRow(id: string, action: string, extra = ''): string {
@@ -1631,14 +1638,14 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   const roster = myRoster(s);
   const lineup = builderLineup();
   const violations = lineup === null ? [] : validateLineup(lineup, { tavern: me, characters: roster }, crOf, config);
-  const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.captain, lineup.allies, input.statsOf), mission, input.baseOf, input.battleModel);
+  const projection = lineup === null || play.picks.length === 0 ? null : projectMission(partyFrom(lineup.starters, input.statsOf), mission, input.baseOf, input.battleModel);
   const home = homeTavern(s.state, week) === me;
   const total = play.picks.reduce((t, id) => t + crOf(id), 0);
   const legal = lineup !== null && violations.length === 0;
   // With no legal lineup on the roster at all, the week can still be played (and scores 0).
   const stuck = !legal && s.suggestLineup() === null;
 
-  // Starters (captain first) and the bench as two labelled groups, so where someone sits never hangs on a button's label.
+  // Starters (in lineup order) and the bench as two labelled groups, so where someone sits never hangs on a button's label.
   const starters = play.picks.filter((id) => roster.includes(id));
   const bench = roster.filter((id) => !play.picks.includes(id));
   const full = play.picks.length >= config.roster.starters;
@@ -1647,13 +1654,8 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     const btn = on
       ? `<button type="button" class="small" data-action="play-lu-remove" data-id="${esc(id)}" aria-label="Move ${esc(charName(id))} to the bench">Bench</button>`
       : `<button type="button" class="small" data-action="play-lu-add" data-id="${esc(id)}" ${full ? 'disabled title="Bench a starter first"' : ''}>Start</button>`;
-    const cap =
-      id === play.captain
-        ? '<span class="cap" title="captain">C</span><span class="small">captain</span>'
-        : on
-          ? `<button type="button" class="small" data-action="play-lu-captain" data-id="${esc(id)}">Make captain</button>`
-          : '';
-    return charRow(id, btn, `<td>${cap}</td>`).replace('<tr>', `<tr class="${on ? 'sel' : ''}">`);
+    const slot = on ? `<span class="small muted">${play.picks.indexOf(id) + 1}</span>` : '';
+    return charRow(id, btn, `<td>${slot}</td>`).replace('<tr>', `<tr class="${on ? 'sel' : ''}">`);
   };
   const groupRow = (label: string): string => `<tr class="group"><td colspan="7">${label}</td></tr>`;
   const rosterRows =
@@ -1666,6 +1668,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     `<section class="card"><div class="row" style="justify-content:space-between"><h2>Week ${week}: ${esc(mission.id)}</h2><span class="muted small">${esc(environmentOf(week))} · ${homeLine(s, week)}</span></div>` +
     `<div class="scroll"><table><thead><tr>${CHAR_HEAD}<th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` +
     `<p class="small">CR total ${num(formatCrTotal(total))} of ${num(formatCrTotal(BUDGET))}</p>${crMeter(total)}` +
+    `<div class="row">${retreatSelect('play-retreat', 'play-retreat', play.retreat)}</div>` +
     (lineup === null ? '' : violations.length === 0 ? '<p class="okline">Legal lineup</p>' : violationList(violations)) +
     (projection === null
       ? ''
@@ -1829,19 +1832,12 @@ function playClick(action: string, id: string | undefined): boolean {
         renderTab();
       }
       return true;
-    case 'play-lu-captain':
-      if (id !== undefined) {
-        play.captain = id;
-        play.picks = [id, ...play.picks.filter((p) => p !== id)];
-        renderTab();
-      }
-      return true;
     case 'play-lu-advice':
       playAct((s) => {
         const lineup = s.suggestLineup();
         if (lineup === null) throw new Error('The advisor finds no legal lineup on this roster.');
-        play.picks = [lineup.captain, ...lineup.allies];
-        play.captain = lineup.captain;
+        play.picks = [...lineup.starters];
+        play.retreat = lineup.retreat;
       });
       return true;
     case 'play-claim':
@@ -1862,9 +1858,10 @@ function playClick(action: string, id: string | undefined): boolean {
       if (s === null || stage?.kind !== 'week') return true;
       const lineup = builderLineup();
       const pending = s.pendingLineup();
-      const same = pending !== null && lineup !== null && pending.captain === lineup.captain && pending.allies.join() === lineup.allies.join();
+      const same =
+        pending !== null && lineup !== null && pending.starters.join() === lineup.starters.join() && retreatValue(pending.retreat) === retreatValue(lineup.retreat);
       const legal = lineup !== null && validateLineup(lineup, { tavern: s.human!.tavern, characters: myRoster(s) }, crOf, config).length === 0;
-      const moves: PlayMove[] = lineup === null || same || !legal ? [] : [{ t: 'lineup', captain: lineup.captain, allies: [...lineup.allies] }];
+      const moves: PlayMove[] = lineup === null || same || !legal ? [] : [{ t: 'lineup', starters: [...lineup.starters], retreat: lineup.retreat }];
       playMoves([...moves, { t: 'week' }], () => {
         play.played = stage.week;
       });
@@ -1891,7 +1888,6 @@ panel.addEventListener('click', (ev) => {
     case 'lab-add':
       if (id !== undefined && lab.picks.length < 4 && !lab.picks.includes(id)) {
         lab.picks.push(id);
-        if (lab.picks.length === 1) lab.captain = id;
         lab.roll = null;
         lab.sample = null;
         refreshLab();
@@ -1900,18 +1896,9 @@ panel.addEventListener('click', (ev) => {
     case 'lab-remove':
       if (id !== undefined) {
         lab.picks = lab.picks.filter((p) => p !== id);
-        if (lab.captain === id) lab.captain = lab.picks[0] ?? null;
         lab.roll = null;
         lab.sample = null;
         refreshLab();
-      }
-      break;
-    case 'lab-captain':
-      if (id !== undefined) {
-        lab.captain = id;
-        lab.roll = null;
-        lab.sample = null;
-        refreshLab({ party: true, analysis: true });
       }
       break;
     case 'lab-up':
@@ -1931,7 +1918,7 @@ panel.addEventListener('click', (ev) => {
       break;
     case 'lab-clear':
       lab.picks = [];
-      lab.captain = null;
+      lab.retreat = 'never';
       lab.roll = null;
       lab.sample = null;
       refreshLab();
@@ -1987,6 +1974,16 @@ panel.addEventListener('change', (ev) => {
       break;
     case 'play-drop':
       play.drop = target.value;
+      break;
+    case 'play-retreat':
+      play.retreat = parseRetreat(target.value);
+      renderTab();
+      break;
+    case 'lab-retreat':
+      lab.retreat = parseRetreat(target.value);
+      lab.roll = null;
+      lab.sample = null;
+      refreshLab({ analysis: true });
       break;
     case 'play-sort':
       play.draftSort = target.value as typeof play.draftSort;

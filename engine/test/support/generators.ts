@@ -151,14 +151,14 @@ function randomEncounter(rng: Rng): Array<{ readonly ref: string; readonly count
   return Array.from({ length: int(rng, 1, 2) }, () => ({ ref: pick(rng, FIXTURE_SLUGS), count: int(rng, 1, 4) }));
 }
 
-/** Four starters on random fixture bases with a few random modifiers each, and a random captain. */
+/** Four starters on random fixture bases with a few random modifiers each. */
 export function randomParty(rng: Rng): Party {
   const members: EffectiveStats[] = [];
   for (let i = 0; i < 4; i++) {
     const slug = pick(rng, FIXTURE_SLUGS);
     members.push(effectiveStats({ ref: { id: `m${i}`, base: slug }, modifiers: randomModifiers(rng) }, baseOf(slug), TRAITS));
   }
-  return { captain: pick(rng, members).characterId, members };
+  return { members };
 }
 
 function randomModifiers(rng: Rng): Modifier[] {

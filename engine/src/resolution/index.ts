@@ -5,9 +5,9 @@
  * - Check odds: `p = clamp((21 − (DC − mod)) / 20, 0, 1)`, with advantage as
  *   `1 − (1 − p)²` (docs/decisions.md D-38).
  * - Best-fit assignment: each check goes to the starter with the best pass
- *   chance for it, so advantage counts. That starter is `{actor}`. Ties go to
- *   the captain, then lineup order (D-15). A `requires` gate limits who may
- *   attempt; if nobody qualifies the check auto-fails (D-39).
+ *   chance for it, so advantage counts. That starter is `{actor}`. Ties go by
+ *   lineup order (D-15; there is no captain, D-12). A `requires` gate
+ *   limits who may attempt; if nobody qualifies the check auto-fails (D-39).
  * - Battle odds: a black-box `p(win)` from party vs encounter, using an
  *   expected-value model (docs/specs/05). Swappable behind `BattleModel`.
  * - The weekly run: walk the DAG once with per-node dice. Each passed check
@@ -24,15 +24,11 @@ import { missionHaul, type CheckSpec, type Encounter, type Mission, type Mission
 import { rollD20, type Rng } from '../rng';
 
 /**
- * The four starters for a week. The captain is one of them.
- *
- * `members` is in lineup order: the order the manager listed the starters
- * (captain included, wherever it sits). Best-fit ties use it after the
- * captain (docs/decisions.md D-15).
+ * The four starters for a week, in lineup order: the order the manager listed
+ * them. Best-fit ties use that order (docs/decisions.md D-15). There is no
+ * captain (D-12).
  */
 export interface Party {
-  /** `characterId` of the captain. Must match one of `members`. */
-  readonly captain: string;
   /** The starters, in lineup order. */
   readonly members: ReadonlyArray<EffectiveStats>;
 }
@@ -75,18 +71,18 @@ export function passChance(modifier: number, dc: number, advantage: boolean): nu
  * advantage when `advantages` holds `checkTargetKey(check)`.
  *
  * The actor is the eligible starter with the highest `pPass` (so advantage
- * beats an equal modifier). Ties go to the captain, then to `members` in
- * lineup order (D-15). The captain has no other effect (D-12).
+ * beats an equal modifier). Ties go to the earliest of `members`, in lineup
+ * order (D-15).
  *
  * A `requires` gate (D-39) limits eligibility to starters with that speed or
  * sense above 0 feet. If none qualifies the check auto-fails: `eligible` is
  * false and `pPass` is 0, and the actor is still chosen best-fit from every
  * starter, only so the story has someone to fail it.
  *
- * Throws if the party is empty or the captain is not one of its members.
+ * Throws if the party is empty.
  */
 export function checkOdds(party: Party, check: CheckSpec): CheckOdds {
-  const order = tiebreakOrder(party);
+  const order = party.members;
   const key = checkTargetKey(check);
   const requires = check.requires;
   const eligibleMembers = requires === undefined ? order : order.filter((m) => meets(m, requires));
@@ -277,16 +273,6 @@ export function missionGraph(mission: Mission, caller: string): MissionGraph {
 }
 
 // ── internals ──────────────────────────────────────────────────────────────
-
-/** Members in tiebreak order: the captain, then the rest in lineup order. */
-function tiebreakOrder(party: Party): ReadonlyArray<EffectiveStats> {
-  if (party.members.length === 0) throw new Error('checkOdds: the party has no members');
-  const captain = party.members.find((m) => m.characterId === party.captain);
-  if (captain === undefined) {
-    throw new Error(`checkOdds: captain "${party.captain}" is not one of the party's members`);
-  }
-  return [captain, ...party.members.filter((m) => m !== captain)];
-}
 
 function modifierFor(member: EffectiveStats, check: CheckSpec): number {
   switch (check.type) {
