@@ -217,7 +217,7 @@ export interface ResolutionMismatch {
  *   roll)`, and there is no injury without a DNF (D-51). A DNF with no
  *   injury is allowed, since a boon may prevent it (D-52).
  * - `dnf`, `retreatedBefore`, `checksPassed`, `checksAttempted`, `loot` (the
- *   `loot` of each passed check and won battle) and `score`
+ *   `loot` of each passed check and won battle, or 0 on a DNF, D-54) and `score`
  *   (`lootScore(loot, missionHaul(mission))`, DNF or not) match the walk.
  * - `points` = `runPoints(score, scoring, home)` from `season.created`'s
  *   scoring, where home means the tavern's sponsor set this week's mission
@@ -320,6 +320,7 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
           }
           if (record.outcome === 'lose') {
             dnf = true;
+            loot = 0; // a DNF loses everything (D-54)
             break;
           }
           if (node.kind === 'battle') loot += node.loot ?? 0;
@@ -353,7 +354,7 @@ export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyA
     if (run.dnf !== dnf) report('run.dnf', `dnf is ${run.dnf}, but the walk ${dnf ? 'loses a battle' : 'reaches an end'}`);
     if (run.checksPassed !== passed) report('run.checksPassed', `${run.checksPassed}, but ${passed} check(s) passed`);
     if (run.checksAttempted !== attempted) report('run.checksAttempted', `${run.checksAttempted}, but ${attempted} check(s) attempted`);
-    if (run.loot !== loot) report('run.loot', `${run.loot}, but the passed checks and won battles bank ${loot}`);
+    if (run.loot !== loot) report('run.loot', `${run.loot}, but the walk carries home ${loot}${dnf ? ' (a DNF loses everything)' : ''}`);
     const score = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - score) > 1e-9) report('run.score', `score ${run.score} should be ${score}`);
   }

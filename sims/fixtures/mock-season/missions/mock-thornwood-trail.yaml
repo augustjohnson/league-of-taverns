@@ -37,7 +37,7 @@ nodes:
     encounter:
       creatures:
         - { ref: hobgoblin, count: 1 }
-        - { ref: goblin, count: 4 }
+        - { ref: goblin, count: 2 }
   - id: dodge-snare
     rank: 4
     kind: check
@@ -49,9 +49,9 @@ nodes:
     loot: 30
     encounter:
       creatures:
-        - { ref: bugbear, count: 2 }
-        - { ref: hobgoblin, count: 2 }
-        - { ref: goblin, count: 4 }
+        - { ref: bugbear, count: 1 }
+        - { ref: hobgoblin, count: 1 }
+        - { ref: goblin, count: 1 }
   - id: haul-loot
     rank: 6
     kind: check

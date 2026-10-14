@@ -46,8 +46,7 @@ nodes:
     encounter:
       creatures:
         - { ref: giant-spider, count: 2 }
-        - { ref: giant-centipede, count: 4 }
-        - { ref: swarm-of-bats, count: 2 }
+        - { ref: giant-centipede, count: 2 }
   - id: cart-out
     rank: 6
     kind: check

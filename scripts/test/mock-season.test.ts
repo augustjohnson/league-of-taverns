@@ -130,14 +130,14 @@ describe('mock season missions', () => {
     }
   });
 
-  it('keeps climax encounters between 0.25 and 0.75 of B, early ones smaller, with no spellcasters', () => {
+  it('keeps climax encounters between 1/12 and 1/4 of B (tuned to about 5% DNFs, D-54), early ones smaller, with no spellcasters', () => {
     for (const mission of missions) {
       const battles = battlesOf(mission);
       const lastRank = Math.max(...battles.map((b) => b.rank));
       for (const battle of battles) {
         const total = battle.encounter.creatures.reduce((sum, c) => sum + c.count * crOf.get(c.ref)!, 0);
-        if (battle.rank === lastRank) expect(total, `${mission.id}/${battle.id}`).toBeGreaterThanOrEqual(0.25 * config.budget.partyCr);
-        expect(total, `${mission.id}/${battle.id}`).toBeLessThanOrEqual(0.75 * config.budget.partyCr);
+        if (battle.rank === lastRank) expect(total, `${mission.id}/${battle.id}`).toBeGreaterThanOrEqual(config.budget.partyCr / 12);
+        expect(total, `${mission.id}/${battle.id}`).toBeLessThanOrEqual(0.25 * config.budget.partyCr);
         for (const c of battle.encounter.creatures) expect(isSpellcaster(bySlug.get(c.ref)!), c.ref).toBe(false);
       }
     }

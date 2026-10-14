@@ -27,7 +27,7 @@ weeks:
     title: The Saltmarsh Wreck
     environment: coast
     theme: False lights on the rocks, and what guards the hold.
-    keywords: [perception, athletics, bandit captain fight, acrobatics, investigation, sahuagin fight, str save]
+    keywords: [perception, athletics, bandit fight, acrobatics, investigation, sahuagin fight, str save]
     commitment: null
     sponsor: the-drowned-lord
   - week: 3

@@ -29,7 +29,6 @@ nodes:
     loot: 10
     encounter:
       creatures:
-        - { ref: bandit-captain, count: 1 }
         - { ref: bandit, count: 4 }
   - id: board-wreck
     rank: 3
@@ -47,9 +46,7 @@ nodes:
     loot: 25
     encounter:
       creatures:
-        - { ref: sahuagin, count: 4 }
-        - { ref: reef-shark, count: 2 }
-        - { ref: giant-crab, count: 4 }
+        - { ref: sahuagin, count: 3 }
   - id: haul-out
     rank: 6
     kind: check

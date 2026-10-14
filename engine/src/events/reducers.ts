@@ -132,7 +132,8 @@
  *   something in the mission (`dishonestKeywords`, D-42), so once missions
  *   are hidden, the reveal proves the keywords were honest.
  * - `mission.resolved`: the counts and the loot (the `loot` of each passed
- *   check node and won battle node) are recomputed from the recorded nodes, and the score must
+ *   check node and won battle node, or 0 on a DNF, D-54) are recomputed from
+ *   the recorded nodes, and the score must
  *   equal `lootScore(loot, missionHaul(mission))`, DNF or not, to within
  *   1e-9. An `injury` needs a DNF and a starter from the lineup, and that
  *   starter can't start the next week (D-51; `injuredFor`). Everything else
@@ -612,7 +613,8 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
         `nodes record ${passed}/${checks.length} checks, run says ${run.checksPassed}/${run.checksAttempted}`,
       );
     }
-    const loot = lootOf(mission, run.nodes);
+    // A DNF carries nothing home (D-54).
+    const loot = run.dnf ? 0 : lootOf(mission, run.nodes);
     if (loot !== run.loot) fail(event, 'resolve.score_mismatch', `nodes bank ${loot} loot, run says ${run.loot}`);
     const expected = lootScore(loot, missionHaul(mission));
     if (Math.abs(run.score - expected) > 1e-9) fail(event, 'resolve.score_mismatch', `score ${run.score} should be ${expected}`);

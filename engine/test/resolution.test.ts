@@ -351,14 +351,14 @@ describe('runMission', () => {
     expect(runMission(four, branching, scripted({ a: [0] }), baseOf, constantModel(0.5), { retreat: 'avoid_battles' }).injury).toBeNull();
   });
 
-  it('a DNF keeps the loot banked before the lost battle (D-46)', () => {
+  it('a DNF loses the loot banked before the lost battle (D-54)', () => {
     // start → a (30) → fight → b (70) → done: haul 100.
     const late = missionOf(
       [start(), skillCheck('a', 1, 'stealth', 12, 30), battle('fight', 2), skillCheck('b', 3, 'athletics', 10, 70), end('done', 4)],
       [edge('start', 'a', 'always'), edge('a', 'fight', 'always'), edge('fight', 'b', 'win'), edge('b', 'done', 'always')],
     );
     const run = runMission(party, late, scripted({ a: [0.45], fight: [0.9] }), baseOf, constantModel(0.5));
-    expect(run).toMatchObject({ path: ['start', 'a', 'fight'], dnf: true, checksPassed: 1, loot: 30, score: 0.3 });
+    expect(run).toMatchObject({ path: ['start', 'a', 'fight'], dnf: true, checksPassed: 1, loot: 0, score: 0 });
   });
 
   it('banks a battle\'s loot on a win, and nothing on a loss (D-50)', () => {
@@ -370,7 +370,7 @@ describe('runMission', () => {
     const won = runMission(party, bounty, scripted({ a: [0.45], fight: [0.1], b: [0.9] }), baseOf, constantModel(0.5));
     expect(won).toMatchObject({ dnf: false, retreatedBefore: null, checksPassed: 2, loot: 100, score: 1 });
     const lost = runMission(party, bounty, scripted({ a: [0.45], fight: [0.9] }), baseOf, constantModel(0.5));
-    expect(lost).toMatchObject({ dnf: true, loot: 30, score: 0.3 });
+    expect(lost).toMatchObject({ dnf: true, loot: 0, score: 0 });
   });
 
   describe('retreat orders (D-49)', () => {

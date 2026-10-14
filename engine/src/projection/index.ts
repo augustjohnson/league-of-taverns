@@ -4,7 +4,7 @@
  * Responsibilities:
  * - Forward-propagate probability through the layered DAG. The state per node
  *   is a distribution over loot banked so far, so the score distribution is
- *   exact (docs/decisions.md D-45, D-46), and so is a retreat order, which
+ *   exact (docs/decisions.md D-45, D-54), and so is a retreat order, which
  *   depends only on the loot banked (D-49).
  * - Return the expected score, P(DNF), P(reaching each node), and the full
  *   score distribution. The difficulty report and the bots consume these.
@@ -32,9 +32,9 @@ export interface Projection {
   readonly reach: Readonly<Record<string, number>>;
   /**
    * Exact distribution of final score, as [score, probability] pairs summing
-   * to 1, sorted by score. A DNF or a retreat counts at the loot it banked.
-   * Runs that bank the same loot are one entry. Only scores with positive
-   * probability appear.
+   * to 1, sorted by score. A retreat counts at the loot it banked, and a DNF
+   * at 0 (D-54). Runs that end with the same loot are one entry. Only scores
+   * with positive probability appear.
    */
   readonly distribution: ReadonlyArray<readonly [number, number]>;
 }
@@ -49,7 +49,7 @@ export interface Projection {
  * `fail` (both along `always` if that is its only edge). At a battle, mass
  * whose loot makes `options.retreat` turn back ends there, keeping its loot
  * (D-49). The rest fights: `pWin` of it goes along `win`, the battle's `loot`
- * richer (D-50), and the remainder ends as a DNF, keeping its loot. End nodes
+ * richer (D-50), and the remainder ends as a DNF with nothing (D-54). End nodes
  * collect the rest. Odds come from `checkOdds` and `battleOdds`, exactly as in
  * `runMission`, so the mean of many runs converges to `expectedScore`.
  *
@@ -137,7 +137,8 @@ export function projectMission(
           if (onWin !== undefined) send(onWin, loot + bounty, prob * pWin);
           const lost = prob * (1 - pWin);
           pDnf += lost;
-          if (lost > 0) addMass(finals, loot, lost);
+          // A DNF loses everything banked (D-54).
+          if (lost > 0) addMass(finals, 0, lost);
         }
         break;
       }

@@ -41,9 +41,8 @@ nodes:
     loot: 30
     encounter:
       creatures:
-        - { ref: lizardfolk, count: 3 }
+        - { ref: lizardfolk, count: 1 }
         - { ref: crocodile, count: 2 }
-        - { ref: giant-frog, count: 4 }
   - id: strongbox
     rank: 6
     kind: check

@@ -12,11 +12,11 @@
  *   expected-value model (docs/specs/05). Swappable behind `BattleModel`.
  * - The weekly run: walk the DAG once with per-node dice. Each passed check
  *   banks its loot, and so does each battle won (D-50). Losing a battle ends
- *   the run (DNF) and keeps the loot banked so far. Just before each battle
- *   the lineup's retreat order may turn the party back, keeping its loot
- *   without a DNF (D-49). A DNF injures one starter, picked by a recorded
- *   roll (D-51). Score = loot banked ÷ the mission's haul (docs/decisions.md
- *   D-45, D-46).
+ *   the run (DNF) and loses everything banked (D-54). Just before each
+ *   battle the lineup's retreat order may turn the party back, keeping its
+ *   loot without a DNF (D-49). A DNF injures one starter, picked by a recorded
+ *   roll (D-51). Score = loot carried home ÷ the mission's haul
+ *   (docs/decisions.md D-45, D-54).
  *
  * Projection (exact expectation) lives in ../projection. Both must use these
  * same odds functions so they agree by construction.
@@ -161,7 +161,10 @@ export interface RunResult {
   readonly retreatedBefore: string | null;
   readonly checksPassed: number;
   readonly checksAttempted: number;
-  /** Loot banked: the `loot` of every passed check and won battle, DNF or not (D-45, D-46, D-50). */
+  /**
+   * Loot carried home: the `loot` of every passed check and won battle
+   * (D-45, D-50), or 0 on a DNF, which loses everything (D-54).
+   */
   readonly loot: number;
   /** `lootScore(loot, missionHaul(mission))`: in [0, 1], and 1 on the best path. */
   readonly score: number;
@@ -218,7 +221,7 @@ export interface RunOptions {
  *
  * `path` lists every visited node, start and end included (on a DNF it ends at
  * the lost battle; on a retreat, at the node before the battle). Each passed
- * check banks its `loot`, and a DNF keeps what was banked. Score is
+ * check banks its `loot`, and a DNF loses all of it (D-54). Score is
  * `lootScore(loot, missionHaul(mission))`.
  *
  * `rngForNode` is a factory so each node's dice depend only on its id, never
@@ -299,6 +302,7 @@ export function runMission(
         const won = roll < pWin;
         nodes.push({ node: node.id, kind: 'battle', pWin, roll, outcome: won ? 'win' : 'lose' });
         if (!won) {
+          loot = 0; // a DNF loses everything (D-54)
           if (options.injuries === false) return result(true, null);
           const injuryRoll = rngForNode(injuryStream(node.id))();
           return result(true, null, { character: injuredStarter(party.members, injuryRoll).characterId, roll: injuryRoll });

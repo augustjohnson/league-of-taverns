@@ -29,7 +29,7 @@ nodes:
     loot: 5
     encounter:
       creatures:
-        - { ref: thug, count: 2 }
+        - { ref: thug, count: 1 }
         - { ref: bandit, count: 2 }
   - id: lift-prize
     rank: 4
@@ -42,8 +42,8 @@ nodes:
     loot: 30
     encounter:
       creatures:
-        - { ref: thug, count: 4 }
-        - { ref: bandit, count: 8 }
+        - { ref: thug, count: 2 }
+        - { ref: bandit, count: 1 }
   - id: slip-out
     rank: 6
     kind: check

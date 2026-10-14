@@ -66,18 +66,18 @@ describe('projection', () => {
     ]);
   });
 
-  it('a lost battle keeps the loot banked before it (D-46)', () => {
+  it('a lost battle loses the loot banked before it (D-54)', () => {
     // A certain check (1), a battle at p(win) = 0.3, then a certain check (3). Haul 4.
     const mission = missionOf(
       [start(), skillCheck('c', 1, 'stealth', 1), battle('fight', 2), skillCheck('d', 3, 'stealth', 1, 3), end('done', 4)],
       [edge('start', 'c', 'always'), edge('c', 'fight', 'always'), edge('fight', 'd', 'win'), edge('d', 'done', 'always')],
     );
     const projection = projectMission(zero, mission, baseOf, constantModel(0.3));
-    expect(projection.expectedScore).toBeCloseTo(0.7 * 0.25 + 0.3 * 1, 12);
+    expect(projection.expectedScore).toBeCloseTo(0.3 * 1, 12);
     expect(projection.pDnf).toBeCloseTo(0.7, 12);
     expect(projection.reach).toEqual({ start: 1, c: 1, fight: 1, d: 0.3, done: 0.3 });
     expectDistribution(projection, [
-      [0.25, 0.7],
+      [0, 0.7],
       [1, 0.3],
     ]);
   });
@@ -88,8 +88,8 @@ describe('projection', () => {
     const projection = projectMission(zero, loadMission(EXAMPLE_MISSION), baseOf, constantModel(0.5));
     // Loot: find-path 20, slip-past 30, haul-chain 50, wade-across 10; haul 100.
     // Find the path (0.45, +20): slip past (0.35, +30) then haul the chain (+50) or
-    // wade (+10), or fail into the toll fight, which keeps the 20 win or lose.
-    const viaPath = 20 + 0.35 * (30 + 0.4 * 50 + 0.6 * 0.45 * 10);
+    // wade (+10), or fail into the toll fight, which keeps the 20 on a win and loses it on a loss (D-54).
+    const viaPath = 0.35 * (20 + 30 + 0.4 * 50 + 0.6 * 0.45 * 10) + 0.65 * 0.5 * 20;
     // Miss it (0.55): lose the bog ambush with nothing (0.5), or haul the chain or wade.
     const viaBog = 0.5 * (0.4 * 50 + 0.6 * 0.45 * 10);
     expect(projection.expectedScore).toBeCloseTo((0.45 * viaPath + 0.55 * viaBog) / 100, 12);
@@ -162,7 +162,7 @@ describe('projection', () => {
       [edge('start', 'c', 'always'), edge('c', 'fight', 'always'), edge('fight', 'd', 'win'), edge('d', 'done', 'always')],
     );
     const fight = projectMission(zero, mission, baseOf, constantModel(0.4));
-    expect(fight.expectedScore).toBeCloseTo(0.6 * 0.25 + 0.4 * 1, 12);
+    expect(fight.expectedScore).toBeCloseTo(0.4 * 1, 12);
     expect([fight.pDnf, fight.pRetreat]).toEqual([0.6, 0]);
     expect(fight.reach).toEqual({ start: 1, c: 1, fight: 1, d: 0.4, done: 0.4 });
 
@@ -175,6 +175,20 @@ describe('projection', () => {
       expect(back.distribution).toEqual([[0.25, 1]]);
     }
     expect(projectMission(zero, mission, baseOf, constantModel(0.4), { retreat: { bank: 2 } })).toEqual(fight);
+  });
+
+  it('makes turning back pay when a DNF would lose a big bank (D-49, D-54)', () => {
+    // A certain check (60), a battle at p(win) = 0.4 with bounty 10, then a certain check (30). Haul 100.
+    const mission = missionOf(
+      [start(), skillCheck('c', 1, 'stealth', 1, 60), { ...battle('fight', 2), loot: 10 }, skillCheck('d', 3, 'stealth', 1, 30), end('done', 4)],
+      [edge('start', 'c', 'always'), edge('c', 'fight', 'always'), edge('fight', 'd', 'win'), edge('d', 'done', 'always')],
+    );
+    const fight = projectMission(zero, mission, baseOf, constantModel(0.4));
+    const back = projectMission(zero, mission, baseOf, constantModel(0.4), { retreat: { bank: 60 } });
+    expect(fight.expectedScore).toBeCloseTo(0.4, 12); // 0.4 × 100
+    expect(back.expectedScore).toBeCloseTo(0.6, 12); // keep the 60
+    // At p(win) = 0.7 the fight is worth it again: 0.7 × 100 > 60.
+    expect(projectMission(zero, mission, baseOf, constantModel(0.7)).expectedScore).toBeGreaterThan(0.6);
   });
 
   it('applies a bank threshold per loot state, so one battle can split', () => {

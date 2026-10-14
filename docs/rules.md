@@ -81,7 +81,8 @@
 - **Retreat order** **[D-49]:** each lineup also says when the
   party turns back instead of fighting: `never` (the default),
   `avoid_battles`, or `bank: N` (turn back before a battle once at least N
-  loot is banked). Turning back keeps the banked loot and is not a DNF (§6).
+  loot is banked). Turning back keeps the banked loot and is not a DNF (§6),
+  while a DNF loses everything, so the order is a real gamble.
 - **Submitting:** use the *Set lineup* form any time before the weekly lock.
   The latest valid submission counts. An invalid submission is rejected with
   reasons and leaves the previous one standing.
@@ -115,8 +116,9 @@
   safer route: a party with no special speeds or senses can still reach the
   full haul.
 - **Battles:** the party's odds of winning come from its combined strength
-  against the encounter. **Losing any battle ends the mission (DNF).** The
-  party keeps the loot banked so far **[D-46]**. A battle may carry loot,
+  against the encounter. **Losing any battle ends the mission (DNF), and
+  the party loses everything it banked on it** **[D-54]**. Missions are
+  tuned so about 5% of runs end this way. A battle may carry loot,
   banked when the party wins **[D-50]**.
 - **Injuries** **[D-51]:** when a party loses a battle, one of its four
   starters, picked by a recorded random roll, is injured and can't start

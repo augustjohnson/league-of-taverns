@@ -336,7 +336,7 @@ function rollLog(mission: Mission, run: RunResult, home = false): string {
   }
   const checks = `${run.checksPassed} of ${run.checksAttempted} checks passed`;
   const score = run.dnf
-    ? `DNF after ${checks}, keeping ${run.loot} loot: score ${scoreFraction(run.score)}`
+    ? `DNF after ${checks}: everything banked is lost, score ${scoreFraction(run.score)}`
     : run.retreatedBefore !== null
       ? `Turned back before ${run.retreatedBefore} after ${checks}, keeping ${run.loot} loot: score ${scoreFraction(run.score)}`
       : `${checks}: score ${scoreFraction(run.score)}`;

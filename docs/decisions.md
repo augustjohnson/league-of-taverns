@@ -231,7 +231,7 @@ engine.
 - *Open:* the haul amount.
 - *Loot shape, decided (2026-10-13): rising loot, late climax.* Missions are
   authored so loot grows along each path and the biggest battle sits near the
-  end. A DNF then costs about half the haul, retreat orders (D-49) matter, and
+  end. A DNF then costs everything banked (D-54), retreat orders (D-49) matter, and
   the reveal builds to a peak. This is an authoring rule, not a hard
   validator rule. *Default (confirm):* the difficulty report (T7.2) flags a
   mission whose best path doesn't pay at least half its loot in its last
@@ -244,7 +244,8 @@ engine.
   0.23 against 0.36). Bots that pick a retreat order (T9.5) should pull DNFs
   back down.
 
-**D-46 DNF keeps banked loot: DECIDED (2026-10-11).** Replaces "a DNF scores
+**D-46 DNF keeps banked loot: SUPERSEDED by D-54 (2026-10-14).** A DNF now
+loses everything; the original entry follows. Replaced "a DNF scores
 0". Losing a battle ends the mission, and the party keeps the loot banked
 before the battle. The penalty for a DNF is the loot it didn't reach, so
 where battles sit in a mission sets the penalty. Sims (200 seasons, mock
@@ -254,6 +255,32 @@ Re-run on the mock missions (same seed): DNFs stay at 20%, and runs scoring
 0 fall from 21% to 7%. The spread only falls to about ±32, because the mock
 missions' battles come early, so a DNF has banked little. Late battles and
 rising loot (lore.md) are the levers for cutting it further.
+
+**D-54 A DNF loses everything, and DNFs are rare: DECIDED (2026-10-14).**
+Supersedes D-46.
+- Losing a battle ends the mission and the party carries **nothing** home:
+  every check and bounty banked on that mission is lost. The injury (D-51)
+  still applies.
+- Missions are tuned so about **5%** of runs end in a DNF, against 30%
+  before. In the mock season that meant shrinking the climax battles to
+  about CR 1–2.5 (a 95–97% win chance for the parties the bots field), and
+  the early fights to about 97%.
+- Why: under D-46 a DNF cost only the loot not yet reached, so fighting was
+  never worse than turning back and retreat orders (D-49) had nothing to
+  weigh. Now a fight risks the whole bank, so a retreat order has a real
+  price, and a DNF is a rare, dramatic event rather than a weekly tax.
+- *Measured* (200 mock seasons, seed `review`, bots maximizing expected
+  loot): DNFs 4.6% of runs (cr-greedy 2.4%, skill-coverage 5.2%); mean
+  points rose from about 56 to 69; titles per seat: skill-coverage 0.36,
+  cr-greedy 0.15, value 0.15, random 0.09 (par 0.17). Taverns stayed even
+  (26 to 40 titles against a par of 33).
+- *Consequences:* with a 96% win chance, fighting still beats turning back
+  in expectation, so the expected-loot bots never retreat; a retreat order
+  becomes a variance choice, such as protecting a lead in the last weeks,
+  and it pays against the rare hard fight or a weak party. Battle strength
+  matters much less than skills now, which is why `cr-greedy` fell from
+  first to par. Mission authors (and the generator, D-53) target about 5%
+  DNFs; the difficulty report (T7.2) should show each mission's DNF rate.
 
 **D-47 Home bonus: DROPPED (2026-10-13), was ×1.25.** Season 1 sets
 `scoring.homeBonus: 1` (off). The engine support stays, so it can come back
@@ -311,8 +338,9 @@ come from the same review.
 `RunResult.retreatedBefore`, `Projection.pRetreat`, and the
 `verifyResolutions` audit. The `projection` bots try every order on their
 best three lineups and keep the one with the highest expected loot (T9.5).
-- *Found when building it (2026-10-13), OPEN:* while a DNF keeps the loot
-  banked so far (D-46), turning back can never raise a week's expected loot:
+- *Found when building it (2026-10-13), RESOLVED by D-54 (2026-10-14): a DNF
+  now loses everything.* While a DNF kept the loot banked so far (D-46),
+  turning back could never raise a week's expected loot:
   at a battle with L banked, retreating ends on L, and fighting ends on at
   least L (a loss keeps L, a win adds the bounty and the rest of the path).
   So the bots never turn back (200 mock seasons, seed `review`: no change

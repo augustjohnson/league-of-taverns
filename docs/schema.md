@@ -323,8 +323,8 @@ nobody chooses sits the season out; its god's week is still played.
 `mission.resolved.run` holds the full `RunResult`: `path`, and for each node
 `{node, kind, actor, d20, modifier, dc, advantage, disadvantage, outcome}` (checks; `disadvantage` from a hex, D-52) or
 `{node, kind, pWin, roll, outcome}` (battles), plus `dnf`, `checksPassed`,
-`checksAttempted`, `loot` (banked by passed checks and won battles, kept on a
-DNF or a retreat) and `score` (loot ÷ the mission's haul, D-45, D-46, D-50).
+`checksAttempted`, `loot` (carried home: banked by passed checks and won
+battles, kept on a retreat, 0 on a DNF, D-54) and `score` (loot ÷ the mission's haul, D-45, D-50, D-54).
 `retreatedBefore` names the battle a party turned back before by its retreat
 order, or is null (D-49); the battle is not on `path`. `injury` is, on a
 DNF, `{ character, roll }`: the starter hurt and the roll in [0, 1) that

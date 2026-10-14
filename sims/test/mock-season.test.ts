@@ -78,7 +78,8 @@ describe('one seeded mock season', () => {
 
   it('benches the injured: a DNF hurts one starter, who starts nowhere the next week (D-51)', () => {
     let injuries = 0;
-    for (const seed of ['sim-1', 'sim-2', 'sim-3']) {
+    // DNFs are rare (about 5% of runs, D-54), so look across several seasons.
+    for (const seed of ['sim-1', 'sim-2', 'sim-3', 'sim-4', 'sim-5', 'sim-6']) {
       const { events, state } = seed === 'sim-1' ? sim1 : runMockSeason(input, { seed });
       for (const event of events) {
         if (event.type !== 'mission.resolved') continue;
@@ -133,8 +134,8 @@ describe('one seeded mock season', () => {
   });
 
   it('pins the sim-1 champion', () => {
-    expect(sim1.summary.champions).toEqual([{ tavern: 'the-drowned-rat', bot: 'cr-greedy' }]);
-    expect(sim1.summary.standings[0]!.tavern).toBe('the-drowned-rat');
+    expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'skill-coverage' }]);
+    expect(sim1.summary.standings[0]!.tavern).toBe('the-gilded-flagon');
   });
 });
 
