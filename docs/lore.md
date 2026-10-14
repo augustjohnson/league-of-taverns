@@ -29,7 +29,11 @@ are trades, and there's a waiver wire.
 | The party heads out on the god's trial | The weekly mission, run once |
 | Loot carried home | Score (D-45) |
 | The party is beaten and flees with what it is carrying | DNF: the mission ends and the party keeps the loot banked so far (D-46) |
-| The god is generous with its own tavern on its own trial | Home bonus: ×1.25 loot (D-47) |
+| Someone limps home hurt | Injury: after a DNF, one starter sits out next week (D-51) |
+| The party thinks better of it and turns for home | Retreat order: turn back before a battle with the loot in hand (D-49) |
+| A god chose this tavern long before the barkeep noticed | Every tavern is already blessed; managers pick a tavern, not a god (D-52) |
+| The god's favour | Boon: one rule bent for that tavern (D-52) |
+| The god's spite | Hex: once a season, curse a rival's party for one trial (D-52) |
 | The **scrying ball** in each tavern shows the run as it happens | The narrated run. Before the run, the ball's odds are the projected points |
 
 ## Where story touches play
@@ -37,8 +41,9 @@ are trades, and there's a waiver wire.
 Chrome (names, backstories, story text) still never affects play. A few
 **story-shaped rules** do. They are ordinary rules in the season config, and
 the story explains them. The test for adding one is that **it treats every
-tavern the same over a season**. The home bonus passes because every tavern
-gets exactly one home week.
+tavern the same over a season**. A hex passes because every tavern gets
+exactly one. (The home bonus passed for the same reason, with one home week
+each, but was dropped to keep the rules small, D-47.)
 
 Which god sponsors which tavern, and which trial is whose, is mechanical data.
 Each god's name, personality and the words it speaks are chrome.
@@ -46,31 +51,23 @@ Each god's name, personality and the words it speaks are chrome.
 ## Ideas, not rules
 
 These are not decided. Each one would need its own decision before it goes in.
+Mission shape (rising loot, a late climax) became a rule in D-45, injuries
+became D-51, and boons and hexes became D-52.
 
 - **A mystery mission.** A secret extra trial chosen by the GM and set by no
   sponsoring god. It could be a finale, a tiebreaker, or loot only.
-- **Boons and hexes.** Each god gives its tavern one sealed favour per season,
-  played when lineups lock and revealed at the run. It could be a buff to your
-  own party or a hex on a rival's. It would be built from the modifier
-  registry and kept secret with a commitment, the same way missions are. It
-  could expand into more Survivor-style play (alliances, sabotage), but
-  complexity climbs quickly.
-- **Mission shape.** Loot that grows with each check, and the hard battle late
-  in the mission. A DNF then costs roughly half the haul, and the scrying ball
-  gets a climax.
 - **Round-by-round battles.** Replace the black-box `pWin` (ev-ttk-v0) with
   a battle simulated round by round, with real HP per combatant, so the log
-  knows who dropped and when. That opens rules like injuries: the last party
-  member standing in a TPK is unavailable the following week. Costs: the
-  exact projection no longer works (it would need sampling or a much harder
-  calculation), and injuries are a rules change with a knock-on to lineups.
+  knows who dropped and when. Injuries (D-51) could then hit whoever
+  actually fell, instead of a random starter. Cost: the exact projection no
+  longer works (it would need sampling or a much harder calculation).
 - **Sponsor gifts.** At season start each sponsor offers its tavern a choice
   of one of three magic items (say a headband of intellect, a belt of
   dwarvenkind, or Blackrazor), held by one character. Simple items map onto
   the modifier registry (skill and save bonuses, advantage, senses,
   `battle_bonus`). Ability-score items like the headband need the engine to
   set ability scores. Items with active effects (Blackrazor) only make sense
-  with round-by-round battles. Close kin of boons and hexes above.
+  with round-by-round battles. Close kin of boons (D-52).
 - **Gods' tastes.** Each god's trial leans on its domain: the sea god writes
   swimming checks. That gives each tavern a reason to draft for its own week
   without adding a rule.

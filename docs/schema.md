@@ -149,6 +149,7 @@ nodes:
     encounter:
       creatures:             # Open5e slugs in the pinned snapshot; the first is the "lead" ({battle_creature})
         - { ref: crocodile, count: 3 }
+    # loot: 30               # planned (D-50): banked on a win, counted by the haul rule
   - { id: crossed-dry, rank: 5, kind: end }
 edges:
   - { from: start, to: find-path, on: always }   # always | pass | fail | win
@@ -167,16 +168,19 @@ edges:
 | `edges.battle` | a battle has exactly one `win`. `lose` edges don't exist: losing is a DNF |
 | `edges.start` | start has exactly one `always` |
 | `scored` | every start→end path attempts ≥ 1 check |
-| `haul` | the most loot any start→end path can bank equals `missions.haul` (D-45). A check's loot counts when the path leaves it by `pass` or `always` |
+| `haul` | the most loot any start→end path can bank equals `missions.haul` (D-45). A check's loot counts when the path leaves it by `pass` or `always`. Planned (D-50): a battle's loot counts when the path leaves it by `win` |
+| `gates` | planned (D-39): a party with no special speeds or senses can still bank the full haul, so a `requires` gate only opens a better or safer route |
 | `dc` | `dcBand.min ≤ dc ≤ dcBand.max` |
 | `encounter.ref` | every creature ref exists in the pinned snapshot |
 | `encounter.budget` | Σ count × CR ≤ `encounterCrRatio × B` per battle |
 | `size` | node count ≤ `maxNodes`, max rank ≤ `maxRank`, battles on any path within `battlesPerPath` |
 | `environment` | when selected, matches the schedule entry |
 
-**Commitments:** none. Missions are open (D-08). The `commitment` and `sha256`
-fields on `season.created` and `mission.revealed` stay in the event schema,
-nullable or unused, until D-13's details settle.
+**Commitments:** none yet. Missions are open for now (D-08). The `commitment`
+and `sha256` fields on `season.created` and `mission.revealed` stay in the
+event schema, nullable or unused. They come back into use when missions
+become hidden until the lock (D-08's direction): a sha256 commitment per
+mission in `season.created`, checked by `mission.revealed` at the lock.
 
 ## Mission chrome
 
@@ -207,7 +211,8 @@ beat is its DNF ending, so no separate DNF outro is needed. Beats for unknown
 node ids are errors.
 
 **Tokens:** `{actor}` (check beats only), `{battle_creature}` (battle beats
-only), `{captain}`, `{allies}`, `{tavern}` (anywhere). Any other `{…}` is an
+only), `{captain}`, `{allies}`, `{tavern}` (anywhere). `{captain}` goes
+away with D-12 (no captain). Any other `{…}` is an
 error. Tokens bind to data at render time and never to new rolls.
 
 **Mechanical-fact lint (T8.3):** no digits, no `DC`, `roll`, `d20`,
@@ -236,8 +241,8 @@ The annotated example in the file is the reference. Key groups:
 | `budget` | `partyCr` (B), `modifierPointsPerCharacter` |
 | `roster` | `size`, `starters` (4), `ownership` |
 | `draft` | `format`, `rounds`, `order`, `pickWindowHours`, `onTimeout` |
-| `scoring` | `pointsScale`, `homeBonus` (D-47; 1 = off) |
-| `waivers` | `priority`, `initialOrder` |
+| `scoring` | `pointsScale`, `homeBonus` (D-47; 1 = off, and Season 1 is off) |
+| `waivers` | `priority`, `initialOrder`. Planned (D-05): `priority: reverse_standings` |
 | `trades` | `vetoWindowHours`, `vetoBy`, `deadlineWeek` |
 | `missedLineup` | `carry_over` |
 | `schedules` | cron for `lineupLock`, `weeklyRun`, `waivers` |
@@ -250,10 +255,18 @@ governs, and CI flags later edits to the file.
 
 `managers.yaml`: `commissioner`, `gm`, and `taverns: [{ id, name, manager: { login, githubId } | { bot } }]`.
 
-`schedule.yaml`: `season`, `sponsors: [{ id, tavern }]`, `weeks: [{ week, title, environment, theme, commitment, sponsor }]`.
+`schedule.yaml`: `season`, `sponsors: [{ id, tavern }]`, `weeks: [{ week, title, environment, theme, keywords, commitment, sponsor }]`.
+`keywords` (planned, D-42) is a list of short strings naming what the mission
+tests, such as `survival`, `con save` or `lizardfolk fight`. `lock-check`
+rejects a keyword that names nothing in the selected mission.
 `sponsor` is a sponsor id or null. Each sponsor backs one tavern (in
 `managers.yaml`) and sets at most one week (D-48). On that week the tavern's
-points are × `scoring.homeBonus` (D-47). A god's name and voice are chrome.
+points are × `scoring.homeBonus` (D-47; Season 1 sets 1, so nothing). A god's
+name and voice are chrome. Planned (D-52): each sponsor carries a `boon` (an id
+from a closed boon registry), and the tavern–god pairing becomes permanent, so
+it moves out of the per-season schedule into a league-level file.
+`managers.yaml` then lists managers without taverns, and the tavern pick
+(below) binds them. At most 6 taverns (D-01).
 
 ---
 
@@ -289,8 +302,10 @@ points are × `scoring.homeBonus` (D-47). A god's name and voice are chrome.
 | `tavern.joined` | commissioner | `tavern`, `name`, `manager` | phase `preseason`, tavern id unique, manager not already in a tavern |
 | `character.retained` | commissioner | `tavern`, `character`, `fromSeason`, `basis`, `costRound` | before the first pick, character pooled and unowned, tavern within its keeper limit |
 | `draft.pick` | manager / system (autopick) | `pick`, `tavern`, `character`, `auto` | `pick` = number of prior picks, `tavern` is on the clock, character pooled and unowned, roster not full. The first pick freezes the tavern list and order |
-| `lineup.set` | manager | `tavern`, `week`, `lineup{captain, allies[3]}` | draft complete, week not locked, lineup legal (§ Roster) |
+| `lineup.set` | manager | `tavern`, `week`, `lineup{captain, allies[3]}`. Planned (D-12, D-49): `lineup{starters[4], retreat}`, where `retreat` is `never` \| `avoid_battles` \| `{ bank: N }` | draft complete, week not locked, lineup legal (§ Roster) |
 | `lineup.locked` | system | `week`, `lineups[{tavern, lineup, source}]` | week not already locked, previous week finalized, one entry per tavern, each lineup legal |
+| `tavern.chosen` (planned, D-52) | manager | `tavern`, `manager` | phase `preseason`, the manager is on the clock in reverse draft order, the tavern is unclaimed |
+| `hex.declared` (planned, D-52) | manager | `tavern`, `target`, `ability`, `week` | target is another tavern, the week isn't locked, the tavern hasn't hexed this season, the target has no hex that week |
 | `waiver.claimed` | manager | `claim`, `tavern`, `add`, `drop` | draft complete, `add` is a free agent now, `drop` is on the roster |
 | `waiver.resolved` | system | `week`, `outcomes[{claim, awarded, reason}]`, `priorityAfter` | week finalized, outcomes cover every pending claim and match `resolveWaivers` |
 | `trade.proposed` | manager | `trade`, `from`, `to`, `give[]`, `receive[]` | both taverns own the listed characters, before the deadline |
@@ -306,7 +321,9 @@ points are × `scoring.homeBonus` (D-47). A god's name and voice are chrome.
 `{node, kind, actor, d20, modifier, dc, advantage, outcome}` (checks) or
 `{node, kind, pWin, roll, outcome}` (battles), plus `dnf`, `checksPassed`,
 `checksAttempted`, `loot` (banked by passed checks, kept on a DNF) and `score`
-(loot ÷ the mission's haul, D-45, D-46).
+(loot ÷ the mission's haul, D-45, D-46). Planned: a `retreated` marker for a
+party that turned back (D-49), and on a DNF the `injured` starter with the
+roll that picked it (D-51).
 
 ### What's recorded vs derived [D-20]
 

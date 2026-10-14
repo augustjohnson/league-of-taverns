@@ -11,10 +11,20 @@
   has a **sponsor** (a god), and each week is one sponsor's mission
   ([lore.md](lore.md)).
 - Each **manager** runs one **tavern**. Managers are listed in
-  `managers.yaml` and identified by GitHub account.
+  `managers.yaml` and identified by GitHub account. A league has at most
+  **6 taverns** **[D-01]**, so a season is 6 weeks.
+- **Gods, boons and hexes** **[D-52, not built yet]:** every tavern is
+  already blessed by one god, and the pairing never changes. The god gives
+  its tavern:
+  - a **boon**, which bends one rule for that tavern (the list is being
+    playtested: for example, a DNF doesn't injure, or a bigger CR budget for
+    one mission), and
+  - one **hex** per season (§6).
+  A manager keeps their tavern from season to season (details for Season 2).
+  There is no home bonus **[D-47]**.
 - A **commissioner** administers the league: vetoes, disputes, and
   `managers.yaml`. A **GM** curates characters, modifiers and missions. They
-  may be the same person **[OPEN D-09]**.
+  may be the same person, and the GM may also manage a tavern **[D-09]**.
 - All manager actions go through **GitHub issue forms** (§10). Nothing
   counts unless an Action records it as an event.
 
@@ -34,15 +44,15 @@
 
 ## 3. Rosters
 
-- Rosters hold **7** characters **[OPEN D-03]**.
+- Rosters hold **7** characters **[D-03]**.
 - **Exclusive ownership:** a character belongs to at most one tavern
-  **[OPEN D-01]**. Unowned pool characters are **free agents**.
+  **[D-01]**. Unowned pool characters are **free agents**.
 - There is no roster-level CR cap. The budget applies only to the four starters
   **[OPEN D-40]**.
 
 ## 4. The draft
 
-- **Snake draft**, 7 rounds **[OPEN D-02]**. Round 1 runs in draft order,
+- **Snake draft**, 7 rounds **[D-02]**. Round 1 runs in draft order,
   round 2 in reverse, and so on.
 - Draft order is a seeded shuffle of the joined taverns, reproducible from
   the season id. The commissioner may set it manually instead.
@@ -51,17 +61,24 @@
   `value` bot strategy **[OPEN D-26]**.
 - Keepers from last season (§12) are placed before the draft and cost the
   tavern a pick **[OPEN D-11]**.
+- **Tavern pick** **[D-52, not built yet]:** before the draft, managers
+  choose taverns (each with its god, boon and hex) in **reverse** draft
+  order. The manager who drafts monsters last chooses a tavern first.
 
 ## 5. Lineups and the budget
 
-- Each week a tavern starts a **party** of **4**: **1 captain + 3 allies**,
-  all from its roster. The other 3 sit on the **bench**. Choosing who starts
-  is the main weekly decision.
+- Each week a tavern starts a **party** of **4** from its roster. There is
+  no captain **[D-12]**. The other 3 sit on the **bench**. Choosing who
+  starts is the main weekly decision. *(Until this is built, lineups still
+  name an inert captain, which only breaks best-fit ties.)*
 - **Budget:** the total CR of the four starters must be **≤ B**. Season 1 uses
   B = 12. Fractional CRs count exactly (four CR 1/2 characters total 2).
-- The **captain's mechanical role** is not yet defined **[OPEN D-12]**. Until
-  it is, the captain is named in the story and is first in tiebreak order for
-  best-fit assignment (§6).
+- An **injured** character (§6) can't start the week after its injury
+  **[D-51, not built yet]**.
+- **Retreat order** **[D-49, not built yet]:** each lineup also says when the
+  party turns back instead of fighting: `never` (the default),
+  `avoid_battles`, or `bank: N` (turn back before a battle once at least N
+  loot is banked). Turning back keeps the banked loot and is not a DNF (§6).
 - **Submitting:** use the *Set lineup* form any time before the weekly lock.
   The latest valid submission counts. An invalid submission is rejected with
   reasons and leaves the previous one standing.
@@ -71,55 +88,81 @@
   lineup carries over. If the carried lineup is illegal (a starter was traded,
   dropped or claimed away), or there is no previous lineup, a fallback picks the
   legal lineup with the highest total CR, ties broken by draft order
-  **[OPEN D-27]**. A tavern with no legal lineup at all scores 0 for the week.
+  **[OPEN D-27]**. A carried lineup keeps its retreat order, and the
+  fallback uses `never` **[D-49]**. A tavern with no legal lineup at all
+  scores 0 for the week.
 
 ## 6. Missions
 
-- Each week has a **public schedule entry**: title, environment and theme.
-  That is all managers know when they set lineups.
-- The **mission itself** is hidden until the week runs. It is a branching path
-  of **skill checks** and **battles** that the GM locked before the draft.
+- Each week has a **public schedule entry**: title, environment, theme, and
+  a **keyword description** of what the mission tests (skills, saves, gates,
+  the lead creature of each battle) **[D-42, keywords not built yet]**.
+- The **mission itself** is a branching path of **skill checks** and
+  **battles** that the GM locked before the draft. For now missions are
+  public (§11), so a manager may read the full mission before the lock.
+  *Planned* **[D-08]**: each mission stays hidden until its week's lock, and
+  managers plan from the schedule entry and its keywords.
 - **Checks:** a d20 plus the party's best modifier for that check, against a
   DC. Pass chance = `clamp((21 − (DC − mod)) / 20, 0, 1)`. Each check is made
   by the starter with the best modifier for it (**best fit**). Some modifiers
   grant **advantage** (roll twice, keep the higher).
 - Some checks need a capability (a fly speed, darkvision). If no starter has
-  it, the check fails automatically **[OPEN D-39]**.
+  it, the check fails automatically **[D-39]**. A gate only opens a better or
+  safer route: a party with no special speeds or senses can still reach the
+  full haul.
 - **Battles:** the party's odds of winning come from its combined strength
   against the encounter. **Losing any battle ends the mission (DNF).** The
-  party keeps the loot banked so far **[D-46]**.
+  party keeps the loot banked so far **[D-46]**. A battle may carry loot,
+  banked when the party wins **[D-50, not built yet]**.
+- **Injuries** **[D-51, not built yet]:** when a party loses a battle, one
+  of its four starters, picked by a recorded random roll, is injured and
+  can't start next week. Injuries last one week.
+- **Hex** **[D-52, not built yet]:** once per season, a tavern names a
+  rival, one **ability score** and one **week**. That week, the rival's party
+  has disadvantage on every check and save using that ability (like
+  *Bestow Curse*). Battles are unaffected, and disadvantage cancels
+  advantage. A hex is declared with an issue form any time before that
+  week's lock, so it is public and the target can adjust. At most one hex
+  per target per week (the first declared counts), and it can't be withdrawn.
+- **Turning back** **[D-49, not built yet]:** just before a battle, the
+  party's retreat order (§5) is checked. If it says to turn back, the mission
+  ends there, the party keeps its banked loot, and it is not a DNF.
 - Passing or failing a check decides which way the mission branches. Failing
   often leads into a battle.
+- **Shape** **[D-45]:** missions are authored so loot rises along each path
+  and the biggest battle comes near the end.
 
 ## 7. Scoring
 
 - **Loot:** each check carries a loot value. Passing a check banks it, and
-  failing banks nothing **[D-45]**.
+  failing banks nothing **[D-45]**. Battles may carry loot too, banked on a
+  win **[D-50, not built yet]**.
 - **Score** for a week = loot banked. **Points** = loot.
 - **Fixed haul:** every mission's best path pays the same total loot, so every
   week counts equally **[D-45]**.
-- **Home bonus:** on its sponsor's mission, a tavern's loot × 1.25 **[D-47]**.
+- **No home bonus** **[D-47]:** a god's own week gives its tavern nothing
+  extra (`scoring.homeBonus: 1`).
 - In the engine, score = loot ÷ haul and points = round(score ×
   `pointsScale`). With the haul and `pointsScale` both 100, points equal loot.
 - **Sponsors come from the GM's season package:** `schedule.yaml` names
-  each god, the tavern it backs and the week it sets; `config.yaml` sets the
-  bonus (`scoring.homeBonus`). Projected points include the bonus too.
+  each god, the tavern it backs and the week it sets. `config.yaml` can still
+  turn a home bonus back on (`scoring.homeBonus`).
 - Each week runs **once**, as a single real random roll per check and battle
   **[D-13, details to come]**. The rolls are recorded in the event log, so the
   result is final and auditable, though not re-derivable from a seed.
 - **Projected points** are the exact expected points for the lineup on that
   mission (no dice). They are published next to actual points after the run.
-  Missions are public (§11), so managers can also work them out before the
-  lock **[OPEN D-42]**.
+  While missions are public (§11), managers can also work them out before
+  the lock **[D-42]**. Once missions are hidden **[D-08]**, they can't.
 
 ## 8. Standings
 
 - **League table** **[D-04]:** no matchups. Every week, every tavern runs the
   same mission against the whole league. Standings rank taverns by **total
   loot** over the season.
-- **Ties** **[D-14]:** no tiebreakers. Equal totals share a rank, and a tie
-  for first gives co-champions. A tiebreak at season end only, if one is
-  ever wanted, is still open.
+- **Ties** **[D-14]:** equal totals share a rank. A tie for first at season
+  end goes to the tavern with fewer DNFs over the season, and gives
+  co-champions only if that is tied too.
 - **No playoffs.** The champion is the top of the table after the last week.
 
 ## 9. Free agents and waivers
@@ -128,10 +171,14 @@
   agent and drops one rostered character if the roster is full.
 - Claims resolve **once a week, after the run** (Friday 12:00 UTC), all
   together.
-- **Rolling priority** **[OPEN D-05]:** initial order is reverse draft order.
-  Each claim, in priority order, is awarded if the character is still
-  available and the drop is still legal. A tavern that wins a claim moves to
-  the back of the order. A tavern's own claims are tried in submission order.
+- **Reverse-standings priority** **[D-05, not built yet]:** each window, the
+  lowest tavern on the table claims first. Ties on the table go to reverse
+  draft order. Each claim, in priority order, is awarded if the character is
+  still available and the drop is still legal. Winning a claim doesn't move a
+  tavern: the order is rebuilt from the standings every week. A tavern's own
+  claims are tried in submission order. *(Until this is built: rolling
+  priority, initial order reverse draft, and a tavern that wins a claim moves
+  to the back.)*
 - Dropped characters become free agents at once and can be claimed in the
   next window.
 - A character claimed or dropped after the lock still played this week for its
@@ -154,20 +201,21 @@
 
 | When | Public |
 |---|---|
-| Season announced | Config, schedule (title, environment, theme per week), pool with bases and modifiers, character chrome |
-| Once selected | Every mission's full structure. The repo is public and missions aren't secret **[D-08]** |
-| During the season | All rosters, transactions and lineup submissions (issues are public) **[D-24]** |
-| Weekly lock | Every tavern's lineup |
+| Season announced | Config, schedule (title, environment, theme and keywords per week), pool with bases and modifiers, every tavern's god, boon and hex, character chrome |
+| Once selected | Every mission's full structure, for now. *Planned* **[D-08]**: hidden until its week's lock, with only a sha256 commitment public before then |
+| Before the draft | Which manager chose which tavern **[D-52]** |
+| During the season | All rosters, transactions, lineup submissions and declared hexes (issues are public) **[D-24]** |
+| Weekly lock | Every tavern's lineup. *Planned* **[D-08]**: that week's mission |
 | Weekly run | Every tavern's per-node rolls and path, actual and projected points, and the story |
 
 Candidate missions can be committed in plaintext too **[D-18, moot]**.
 
 ## 12. Carryover between seasons
 
-**[OPEN D-11]**. Season 1 defaults, applied when Season 2 is created:
+**[D-11]**. Applied when Season 2 is created:
 
-- Each tavern may **keep 1** character from its final roster. The champion may
-  keep 1 more.
+- Each tavern may **keep 1** character from its final roster. The champion
+  gets no extra keeper.
 - A keeper costs the pick in the round where that character was drafted last
   season. Undrafted pickups cost the last round.
 - A kept character returns with its id, chrome and career history. The GM may
@@ -185,4 +233,7 @@ Candidate missions can be committed in plaintext too **[D-18, moot]**.
   the recorded path and score follow from them.
 - Missions are locked before the draft. Changing a selected mission after
   `season.created` is a rules violation that CI flags.
-- The GM knows every mission **[OPEN D-09]**.
+- The GM knows every mission and may still manage a tavern **[D-09]**.
+  For now missions are locked and public before the draft, and the weekly
+  roll is real, so the GM's only edge is having written them. This is
+  revisited when missions become hidden **[D-08]**.
