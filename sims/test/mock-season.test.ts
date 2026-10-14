@@ -93,7 +93,7 @@ describe('one seeded mock season', () => {
       expect(verifyResolutions(events)).toEqual([]);
     }
     expect(injuries).toBeGreaterThan(10);
-  });
+  }, 30_000); // several whole seasons
 
   it('refuses a lineup with last week\'s injured starter', () => {
     // An injury before the last week whose character is still on a roster after that week's waivers.
@@ -131,7 +131,7 @@ describe('one seeded mock season', () => {
     }
     expect(hexes).toBeGreaterThan(6);
     expect(hexedChecks).toBeGreaterThan(0);
-  });
+  }, 30_000); // several whole seasons
 
   it('pins the sim-1 champion', () => {
     expect(sim1.summary.champions).toEqual([{ tavern: 'the-gilded-flagon', bot: 'skill-coverage' }]);
@@ -163,5 +163,5 @@ describe('many seasons', () => {
     expect(totals.bestProjectedTops.share).toBeGreaterThan(0);
     expect(totals.dnfRate).toBeGreaterThanOrEqual(0);
     expect(totals.dnfRate).toBeLessThan(1);
-  });
+  }, 30_000); // about 5 s on CI, past the 5 s default
 });
