@@ -125,6 +125,16 @@ only the snapshot records used, each pooled character's chrome name, and each
 sponsoring god's chrome (name, call and banner) for display; chrome never
 reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
+In the draft, characters show as cards (`charCard` in `src/playground/app.ts`):
+name and CR, the art (a silhouette until portraits reach the page), the
+monster line with its size in words, AC, HP, speed and best skills. Free
+agents are neutral; your roster wears your banner, and a drafted card turns
+over into it. A Show control swaps the free agents back to the table. When
+the clock comes back to you after a pick, the draft card glows once and its
+heading bounces. In the lineup builder the CR meter jellies when a starter
+still fits the budget and shakes when one doesn't; the engine's reason shows
+below it as before.
+
 Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
 your tavern raises its banner with one burst of party.js sparkles (bundled)
 and micron's swing (its CSS vendored into `page.html` with its MIT notice),
@@ -136,7 +146,9 @@ a breath out for turning back, a dimmed run after a DNF, and nothing for a
 quiet week. A hex takes a second click to declare (it is public and final),
 then lands in the list in your colours with a jolt and a few embers; a rival's
 hex on you opens that week's reveal in the rival's colours before the party
-sets out. The last week's reveal ends the season: if you won, your banner
+sets out. From week 2 the Play standings show how far each tavern moved
+since last week (▲/▼, `tableMoves`), and when a week's reveal ends the rows
+slide from last week's order into this week's. The last week's reveal ends the season: if you won, your banner
 goes up over the final card and the only full-screen confetti in the page
 rises in its colours; if not, you get your week's moment, the champion's flag
 swings in theirs, and the card gives your finish and your best week. The

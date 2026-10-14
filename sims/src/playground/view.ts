@@ -507,6 +507,24 @@ export function bestWeek(
   return best === null ? null : { week: best.week, points: best.points, topped: best.rank === 1 && best.points > 0 };
 }
 
+/**
+ * How each tavern moved in a table since the one before it: the row it was in
+ * (0-based) and the places it rose (negative when it fell). A tavern missing
+ * from `before` is taken to have stood still where it is now.
+ */
+export function tableMoves(
+  before: ReadonlyArray<{ readonly tavern: string; readonly rank: number }>,
+  after: ReadonlyArray<{ readonly tavern: string; readonly rank: number }>,
+): ReadonlyMap<string, { readonly wasRow: number; readonly rose: number }> {
+  const was = new Map(before.map((r, i) => [r.tavern, { row: i, rank: r.rank }]));
+  return new Map(
+    after.map((r, i) => {
+      const w = was.get(r.tavern);
+      return [r.tavern, w === undefined ? { wasRow: i, rose: 0 } : { wasRow: w.row, rose: w.rank - r.rank }];
+    }),
+  );
+}
+
 // ── banners ────────────────────────────────────────────────────────────────
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

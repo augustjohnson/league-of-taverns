@@ -336,3 +336,79 @@ export function hailChampion(card: HTMLElement, banner?: Banner): void {
   }
   micron(card.querySelector('.finish'), 'fade', { duration: 0.9, delay: 0.6 });
 }
+
+/**
+ * A drafted card turns over: it lands in your roster in neutral chrome, turns
+ * away, and comes back in your banner. A nod. Nothing for a card without a
+ * banner, which stays neutral. Timers, not animationend, drive the turn, so a
+ * tab that stops animating (hidden, or the animation cancelled) still ends
+ * with the card face up in your colours.
+ */
+export function turnCard(card: HTMLElement | null): void {
+  if (card === null || reducedMotion() || !card.classList.contains('themed')) return;
+  card.classList.replace('themed', 'neutral');
+  card.classList.add('turning-out');
+  window.setTimeout(() => {
+    card.classList.remove('turning-out');
+    card.classList.replace('neutral', 'themed');
+    card.classList.add('turning-in');
+    window.setTimeout(() => card.classList.remove('turning-in'), 340);
+  }, 230);
+}
+
+/**
+ * The clock comes back to you: once your pick has turned over, the bots have
+ * picked and it is your turn again, so the draft card glows once and its
+ * heading bounces. A nod, after each of your picks only; bot picks stay
+ * quiet. The playground's bots pick at once, so a pulse that ran the whole
+ * time you are on the clock would run the whole draft and mean nothing.
+ */
+export function clockBack(card: HTMLElement | null): void {
+  if (card === null || reducedMotion()) return;
+  window.setTimeout(() => {
+    if (!card.isConnected) return;
+    card.classList.add('clock-back');
+    micron(card.querySelector('h2'), 'bounce', { duration: 0.6 });
+  }, 600);
+}
+
+/**
+ * The CR meter answers a change to the lineup: a jelly when it still fits the
+ * budget, a shake when it no longer does. Only the meter moves; the engine's
+ * reason shows below it as before. A nod.
+ */
+export function nodMeter(meter: Element | null, result: 'fits' | 'over'): void {
+  micron(meter, result === 'over' ? 'shake' : 'jelly', { duration: result === 'over' ? 0.5 : 0.45 });
+}
+
+/**
+ * The table moves: each row starts where it stood last week (`data-was`)
+ * and slides to where it stands now, a little after the one above it, so a
+ * climb or a fall is felt every week and not only at the season's end. The
+ * ▲/▼ column says the same thing in words and stays put.
+ */
+export function slideStandings(table: HTMLTableElement | null): void {
+  if (table === null || reducedMotion() || !table.isConnected) return;
+  const rows = [...table.querySelectorAll<HTMLElement>('tbody tr[data-was]')];
+  const height = rows[0]?.getBoundingClientRect().height ?? 0;
+  const moved = rows.filter((row, i) => {
+    const dy = (Number(row.dataset.was) - i) * height;
+    if (dy === 0 || Number.isNaN(dy)) return false;
+    row.style.transition = 'none';
+    row.style.transform = `translateY(${dy}px)`;
+    return true;
+  });
+  if (moved.length === 0) return;
+  void table.offsetHeight; // lay the rows out where they were before letting them go
+  moved.forEach((row, i) => {
+    row.classList.add('sliding');
+    row.style.transition = `transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) ${0.25 + 0.06 * i}s`;
+    row.style.transform = '';
+  });
+  window.setTimeout(() => {
+    for (const row of moved) {
+      row.classList.remove('sliding');
+      row.style.transition = '';
+    }
+  }, 1600);
+}
