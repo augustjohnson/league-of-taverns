@@ -241,8 +241,6 @@ td.pt-cell { width: 1%; padding-block: 3px; }
 .face { display: inline-flex; align-items: center; gap: 8px; }
 .faces { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .faces .face { gap: 5px; }
-.advice { display: flex; gap: 12px; align-items: flex-start; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--node); }
-.advice .tagline { font-style: italic; color: var(--muted); }
 
 .pick-list { display: grid; gap: 6px; }
 .slot { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--node); }
@@ -275,7 +273,6 @@ svg.odds .hit:hover { fill: color-mix(in srgb, var(--brass) 10%, transparent); }
 /* Small buttons stay big enough to hit */
 button.small { padding: 4px 10px; font-size: 12.5px; min-height: 28px; }
 /* Lineup builder: starters and bench as two labelled groups */
-tr.advised td { background: var(--brass-soft); }
 td.skills { white-space: normal; min-width: 11em; }
 td.flow { white-space: normal; }
 .graph svg { height: auto; }
@@ -331,7 +328,6 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
   width: 168px; padding: 7px; border-radius: 9px; background: var(--frame); border: 1px solid var(--frame-edge); display: grid; gap: 5px; grid-template-rows: auto auto auto auto 1fr;
   box-shadow: 0 6px 14px -9px rgba(0, 0, 0, 0.45); }
 .lcard.themed { --frame: var(--banner-pattern), var(--banner-ground); --frame-edge: var(--banner-line); --face: var(--banner-bg); --accent: var(--banner-line); --accent-ink: var(--banner-ink); }
-.lcard.advised { outline: 2px solid var(--brass); outline-offset: 2px; }
 /* A character who can't play this week (injured): greyed, the foot's tag left clear. */
 .lcard.dim > :not(.card-foot) { opacity: 0.5; filter: grayscale(0.8); }
 .lcard > * { background: var(--face); border-radius: 4px; min-width: 0; }

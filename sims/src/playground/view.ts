@@ -270,15 +270,12 @@ export function draftBoard(order: ReadonlyArray<string>, picks: ReadonlyArray<Dr
 }
 
 /**
- * The crier's notes on a pick (the draft log, app.ts draftLogHtml). `steal`
- * and `reach` measure the pick against where the bots usually take that
- * character (its average draft position, `adp`, 0-based): a steal comes
- * `STEAL_ROUNDS` rounds or more after it, a reach `REACH_ROUNDS` or more
- * before it. `sniped` is a rival taking the character your advisor suggested
- * at your last turn, the one you passed on; `advice` is you taking that
- * suggestion.
+ * The crier's notes on a pick (the draft log, app.ts draftLogHtml): each
+ * pick against where the bots usually take that character (its average draft
+ * position, `adp`, 0-based). A steal comes `STEAL_ROUNDS` rounds or more
+ * after it, a reach `REACH_ROUNDS` or more before it.
  */
-export type DraftNote = 'steal' | 'reach' | 'sniped' | 'advice';
+export type DraftNote = 'steal' | 'reach';
 
 /**
  * Rounds from the average draft position that make a steal or a reach. A reach
@@ -299,24 +296,17 @@ export interface DraftCall extends DraftCell {
 export function draftCalls(
   picks: ReadonlyArray<DraftCell>,
   adp: ReadonlyMap<string, number>,
-  { me, teams, advice }: { readonly me: string | null; readonly teams: number; readonly advice: ReadonlyMap<number, string> },
+  teams: number,
 ): ReadonlyArray<DraftCall> {
   // Earliest first; ties by id, so the order never depends on map order.
   const ranked = [...adp.keys()].sort((a, b) => adp.get(a)! - adp.get(b)! || (a < b ? -1 : a > b ? 1 : 0));
   const taken = new Set<string>();
-  let advised: string | null = null;
   return picks.map((p) => {
     const at = adp.get(p.character) ?? null;
     const board = ranked.filter((id) => !taken.has(id)).slice(0, 3);
     const notes: DraftNote[] = [];
     if (at !== null && p.pick - at >= STEAL_ROUNDS * teams) notes.push('steal');
     if (at !== null && at - p.pick >= REACH_ROUNDS * teams) notes.push('reach');
-    if (p.tavern === me) {
-      advised = advice.get(p.pick) ?? null;
-      if (advised === p.character) notes.push('advice');
-    } else if (advised !== null && advised === p.character) {
-      notes.push('sniped');
-    }
     taken.add(p.character);
     return { ...p, adp: at, notes, board };
   });
