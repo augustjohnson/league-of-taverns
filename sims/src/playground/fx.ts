@@ -386,17 +386,16 @@ export function clockBack(card: HTMLElement | null): void {
   }, 600);
 }
 
-/** Milliseconds for the crier's beats: your own pick, a rival's eye running over the board, the pause after a pick lands, a snipe's sting. */
-const CALL = { mine: 600, choosing: 750, landed: 320, sniped: 700, round: 260 } as const;
+/** Milliseconds for the crier's beats: your own pick, a rival's eye running over the board, the pause after a pick lands. */
+const CALL = { mine: 600, choosing: 750, landed: 320, round: 260 } as const;
 
 /**
  * The draft log (app.ts draftLogHtml): the crier calls the picks your move
  * caused, one at a time, after `delay` ms. Your own pick lands at once. For a
- * rival's, the tavern is "choosing" while the name flickers through the best
- * values left on the board (`data-board`), then it settles on the real pick,
- * with its portrait and the crier's notes: a steal pops, and a rival sniping
- * your advisor's pick stings with a jolt. Until it ends the card is
- * `.revealing`, and page.html hides the sections below it (the clock, the
+ * rival's, the tavern is "choosing" while the name flickers through who
+ * usually goes next (`data-board`), then it settles on the real pick, with
+ * its portrait and the crier's notes (a steal pops). Until it ends the card
+ * is `.revealing`, and page.html hides the sections below it (the clock, the
  * free agents) so they don't give the picks away. Skip (or Esc) shows them
  * all at once; `then` runs when it ends, skipped or not, or at once with
  * nothing to call or under reduced motion.
@@ -465,9 +464,7 @@ export function revealDraft(card: HTMLElement, { delay = 0, then }: { delay?: nu
       if (verb !== null) verb.textContent = takes;
       line.classList.remove('choosing');
       micron(line.querySelector('.tag.good'), 'pop', { duration: 0.4 });
-      const sniped = line.querySelector('[data-sniped]') !== null;
-      if (sniped) micron(line, 'jerk', { duration: 0.6 });
-      await sleep(sniped ? CALL.sniped : CALL.landed);
+      await sleep(CALL.landed);
     }
     finish();
   })();

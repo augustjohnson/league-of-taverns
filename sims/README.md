@@ -77,14 +77,14 @@ The tabs:
 
 - **Play vs bots:** manage one tavern yourself against the bots. Pick a
   tavern and a seed and start; draft when you are on the clock (the crier
-  calls every pick as it happens, free agents as cards or a table, sorted by the bots' `valueOf` rating, the advisor's pick
-  marked; portraits on your roster, the free agents and the board), then
-  before each week set a lineup (starters and bench as two decks of cards, with
+  calls every pick as it happens, free agents as cards or a table, sorted
+  by the bots' `valueOf` rating; portraits on your roster, the free agents
+  and the board), then before each week set a lineup (starters and bench as
+  two decks of cards, empty in week 1 and last week's after that, with
   `validateLineup`, the projection and the mission graph live) and make waiver
   claims, and press Play week, which locks in the lineup on screen (it stays
   disabled while that lineup is illegal). The bots draft, set lineups and
-  claim through the same `SeasonSession`. Your tavern's bot stays on as an
-  advisor that can suggest a pick, a lineup or claims. Your events carry a
+  claim through the same `SeasonSession`; nothing suggests your moves. Your events carry a
   `manager` actor. The season is saved in the browser's localStorage as its
   seed, tavern and your moves, and replayed on reload; New season asks for a
   second click before abandoning one in progress. When the season ends it is
@@ -155,8 +155,7 @@ the crier calls the draft pick by pick (`revealDraft`): after your pick,
 each rival's tavern is "choosing" while names flicker through who usually
 goes next, then its pick lands with a portrait and the crier's notes
 (`draftCalls`: a steal a round or more past its average draft position, a
-reach three or more before it, *sniped* when a rival takes the pick your
-advisor suggested and you passed on), and the sections below the log stay
+reach three or more before it), and the sections below the log stay
 hidden until the last call, so the free agents don't give it away. The log
 stays up until week 1 is played, so the draft's last picks land too. And
 playing a week plays your run back node by node in the scrying ball:

@@ -120,7 +120,6 @@ const crOf = (id: string): CrEighths => {
 const tavernById = new Map(input.taverns.map((t) => [t.id, t]));
 const tavernName = (id: string): string => tavernById.get(id)?.name ?? id;
 const botOf = (id: string): string => run?.result.summary.taverns.find((t) => t.tavern === id)?.bot ?? '?';
-const managerBot = (id: string): string => input.managers.find((m) => m.id === id)?.bot ?? '?';
 const layouts = new Map<number, GraphLayout>(WEEKS.map((w) => [w, layoutMission(missionOf(w))]));
 
 // Banners: each tavern fights under its god's colours (chrome from gods/<id>/god.yaml). One generated rule per god sets
@@ -1466,8 +1465,7 @@ function startBatch(): void {
 /** One of the person's moves. A season is its seed, its tavern and these, replayed in order, so it can be saved and restored. */
 type PlayMove =
   | { readonly t: 'tavern'; readonly id: string }
-  /** `advice` is what the advisor suggested when you picked, kept for the draft log's notes (seasons saved before it have none). */
-  | { readonly t: 'draft'; readonly id: string; readonly advice?: string }
+  | { readonly t: 'draft'; readonly id: string }
   | { readonly t: 'lineup'; readonly starters: ReadonlyArray<string>; readonly retreat: RetreatOrder }
   | { readonly t: 'claim'; readonly add: string; readonly drop: string | null }
   | { readonly t: 'hex'; readonly target: string; readonly ability: Ability; readonly week: number }
@@ -1487,7 +1485,7 @@ const PLAY_FINGERPRINT = `${data.version}:${config.id}:${data.configSha256}:${in
 
 const play = {
   session: null as SeasonSession | null,
-  /** The manager seat the person takes; its bot stays on as the advisor. */
+  /** The manager seat the person takes. */
   manager: input.managers[0]?.id ?? '',
   seed: '',
   error: null as string | null,
@@ -1641,13 +1639,13 @@ function myRoster(s: SeasonSession): ReadonlyArray<string> {
   return s.state.taverns.get(s.humanTavern!)?.roster ?? [];
 }
 
-/** Point the builder at the next week: the submitted lineup, else last week's, else the advisor's. Drops anyone no longer on the roster. */
+/** Point the builder at the next week: the submitted lineup, else last week's, else nobody. Drops anyone no longer on the roster. */
 function syncBuilder(s: SeasonSession, week: number): void {
   const roster = new Set(myRoster(s));
   if (play.builderWeek !== week) {
     play.builderWeek = week;
     const me = s.humanTavern!;
-    const lineup = s.pendingLineup() ?? s.state.lockedLineups.get(week - 1)?.find((l) => l.tavern === me)?.lineup ?? s.suggestLineup();
+    const lineup = s.pendingLineup() ?? s.state.lockedLineups.get(week - 1)?.find((l) => l.tavern === me)?.lineup ?? null;
     play.picks = lineup === null ? [] : [...lineup.starters];
     play.retreat = lineup?.retreat ?? 'never';
   }
@@ -1690,7 +1688,7 @@ const SILHOUETTE =
  */
 function charCard(
   id: string,
-  { owner = null, foot = '', advised = false, dim = false }: { owner?: string | null; foot?: string; advised?: boolean; dim?: boolean } = {},
+  { owner = null, foot = '', dim = false }: { owner?: string | null; foot?: string; dim?: boolean } = {},
 ): string {
   const st = input.statsOf(id);
   const themed = owner !== null && bannerOf(owner) !== null;
@@ -1700,7 +1698,7 @@ function charCard(
   const epithet = chromeOf(id)?.epithet;
   const face = chromeOf(id)?.face !== undefined;
   return (
-    `<article class="lcard ${themed ? 'themed' : 'neutral'}${advised ? ' advised' : ''}${dim ? ' dim' : ''}" data-card="${esc(id)}"${themed ? bannerAttr(owner) : ''}>` +
+    `<article class="lcard ${themed ? 'themed' : 'neutral'}${dim ? ' dim' : ''}" data-card="${esc(id)}"${themed ? bannerAttr(owner) : ''}>` +
     `<header><div class="who"><b>${esc(charName(id))}</b>${epithet === undefined ? '' : `<span>${esc(epithet)}</span>`}</div><span class="cr" title="Challenge rating">${formatCr(crOf(id))}</span></header>` +
     (face
       ? `<div class="art has-face" data-art="${esc(id)}"><span class="face" role="img" aria-label="${esc(charName(id))}"></span></div>`
@@ -1745,7 +1743,7 @@ function renderPlay(): string {
 }
 
 function renderPlaySetup(): string {
-  const options = input.managers.map((m) => `<option value="${esc(m.id)}" ${m.id === play.manager ? 'selected' : ''}>${esc(m.id)} (advisor: ${esc(m.bot)})</option>`).join('');
+  const options = input.managers.map((m) => `<option value="${esc(m.id)}" ${m.id === play.manager ? 'selected' : ''}>${esc(m.id)}</option>`).join('');
   return (
     `<section class="card"><h2>Play vs bots</h2>` +
     `<p>Manage one tavern yourself against ${input.managers.length - 1} bots. Before the draft, everyone chooses a tavern in reverse draft order. Then draft when you are on the clock, and before each week set a lineup and make waiver claims, and play the week. ` +
@@ -1753,7 +1751,7 @@ function renderPlaySetup(): string {
     `<div class="row"><label class="label" for="play-tavern">Your seat</label><select id="play-tavern" data-action="play-tavern">${options}</select>` +
     `<label class="label" for="play-seed">Seed</label><input type="text" id="play-seed" data-action="play-seed" placeholder="random" value="${esc(play.seed)}" spellcheck="false" autocomplete="off">` +
     `<button type="button" class="primary" data-action="play-start">Start season</button></div>` +
-    `<p class="hint">Your seat's bot stays on as your advisor and can suggest a pick, a lineup or waiver claims. The seed drives the draft order, the bots and the dice, so the same seed and the same moves give the same season. ` +
+    `<p class="hint">The seed drives the draft order, the bots and the dice, so the same seed and the same moves give the same season. ` +
     `Your season is saved in this browser as you play, and when it ends it loads into the other tabs.</p></section>`
   );
 }
@@ -1814,7 +1812,6 @@ function ordinal(n: number): string {
 /** The tavern pick (D-52): every tavern is already blessed by its god; you choose a tavern, not a god. */
 function renderPlayTavernPick(s: SeasonSession): string {
   const open = new Set(s.openTaverns());
-  const advice = s.suggestTavern();
   const weekOf = (tavern: string): number | null => {
     const god = s.state.sponsors.find((sp) => sp.tavern === tavern)?.id;
     return s.state.schedule.find((w) => w.sponsor === god)?.week ?? null;
@@ -1825,7 +1822,7 @@ function renderPlayTavernPick(s: SeasonSession): string {
       const god = s.state.sponsors.find((sp) => sp.tavern === t.id)?.id;
       const week = weekOf(t.id);
       const action = open.has(t.id)
-        ? `<button type="button" class="${t.id === advice ? 'primary ' : ''}small" data-action="play-tavern-pick" data-id="${esc(t.id)}">Choose</button>`
+        ? `<button type="button" class="small" data-action="play-tavern-pick" data-id="${esc(t.id)}">Choose</button>`
         : `<span class="muted small">${esc(owner ?? '')}</span>`;
       const banner = bannerOf(t.id);
       const flag = banner === null ? '' : `<i class="flag" aria-hidden="true"></i> `;
@@ -1858,21 +1855,13 @@ function draftLogHtml(s: SeasonSession): string {
   const me = s.humanTavern;
   const teams = s.state.managers.size;
   const picks = s.events.flatMap((e) => (e.type === 'draft.pick' ? [e.payload] : []));
-  // Your picks in order pair with your draft moves in order: that is where each one's advice was kept.
-  const mine = picks.filter((p) => p.tavern === me);
-  const moves = play.moves.filter((m): m is Extract<PlayMove, { t: 'draft' }> => m.t === 'draft');
-  const advice = new Map(mine.flatMap((p, i) => (moves[i]?.advice === undefined ? [] : [[p.pick, moves[i]!.advice!] as const])));
-  const calls = draftCalls(picks, ADP, { me, teams, advice });
+  const calls = draftCalls(picks, ADP, teams);
   const freshFrom = me === null ? 0 : Math.max(0, picks.map((p) => p.tavern).lastIndexOf(me));
   const usually = (c: (typeof calls)[number]): string => `Usually goes around pick ${Math.round(c.adp ?? 0) + 1}; taken at ${c.pick + 1}`;
   const note = (c: (typeof calls)[number], n: (typeof c.notes)[number]): string =>
     n === 'steal'
       ? `<span class="tag good" title="${usually(c)}">steal</span>`
-      : n === 'reach'
-        ? `<span class="tag" title="${usually(c)}">reach</span>`
-        : n === 'sniped'
-          ? `<span class="tag bad" data-sniped title="Your advisor's pick at your last turn">sniped</span>`
-          : `<span class="tag brass" title="Your advisor's pick">advisor's pick</span>`;
+      : `<span class="tag" title="${usually(c)}">reach</span>`;
   const lines = calls.flatMap((c, i) => {
     const round = Math.floor(c.pick / teams);
     const fresh = i >= freshFrom ? ' fresh' : '';
@@ -1902,7 +1891,6 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
   const n = s.state.managers.size;
   const picks = s.events.flatMap((e) => (e.type === 'draft.pick' ? [e.payload] : []));
   const mine = myRoster(s);
-  const advice = s.suggestPick();
   const q = play.filter.trim().toLowerCase();
   const available = freeAgents(s.state);
   const values = s.draftValues(available);
@@ -1910,19 +1898,16 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     .filter((id) => matchesFilter(id, q))
     .sort((a, b) => (play.draftSort === 'value' ? values.get(b)! - values.get(a)! : crOf(b) - crOf(a)) || charName(a).localeCompare(charName(b)));
   const draftButton = (id: string): string =>
-    `<button type="button" class="${id === advice ? 'primary ' : ''}small" data-action="play-draft" data-id="${esc(id)}">Draft</button>`;
+    `<button type="button" class="small" data-action="play-draft" data-id="${esc(id)}">Draft</button>`;
   const rows = shown
     .map((id) => {
-      const advised = id === advice;
-      const extra = `<td class="n small">${values.get(id)!.toFixed(2)}</td><td>${advised ? '<span class="tag brass">advisor</span>' : ''}</td>`;
-      return charRow(id, draftButton(id), extra).replace('<tr>', advised ? '<tr class="advised">' : '<tr>');
+      return charRow(id, draftButton(id), `<td class="n small">${values.get(id)!.toFixed(2)}</td>`);
     })
     .join('');
   const cards = shown
     .map((id) =>
       charCard(id, {
-        advised: id === advice,
-        foot: `${draftButton(id)}<span class="small muted" title="The bots' rating">value ${values.get(id)!.toFixed(2)}</span>${id === advice ? '<span class="tag brass">advisor</span>' : ''}`,
+        foot: `${draftButton(id)}<span class="small muted" title="The bots' rating">value ${values.get(id)!.toFixed(2)}</span>`,
       }),
     )
     .join('');
@@ -1940,8 +1925,6 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     .join('');
   return (
     `<section class="card" id="play-clock"><div class="row" style="justify-content:space-between"><h2>You are on the clock</h2><span class="muted small">pick #${pick + 1}, round ${Math.floor(pick / n) + 1} of ${config.draft.rounds}</span></div>` +
-    `<p class="small">Advisor (${esc(managerBot(s.human!.manager))}) suggests ${charChip(advice)} <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
-    `<button type="button" class="primary small" data-action="play-draft" data-id="${esc(advice)}">Take it</button></p>` +
     `<div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
     (mine.length === 0 ? '<p class="muted small">Nobody yet.</p>' : `<div class="deck" id="play-roster">${mine.map((id) => charCard(id, { owner: me })).join('')}</div>`) +
     `<p class="hint">Each week you start ${config.roster.starters} with total CR at most ${formatCr(BUDGET)}.</p></div></section>` +
@@ -1950,15 +1933,14 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     `<label class="label" for="play-fa-view">Show</label><select id="play-fa-view" data-action="play-fa-view"><option value="cards" ${play.faView === 'cards' ? 'selected' : ''}>cards</option><option value="table" ${play.faView === 'table' ? 'selected' : ''}>table</option></select></div>` +
     (play.faView === 'cards'
       ? `<div id="play-fa" class="deck">${cards || '<p class="muted">No match.</p>'}</div>`
-      : `<div id="play-fa" class="scroll"><table><thead><tr>${CHAR_HEAD}<th class="n" title="The bots' rating: battle strength plus skill breadth, per CR">value</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="muted">No match.</td></tr>'}</tbody></table></div>`) +
-    `<p class="hint">Value is the bots' rating: battle strength plus skill breadth, per CR, with the cheapest picks rated as if they cost more, since unspent budget is worth nothing. Your advisor also weighs your roster so far.</p></section>` +
+      : `<div id="play-fa" class="scroll"><table><thead><tr>${CHAR_HEAD}<th class="n" title="The bots' rating: battle strength plus skill breadth, per CR">value</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted">No match.</td></tr>'}</tbody></table></div>`) +
+    `<p class="hint">Value is the bots' rating: battle strength plus skill breadth, per CR, with the cheapest picks rated as if they cost more, since unspent budget is worth nothing.</p></section>` +
     `<section class="card"><h3>Draft board</h3><div class="scroll"><table class="draft"><thead><tr><th>round</th>${s.state.draft.order
       .map((t) => `<th class="${t === me ? 'hot' : ''}">${esc(tavernName(t))}</th>`)
       .join('')}</tr></thead><tbody>${boardRows || `<tr><td colspan="${n + 1}" class="muted">No picks yet.</td></tr>`}</tbody></table></div></section>`
   );
 }
 
-/** The advisor's pick as a card: portrait, name, base and tagline, and a button to take it. */
 function renderPlayWeek(s: SeasonSession, week: number): string {
   const me = s.humanTavern!;
   const mission = missionOf(week);
@@ -2012,7 +1994,6 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
         `<div><span class="label">chance to turn back</span><span class="v">${pct(projection.pRetreat)}</span></div></div>` +
         (home ? `<p class="hint">Includes your home bonus (× ${config.scoring.homeBonus}).</p>` : '') +
         retreatTable(partyFrom(lineup!.starters, input.statsOf, hexOn(s.state, me, week)), mission, play.retreat, home)) +
-    `<div class="row"><button type="button" data-action="play-lu-advice">Use the advisor's lineup</button></div>` +
     (projection === null ? '' : graphSvg(layouts.get(week)!, { reach: projection.reach }) + graphLegend({ reach: projection.reach })) +
     `</section>`;
 
@@ -2020,7 +2001,6 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
   if (week < config.weeks) {
     const fa = freeAgents(s.state);
     const claims = s.pendingClaims().filter((c) => c.tavern === me);
-    const advice = s.suggestClaims();
     waivers =
       `<section class="card"><h2>Waivers</h2>` +
       `<p class="small muted">Claims resolve after week ${week}'s run, in waiver priority order (yours: ${waiverPriority(s.state).indexOf(me) + 1} of ${waiverPriority(s.state).length}${config.waivers.priority === 'reverse_standings' ? ', lowest on the table first' : ''}). A claim cannot be withdrawn.</p>` +
@@ -2031,12 +2011,6 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
         .map((id) => `<option value="${esc(id)}" ${id === play.drop ? 'selected' : ''}>${esc(charName(id))} (CR ${formatCr(crOf(id))})</option>`)
         .join('')}</select>` +
       `<button type="button" data-action="play-claim" ${play.add === '' ? 'disabled' : ''}>Claim</button></div>` +
-      `<p class="small">Advisor: ${
-        advice.length === 0
-          ? '<span class="muted">no claims</span>'
-          : advice.map((c) => `+${esc(charName(c.add))}${c.drop === null ? '' : ` −${esc(charName(c.drop))}`}`).join(', ') +
-            ` <button type="button" class="small" data-action="play-claim-advice">Make these claims</button>`
-      }</p>` +
       (claims.length === 0 ? '' : `<p class="small">Your pending claims: ${claims.map((c) => `+<b>${esc(charName(c.add))}</b>${c.drop === null ? '' : ` −${esc(charName(c.drop))}`}`).join('; ')}</p>`) +
       `</section>`;
   }
@@ -2045,7 +2019,7 @@ function renderPlayWeek(s: SeasonSession, week: number): string {
     ? `Plays the lineup above: ${starters.map((id) => esc(charName(id))).join(', ')}. The bots set their lineups and claims when you play the week.`
     : stuck
       ? '<span class="fail">No legal lineup exists on your roster, so you will score 0 this week.</span> Claim cheaper characters on waivers.'
-      : '<span class="fail">Your lineup is not legal yet.</span> Fix it above, or use the advisor\'s lineup, to play the week.';
+      : '<span class="fail">Your lineup is not legal yet.</span> Fix it above to play the week.';
   return (
     lineupCardHtml +
     renderPlayHex(s, week) +
@@ -2366,14 +2340,8 @@ function playClick(action: string, id: string | undefined): boolean {
     case 'play-draft':
       // The drafted card turns over into your colours once it lands in your roster.
       // The crier calls your pick and the bots' after it; then the drafted card turns over into your colours.
-      if (id !== undefined && play.session !== null) {
-        let advice: string | undefined;
-        try {
-          advice = play.session.suggestPick();
-        } catch {
-          advice = undefined;
-        }
-        playMoves([{ t: 'draft', id, ...(advice === undefined ? {} : { advice }) }], () => {
+      if (id !== undefined) {
+        playMoves([{ t: 'draft', id }], () => {
           pendingFx = () =>
             revealMyDraft(0, () => {
               turnCard(panel.querySelector<HTMLElement>(`#play-roster [data-card="${CSS.escape(id)}"]`));
@@ -2400,19 +2368,6 @@ function playClick(action: string, id: string | undefined): boolean {
         renderTab();
       }
       return true;
-    case 'play-lu-advice':
-      playAct((s) => {
-        const lineup = s.suggestLineup();
-        if (lineup === null) throw new Error('The advisor finds no legal lineup on this roster.');
-        const added = lineup.starters.filter((p) => !play.picks.includes(p));
-        play.picks = [...lineup.starters];
-        play.retreat = lineup.retreat;
-        pendingFx = () => {
-          for (const p of added) turnCard(panel.querySelector<HTMLElement>(`#play-starters [data-card="${CSS.escape(p)}"]`));
-          nodMeter(panel.querySelector('#play-lineup .meter'), 'fits');
-        };
-      });
-      return true;
     case 'play-hex':
       play.confirmHex = true;
       renderTab();
@@ -2438,11 +2393,6 @@ function playClick(action: string, id: string | undefined): boolean {
         play.drop = '';
       });
       return true;
-    case 'play-claim-advice': {
-      const s = play.session;
-      if (s !== null) playMoves(s.suggestClaims().map(({ add, drop }) => ({ t: 'claim', add, drop })));
-      return true;
-    }
     case 'play-week': {
       // Playing the week locks in the lineup on screen: what you see is what plays.
       const s = play.session;
