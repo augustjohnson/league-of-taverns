@@ -990,6 +990,25 @@ function summarize(
 
 // ── many runs ──────────────────────────────────────────────────────────────
 
+/**
+ * Each pooled character's average draft position (0-based) over `runs`
+ * all-bot drafts (seeds `adp-1`, `adp-2`, ...), a character a draft left
+ * unpicked counting as the pick after the last. Where the bots usually take
+ * someone: the playground's draft log calls a pick against it (steal, reach).
+ * Pure; drafts only, no weeks.
+ */
+export function averageDraftPositions(input: SeasonInput, runs = 100): ReadonlyMap<string, number> {
+  const pool = input.pool.map((p) => p.character.ref.id);
+  const total = new Map(pool.map((id) => [id, 0]));
+  for (let n = 1; n <= runs; n++) {
+    const session = new SeasonSession(input, { seed: `adp-${n}` });
+    session.advanceDraft();
+    const at = new Map(session.events.flatMap((e) => (e.type === 'draft.pick' ? [[e.payload.character, e.payload.pick] as const] : [])));
+    for (const id of pool) total.set(id, total.get(id)! + (at.get(id) ?? at.size));
+  }
+  return new Map(pool.map((id) => [id, total.get(id)! / runs]));
+}
+
 /** Run n's seed (1-based): the base seed itself for run 1, so one run reproduces `runMockSeason({ seed })`; then `<seed>~<n>`. */
 export function runSeed(seed: string, n: number): string {
   return n === 1 ? seed : `${seed}~${n}`;

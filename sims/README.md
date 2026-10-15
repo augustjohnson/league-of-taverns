@@ -76,8 +76,8 @@ modifiers), so every character has a face. It loads seed `sim-1` on open.
 The tabs:
 
 - **Play vs bots:** manage one tavern yourself against the bots. Pick a
-  tavern and a seed and start; draft when you are on the clock (free agents
-  as cards or a table, sorted by the bots' `valueOf` rating, the advisor's pick
+  tavern and a seed and start; draft when you are on the clock (the crier
+  calls every pick as it happens, free agents as cards or a table, sorted by the bots' `valueOf` rating, the advisor's pick
   marked; portraits on your roster, the free agents and the board), then
   before each week set a lineup (starters and bench as two decks of cards, with
   `validateLineup`, the projection and the mission graph live) and make waiver
@@ -129,9 +129,10 @@ The tabs:
 How it is built: `src/build-playground.ts` loads the season with the scripts
 loaders (`loadMockSeasonParts`), serializes it with `serializeSeason`
 (`src/playground/data.ts`: the config, schedule, taverns, pool, missions,
-only the snapshot records used, each pooled character's chrome name, and each
-sponsoring god's chrome (name, call and banner) for display; chrome never
-reaches the engine), bundles `src/playground/app.ts` with esbuild
+only the snapshot records used, each pooled character's chrome name, each
+sponsoring god's chrome (name, call and banner), and each character's
+average draft position over 100 all-bot drafts (`averageDraftPositions`),
+for display; none of it reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
 In the draft, characters show as cards (`charCard` in `src/playground/app.ts`):
 name, epithet and CR, the art (the portrait's face crop over a blurred copy
@@ -150,7 +151,15 @@ below it as before.
 Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
 your tavern raises its banner with one burst of party.js sparkles (bundled)
 and micron's swing (its CSS vendored into `page.html` with its MIT notice),
-and playing a week plays your run back node by node in the scrying ball:
+the crier calls the draft pick by pick (`revealDraft`): after your pick,
+each rival's tavern is "choosing" while names flicker through who usually
+goes next, then its pick lands with a portrait and the crier's notes
+(`draftCalls`: a steal a round or more past its average draft position, a
+reach three or more before it, *sniped* when a rival takes the pick your
+advisor suggested and you passed on), and the sections below the log stay
+hidden until the last call, so the free agents don't give it away. The log
+stays up until week 1 is played, so the draft's last picks land too. And
+playing a week plays your run back node by node in the scrying ball:
 dice tumble before they settle, the loot counter climbs, and a DNF drains it
 to 0. The reveal ends in a moment sized to the week (`weekOutcome`): confetti
 in your banner's colours for topping it, sparkles for beating the projection,

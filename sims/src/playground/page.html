@@ -169,6 +169,7 @@ tr.champ td:first-child { box-shadow: inset 3px 0 0 var(--brass); }
 .tag { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; color: var(--muted); }
 .tag.brass { border-color: var(--brass); color: var(--brass); }
 .tag.bad { border-color: var(--bad); color: var(--bad); }
+.tag.good { border-color: var(--good); color: var(--good); }
 
 /* Mission graph */
 .graph { overflow-x: auto; background: var(--sunken); border: 1px solid var(--line); border-radius: var(--radius); }
@@ -382,6 +383,26 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 @media (prefers-reduced-motion: reduce) {
   .banner-card.raised, .banner-card.raised *, [class*="mjs-"] { animation: none !important; }
 }
+
+/* The draft log (app.ts draftLogHtml, fx.ts revealDraft): the crier calls each pick under the tavern's flag; your own
+   lines sit in your banner. While the card is .revealing, the picks your move caused come in one by one (.shown) and
+   every section after the card stays hidden, so the free agents don't give the picks away. A rival's line reads
+   "is choosing" while the name flickers, its portrait and notes held back until it lands. */
+.draft-log { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; max-height: 19em; overflow-y: auto; overscroll-behavior: contain; }
+.draft-log > li { display: flex; gap: 8px; align-items: center; padding: 2px 6px; border-radius: var(--radius); min-height: 32px; }
+.draft-log > li.round { min-height: 0; padding-top: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+.draft-log > li.done { color: var(--muted); font-style: italic; }
+.draft-log .pk { flex: none; min-width: 2em; text-align: right; font: 11px var(--font-num); color: var(--muted); }
+.draft-log .line { display: flex; flex-wrap: wrap; gap: 0 5px; align-items: center; min-width: 0; }
+.draft-log .flag { width: 20px; height: 13px; border-left-width: 4px; }
+.draft-log > li.mine { background: var(--banner-bg, var(--brass-soft)); color: var(--banner-ink, var(--ink)); }
+.draft-log > li.mine .muted { color: inherit; opacity: 0.75; }
+.draft-log-card:not(.revealing) [data-reveal-skip] { display: none; }
+.draft-log-card.revealing ~ * { display: none !important; }
+.draft-log-card.revealing .draft-log > li.fresh:not(.shown) { display: none; }
+.draft-log-card.revealing .draft-log > li.shown { animation: banner-rise 0.3s ease-out both; }
+.draft-log li.choosing .landed { visibility: hidden; }
+.draft-log li.choosing .who { color: var(--muted); font-weight: 400; }
 
 /* The week reveal (fx.ts revealWeek): the scrying ball plays your run back. While the card is .revealing, the path,
    the outcomes, everything marked data-spoiler and every section after the card stay hidden; .shown brings each piece

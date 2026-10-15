@@ -269,6 +269,59 @@ export function draftBoard(order: ReadonlyArray<string>, picks: ReadonlyArray<Dr
   return rows;
 }
 
+/**
+ * The crier's notes on a pick (the draft log, app.ts draftLogHtml). `steal`
+ * and `reach` measure the pick against where the bots usually take that
+ * character (its average draft position, `adp`, 0-based): a steal comes
+ * `STEAL_ROUNDS` rounds or more after it, a reach `REACH_ROUNDS` or more
+ * before it. `sniped` is a rival taking the character your advisor suggested
+ * at your last turn, the one you passed on; `advice` is you taking that
+ * suggestion.
+ */
+export type DraftNote = 'steal' | 'reach' | 'sniped' | 'advice';
+
+/**
+ * Rounds from the average draft position that make a steal or a reach. A reach
+ * needs more: the random bot often takes someone who usually goes undrafted.
+ * On the mock season each fires on about one pick in ten (steal 12%, reach 7%).
+ */
+export const STEAL_ROUNDS = 1;
+export const REACH_ROUNDS = 3;
+
+export interface DraftCall extends DraftCell {
+  /** Where the bots usually take the character (0-based), or null when `adp` has no entry. */
+  readonly adp: number | null;
+  readonly notes: ReadonlyArray<DraftNote>;
+  /** Who usually goes next among those still on the board (up to three, earliest first): who the crier's eye runs over. */
+  readonly board: ReadonlyArray<string>;
+}
+
+export function draftCalls(
+  picks: ReadonlyArray<DraftCell>,
+  adp: ReadonlyMap<string, number>,
+  { me, teams, advice }: { readonly me: string | null; readonly teams: number; readonly advice: ReadonlyMap<number, string> },
+): ReadonlyArray<DraftCall> {
+  // Earliest first; ties by id, so the order never depends on map order.
+  const ranked = [...adp.keys()].sort((a, b) => adp.get(a)! - adp.get(b)! || (a < b ? -1 : a > b ? 1 : 0));
+  const taken = new Set<string>();
+  let advised: string | null = null;
+  return picks.map((p) => {
+    const at = adp.get(p.character) ?? null;
+    const board = ranked.filter((id) => !taken.has(id)).slice(0, 3);
+    const notes: DraftNote[] = [];
+    if (at !== null && p.pick - at >= STEAL_ROUNDS * teams) notes.push('steal');
+    if (at !== null && at - p.pick >= REACH_ROUNDS * teams) notes.push('reach');
+    if (p.tavern === me) {
+      advised = advice.get(p.pick) ?? null;
+      if (advised === p.character) notes.push('advice');
+    } else if (advised !== null && advised === p.character) {
+      notes.push('sniped');
+    }
+    taken.add(p.character);
+    return { ...p, adp: at, notes, board };
+  });
+}
+
 // ── rosters over time ──────────────────────────────────────────────────────
 
 /** Each tavern's roster at week `week`'s lineup lock, by replaying the log up to that `lineup.locked`. Final rosters if the week has no lock. */
