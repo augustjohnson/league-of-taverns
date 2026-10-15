@@ -14,6 +14,9 @@ import {
   bestWeek,
   bannerGods,
   draftBoard,
+  draftCalls,
+  REACH_ROUNDS,
+  STEAL_ROUNDS,
   formatCr,
   formatCrTotal,
   layoutMission,
@@ -245,6 +248,63 @@ describe('table moves', () => {
       c: { wasRow: 2, rose: 0 },
       e: { wasRow: 3, rose: 0 },
     });
+  });
+});
+
+describe('draft calls', () => {
+  // Usually taken in the order a, b, c, d, e, then z (rarely drafted); two teams, so a round is two picks.
+  const adp = new Map([
+    ['z', 9],
+    ['a', 0],
+    ['b', 1.2],
+    ['c', 2],
+    ['d', 3.5],
+    ['e', 4],
+  ]);
+  const pick = (n: number, tavern: string, character: string) => ({ pick: n, tavern, character });
+  const none = { me: null, teams: 2, advice: new Map<number, string>() };
+
+  it(`calls a steal ${STEAL_ROUNDS} round late and a reach ${REACH_ROUNDS} rounds early, against the average draft position`, () => {
+    const calls = draftCalls([pick(0, 'x', 'b'), pick(1, 'y', 'c'), pick(2, 'y', 'z'), pick(3, 'x', 'a'), pick(4, 'x', 'd')], adp, none);
+    expect(calls.map((c) => [c.character, c.adp, c.notes])).toEqual([
+      ['b', 1.2, []],
+      ['c', 2, []],
+      ['z', 9, ['reach']],
+      ['a', 0, ['steal']],
+      ['d', 3.5, []],
+    ]);
+  });
+
+  it('runs its eye over who usually goes next among those left', () => {
+    const calls = draftCalls([pick(0, 'x', 'a'), pick(1, 'y', 'c'), pick(2, 'y', 'b')], adp, none);
+    expect(calls.map((c) => c.board)).toEqual([
+      ['a', 'b', 'c'],
+      ['b', 'c', 'd'],
+      ['b', 'd', 'e'],
+    ]);
+  });
+
+  it('has no average for a character outside it, and no note', () => {
+    expect(draftCalls([pick(9, 'x', 'q')], adp, none)[0]).toMatchObject({ adp: null, notes: [] });
+  });
+
+  it("marks your advisor's pick when you take it, and a rival sniping it when you pass on it", () => {
+    const advice = new Map([
+      [0, 'a'],
+      [3, 'c'],
+    ]);
+    const picks = [pick(0, 'me', 'a'), pick(1, 'y', 'b'), pick(2, 'y', 'd'), pick(3, 'me', 'e'), pick(4, 'y', 'c')];
+    expect(draftCalls(picks, adp, { me: 'me', teams: 2, advice }).map((c) => c.notes)).toEqual([['advice'], [], [], [], ['steal', 'sniped']]);
+  });
+
+  it('snipes only the suggestion from your latest turn, and never your own pick', () => {
+    // Advised b at pick 0 (passed on), c at pick 2 (passed on): b going later is no snipe, c is.
+    const advice = new Map([
+      [0, 'b'],
+      [2, 'c'],
+    ]);
+    const picks = [pick(0, 'me', 'a'), pick(1, 'y', 'd'), pick(2, 'me', 'e'), pick(3, 'y', 'b'), pick(4, 'y', 'c')];
+    expect(draftCalls(picks, adp, { me: 'me', teams: 2, advice }).map((c) => c.notes.includes('sniped'))).toEqual([false, false, false, false, true]);
   });
 });
 

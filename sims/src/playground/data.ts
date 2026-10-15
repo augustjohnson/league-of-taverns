@@ -15,7 +15,7 @@ import type { GodChrome } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInput, type SeasonInput, type SeasonParts } from '../season-runner';
 
 /** Bumped when the shape changes. */
-export const PLAYGROUND_DATA_VERSION = 6;
+export const PLAYGROUND_DATA_VERSION = 7;
 
 /** A character's chrome, for display only. It never reaches `seasonInput` or the engine. */
 export interface PlaygroundChrome {
@@ -37,6 +37,8 @@ export interface PlaygroundData extends SeasonParts {
   readonly chrome: Readonly<Record<string, PlaygroundChrome>>;
   /** Each god's chrome (name, call, banner) by god id, for the page only. Gods missing here show as ids, with no banner. */
   readonly gods: Readonly<Record<string, GodChrome>>;
+  /** Each pooled character's average draft position over all-bot drafts (`averageDraftPositions`), for the draft log's notes. */
+  readonly adp: Readonly<Record<string, number>>;
 }
 
 /** Every Open5e slug a season touches: each pool base and each encounter creature. */
@@ -55,14 +57,15 @@ export function usedSlugs(pool: SeasonParts['pool'], missions: ReadonlyArray<{ r
  * Reduce `parts` to what the page needs. Snapshot records are kept verbatim,
  * in snapshot order, first record per slug, and only for slugs the season
  * uses (`usedSlugs`). Throws if a used slug has no record. `chrome` (the
- * characters') and `gods` (the sponsoring gods') ride along untouched, for
- * display only (the build reads them in Node: ../playground-build.ts).
+ * characters'), `gods` (the sponsoring gods') and `adp` ride along untouched,
+ * for display only (the build makes them in Node: ../playground-build.ts).
  */
 export function serializeSeason(
   parts: SeasonParts,
   source: string,
   chrome: PlaygroundData['chrome'] = {},
   gods: PlaygroundData['gods'] = {},
+  adp: PlaygroundData['adp'] = {},
 ): PlaygroundData {
   const wanted = usedSlugs(parts.pool, parts.missions);
   const kept = new Map<string, Open5eMonster>();
@@ -85,6 +88,7 @@ export function serializeSeason(
     missions: parts.missions,
     snapshot: [...kept.values()],
     chrome,
+    adp,
   };
 }
 

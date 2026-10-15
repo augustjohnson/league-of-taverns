@@ -1,7 +1,7 @@
 import { InvalidEventError, freeAgents } from '@league-of-taverns/engine';
 import { describe, expect, it } from 'vitest';
 import { loadMockSeason } from '../src/load';
-import { SeasonSession, runMockSeason, type HumanSeat } from '../src/season-runner';
+import { SeasonSession, averageDraftPositions, runMockSeason, type HumanSeat } from '../src/season-runner';
 
 // Player vs bots: one tavern managed by a person, a step at a time, through
 // the same engine checks as the all-bot season.
@@ -112,5 +112,22 @@ describe('a season with a human seat', () => {
     session.advanceDraft();
     while (session.stage.kind === 'week') session.playWeek();
     expect(session.finish().ndjson).toBe(runMockSeason(input, { seed: 'sim-1' }).ndjson);
+  });
+});
+
+describe('average draft positions', () => {
+  it('places every pooled character between the first pick and one past the last, the same every time', () => {
+    const picks = input.config.draft.rounds * input.managers.length;
+    const adp = averageDraftPositions(input, 5);
+    expect([...adp.keys()].sort()).toEqual(input.pool.map((p) => p.character.ref.id).sort());
+    for (const at of adp.values()) {
+      expect(at).toBeGreaterThanOrEqual(0);
+      expect(at).toBeLessThanOrEqual(picks);
+    }
+    // Each draft fills every pick once, and each of the pool's leftovers counts as the pick after the last.
+    const sum = [...adp.values()].reduce((t, x) => t + x, 0);
+    const leftovers = input.pool.length - picks;
+    expect(sum).toBeCloseTo((picks * (picks - 1)) / 2 + leftovers * picks, 6);
+    expect(averageDraftPositions(input, 5)).toEqual(adp);
   });
 });

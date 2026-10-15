@@ -61,7 +61,7 @@ import {
 } from '../reports';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 import { seasonInputFromData, type PlaygroundChrome, type PlaygroundData } from './data';
-import { clockBack, crownChampion, hailChampion, layCurse, nodMeter, raiseBanner, revealWeek, slideStandings, turnCard, weekMoment } from './fx';
+import { clockBack, crownChampion, hailChampion, layCurse, nodMeter, raiseBanner, revealDraft, revealWeek, slideStandings, turnCard, weekMoment } from './fx';
 import {
   actorLabel,
   aggregateRows,
@@ -70,6 +70,7 @@ import {
   bannerGods,
   checkLabel,
   draftBoard,
+  draftCalls,
   eventSummary,
   formatCr,
   formatCrTotal,
@@ -503,6 +504,8 @@ function renderTab(): void {
   pendingFx = null;
   if (tab === 'play') {
     panel.innerHTML = renderPlay();
+    const log = panel.querySelector('.draft-log');
+    if (log !== null) log.scrollTop = log.scrollHeight;
     fx?.();
     return;
   }
@@ -1463,7 +1466,8 @@ function startBatch(): void {
 /** One of the person's moves. A season is its seed, its tavern and these, replayed in order, so it can be saved and restored. */
 type PlayMove =
   | { readonly t: 'tavern'; readonly id: string }
-  | { readonly t: 'draft'; readonly id: string }
+  /** `advice` is what the advisor suggested when you picked, kept for the draft log's notes (seasons saved before it have none). */
+  | { readonly t: 'draft'; readonly id: string; readonly advice?: string }
   | { readonly t: 'lineup'; readonly starters: ReadonlyArray<string>; readonly retreat: RetreatOrder }
   | { readonly t: 'claim'; readonly add: string; readonly drop: string | null }
   | { readonly t: 'hex'; readonly target: string; readonly ability: Ability; readonly week: number }
@@ -1727,12 +1731,14 @@ function renderPlay(): string {
   if (s === null) return err + renderPlaySetup();
   const stage = s.stage;
   if (stage.kind === 'tavern') return playHeader(s) + err + renderPlayTavernPick(s);
-  if (stage.kind === 'draft') return playHeader(s) + err + renderPlayDraft(s, stage.pick);
+  if (stage.kind === 'draft') return playHeader(s) + err + draftLogHtml(s) + renderPlayDraft(s, stage.pick);
   if (stage.kind === 'week') syncBuilder(s, stage.week);
   return (
     playHeader(s) +
     err +
     (play.played === null ? '' : renderPlayResult(s, play.played)) +
+    // The draft's log stays up until the first week is played, so its last picks have somewhere to land.
+    (stage.kind === 'week' && play.played === null ? draftLogHtml(s) : '') +
     (stage.kind === 'week' ? renderPlayWeek(s, stage.week) : '') +
     renderPlayStandings(s)
   );
@@ -1786,6 +1792,13 @@ function playHeader(s: SeasonSession): string {
   );
 }
 
+/** The crier calls the picks your move caused, after `delay` ms; `then` once they are all in (at once if none are). */
+function revealMyDraft(delay: number, then: () => void): void {
+  const card = panel.querySelector<HTMLElement>('#play-draft-log');
+  if (card === null) then();
+  else revealDraft(card, { delay, then });
+}
+
 /** The tavern-pick moment: your banner goes up over the Play header. */
 function raiseMyBanner(): void {
   const me = play.session?.humanTavern;
@@ -1832,12 +1845,63 @@ function renderPlayTavernPick(s: SeasonSession): string {
   );
 }
 
+/**
+ * The crier: the draft called pick by pick, in the scrying ball's manner. Each line is a tavern under its flag taking
+ * a character, with the crier's notes (view.ts draftCalls). The lines from your latest pick on are `.fresh`: the ones
+ * your move just caused, which the reveal (fx.ts revealDraft) calls out one at a time; `data-board` holds the names
+ * the crier's eye runs over before a rival's pick lands. Shown through the draft and in week 1 until it is played.
+ */
+/** Where the bots usually draft each character (data.adp), for the crier's steals and reaches. */
+const ADP: ReadonlyMap<string, number> = new Map(Object.entries(data.adp));
+
+function draftLogHtml(s: SeasonSession): string {
+  const me = s.humanTavern;
+  const teams = s.state.managers.size;
+  const picks = s.events.flatMap((e) => (e.type === 'draft.pick' ? [e.payload] : []));
+  // Your picks in order pair with your draft moves in order: that is where each one's advice was kept.
+  const mine = picks.filter((p) => p.tavern === me);
+  const moves = play.moves.filter((m): m is Extract<PlayMove, { t: 'draft' }> => m.t === 'draft');
+  const advice = new Map(mine.flatMap((p, i) => (moves[i]?.advice === undefined ? [] : [[p.pick, moves[i]!.advice!] as const])));
+  const calls = draftCalls(picks, ADP, { me, teams, advice });
+  const freshFrom = me === null ? 0 : Math.max(0, picks.map((p) => p.tavern).lastIndexOf(me));
+  const usually = (c: (typeof calls)[number]): string => `Usually goes around pick ${Math.round(c.adp ?? 0) + 1}; taken at ${c.pick + 1}`;
+  const note = (c: (typeof calls)[number], n: (typeof c.notes)[number]): string =>
+    n === 'steal'
+      ? `<span class="tag good" title="${usually(c)}">steal</span>`
+      : n === 'reach'
+        ? `<span class="tag" title="${usually(c)}">reach</span>`
+        : n === 'sniped'
+          ? `<span class="tag bad" data-sniped title="Your advisor's pick at your last turn">sniped</span>`
+          : `<span class="tag brass" title="Your advisor's pick">advisor's pick</span>`;
+  const lines = calls.flatMap((c, i) => {
+    const round = Math.floor(c.pick / teams);
+    const fresh = i >= freshFrom ? ' fresh' : '';
+    const head = c.pick % teams === 0 ? [`<li class="round${fresh}">Round ${round + 1}</li>`] : [];
+    const st = input.statsOf(c.character);
+    const flag = bannerOf(c.tavern) === null ? '' : '<i class="flag" aria-hidden="true"></i> ';
+    const board = c.tavern === me ? '' : ` data-board="${esc(JSON.stringify(c.board.map(charName)))}"`;
+    return [
+      ...head,
+      `<li class="call${c.tavern === me ? ' mine' : ''}${fresh}" data-pick="${c.pick}"${board}${bannerAttr(c.tavern)}>` +
+        `<span class="pk">${c.pick + 1}</span><span class="line">${flag}<b>${esc(c.tavern === me ? 'You' : tavernName(c.tavern))}</b> <span class="verb">${c.tavern === me ? 'take' : 'takes'}</span> ` +
+        `<span class="landed">${portrait(c.character, 'sm')}</span><b class="who">${esc(charName(c.character))}</b> ` +
+        `<span class="landed"><span class="muted small">${esc(st.base.typeName)} · CR ${formatCr(crOf(c.character))}</span>${c.notes.map((n) => ` ${note(c, n)}`).join('')}</span></span></li>`,
+    ];
+  });
+  if (s.state.draft.complete) lines.push(`<li class="done fresh">The draft is done: every tavern has its ${config.draft.rounds}.</li>`);
+  return (
+    `<section class="card draft-log-card" id="play-draft-log"><div class="row" style="justify-content:space-between"><span class="label">The crier</span>` +
+    `<button type="button" class="small" data-reveal-skip title="Show every pick now (Esc)">Skip</button></div>` +
+    (lines.length === 0 ? '<p class="muted small">You have the first pick: the crier waits on you.</p>' : `<ol class="draft-log" aria-live="polite">${lines.join('')}</ol>`) +
+    `</section>`
+  );
+}
+
 function renderPlayDraft(s: SeasonSession, pick: number): string {
   const me = s.humanTavern!;
   const n = s.state.managers.size;
   const picks = s.events.flatMap((e) => (e.type === 'draft.pick' ? [e.payload] : []));
   const mine = myRoster(s);
-  const since = picks.slice(picks.map((p) => p.tavern).lastIndexOf(me) + 1);
   const advice = s.suggestPick();
   const q = play.filter.trim().toLowerCase();
   const available = freeAgents(s.state);
@@ -1876,7 +1940,6 @@ function renderPlayDraft(s: SeasonSession, pick: number): string {
     .join('');
   return (
     `<section class="card" id="play-clock"><div class="row" style="justify-content:space-between"><h2>You are on the clock</h2><span class="muted small">pick #${pick + 1}, round ${Math.floor(pick / n) + 1} of ${config.draft.rounds}</span></div>` +
-    (since.length === 0 ? '' : `<p class="small">Since your last pick: ${since.map((p) => `${esc(tavernName(p.tavern))} took <b>${esc(charName(p.character))}</b>`).join('; ')}.</p>`) +
     `<p class="small">Advisor (${esc(managerBot(s.human!.manager))}) suggests ${charChip(advice)} <span class="muted">CR ${formatCr(crOf(advice))}</span> ` +
     `<button type="button" class="primary small" data-action="play-draft" data-id="${esc(advice)}">Take it</button></p>` +
     `<div class="stack"><span class="label">Your roster (${mine.length} of ${config.roster.size})</span>` +
@@ -2290,16 +2353,32 @@ function playClick(action: string, id: string | undefined): boolean {
       return true;
     case 'play-tavern-pick':
       // Only once the engine accepts the pick: a refusal skips `after`, so no banner goes up.
-      if (id !== undefined) playMoves([{ t: 'tavern', id }], () => (pendingFx = raiseMyBanner));
+      // The bots ahead of you in the draft pick at once; the crier calls them once your banner is up.
+      if (id !== undefined) {
+        playMoves([{ t: 'tavern', id }], () => {
+          pendingFx = () => {
+            raiseMyBanner();
+            revealMyDraft(900, () => clockBack(panel.querySelector<HTMLElement>('#play-clock')));
+          };
+        });
+      }
       return true;
     case 'play-draft':
       // The drafted card turns over into your colours once it lands in your roster.
-      if (id !== undefined) {
-        playMoves([{ t: 'draft', id }], () => {
-          pendingFx = () => {
-            turnCard(panel.querySelector<HTMLElement>(`#play-roster [data-card="${CSS.escape(id)}"]`));
-            clockBack(panel.querySelector<HTMLElement>('#play-clock'));
-          };
+      // The crier calls your pick and the bots' after it; then the drafted card turns over into your colours.
+      if (id !== undefined && play.session !== null) {
+        let advice: string | undefined;
+        try {
+          advice = play.session.suggestPick();
+        } catch {
+          advice = undefined;
+        }
+        playMoves([{ t: 'draft', id, ...(advice === undefined ? {} : { advice }) }], () => {
+          pendingFx = () =>
+            revealMyDraft(0, () => {
+              turnCard(panel.querySelector<HTMLElement>(`#play-roster [data-card="${CSS.escape(id)}"]`));
+              clockBack(panel.querySelector<HTMLElement>('#play-clock'));
+            });
         });
       }
       return true;

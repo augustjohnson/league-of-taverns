@@ -21,6 +21,7 @@ import { decodePng, encodeIndexedPng } from '@league-of-taverns/scripts/lib/imag
 import { build } from 'esbuild';
 import { REPO_ROOT, loadCharacterChrome, loadGodChrome, rootDir } from '@league-of-taverns/scripts/lib/repo';
 import { DEFAULT_SEASON_DIR, charactersRootOf, loadMockSeasonParts } from './load';
+import { averageDraftPositions, seasonInput } from './season-runner';
 import { serializeSeason, type PlaygroundChrome, type PlaygroundData } from './playground/data';
 
 const PLAYGROUND_SRC = join(dirname(fileURLToPath(import.meta.url)), 'playground');
@@ -121,7 +122,9 @@ export async function buildPlaygroundHtml(dir: string = DEFAULT_SEASON_DIR): Pro
   const seasonDir = resolve(rootDir(REPO_ROOT), dir);
   const godsRoot = existsSync(join(seasonDir, 'gods')) ? seasonDir : charactersRootOf(dir);
   const gods = Object.fromEntries(parts.sponsors.map(({ id }) => [id, loadGodChrome(id, godsRoot)]));
-  const data = serializeSeason(parts, dir, chrome, gods);
+  // Where the bots usually draft each character, rounded to a tenth: the draft log's yardstick for a steal or a reach.
+  const adp = Object.fromEntries([...averageDraftPositions(seasonInput(parts))].map(([id, at]) => [id, Math.round(at * 10) / 10]));
+  const data = serializeSeason(parts, dir, chrome, gods, adp);
   const template = readFileSync(join(PLAYGROUND_SRC, 'page.html'), 'utf8');
   const html = renderPage(template, data, await bundleApp());
   return { html, data };

@@ -78,6 +78,41 @@ export function raiseBanner(card: HTMLElement | null, banner: Banner): void {
   }, 300);
 }
 
+/**
+ * The clock for a reveal: every wait goes through `sleep`, so Skip (the
+ * `button`, or Esc) cuts all of them short at once. `done` stops listening.
+ */
+function pacer(button: HTMLElement | null): { sleep: (ms: number) => Promise<void>; readonly skipped: boolean; done: () => void } {
+  let skipped = false;
+  const cancels = new Set<() => void>();
+  const skip = (): void => {
+    skipped = true;
+    for (const cancel of [...cancels]) cancel();
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') skip();
+  };
+  button?.addEventListener('click', skip);
+  document.addEventListener('keydown', onKey);
+  return {
+    sleep: (ms) =>
+      new Promise((resolve) => {
+        if (skipped) return resolve();
+        const cancel = (): void => {
+          window.clearTimeout(timer);
+          cancels.delete(cancel);
+          resolve();
+        };
+        const timer = window.setTimeout(cancel, ms);
+        cancels.add(cancel);
+      }),
+    get skipped() {
+      return skipped;
+    },
+    done: () => document.removeEventListener('keydown', onKey),
+  };
+}
+
 /** Milliseconds for each beat of the week reveal: a node with no roll, a check's roll, a battle's, and an ending line. */
 const BEAT = { step: 380, check: 800, battle: 1400, tail: 900, count: 450, curse: 1500 } as const;
 const BRASS = Color.fromHex('#d5aa4c');
@@ -118,27 +153,8 @@ export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => vo
     if (n.left < f.left + 24 || n.right > f.right - 24) frame.scrollBy({ left: n.left + n.width / 2 - (f.left + f.width / 2), behavior: 'smooth' });
   };
 
-  // Every wait goes through sleep, so a skip cuts all of them short at once.
-  let skipped = false;
-  const cancels = new Set<() => void>();
-  const sleep = (ms: number): Promise<void> =>
-    new Promise((resolve) => {
-      if (skipped) return resolve();
-      const cancel = (): void => {
-        window.clearTimeout(timer);
-        cancels.delete(cancel);
-        resolve();
-      };
-      const timer = window.setTimeout(cancel, ms);
-      cancels.add(cancel);
-    });
-  const skip = (): void => {
-    skipped = true;
-    for (const cancel of [...cancels]) cancel();
-  };
-  const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') skip();
-  };
+  const pace = pacer(skipButton);
+  const { sleep } = pace;
 
   let shown = 0;
   const countTo = (target: number): void => {
@@ -147,7 +163,7 @@ export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => vo
     shown = target;
     const start = performance.now();
     const tick = (now: number): void => {
-      if (skipped || !counter.isConnected) return;
+      if (pace.skipped || !counter.isConnected) return;
       const t = Math.min(1, (now - start) / BEAT.count);
       counter.textContent = String(Math.round(from + (target - from) * (1 - (1 - t) ** 3)));
       if (t < 1) requestAnimationFrame(tick);
@@ -171,7 +187,7 @@ export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => vo
   };
 
   const finish = (): void => {
-    document.removeEventListener('keydown', onKey);
+    pace.done();
     if (!card.isConnected) return;
     const hadFocus = document.activeElement === skipButton;
     for (const el of card.querySelectorAll('.current, .rolling')) el.classList.remove('current', 'rolling');
@@ -186,8 +202,6 @@ export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => vo
   card.classList.add('revealing');
   if (counter !== null) counter.textContent = '0';
   if (frame !== null) frame.scrollLeft = 0;
-  skipButton?.addEventListener('click', skip);
-  document.addEventListener('keydown', onKey);
   // The Play button that started this is gone, so keyboard focus goes to Skip.
   if (document.activeElement === null || document.activeElement === document.body) skipButton?.focus({ preventScroll: true });
   card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -202,7 +216,7 @@ export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => vo
     }
     let previous: Element | null = null;
     for (const [i, id] of path.entries()) {
-      if (skipped || !card.isConnected) break;
+      if (pace.skipped || !card.isConnected) break;
       const node = graphNode(id);
       if (i > 0) for (const el of card.querySelectorAll(`.graph ${attr('data-edge', `${path[i - 1]}>${id}`)}`)) el.classList.add('shown');
       previous?.classList.remove('current');
@@ -223,14 +237,14 @@ export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => vo
       countTo(Number(line.dataset.total));
       // Small nods for good news: the loot tag pops, and a natural 20 throws a few sparks.
       micron(line.querySelector('[data-bank]'), 'pop', { duration: 0.4 });
-      if (!skipped && die?.dataset.roll === 'd20' && die.textContent === '20') {
+      if (!pace.skipped && die?.dataset.roll === 'd20' && die.textContent === '20') {
         sparkles(die, { count: variation.range(8, 12), size: variation.range(0.4, 0.8), speed: variation.range(60, 140), color: BRASS });
       }
       await sleep(BEAT.step);
     }
     previous?.classList.remove('current');
     for (const line of card.querySelectorAll<HTMLElement>('.tale [data-tail]')) {
-      if (skipped || !card.isConnected) break;
+      if (pace.skipped || !card.isConnected) break;
       line.classList.add('shown');
       countTo(Number(line.dataset.total));
       if (line.dataset.tail === 'dnf') micron(counter, 'shake', { duration: 0.6 });
@@ -370,6 +384,93 @@ export function clockBack(card: HTMLElement | null): void {
     card.classList.add('clock-back');
     micron(card.querySelector('h2'), 'bounce', { duration: 0.6 });
   }, 600);
+}
+
+/** Milliseconds for the crier's beats: your own pick, a rival's eye running over the board, the pause after a pick lands, a snipe's sting. */
+const CALL = { mine: 600, choosing: 750, landed: 320, sniped: 700, round: 260 } as const;
+
+/**
+ * The draft log (app.ts draftLogHtml): the crier calls the picks your move
+ * caused, one at a time, after `delay` ms. Your own pick lands at once. For a
+ * rival's, the tavern is "choosing" while the name flickers through the best
+ * values left on the board (`data-board`), then it settles on the real pick,
+ * with its portrait and the crier's notes: a steal pops, and a rival sniping
+ * your advisor's pick stings with a jolt. Until it ends the card is
+ * `.revealing`, and page.html hides the sections below it (the clock, the
+ * free agents) so they don't give the picks away. Skip (or Esc) shows them
+ * all at once; `then` runs when it ends, skipped or not, or at once with
+ * nothing to call or under reduced motion.
+ */
+export function revealDraft(card: HTMLElement, { delay = 0, then }: { delay?: number; then?: () => void } = {}): void {
+  const lines = [...card.querySelectorAll<HTMLElement>('.draft-log > li.fresh')];
+  if (lines.length === 0 || reducedMotion()) {
+    then?.();
+    return;
+  }
+  const log = card.querySelector<HTMLElement>('.draft-log');
+  const pace = pacer(card.querySelector<HTMLElement>('[data-reveal-skip]'));
+  const { sleep } = pace;
+  /** Keep the newest line in view, as a log does. */
+  const follow = (): void => {
+    if (log !== null) log.scrollTop = log.scrollHeight;
+  };
+  const finish = (): void => {
+    pace.done();
+    if (!card.isConnected) return;
+    for (const el of card.querySelectorAll('.choosing')) el.classList.remove('choosing');
+    card.classList.remove('revealing');
+    follow();
+    then?.();
+  };
+
+  card.classList.add('revealing');
+  follow();
+  void (async () => {
+    await sleep(delay);
+    for (const line of lines) {
+      if (pace.skipped || !card.isConnected) break;
+      line.classList.add('shown');
+      follow();
+      if (!line.classList.contains('call')) {
+        await sleep(CALL.round);
+        continue;
+      }
+      if (line.classList.contains('mine')) {
+        micron(line.querySelector('.who'), 'pop', { duration: 0.4 });
+        await sleep(CALL.mine);
+        continue;
+      }
+      const who = line.querySelector<HTMLElement>('.who');
+      const verb = line.querySelector<HTMLElement>('.verb');
+      let board: ReadonlyArray<string> = [];
+      try {
+        board = JSON.parse(line.dataset.board ?? '[]') as ReadonlyArray<string>;
+      } catch {
+        board = [];
+      }
+      const name = who?.textContent ?? '';
+      const takes = verb?.textContent ?? '';
+      line.classList.add('choosing');
+      if (verb !== null) verb.textContent = 'is choosing';
+      let i = 0;
+      const spin =
+        who === null || board.length === 0
+          ? 0
+          : window.setInterval(() => {
+              who.textContent = board[i++ % board.length]!;
+            }, 110);
+      await sleep(CALL.choosing);
+      window.clearInterval(spin);
+      if (who !== null) who.textContent = name;
+      if (verb !== null) verb.textContent = takes;
+      line.classList.remove('choosing');
+      micron(line.querySelector('.tag.good'), 'pop', { duration: 0.4 });
+      const sniped = line.querySelector('[data-sniped]') !== null;
+      if (sniped) micron(line, 'jerk', { duration: 0.6 });
+      await sleep(sniped ? CALL.sniped : CALL.landed);
+    }
+    finish();
+  })();
 }
 
 /**
