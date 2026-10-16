@@ -607,7 +607,7 @@ Owns `bots/`, `sims/`.
 #### T9.5 Bots and playground for retreat orders, hexes and boons · M
 - *Partly done (2026-10-13):* bots choose a tavern (random), a hex (`leader`) and a retreat order (best expected loot); the playground has the tavern pick, a hex form, keywords and expected points per retreat order. Left: boons (T6.10), and the balance report rows (T9.3).
 - **Goal:** bots choose a retreat order (the projection scores each), when
-  and whom to hex, and a tavern in the tavern pick; the playground's Play tab
+  and whom to hex, and a tavern in the tavern pick; the playground's game
   shows each tavern's god, boon and hex, the keywords, declared hexes, and
   the expected loot per retreat order.
 - **Acceptance:** the balance report shows how often each retreat order is
@@ -706,7 +706,7 @@ Each task here can be specified but not finished until its decision in
 | Task | Blocked on | What's blocked |
 |---|---|---|
 | **T10.2 Live roll + week start** · S | D-13 details | How `run-week` draws and records a real random roll. Keep `seal` and `reveal`: hidden missions (D-08, T10.6) need them. |
-| **T10.6 Hidden missions** · M | D-08 defaults | Encrypt selected missions in the repo, commitments in `season.created`, reveal at the lock (`mission.revealed` moves to `run-week --lock`), candidates and generator output out of the public repo (D-18). Bots: `PublicView` shows a mission only after its lock, plus a keyword-based lineup strategy. Playground: a "hidden missions" mode for the Play tab. |
+| **T10.6 Hidden missions** · M | D-08 defaults | Encrypt selected missions in the repo, commitments in `season.created`, reveal at the lock (`mission.revealed` moves to `run-week --lock`), candidates and generator output out of the public repo (D-18). Bots: `PublicView` shows a mission only after its lock, plus a keyword-based lineup strategy. Playground: a "hidden missions" mode for the game. |
 | **T10.3 Offseason carryover** · M | Unblocked: D-11 decided 2026-10-13 (1 keeper, no champion bonus) | `offseason`: keeper eligibility, `character.retained`, keeper cost in draft order (T4.3 hook), modifier drift cap. |
 | **T5.4 / T8.5 live provider** · S | D-32 | The real `LlmClient`. Everything else in those tasks uses the fake. |
 | **T1.1 document scope** · S | D-17 | Adding non-SRD documents (license text and notices). SRD-only is unblocked. |

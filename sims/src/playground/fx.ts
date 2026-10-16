@@ -78,26 +78,20 @@ export function raiseBanner(card: HTMLElement | null, banner: Banner): void {
   }, 300);
 }
 
-/**
- * The clock for a reveal: every wait goes through `sleep`, so Skip (the
- * `button`, or Esc) cuts all of them short at once. `done` stops listening.
- */
-function pacer(button: HTMLElement | null): { sleep: (ms: number) => Promise<void>; readonly skipped: boolean; done: () => void } {
+/** The clock for a paced reveal: every wait goes through `sleep`, so one `skip` (the Skip button, or Esc) cuts all of them short at once. */
+export interface Pacer {
+  sleep: (ms: number) => Promise<void>;
+  readonly skipped: boolean;
+  skip: () => void;
+}
+
+export function pacer(): Pacer {
   let skipped = false;
   const cancels = new Set<() => void>();
-  const skip = (): void => {
-    skipped = true;
-    for (const cancel of [...cancels]) cancel();
-  };
-  const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') skip();
-  };
-  button?.addEventListener('click', skip);
-  document.addEventListener('keydown', onKey);
   return {
     sleep: (ms) =>
       new Promise((resolve) => {
-        if (skipped) return resolve();
+        if (skipped || ms <= 0) return resolve();
         const cancel = (): void => {
           window.clearTimeout(timer);
           cancels.delete(cancel);
@@ -109,150 +103,173 @@ function pacer(button: HTMLElement | null): { sleep: (ms: number) => Promise<voi
     get skipped() {
       return skipped;
     },
-    done: () => document.removeEventListener('keydown', onKey),
+    skip: () => {
+      skipped = true;
+      for (const cancel of [...cancels]) cancel();
+    },
   };
 }
 
-/** Milliseconds for each beat of the week reveal: a node with no roll, a check's roll, a battle's, and an ending line. */
-const BEAT = { step: 380, check: 800, battle: 1400, tail: 900, count: 450, curse: 1500 } as const;
+/** Milliseconds for each beat of a week's race: a rival's step, the pause before your run, your checks and battles, an ending line. */
+const BEAT = { pip: 230, gap: 700, step: 380, check: 800, battle: 1400, tail: 900, count: 450, curse: 1500 } as const;
 const BRASS = Color.fromHex('#d5aa4c');
 
-/**
- * The week reveal: the scrying ball plays your run back over the result card
- * (app.ts renderPlayResult). Node by node the path lights up; at each check
- * or battle the die tumbles before it settles, the outcome lands and the
- * loot counter climbs. A DNF drains the counter to 0 with a shake. Until it
- * ends, the card is `.revealing` and page.html hides the path, the outcomes,
- * every `[data-spoiler]` and the sections below the card, so nothing gives
- * the result away. Skip (or Esc) shows it all at once.
- *
- * The card already holds the whole result: this only holds pieces back and
- * brings them in, so a reload, a skip or reduced motion shows the same thing.
- * When it ends, skipped or not, the week's moment plays in `banner`'s colours,
- * or `finale` in its place (the last week ends the season).
- */
-export function revealWeek(card: HTMLElement, banner?: Banner, finale?: () => void): void {
-  if (reducedMotion()) return;
-  let path: ReadonlyArray<string>;
-  try {
-    path = JSON.parse(card.dataset.path ?? '[]') as ReadonlyArray<string>;
-  } catch {
-    return;
+/** Count `el` up (or down) to `target` over `ms`, eased; stops early if `stop()` says so. */
+function countUp(el: HTMLElement | null, from: number, target: number, stop: () => boolean, ms = BEAT.count): void {
+  if (el === null || Number.isNaN(target)) return;
+  const start = performance.now();
+  const tick = (now: number): void => {
+    if (stop() || !el.isConnected) return;
+    const t = Math.min(1, (now - start) / ms);
+    el.textContent = String(Math.round(from + (target - from) * (1 - (1 - t) ** 3)));
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/** Move `items` into `order` inside their parent, sliding each from where it stood (FLIP). */
+function reorder(items: ReadonlyArray<HTMLElement>, order: ReadonlyArray<HTMLElement>, animate: boolean): void {
+  const parent = items[0]?.parentElement;
+  if (parent == null) return;
+  const before = new Map(items.map((el) => [el, el.getBoundingClientRect().top]));
+  for (const el of order) parent.append(el);
+  if (!animate) return;
+  for (const el of order) {
+    const dy = (before.get(el) ?? 0) - el.getBoundingClientRect().top;
+    if (Math.abs(dy) < 1) continue;
+    el.style.transition = 'none';
+    el.style.transform = `translateY(${dy}px)`;
   }
-  const attr = (name: string, value: string): string => `[${name}="${CSS.escape(value)}"]`;
-  const graphNode = (id: string): Element | null => card.querySelector(`.graph ${attr('data-node', id)}`);
-  const taleLine = (id: string): HTMLElement | null => card.querySelector<HTMLElement>(`.tale ${attr('data-node', id)}`);
-  const counter = card.querySelector<HTMLElement>('[data-loot]');
-  const skipButton = card.querySelector<HTMLButtonElement>('[data-reveal-skip]');
-  const frame = card.querySelector<HTMLElement>('.graph');
-  /** A wide mission scrolls in its frame: keep the party's node in view. */
-  const follow = (node: Element | null): void => {
-    if (frame === null || node === null) return;
-    const f = frame.getBoundingClientRect();
-    const n = node.getBoundingClientRect();
-    if (n.left < f.left + 24 || n.right > f.right - 24) frame.scrollBy({ left: n.left + n.width / 2 - (f.left + f.width / 2), behavior: 'smooth' });
-  };
+  void parent.offsetHeight;
+  order.forEach((el, i) => {
+    if (el.style.transform === '') return;
+    el.style.transition = `transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) ${0.04 * i}s`;
+    el.style.transform = '';
+    window.setTimeout(() => (el.style.transition = ''), 900);
+  });
+}
 
-  const pace = pacer(skipButton);
+/**
+ * A week's race in the Common Room (play.ts resultsHtml): every tavern's run
+ * as a strip of steps, green for a pass or a win and red for a fail or a
+ * loss, ending home, turned back or beaten.
+ *
+ * The lanes start in draft order with yours last, so the order gives nothing
+ * away. The rivals' strips fill in together, a step a beat, each tavern's
+ * loot landing as its strip ends. Then the scrying ball plays your run back
+ * line by line: the die tumbles before it settles, the outcome lands, your
+ * strip grows and the loot counter climbs; a DNF drains it to 0. Last, the
+ * ranks show and the lanes slide into the week's order.
+ *
+ * The message already holds the whole result: this only holds pieces back
+ * (while it is `.racing`) and brings them in, so a reload, a skip or reduced
+ * motion shows the same thing. Resolves when it ends, skipped or not.
+ */
+export async function raceWeek(msg: HTMLElement, pace: Pacer): Promise<void> {
+  const race = msg.querySelector<HTMLElement>('.race');
+  if (race === null || reducedMotion()) return;
   const { sleep } = pace;
+  const lanes = [...race.querySelectorAll<HTMLElement>(':scope > .lane')];
+  const num = (el: HTMLElement, key: string): number => Number(el.dataset[key] ?? 0);
+  const ranked = [...lanes].sort((a, b) => num(a, 'rank') - num(b, 'rank') || num(a, 'order') - num(b, 'order'));
+  const stop = (): boolean => pace.skipped || !msg.isConnected;
 
-  let shown = 0;
-  const countTo = (target: number): void => {
-    if (counter === null || Number.isNaN(target)) return;
-    const from = shown;
-    shown = target;
-    const start = performance.now();
-    const tick = (now: number): void => {
-      if (pace.skipped || !counter.isConnected) return;
-      const t = Math.min(1, (now - start) / BEAT.count);
-      counter.textContent = String(Math.round(from + (target - from) * (1 - (1 - t) ** 3)));
-      if (t < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+  const land = (lane: HTMLElement): void => {
+    lane.querySelector('.run-end')?.classList.add('shown');
+    const pts = lane.querySelector<HTMLElement>('.pts');
+    if (pts === null) return;
+    pts.classList.add('shown');
+    countUp(pts, 0, num(pts, 'pts'), stop);
   };
-
-  /** Tumble the die for `ms`, then show what it really rolled. Its colour waits too: a 20 or a 1 shows in its border. */
-  const roll = async (die: HTMLElement | null, ms: number): Promise<void> => {
-    if (die === null) return sleep(ms);
-    const final = die.textContent ?? '';
-    const unit = die.dataset.roll === 'unit';
-    die.classList.add('rolling');
-    const spin = window.setInterval(() => {
-      die.textContent = unit ? Math.random().toFixed(3) : String(1 + Math.floor(Math.random() * 20));
-    }, 70);
-    await sleep(ms);
-    window.clearInterval(spin);
-    die.textContent = final;
-    die.classList.remove('rolling');
-  };
-
   const finish = (): void => {
-    pace.done();
-    if (!card.isConnected) return;
-    const hadFocus = document.activeElement === skipButton;
-    for (const el of card.querySelectorAll('.current, .rolling')) el.classList.remove('current', 'rolling');
+    if (!msg.isConnected) return;
+    for (const el of msg.querySelectorAll('.rolling')) el.classList.remove('rolling');
+    for (const pts of msg.querySelectorAll<HTMLElement>('.pts[data-pts]')) pts.textContent = pts.dataset.pts ?? pts.textContent;
+    const counter = msg.querySelector<HTMLElement>('[data-loot]');
     if (counter !== null) counter.textContent = counter.dataset.loot ?? counter.textContent;
-    card.classList.remove('revealing');
-    card.classList.add('revealed');
-    if (hadFocus) card.focus({ preventScroll: true });
-    if (finale === undefined) weekMoment(card, banner);
-    else finale();
+    msg.classList.remove('racing');
+    reorder(lanes, ranked, !pace.skipped);
   };
 
-  card.classList.add('revealing');
-  if (counter !== null) counter.textContent = '0';
-  if (frame !== null) frame.scrollLeft = 0;
-  // The Play button that started this is gone, so keyboard focus goes to Skip.
-  if (document.activeElement === null || document.activeElement === document.body) skipButton?.focus({ preventScroll: true });
-  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  reorder(lanes, [...lanes].sort((a, b) => num(a, 'order') - num(b, 'order')), false);
+  msg.classList.add('racing');
 
-  void (async () => {
-    // A rival's hex falls first, in their colours, and the run waits a beat under it.
-    const curse = card.querySelector<HTMLElement>('.tale [data-head="curse"]');
-    if (curse !== null) {
-      curse.classList.add('shown');
-      micron(curse, 'flicker', { duration: 0.8, delay: 0.2 });
-      await sleep(BEAT.curse);
+  // The rivals, together.
+  const rivals = lanes.filter((l) => !l.classList.contains('mine'));
+  const pips = new Map(rivals.map((l) => [l, [...l.querySelectorAll<HTMLElement>('.strip .pip')]]));
+  const steps = Math.max(0, ...[...pips.values()].map((p) => p.length));
+  for (const lane of rivals) if (pips.get(lane)!.length === 0) land(lane);
+  for (let i = 0; i < steps && !stop(); i++) {
+    for (const lane of rivals) {
+      const row = pips.get(lane)!;
+      row[i]?.classList.add('shown');
+      if (i === row.length - 1) land(lane);
     }
-    let previous: Element | null = null;
-    for (const [i, id] of path.entries()) {
-      if (pace.skipped || !card.isConnected) break;
-      const node = graphNode(id);
-      if (i > 0) for (const el of card.querySelectorAll(`.graph ${attr('data-edge', `${path[i - 1]}>${id}`)}`)) el.classList.add('shown');
-      previous?.classList.remove('current');
-      node?.classList.add('current');
-      follow(node);
-      previous = node;
-      const line = taleLine(id);
-      if (line === null) {
-        await sleep(BEAT.step);
-        node?.classList.add('shown');
+    await sleep(BEAT.pip);
+  }
+
+  // Yours, in the scrying ball.
+  const mine = lanes.find((l) => l.classList.contains('mine'));
+  if (mine !== undefined && !stop()) {
+    await sleep(BEAT.gap);
+    const details = mine.querySelector('details');
+    if (details !== null) details.open = true;
+    const myPips = [...mine.querySelectorAll<HTMLElement>('.strip .pip')];
+    const counter = msg.querySelector<HTMLElement>('[data-loot]');
+    let shown = 0;
+    if (counter !== null) counter.textContent = '0';
+    const countTo = (target: number): void => {
+      countUp(counter, shown, target, stop);
+      shown = target;
+    };
+    /** Tumble the die for `ms`, then show what it really rolled. */
+    const roll = async (die: HTMLElement | null, ms: number): Promise<void> => {
+      if (die === null) return sleep(ms);
+      const final = die.textContent ?? '';
+      const unit = die.dataset.roll === 'unit';
+      die.classList.add('rolling');
+      const spin = window.setInterval(() => {
+        die.textContent = unit ? Math.random().toFixed(3) : String(1 + Math.floor(Math.random() * 20));
+      }, 70);
+      await sleep(ms);
+      window.clearInterval(spin);
+      die.textContent = final;
+      die.classList.remove('rolling');
+    };
+    for (const line of mine.querySelectorAll<HTMLElement>('.tale > li')) {
+      if (stop()) break;
+      line.classList.add('shown');
+      line.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (line.dataset.head === 'curse') {
+        micron(line, 'flicker', { duration: 0.8, delay: 0.2 });
+        await sleep(BEAT.curse);
         continue;
       }
-      line.classList.add('shown', 'rolling');
+      if (line.dataset.tail !== undefined) {
+        countTo(Number(line.dataset.total));
+        if (line.dataset.tail === 'dnf') micron(counter, 'shake', { duration: 0.6 });
+        if (line.dataset.tail === 'injury') micron(line.querySelector('[data-hurt]'), 'flicker', { duration: 0.7 });
+        await sleep(BEAT.tail);
+        continue;
+      }
+      line.classList.add('rolling');
       const die = line.querySelector<HTMLElement>('[data-roll]');
       await roll(die, line.dataset.kind === 'battle' ? BEAT.battle : BEAT.check);
       line.classList.remove('rolling');
-      node?.classList.add('shown');
+      myPips[Number(line.dataset.step)]?.classList.add('shown');
       countTo(Number(line.dataset.total));
       // Small nods for good news: the loot tag pops, and a natural 20 throws a few sparks.
       micron(line.querySelector('[data-bank]'), 'pop', { duration: 0.4 });
-      if (!pace.skipped && die?.dataset.roll === 'd20' && die.textContent === '20') {
+      if (!stop() && die?.dataset.roll === 'd20' && die.textContent === '20') {
         sparkles(die, { count: variation.range(8, 12), size: variation.range(0.4, 0.8), speed: variation.range(60, 140), color: BRASS });
       }
       await sleep(BEAT.step);
     }
-    previous?.classList.remove('current');
-    for (const line of card.querySelectorAll<HTMLElement>('.tale [data-tail]')) {
-      if (pace.skipped || !card.isConnected) break;
-      line.classList.add('shown');
-      countTo(Number(line.dataset.total));
-      if (line.dataset.tail === 'dnf') micron(counter, 'shake', { duration: 0.6 });
-      if (line.dataset.tail === 'injury') micron(line.querySelector('[data-hurt]'), 'flicker', { duration: 0.7 });
-      await sleep(BEAT.tail);
-    }
-    finish();
-  })();
+    for (const pip of myPips) pip.classList.add('shown');
+    land(mine);
+    await sleep(BEAT.count + 250);
+  }
+  finish();
 }
 
 /**
@@ -371,103 +388,17 @@ export function turnCard(card: HTMLElement | null): void {
 }
 
 /**
- * The clock comes back to you: once your pick has turned over, the bots have
- * picked and it is your turn again, so the draft card glows once and its
- * heading bounces. A nod, after each of your picks only; bot picks stay
- * quiet. The playground's bots pick at once, so a pulse that ran the whole
- * time you are on the clock would run the whole draft and mean nothing.
+ * The clock comes back to you: the rivals have picked (or chosen, or readied)
+ * and it is your move, so the action bar glows once and its call to you
+ * (`[data-clock]`) bounces. A nod, once each time it comes back; it never
+ * pulses the whole time you are on the clock.
  */
-export function clockBack(card: HTMLElement | null): void {
-  if (card === null || reducedMotion()) return;
-  window.setTimeout(() => {
-    if (!card.isConnected) return;
-    card.classList.add('clock-back');
-    micron(card.querySelector('h2'), 'bounce', { duration: 0.6 });
-  }, 600);
-}
-
-/** Milliseconds for the crier's beats: your own pick, a rival's eye running over the board, the pause after a pick lands. */
-const CALL = { mine: 600, choosing: 750, landed: 320, round: 260 } as const;
-
-/**
- * The draft log (app.ts draftLogHtml): the crier calls the picks your move
- * caused, one at a time, after `delay` ms. Your own pick lands at once. For a
- * rival's, the tavern is "choosing" while the name flickers through who
- * usually goes next (`data-board`), then it settles on the real pick, with
- * its portrait and the crier's notes (a steal pops). Until it ends the card
- * is `.revealing`, and page.html hides the sections below it (the clock, the
- * free agents) so they don't give the picks away. Skip (or Esc) shows them
- * all at once; `then` runs when it ends, skipped or not, or at once with
- * nothing to call or under reduced motion.
- */
-export function revealDraft(card: HTMLElement, { delay = 0, then }: { delay?: number; then?: () => void } = {}): void {
-  const lines = [...card.querySelectorAll<HTMLElement>('.draft-log > li.fresh')];
-  if (lines.length === 0 || reducedMotion()) {
-    then?.();
-    return;
-  }
-  const log = card.querySelector<HTMLElement>('.draft-log');
-  const pace = pacer(card.querySelector<HTMLElement>('[data-reveal-skip]'));
-  const { sleep } = pace;
-  /** Keep the newest line in view, as a log does. */
-  const follow = (): void => {
-    if (log !== null) log.scrollTop = log.scrollHeight;
-  };
-  const finish = (): void => {
-    pace.done();
-    if (!card.isConnected) return;
-    for (const el of card.querySelectorAll('.choosing')) el.classList.remove('choosing');
-    card.classList.remove('revealing');
-    follow();
-    then?.();
-  };
-
-  card.classList.add('revealing');
-  follow();
-  void (async () => {
-    await sleep(delay);
-    for (const line of lines) {
-      if (pace.skipped || !card.isConnected) break;
-      line.classList.add('shown');
-      follow();
-      if (!line.classList.contains('call')) {
-        await sleep(CALL.round);
-        continue;
-      }
-      if (line.classList.contains('mine')) {
-        micron(line.querySelector('.who'), 'pop', { duration: 0.4 });
-        await sleep(CALL.mine);
-        continue;
-      }
-      const who = line.querySelector<HTMLElement>('.who');
-      const verb = line.querySelector<HTMLElement>('.verb');
-      let board: ReadonlyArray<string> = [];
-      try {
-        board = JSON.parse(line.dataset.board ?? '[]') as ReadonlyArray<string>;
-      } catch {
-        board = [];
-      }
-      const name = who?.textContent ?? '';
-      const takes = verb?.textContent ?? '';
-      line.classList.add('choosing');
-      if (verb !== null) verb.textContent = 'is choosing';
-      let i = 0;
-      const spin =
-        who === null || board.length === 0
-          ? 0
-          : window.setInterval(() => {
-              who.textContent = board[i++ % board.length]!;
-            }, 110);
-      await sleep(CALL.choosing);
-      window.clearInterval(spin);
-      if (who !== null) who.textContent = name;
-      if (verb !== null) verb.textContent = takes;
-      line.classList.remove('choosing');
-      micron(line.querySelector('.tag.good'), 'pop', { duration: 0.4 });
-      await sleep(CALL.landed);
-    }
-    finish();
-  })();
+export function clockBack(bar: HTMLElement | null): void {
+  if (bar === null || reducedMotion()) return;
+  bar.classList.remove('clock-back');
+  void bar.offsetWidth;
+  bar.classList.add('clock-back');
+  micron(bar.querySelector('[data-clock]'), 'bounce', { duration: 0.6 });
 }
 
 /**

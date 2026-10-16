@@ -8,6 +8,7 @@ import { deepEqual } from '../src/deep-equal';
 import { loadMockSeason, loadMockSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
+import { currentRound, feedItems, latestResults, type FeedItem, type FeedOptions } from '../src/playground/feed';
 import {
   artCss,
   bannerCss,
@@ -248,6 +249,92 @@ describe('table moves', () => {
       c: { wasRow: 2, rose: 0 },
       e: { wasRow: 3, rose: 0 },
     });
+  });
+});
+
+describe('the Common Room', () => {
+  const teams = nodeInput.managers.length;
+  const { rounds } = nodeInput.config.draft;
+  const { weeks } = nodeInput.config;
+  const opts: FeedOptions = { me: null, teams, rounds, weeks, adp: new Map() };
+  const items = feedItems(sim1.events, opts);
+  const ofKind = <K extends FeedItem['kind']>(kind: K): Array<Extract<FeedItem, { kind: K }>> =>
+    items.filter((it): it is Extract<FeedItem, { kind: K }> => it.kind === kind);
+
+  it('tells the season in order: the opening, the tavern pick, the draft, then each week', () => {
+    expect(ofKind('divider').map((d) => d.label)).toEqual([
+      'Before the season',
+      'The tavern pick',
+      'The draft',
+      ...Array.from({ length: weeks }, (_, i) => `Week ${i + 1}`),
+    ]);
+    // Each week opens right under its divider, and its results come before the next week opens.
+    for (let w = 1; w <= weeks; w++) {
+      const open = items.findIndex((it) => it.key === `week-open:${w}`);
+      expect(items[open - 1]?.key).toBe(`divider:week:${w}`);
+      expect(items.findIndex((it) => it.key === `results:${w}`)).toBeGreaterThan(open);
+    }
+    expect(ofKind('tavern').map((t) => t.tavern)).toEqual([...sim1.state.taverns.keys()]);
+    expect(new Set(items.map((it) => it.key)).size).toBe(items.length);
+  });
+
+  it('calls the draft round by round, every pick in order', () => {
+    const r = ofKind('round');
+    expect(r.map((x) => x.round)).toEqual(Array.from({ length: rounds }, (_, i) => i + 1));
+    expect(r.every((x) => x.complete && x.calls.length === teams)).toBe(true);
+    expect(r.flatMap((x) => x.calls.map((c) => [c.pick, c.tavern, c.character]))).toEqual(sim1.summary.draft.map((d) => [d.pick, d.tavern, d.character]));
+    expect(currentRound(items)).toBe(rounds);
+    expect(ofKind('draft-done')).toHaveLength(1);
+  });
+
+  it("races every tavern each week, ranked as the engine ranked the week, and keeps the table's running totals", () => {
+    const results = ofKind('results');
+    expect(results.map((x) => x.week)).toEqual(sim1.summary.weeks.map((w) => w.week));
+    for (const [i, w] of sim1.summary.weeks.entries()) {
+      const race = results[i]!;
+      expect(race.runs).toHaveLength(teams);
+      for (const t of w.results) {
+        const lane = race.runs.find((x) => x.tavern === t.tavern)!;
+        expect([lane.points, lane.rank]).toEqual([t.points, t.rank]);
+      }
+    }
+    expect(latestResults(items)).toBe(weeks);
+    const tables = ofKind('table');
+    expect(tables.map((t) => t.final)).toEqual(Array.from({ length: weeks }, (_, i) => i === weeks - 1));
+    expect(tables.at(-1)!.rows.map((r) => [r.tavern, r.rank, r.points])).toEqual(sim1.summary.standings.map((s) => [s.tavern, s.rank, s.points]));
+    // Week 1 has no week before it to move from.
+    expect(tables[0]!.rows.every((r) => r.rose === 0)).toBe(true);
+  });
+
+  it('keeps waiver claims sealed until they resolve, except your own', () => {
+    expect(ofKind('claim')).toHaveLength(0);
+    const waivers = ofKind('waivers');
+    expect(waivers.map((x) => x.week)).toEqual(sim1.summary.weeks.filter((w) => w.week < weeks).map((w) => w.week));
+    for (const x of waivers) {
+      const w = sim1.summary.weeks.find((y) => y.week === x.week)!;
+      expect(x.outcomes.map((o) => [o.tavern, o.add, o.awarded])).toEqual(w.waivers.map((o) => [o.tavern, o.add, o.awarded]));
+    }
+    const me = [...sim1.state.taverns.keys()][0]!;
+    const mine = feedItems(sim1.events, { ...opts, me }).filter((it) => it.kind === 'claim');
+    const claimed = sim1.events.filter((e) => e.type === 'waiver.claimed' && e.payload.tavern === me);
+    expect(mine.map((it) => it.key)).toEqual(claimed.map((e) => (e.type === 'waiver.claimed' ? `claim:${e.payload.claim}` : '')));
+  });
+
+  it('places each "ready" where the log stood when it was said, among your own moves', () => {
+    const open = sim1.events.findIndex((e) => e.type === 'waiver.resolved' && e.payload.week === 1) + 1;
+    const [a, b] = [...sim1.state.taverns.keys()];
+    const withReady = feedItems(sim1.events.slice(0, open), { ...opts, ready: [{ week: 2, tavern: a!, at: open }, { week: 2, tavern: b!, at: open + 5 }] });
+    expect(withReady.slice(-2).map((it) => it.key)).toEqual(['week-open:2', `ready:2:${a}`]);
+    expect(withReady.some((it) => it.key === `ready:2:${b}`)).toBe(false);
+  });
+
+  it('never takes back a message: every key told so far is still there as more of the log arrives', () => {
+    let before = new Set<string>();
+    for (let n = 0; n <= sim1.events.length; n += 7) {
+      const keys = new Set(feedItems(sim1.events.slice(0, n), opts).map((it) => it.key));
+      for (const k of before) expect(keys.has(k), `${k} at ${n}`).toBe(true);
+      before = keys;
+    }
   });
 });
 
