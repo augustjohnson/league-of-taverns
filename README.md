@@ -20,7 +20,8 @@ mission, and the season table ranks taverns by total loot.
 | [docs/schema.md](docs/schema.md) | Draft schemas: character, modifiers, mission, chrome, season config, events, reducers |
 | [docs/season-lifecycle.md](docs/season-lifecycle.md) | Offseason → missions → curation → chrome → lock → draft → weekly runs → offseason |
 | [docs/decisions.md](docs/decisions.md) | Open decisions, plus every difference from the earlier specs |
-| [docs/lore.md](docs/lore.md) | Story frame: barkeeps, sponsoring gods, loot, and where story touches the rules |
+| [docs/lore.md](docs/lore.md) | Story frame: the Lich's contest for a new assistant, the taverns that front for him, and where story touches the rules |
+| [docs/survivor-format.md](docs/survivor-format.md) | Design for the Lich's contest: the Survivor-style format, what changes, what stays, open decisions |
 | [docs/glossary.md](docs/glossary.md) | Terms |
 | [docs/images.md](docs/images.md) | Painted portraits and mission covers: style, stage placement by height, `draft-images`, local ComfyUI setup |
 | [docs/specs/](docs/specs/) | Earlier specs 00–06. Superseded where decisions.md says so |

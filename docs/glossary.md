@@ -5,7 +5,7 @@
 | **Actor** | The starter who makes a given check: the one with the best modifier for it (best fit). Shown as `{actor}` in story text. |
 | **Advantage** | Roll two d20s and keep the higher. Pass chance becomes `1 − (1 − p)²`. Granted only by modifiers. |
 | **B** | The party CR budget. The total CR of the four starters must be ≤ B. |
-| **Barkeep** | Story name for a manager: an ordinary tavern owner pushed around by a god (lore.md). |
+| **Barkeep** | Story name for a manager: an ordinary person running a tavern that fronts for the Lich's organization (lore.md). |
 | **Base** | A character's raw Open5e stat block, identified by slug (e.g. `ogre`), from the season's pinned snapshot. |
 | **Battle** | A mission node won or lost on a black-box `p(win)` from party vs encounter. A win may bank loot (D-50). A loss is a DNF and injures a starter (D-51). |
 | **Boon** | A rule-bending gift a tavern's god grants it, such as "a DNF doesn't injure" (D-52). |
