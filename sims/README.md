@@ -68,28 +68,75 @@ Then open `sims/output/playground/index.html` directly in a browser (no server
 needed). The file is git-ignored and just under 2 MB, the build's limit:
 most of it is each pooled character's painted portrait, cut at build time
 (`playgroundChrome`) to an 88 px thumbnail for the portrait chips and to the
-card's face crop. Names, epithets and portraits are chrome: every tab
-but the event log (which shows ids, as the NDJSON does) shows them, and
+card's face crop. Names, epithets and portraits are chrome: everywhere but
+the workshop's event log (which shows ids, as the NDJSON does) shows them, and
 they never reach `seasonInput`. The mock season pools 48 of
 the real cast (`sims/fixtures/mock-season/pool.yaml`, with mock-season
-modifiers), so every character has a face. It loads seed `sim-1` on open.
-The tabs:
+modifiers), so every character has a face.
 
-- **Play vs bots:** manage one tavern yourself against the bots. Pick a
-  tavern and a seed and start; draft when you are on the clock (the crier
-  calls every pick as it happens, free agents as cards or a table, sorted
-  by the bots' `valueOf` rating; portraits on your roster, the free agents
-  and the board), then before each week set a lineup (starters and bench as
-  two decks of cards, empty in week 1 and last week's after that, with
-  `validateLineup`, the projection and the mission graph live) and make waiver
-  claims, and press Play week, which locks in the lineup on screen (it stays
-  disabled while that lineup is illegal). The bots draft, set lineups and
-  claim through the same `SeasonSession`; nothing suggests your moves. Your events carry a
-  `manager` actor. The season is saved in the browser's localStorage as its
-  seed, tavern and your moves, and replayed on reload; New season asks for a
-  second click before abandoning one in progress. When the season ends it is
-  audited like any run and loads into the other tabs.
-- **Bot run bar** (hidden on the Play tab): any seed, Run, New seed; event
+The page opens to **the game** (`src/playground/play.ts`): one season
+against five bots. Pick a seat and a seed (or none, for a random one) and
+start. The bots' managers show as keepers with page-only names (Mags
+Thornbury, Old Wendel, ...), so the room reads like a table of people; the
+Standings name each one's strategy.
+
+- **The Common Room** is the season's running story, a chat no one types
+  into. Its messages (`src/playground/feed.ts` `feedItems`, pure and
+  tested) come from the event log: the crier opens the season, each keeper
+  takes a tavern, the draft is called round by round (a finished round folds
+  to a row of faces when the next one starts; steals and reaches as before,
+  `draftCalls`), each week opens with its mission, hexes are announced, the
+  lineup lock lists every tavern's four (folded), the scrying ball shows the
+  week as a race, the crier posts the table, and the steward reads the
+  waivers. Rivals' claims stay sealed until they resolve; yours shows to you
+  at once. Folds you open or close stay that way.
+- **The pacing.** The engine and bots decide at once, as they always have, but the
+  room tells it at a person's pace: a rival is "on the clock" (a typing line
+  in the action bar) for about a second before its pick lands, keepers
+  choose taverns a little slower, and when a week opens each rival says it
+  is ready a few seconds apart. Lock in plays your week once everyone is
+  ready; rivals still setting a lineup hurry. The whole page (free agents,
+  standings, your header) shows the league folded from the events the room
+  has told (`applyEvent` up to the room's cursor), so nothing runs ahead of
+  the story: a free agent a rival takes is stamped with their flag, then
+  leaves the list. Skip (or Esc), a reload and `prefers-reduced-motion` tell
+  everything at once. Readiness is presence, not an event, so a reload
+  forgets it.
+- **A week's race** (`fx.ts raceWeek`): every tavern's run as a strip of
+  steps, green for a pass or a win and red for a fail or a loss (a battle
+  round and wide, a gold foot where loot was banked), ending home, turned
+  back or DNF. The lanes start in draft order with yours last, so the order
+  gives nothing away; the rivals' strips fill in together, then the scrying
+  ball plays your run back line by line (the dice tumble, the loot counter
+  climbs, a DNF drains it), then the ranks show and the lanes slide into the
+  week's order. Any lane opens into its tale; yours also has the map of the
+  run. Watch again replays the latest week.
+- **The workspace** beside the room follows the season: **Taverns** (the
+  tavern pick), **Draft** (your roster and the free agents as cards or a
+  table, sorted by the bots' `valueOf` rating; the draft board, folded),
+  **Lineup** (starters and bench as two decks, empty in week 1 and last
+  week's after that, with `validateLineup`, the projection, the retreat
+  table and the mission map; your hex, once a season; waiver claims) and
+  **Roster** at the end. Its buttons only work when the move is yours.
+- **Standings:** the table with each tavern's move since last week, keeper
+  and strategy, total and weekly loot; every roster; every hex.
+- **The action bar** says whose move it is: a rival typing, your turn (it
+  glows when the clock comes back to you), the rivals' readiness with Lock in,
+  or New season at the end.
+
+On a wide screen the room sits beside the workspace or the standings; on a
+narrow one each is a tab, with the action bar always at the bottom. The
+season is saved in the browser's localStorage as its seed, seat and your
+moves, and replayed on reload; New season asks for a second click before
+abandoning one in progress. Your events carry a `manager` actor; nothing
+suggests your moves. When the season ends it is audited like any run and
+loads into the workshop.
+
+**The workshop** (the Workshop button; `src/playground/workshop.ts`) holds
+the tools for checking the league by hand. It runs seed `sim-1` the first
+time it opens, not on page load.
+
+- **Bot run bar:** any seed, Run, New seed; event
   count, the replay check (`replayLog` deep-equals the built state), the
   verify check (`verifyResolutions` finds no mismatches), run time, the NDJSON
   sha256 and the champion.
@@ -134,47 +181,34 @@ sponsoring god's chrome (name, call and banner), and each character's
 average draft position over 100 all-bot drafts (`averageDraftPositions`),
 for display; none of it reaches the engine), bundles `src/playground/app.ts` with esbuild
 as a minified browser IIFE, and inlines both into `src/playground/page.html`.
-In the draft, characters show as cards (`charCard` in `src/playground/app.ts`):
-name, epithet and CR, the art (the portrait's face crop over a blurred copy
-of the portrait; a silhouette for a character without one), the
-monster line with its size in words, AC, HP, speed and best skills. Free
-agents are neutral; your roster wears your banner, and a drafted card turns
-over into it. A Show control swaps the free agents back to the table. The
-lineup builder deals your roster the same way: starters wear your banner,
-the bench is neutral (an injured character greyed out), and Start turns a
-card over into your colours. When
-the clock comes back to you after a pick, the draft card glows once and its
-heading bounces. In the lineup builder the CR meter jellies when a starter
-still fits the budget and shakes when one doesn't; the engine's reason shows
-below it as before.
+`app.ts` only boots the page (theme, and the game or the workshop);
+`shared.ts` holds what both use: the season data, banners, the character
+card (`charCard`), the mission graph and the roll log.
+Characters show as cards: name, epithet and CR, the art (the portrait's face
+crop over a blurred copy of the portrait; a silhouette for a character
+without one), the monster line with its size in words, AC, HP, speed and best
+skills. Free agents are neutral; your roster wears your banner, and a drafted
+card turns over into it. The lineup builder deals your roster the same way:
+starters wear your banner, the bench is neutral (an injured character greyed
+out), and Start turns a card over into your colours; the CR meter jellies
+when a starter still fits the budget and shakes when one doesn't.
 
 Moments (`src/playground/fx.ts`) give a few moves emotional weight: choosing
-your tavern raises its banner with one burst of party.js sparkles (bundled)
-and micron's swing (its CSS vendored into `page.html` with its MIT notice),
-the crier calls the draft pick by pick (`revealDraft`): after your pick,
-each rival's tavern is "choosing" while names flicker through who usually
-goes next, then its pick lands with a portrait and the crier's notes
-(`draftCalls`: a steal a round or more past its average draft position, a
-reach three or more before it), and the sections below the log stay
-hidden until the last call, so the free agents don't give it away. The log
-stays up until week 1 is played, so the draft's last picks land too. And
-playing a week plays your run back node by node in the scrying ball:
-dice tumble before they settle, the loot counter climbs, and a DNF drains it
-to 0. The reveal ends in a moment sized to the week (`weekOutcome`): confetti
-in your banner's colours for topping it, sparkles for beating the projection,
-a breath out for turning back, a dimmed run after a DNF, and nothing for a
-quiet week. A hex takes a second click to declare (it is public and final),
-then lands in the list in your colours with a jolt and a few embers; a rival's
-hex on you opens that week's reveal in the rival's colours before the party
-sets out. From week 2 the Play standings show how far each tavern moved
-since last week (▲/▼, `tableMoves`), and when a week's reveal ends the rows
-slide from last week's order into this week's. The last week's reveal ends the season: if you won, your banner
-goes up over the final card and the only full-screen confetti in the page
-rises in its colours; if not, you get your week's moment, the champion's flag
-swings in theirs, and the card gives your finish and your best week. The
-result card holds the whole result and the reveal only holds pieces
-back, so Skip (or Esc), a reload and `prefers-reduced-motion` all show the
-same thing at once. Each moment plays once after the render its move caused.
+your tavern raises its banner over the header with one burst of party.js
+sparkles (bundled) and micron's swing (its CSS vendored into `page.html` with
+its MIT notice). A week's race ends in a moment sized to your week
+(`weekOutcome`): confetti in your banner's colours for topping it, sparkles
+for beating the projection, a breath out for turning back, a dimmed strip
+after a DNF, and nothing for a quiet week. A hex takes a second click to
+declare (it is public and final), then lands in the room in your colours
+with a jolt and a few embers; a rival's hex on you opens your tale in the
+rival's colours. The table after each week slides from last week's order
+into this week's (▲/▼, `tableMoves`). The last week ends the season: if you
+won, your banner goes up over the crier's final message and the only
+full-screen confetti in the page rises in its colours; if not, the
+champion's flag swings in theirs, and the message gives your finish and your
+best week. Each message holds its whole result and the telling only holds
+pieces back, so Skip, a reload and reduced motion all show the same thing.
 The page calls `seasonInputFromData`, which is the same `seasonInput` the CLI
 uses, so a seed gives the same season, byte for byte: the engine avoids
 `Math.exp`/`Math.log` (not bit-identical across JS engines) in favor of
@@ -184,5 +218,5 @@ The page is written as an Artifact body: it starts with `<title>`, has no
 doctype, html, head or body tags, makes no requests beyond Google Fonts, and
 is pure ASCII so it reads right without a declared charset.
 `src/playground/` is type-checked with DOM types by its own
-`tsconfig.json`; pure view helpers live in `src/playground/view.ts` and are
-tested in `test/playground.test.ts`.
+`tsconfig.json`; pure view helpers live in `src/playground/view.ts` and
+`src/playground/feed.ts` and are tested in `test/playground.test.ts`.

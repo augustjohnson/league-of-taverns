@@ -277,7 +277,6 @@ td.skills { white-space: normal; min-width: 11em; }
 td.flow { white-space: normal; }
 .graph svg { height: auto; }
 .kv .v.muted { color: var(--muted); }
-#run-error.off-tab { display: none; }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 
 /* Banners: each tavern fights under its god's colours (gods/<id>/god.yaml). The page adds one generated rule per god
@@ -353,10 +352,10 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 .lcard .card-foot { background: none; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: center; }
 .lcard .card-foot .muted { color: var(--muted); }
 .lcard.themed .card-foot .muted { color: var(--banner-ink); }
-/* The clock comes back to you (fx.ts clockBack): the draft card glows once in brass. */
+/* The clock comes back to you (fx.ts clockBack): the action bar glows once in brass. */
 @keyframes clock-glow { from { box-shadow: 0 0 0 0 color-mix(in oklch, var(--brass) 55%, transparent); } to { box-shadow: 0 0 0 14px color-mix(in oklch, var(--brass) 0%, transparent); } }
-.card.clock-back { animation: clock-glow 1.1s ease-out; }
-@media (prefers-reduced-motion: reduce) { .card.clock-back { animation: none; } }
+.g-bar.clock-back { animation: clock-glow 1.1s ease-out; }
+@media (prefers-reduced-motion: reduce) { .g-bar.clock-back { animation: none; } }
 @keyframes turn-out { to { transform: rotateY(90deg); } }
 @keyframes turn-in { from { transform: rotateY(-90deg); } to { transform: none; } }
 .lcard.turning-out { animation: turn-out 0.22s ease-in forwards; }
@@ -380,48 +379,11 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
   .banner-card.raised, .banner-card.raised *, [class*="mjs-"] { animation: none !important; }
 }
 
-/* The draft log (app.ts draftLogHtml, fx.ts revealDraft): the crier calls each pick under the tavern's flag; your own
-   lines sit in your banner. While the card is .revealing, the picks your move caused come in one by one (.shown) and
-   every section after the card stays hidden, so the free agents don't give the picks away. A rival's line reads
-   "is choosing" while the name flickers, its portrait and notes held back until it lands. */
-.draft-log { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; max-height: 19em; overflow-y: auto; overscroll-behavior: contain; }
-.draft-log > li { display: flex; gap: 8px; align-items: center; padding: 2px 6px; border-radius: var(--radius); min-height: 32px; }
-.draft-log > li.round { min-height: 0; padding-top: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
-.draft-log > li.done { color: var(--muted); font-style: italic; }
-.draft-log .pk { flex: none; min-width: 2em; text-align: right; font: 11px var(--font-num); color: var(--muted); }
-.draft-log .line { display: flex; flex-wrap: wrap; gap: 0 5px; align-items: center; min-width: 0; }
-.draft-log .flag { width: 20px; height: 13px; border-left-width: 4px; }
-.draft-log > li.mine { background: var(--banner-bg, var(--brass-soft)); color: var(--banner-ink, var(--ink)); }
-.draft-log > li.mine .muted { color: inherit; opacity: 0.75; }
-.draft-log-card:not(.revealing) [data-reveal-skip] { display: none; }
-.draft-log-card.revealing ~ * { display: none !important; }
-.draft-log-card.revealing .draft-log > li.fresh:not(.shown) { display: none; }
-.draft-log-card.revealing .draft-log > li.shown { animation: banner-rise 0.3s ease-out both; }
-.draft-log li.choosing .landed { visibility: hidden; }
-.draft-log li.choosing .who { color: var(--muted); font-weight: 400; }
-
-/* The week reveal (fx.ts revealWeek): the scrying ball plays your run back. While the card is .revealing, the path,
-   the outcomes, everything marked data-spoiler and every section after the card stay hidden; .shown brings each piece
-   in as the run reaches it, and .revealed fades the rest in at the end. */
-.tale-box { display: grid; gap: 6px; }
+/* The scrying ball's tale (play.ts taleHtml): one line per check or battle. */
 .tale { margin: 0; padding-left: 1.6em; display: grid; gap: 5px; font-size: 13px; }
 .tale .die { margin-inline: 2px; }
-.week-result:not(.revealing) [data-reveal-skip], .week-result.revealing [data-after-reveal] { display: none; }
-.panel:has(.week-result.revealing) [data-spoiler], .week-result.revealing ~ * { display: none !important; }
-.week-result.revealing .tale > li:not(.shown) { display: none; }
-.week-result.revealing .tale > li.shown { animation: banner-rise 0.3s ease-out both; }
-.tale li.rolling .outcome { visibility: hidden; }
 .tale .die.rolling { border-color: var(--brass); color: var(--ink); }
-.week-result.revealing .graph .edge.on:not(.shown) { stroke: var(--muted); stroke-width: 1.3; opacity: 0.55; }
-.week-result.revealing .graph .elabel.on:not(.shown) { fill: var(--muted); }
-.week-result.revealing .graph .node:not(.shown) rect { stroke: var(--line); stroke-width: 1.2; fill: var(--node); }
-.week-result.revealing .graph .node.battle:not(.shown) rect { stroke: var(--muted); }
-.week-result.revealing .graph .node:not(.shown) .out { opacity: 0; }
-.week-result.revealing .graph .node.current rect { stroke: var(--brass); stroke-width: 2.4; animation: scry 0.8s ease-in-out infinite alternate; }
-@keyframes scry { from { stroke-opacity: 1; } to { stroke-opacity: 0.3; } }
-.panel:has(.week-result.revealed) [data-spoiler], .week-result.revealed ~ * { animation: banner-rise 0.45s ease-out both; }
-.week-result:focus { outline: none; }
-/* Hexes (fx.ts layCurse, and the curse that opens a week's reveal): a hex involving you wears a banner, yours when you
+/* Hexes (fx.ts layCurse, and the curse that opens a week's tale): a hex involving you wears a banner, yours when you
    laid it and the rival's when it fell on you. The ground stays plain behind the text; the colour is the edge and ink. */
 .hexes { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
 .curse[data-banner] { background: var(--banner-bg); border-left: 4px solid var(--banner-line); border-radius: var(--radius); padding: 3px 8px; color: var(--banner-ink); }
@@ -439,17 +401,207 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 .champ-line .flag { transform-origin: center top; }
 
 /* The table moves (fx.ts slideStandings): a sliding row stays above the rows it passes, yours on top of all. */
-#play-standings tr.sliding { position: relative; z-index: 1; }
-#play-standings tr.sliding.mine { z-index: 2; }
-#play-standings tr.sliding td { background: var(--surface); }
-#play-standings tr.sliding.mine[data-banner] td { background: var(--banner-bg); }
+.mini-table tr.sliding { position: relative; z-index: 1; }
+.mini-table tr.sliding.mine { z-index: 2; }
+.mini-table tr.sliding td { background: var(--surface); }
+.mini-table tr.sliding.mine[data-banner] td { background: var(--banner-bg); }
 td.move { width: 3.2em; font-size: 12px; }
 
-/* What a week leaves behind (fx.ts weekMoment): after a DNF the run dims except where it ended; after a retreat the
-   loot kept is marked. Static, so a reload shows them; they arrive with the end of the reveal. */
-.week-result[data-outcome="dnf"]:not(.revealing) .graph :is(.edge, .elabel, .node:not(.lost)) { opacity: 0.4; transition: opacity 1.2s ease-out; }
-.week-result[data-outcome="retreat"]:not(.revealing) [data-tail="retreat"] { background: var(--good-soft); border-radius: var(--radius); padding: 2px 6px; transition: background-color 0.8s ease-out; }
-@media (prefers-reduced-motion: reduce) { .week-result .graph *, .week-result [data-tail] { transition: none !important; } }
+/* The game (play.ts).
+   The Common Room is the season's story, a chat no one types into; beside it, a workspace for your move and the
+   standings. Wide screens show the room beside one of the two; narrow ones show one view at a time, with the action
+   bar always at the bottom. The game fills the window, and each column scrolls on its own, as a chat app does. */
+body[data-mode="game"] .wrap { max-width: 1380px; height: 100vh; height: 100dvh; grid-template-rows: auto minmax(0, 1fr); padding-block: 10px; gap: 10px; }
+body[data-mode="game"] footer { display: none; }
+.workshop { display: grid; gap: 14px; }
+.workshop > * { min-width: 0; }
+header.top .brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+header.top h1 { font-size: 1.6rem; }
+.top-actions { display: flex; gap: 6px; }
+.game { display: grid; min-height: 0; gap: 8px 16px; grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "head" "tabs" "main" "bar"; }
+.g-head { grid-area: head; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: stretch; }
+.g-tabs { grid-area: tabs; }
+.g-room { grid-area: main; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.g-side { grid-area: main; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 12px; align-content: start; padding-bottom: 12px; }
+.g-bar { grid-area: bar; }
+.game[data-view="room"] .g-side, .game[data-view="work"] .g-room, .game[data-view="work"] #g-table, .game[data-view="table"] .g-room, .game[data-view="table"] #g-work { display: none; }
+@media (min-width: 960px) {
+  .game { grid-template-columns: minmax(380px, 1fr) minmax(0, 1.3fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "head head" "room tabs" "room side" "bar side"; }
+  .g-room { grid-area: room; }
+  .g-side { grid-area: side; }
+  .g-tabs .room-tab { display: none; }
+  /* The room always shows; beside it, the workspace unless the standings are chosen. */
+  .game[data-view] .g-room { display: flex; }
+  .game[data-view="room"] #g-work, .game[data-view="work"] #g-work, .game[data-view="table"] #g-table { display: grid; }
+  .narrow-only { display: none !important; }
+}
+/* A phone: the header shrinks to a line, and your tavern to its name and the week. */
+@media (max-width: 959px) {
+  header.top { flex-wrap: nowrap; align-items: center; padding-bottom: 6px; }
+  header.top h1 { font-size: 1.25rem; }
+  header.top .sub, .you .banner-call, .head-actions .muted { display: none; }
+  .g-head { flex-wrap: nowrap; }
+  .you { flex: 1 1 auto; padding: 4px 10px; }
+  .you.banner-card .pennant { height: 6px; }
+  .you-name { font-size: 1.1rem; }
+  .g-tabs button { padding-inline: 10px; }
+  .room-title { display: none; }
+  .msg { grid-template-columns: 28px minmax(0, 1fr); gap: 2px 8px; padding-inline: 4px; }
+  .sys { width: 26px; height: 26px; }
+  .tav .flag { width: 26px; height: 18px; }
+}
+.g-side .empty { display: grid; gap: 8px; justify-items: start; padding: 24px 16px; color: var(--muted); }
+.row.spread { justify-content: space-between; }
+
+/* Your tavern, up top: its banner once the room has told your choice. */
+.you { flex: 1 1 320px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; display: grid; gap: 2px; align-content: center; }
+.you.banner-card { background: var(--banner-bg); border-color: color-mix(in oklch, var(--banner-line) 40%, var(--line)); padding-top: 0; }
+.you.banner-card .pennant { height: 10px; margin: 0 -12px 4px; }
+.you-line { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; }
+.you-name { font: 400 1.3rem/1.1 var(--font-display); color: var(--banner-ink, var(--ink)); }
+.you .banner-call { font-size: 0.95rem; }
+.head-actions { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: flex-end; }
+
+/* The room: a title, then the messages, newest at the bottom. */
+.room-title { font-family: var(--font-display); font-size: 1.1rem; padding: 8px 14px 6px; border-bottom: 1px solid var(--line); background: var(--sunken); }
+.feed { list-style: none; margin: 0; padding: 8px 6px 14px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 1px; }
+.feed > .welcome { list-style: none; padding: 8px; }
+.feed > .welcome .card { gap: 12px; }
+.divider { display: flex; align-items: center; gap: 10px; margin: 12px 8px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+.msg { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 2px 10px; padding: 6px 8px; border-radius: 6px; }
+.msg:hover { background: color-mix(in oklch, var(--sunken) 55%, transparent); }
+.msg .av { width: 34px; min-height: 26px; display: grid; justify-items: center; align-content: start; padding-top: 2px; }
+.msg .mbody { min-width: 0; display: grid; gap: 2px; }
+.msg .meta { font-size: 12.5px; line-height: 1.3; }
+.msg .author { font-weight: 700; }
+.msg .note { color: var(--muted); }
+.msg .text { font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
+.msg .text p { margin-top: 4px; }
+.msg.compact { padding-block: 2px; }
+.msg.compact .av { min-height: 0; }
+.msg.compact .tav .flag { height: 14px; width: 22px; border-left-width: 4px; }
+.msg.mine[data-banner] { background: color-mix(in oklch, var(--banner-bg) 75%, transparent); }
+.msg.mine[data-banner] .author { color: var(--banner-ink); }
+.msg.private { outline: 1px dashed var(--line); outline-offset: -1px; }
+.msg.fresh { animation: msg-in 0.35s ease-out both; }
+@keyframes msg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.sys { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--brass-soft); }
+.sys svg { width: 19px; height: 19px; fill: var(--brass); }
+.sys.steward svg { fill: none; stroke: var(--brass); stroke-width: 1.7; stroke-linejoin: round; }
+.sys.ball { background: color-mix(in oklch, var(--brass-soft) 60%, var(--sunken)); }
+.sys.ball svg .glint { fill: var(--surface); opacity: 0.8; }
+.tav { display: inline-grid; place-items: center; }
+.tav .flag { width: 30px; height: 22px; }
+.tav .initial { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--sunken); font-family: var(--font-display); }
+.faces.mini { gap: 0; margin-right: 8px; }
+.faces.mini .pt.sm { width: 24px; height: 24px; margin-right: -5px; border-radius: 50%; border-color: var(--surface); }
+.msg .faces .pt.sm { width: 24px; height: 24px; }
+
+/* A fold: a message's detail, opened on a click; the ones you open stay open. */
+details.fold > summary { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: inherit; font-weight: 400; font-size: inherit; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::after { content: '+'; font: 600 12px var(--font-num); color: var(--brass); margin-left: 2px; }
+details.fold[open] > summary::after { content: '\2212'; }
+details.fold > summary:hover::after { text-decoration: underline; }
+
+/* The crier's draft calls, round by round. */
+.calls { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.calls > li { display: flex; gap: 8px; align-items: center; padding: 2px 6px; border-radius: var(--radius); min-height: 30px; }
+.calls .pk { flex: none; min-width: 2em; text-align: right; font: 11px var(--font-num); color: var(--muted); }
+.calls .line { display: flex; flex-wrap: wrap; gap: 0 5px; align-items: center; min-width: 0; }
+.calls .flag, .lineups .flag, .claims .flag, .rosters .flag, .mini-table .flag, .hexes .flag { width: 20px; height: 13px; border-left-width: 4px; }
+.calls > li.mine { background: var(--banner-bg, var(--brass-soft)); color: var(--banner-ink, var(--ink)); }
+.calls > li.mine .muted { color: inherit; opacity: 0.75; }
+.calls > li.fresh { animation: msg-in 0.35s ease-out both; }
+.calls > li.fresh .who { animation: action-pop 0.4s 0.15s ease-in-out; display: inline-block; }
+.lineups, .claims, .rosters { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; }
+.lineups > li, .claims > li, .rosters > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 2px 6px; border-radius: var(--radius); }
+:is(.lineups, .claims, .rosters) > li.mine[data-banner] { background: var(--banner-bg); }
+.mini-table { width: auto; min-width: 16em; margin-top: 4px; }
+.mini-table td { padding: 3px 8px; }
+.mini-table tr.mine[data-banner] td { background: var(--banner-bg); }
+.mini-table tr.champ td:first-child { box-shadow: inset 3px 0 0 var(--brass); }
+
+/* A week's race (fx.ts raceWeek): each tavern's run as a strip, green for a pass or a win and red for a fail or a
+   loss, a battle drawn round and wide, a gold foot where loot was banked. While the message is .racing, every step,
+   end and score not yet .shown is held back, and so are the ranks and your headline. */
+.headline { font-size: 14px; margin-bottom: 2px; }
+.race { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.lane { border-radius: 5px; }
+.lane.mine[data-banner] { background: color-mix(in oklch, var(--banner-bg) 85%, transparent); box-shadow: inset 3px 0 0 var(--banner-line); }
+.lane > details > summary { display: grid; grid-template-columns: 1.3em 22px minmax(5em, 10em) minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 5px; }
+.lane > details > summary::after { display: none; }
+.lane > details > summary:hover { background: color-mix(in oklch, var(--sunken) 70%, transparent); }
+.lane .rk { font: 600 12px var(--font-num); color: var(--muted); text-align: right; }
+.lane .tn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lane .flag { width: 20px; height: 13px; border-left-width: 4px; }
+.lane .pts { font-size: 13px; text-align: right; min-width: 3.2em; }
+.strip { display: flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; }
+.pip { flex: none; width: 9px; height: 15px; border-radius: 2px; display: inline-block; background: var(--line); }
+.pip.ok { background: var(--good); }
+.pip.no { background: var(--bad); }
+.pip.battle { width: 15px; border-radius: 8px; }
+.pip.bank { box-shadow: inset 0 -4px 0 var(--brass); }
+.run-end { flex: none; margin-left: 4px; font: 700 9.5px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.run-end.home { border-color: var(--good); color: var(--good); }
+.run-end.dnf { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+.lane-tale { padding: 2px 6px 8px 2.4em; display: grid; gap: 6px; }
+.loot-line b { font-size: 1.05em; }
+.race-foot { margin-top: 2px; text-align: right; }
+.racing .pip:not(.shown), .racing .run-end:not(.shown) { opacity: 0; }
+.racing .pip.shown { animation: pip-in 0.25s ease-out both; }
+@keyframes pip-in { from { transform: scaleY(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
+.racing .pts:not(.shown), .racing .rk, .racing [data-headline], .racing .race-foot { visibility: hidden; }
+.racing .lane.mine .tale > li:not(.shown) { display: none; }
+.racing .lane.mine .tale > li.shown { animation: msg-in 0.3s ease-out both; }
+.racing .tale li.rolling .outcome { visibility: hidden; }
+/* What a week leaves behind (fx.ts weekMoment): after a DNF your strip dims; after a retreat the loot kept is marked. */
+.msg.results[data-outcome="dnf"]:not(.racing) .lane.mine .strip { opacity: 0.55; transition: opacity 1.2s ease-out; }
+.msg.results[data-outcome="retreat"]:not(.racing) .lane.mine [data-tail="retreat"] { background: var(--good-soft); border-radius: var(--radius); padding: 2px 6px; }
+
+/* The season's end, as a message: a champion's flies their banner. */
+.msg.season-final h2 { margin: 4px 0; }
+.msg.season-final.champion { display: grid; gap: 8px; padding: 0 14px 12px; border: 1px solid var(--banner-line); background: var(--banner-bg); margin-block: 6px; }
+.msg.season-final.champion .pennant { height: 30px; margin-inline: -14px; background: var(--banner-pattern), var(--banner-ground); border-bottom: 2px solid var(--banner-line); }
+.msg.season-final.champion h2 { font-size: 1.8rem; color: var(--banner-ink); }
+
+/* The action bar: whose move it is, and yours when it is. A rival "typing" shows here, as in a chat. */
+.g-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; min-height: 50px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 -6px 14px -12px rgba(0, 0, 0, 0.45); }
+.g-bar .error { flex-basis: 100%; }
+.bar-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.bar-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.typing { display: inline-flex; align-items: center; gap: 6px; }
+.typing .flag { width: 22px; height: 15px; border-left-width: 4px; }
+.dots { display: inline-flex; gap: 3px; margin-left: 2px; }
+.dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.25; animation: dot 1.1s infinite ease-in-out; }
+.dots i:nth-child(2) { animation-delay: 0.18s; }
+.dots i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes dot { 0%, 70%, 100% { opacity: 0.25; transform: none; } 35% { opacity: 1; transform: translateY(-2px); } }
+.ready-row { display: inline-flex; gap: 4px; }
+.rdy { display: inline-grid; place-items: center; min-width: 22px; height: 16px; opacity: 0.3; filter: grayscale(1); transition: opacity 0.3s, filter 0.3s; font-size: 11px; }
+.rdy .flag { width: 22px; height: 15px; border-left-width: 4px; }
+.rdy.on { opacity: 1; filter: none; }
+
+/* The workspace: a free agent a rival takes is stamped with their flag until the list catches up. */
+.lcard { position: relative; }
+.lcard.taken > :not(.stamp) { opacity: 0.3; filter: grayscale(1); transition: opacity 0.3s, filter 0.3s; }
+.stamp { position: absolute; left: 10px; right: 10px; top: 38%; display: flex; gap: 6px; align-items: center; justify-content: center; transform: rotate(-7deg);
+  padding: 4px 6px; border: 2px solid var(--banner-line, var(--bad)); border-radius: 4px; background: var(--banner-bg, var(--surface)); color: var(--banner-ink, var(--bad));
+  font: 700 12px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; animation: stamp 0.3s cubic-bezier(0.2, 0.7, 0.3, 1.4) both; }
+.stamp .flag { width: 18px; height: 12px; border-left-width: 3px; }
+@keyframes stamp { from { opacity: 0; transform: rotate(-7deg) scale(1.7); } to { opacity: 1; transform: rotate(-7deg); } }
+tr.taken td { opacity: 0.3; text-decoration: line-through; }
+.card.on-clock { border-color: var(--brass); box-shadow: inset 0 3px 0 var(--brass); }
+.lock-row { border-top: 1px solid var(--line); padding-top: 10px; }
+tr.taken-row td { opacity: 0.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .msg.fresh, .calls > li.fresh, .calls > li.fresh .who, .racing .pip.shown, .stamp, .dots i { animation: none !important; }
+}
 
 /* Vendored: micron 1.1.6 (https://github.com/webkul/micron), its CSS only; fx.ts applies the interactions.
 MIT License
@@ -479,38 +631,58 @@ SOFTWARE.
 
 <div class="wrap">
   <header class="top">
-    <div class="stack" style="gap:2px">
+    <div class="brand">
       <h1>League of Taverns</h1>
       <p class="sub" id="subtitle">Playground</p>
     </div>
-    <button type="button" id="theme" title="Switch colour theme">Theme: auto</button>
+    <div class="top-actions">
+      <button type="button" class="small" id="mode">Workshop</button>
+      <button type="button" class="small" id="theme" title="Switch colour theme">Theme: auto</button>
+    </div>
   </header>
 
-  <section class="runbar" id="runbar" aria-label="The bot run: a season with bots in every seat">
-    <form id="run-form">
-      <span class="runbar-title">Bot run</span>
-      <label class="label" for="seed">Seed</label>
-      <input type="text" id="seed" value="sim-1" spellcheck="false" autocomplete="off">
-      <button type="submit" class="primary" id="run">Run</button>
-      <button type="button" id="new-seed">New seed</button>
-    </form>
-    <div class="chips" id="status" aria-live="polite"><span class="chip">Loading the engine…</span></div>
+  <section id="game" class="game" data-view="room" aria-label="Your season against the bots">
+    <div id="g-head" class="g-head"></div>
+    <nav class="tabs g-tabs" role="tablist" id="g-tabs" aria-label="Your season">
+      <button type="button" role="tab" class="room-tab" id="g-tab-room" data-action="g-view" data-view="room" aria-controls="g-room">Common Room</button>
+      <button type="button" role="tab" id="g-tab-work" data-action="g-view" data-view="work" aria-controls="g-work">Draft</button>
+      <button type="button" role="tab" id="g-tab-table" data-action="g-view" data-view="table" aria-controls="g-table">Standings</button>
+    </nav>
+    <section id="g-room" class="g-room" role="tabpanel" aria-labelledby="g-tab-room">
+      <div class="room-title">The Common Room</div>
+      <ol id="g-feed" class="feed" aria-live="polite" aria-relevant="additions"></ol>
+    </section>
+    <div id="g-bar" class="g-bar" aria-live="polite" hidden></div>
+    <section id="g-work" class="g-side" role="tabpanel" aria-labelledby="g-tab-work"></section>
+    <section id="g-table" class="g-side" role="tabpanel" aria-labelledby="g-tab-table"></section>
   </section>
-  <div id="run-error" class="error" hidden></div>
 
-  <nav class="tabs" role="tablist" id="tabs" aria-label="Playground views">
-    <button type="button" role="tab" id="tab-play" aria-controls="panel" data-tab="play" aria-selected="false" tabindex="-1">Play vs bots</button>
-    <button type="button" role="tab" id="tab-standings" aria-controls="panel" data-tab="standings" aria-selected="true" class="group-start" title="The loaded season: the bot run, or your finished season">Standings</button>
-    <button type="button" role="tab" id="tab-weeks" aria-controls="panel" data-tab="weeks" aria-selected="false" tabindex="-1">Weeks</button>
-    <button type="button" role="tab" id="tab-draft" aria-controls="panel" data-tab="draft" aria-selected="false" tabindex="-1">Draft board</button>
-    <button type="button" role="tab" id="tab-reports" aria-controls="panel" data-tab="reports" aria-selected="false" tabindex="-1">Reports</button>
-    <button type="button" role="tab" id="tab-lab" aria-controls="panel" data-tab="lab" aria-selected="false" tabindex="-1" class="group-start" title="Tools">Lineup lab</button>
-    <button type="button" role="tab" id="tab-pool" aria-controls="panel" data-tab="pool" aria-selected="false" tabindex="-1">Pool</button>
-    <button type="button" role="tab" id="tab-events" aria-controls="panel" data-tab="events" aria-selected="false" tabindex="-1">Event log</button>
-    <button type="button" role="tab" id="tab-batch" aria-controls="panel" data-tab="batch" aria-selected="false" tabindex="-1">Batch</button>
-  </nav>
+  <section id="workshop" class="workshop" aria-label="The workshop" hidden>
+    <section class="runbar" id="runbar" aria-label="The bot run: a season with bots in every seat">
+      <form id="run-form">
+        <span class="runbar-title">Bot run</span>
+        <label class="label" for="seed">Seed</label>
+        <input type="text" id="seed" value="sim-1" spellcheck="false" autocomplete="off">
+        <button type="submit" class="primary" id="run">Run</button>
+        <button type="button" id="new-seed">New seed</button>
+      </form>
+      <div class="chips" id="status" aria-live="polite"><span class="chip">Not run yet</span></div>
+    </section>
+    <div id="run-error" class="error" hidden></div>
 
-  <main id="panel" class="panel" role="tabpanel" aria-labelledby="tab-standings" tabindex="-1"><p class="muted">Running seed sim-1…</p></main>
+    <nav class="tabs" role="tablist" id="ws-tabs" aria-label="Workshop views">
+      <button type="button" role="tab" id="tab-standings" aria-controls="ws-panel" data-tab="standings" aria-selected="true" title="The loaded season: the bot run, or your finished season">Standings</button>
+      <button type="button" role="tab" id="tab-weeks" aria-controls="ws-panel" data-tab="weeks" aria-selected="false" tabindex="-1">Weeks</button>
+      <button type="button" role="tab" id="tab-draft" aria-controls="ws-panel" data-tab="draft" aria-selected="false" tabindex="-1">Draft board</button>
+      <button type="button" role="tab" id="tab-reports" aria-controls="ws-panel" data-tab="reports" aria-selected="false" tabindex="-1">Reports</button>
+      <button type="button" role="tab" id="tab-lab" aria-controls="ws-panel" data-tab="lab" aria-selected="false" tabindex="-1" class="group-start" title="Tools">Lineup lab</button>
+      <button type="button" role="tab" id="tab-pool" aria-controls="ws-panel" data-tab="pool" aria-selected="false" tabindex="-1">Pool</button>
+      <button type="button" role="tab" id="tab-events" aria-controls="ws-panel" data-tab="events" aria-selected="false" tabindex="-1">Event log</button>
+      <button type="button" role="tab" id="tab-batch" aria-controls="ws-panel" data-tab="batch" aria-selected="false" tabindex="-1">Batch</button>
+    </nav>
+
+    <main id="ws-panel" class="panel" role="tabpanel" aria-labelledby="tab-standings" tabindex="-1"><p class="muted">Running seed sim-1…</p></main>
+  </section>
 
   <footer>
     Runs the real <span class="mono">@league-of-taverns/engine</span> and bots in your browser. A seed gives the same season as

@@ -270,8 +270,8 @@ export function draftBoard(order: ReadonlyArray<string>, picks: ReadonlyArray<Dr
 }
 
 /**
- * The crier's notes on a pick (the draft log, app.ts draftLogHtml): each
- * pick against where the bots usually take that character (its average draft
+ * The crier's notes on a pick (the draft's rounds in the Common Room, play.ts):
+ * each pick against where the bots usually take that character (its average draft
  * position, `adp`, 0-based). A steal comes `STEAL_ROUNDS` rounds or more
  * after it, a reach `REACH_ROUNDS` or more before it.
  */
@@ -289,8 +289,6 @@ export interface DraftCall extends DraftCell {
   /** Where the bots usually take the character (0-based), or null when `adp` has no entry. */
   readonly adp: number | null;
   readonly notes: ReadonlyArray<DraftNote>;
-  /** Who usually goes next among those still on the board (up to three, earliest first): who the crier's eye runs over. */
-  readonly board: ReadonlyArray<string>;
 }
 
 export function draftCalls(
@@ -298,17 +296,12 @@ export function draftCalls(
   adp: ReadonlyMap<string, number>,
   teams: number,
 ): ReadonlyArray<DraftCall> {
-  // Earliest first; ties by id, so the order never depends on map order.
-  const ranked = [...adp.keys()].sort((a, b) => adp.get(a)! - adp.get(b)! || (a < b ? -1 : a > b ? 1 : 0));
-  const taken = new Set<string>();
   return picks.map((p) => {
     const at = adp.get(p.character) ?? null;
-    const board = ranked.filter((id) => !taken.has(id)).slice(0, 3);
     const notes: DraftNote[] = [];
     if (at !== null && p.pick - at >= STEAL_ROUNDS * teams) notes.push('steal');
     if (at !== null && at - p.pick >= REACH_ROUNDS * teams) notes.push('reach');
-    taken.add(p.character);
-    return { ...p, adp: at, notes, board };
+    return { ...p, adp: at, notes };
   });
 }
 
@@ -548,6 +541,11 @@ export function bestWeek(
   let best: { week: number; points: number; rank: number } | null = null;
   for (const w of weeks) if (best === null || w.points > best.points || (w.points === best.points && w.week < best.week)) best = w;
   return best === null ? null : { week: best.week, points: best.points, topped: best.rank === 1 && best.points > 0 };
+}
+
+/** Rank by points, highest first; equal points share a rank, and the next rank skips (1, 1, 3). */
+export function ranked<T extends { readonly points: number }>(rows: ReadonlyArray<T>): ReadonlyArray<T & { readonly rank: number }> {
+  return rows.map((r) => ({ ...r, rank: 1 + rows.filter((o) => o.points > r.points).length }));
 }
 
 /**
