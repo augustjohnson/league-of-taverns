@@ -1129,10 +1129,19 @@ function startBatch(): void {
 
 const panel = $('ws-panel');
 let opened = false;
+/** A season you played to the end, waiting for the workshop to open: loading it audits the whole log, so it waits until it's wanted. */
+let played: { readonly seed: string; readonly finish: () => MockSeasonResult } | null = null;
 
 /** Show the workshop. The first time, run the seed in the run bar (sim-1 unless your season is already loaded). */
 export function openWorkshop(): void {
   markTabs();
+  if (played !== null) {
+    loadPlayed(played.seed, played.finish);
+    played = null;
+    opened = true;
+    renderTab();
+    return;
+  }
   if (opened) {
     renderTab();
     return;
@@ -1148,8 +1157,12 @@ export function openWorkshop(): void {
   requestAnimationFrame(() => setTimeout(() => doRun(($('seed') as HTMLInputElement).value.trim() || 'sim-1'), 0));
 }
 
-/** Load a season you played to the end into the workshop's tabs, like a seed run. */
+/** Load a season you played to the end into the workshop's tabs, like a seed run, the next time the workshop opens. */
 export function loadPlayedSeason(seed: string, finish: () => MockSeasonResult): void {
+  played = { seed, finish };
+}
+
+function loadPlayed(seed: string, finish: () => MockSeasonResult): void {
   const started = performance.now();
   let error: string | null = null;
   try {
@@ -1163,7 +1176,7 @@ export function loadPlayedSeason(seed: string, finish: () => MockSeasonResult): 
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
-  if (opened) renderStatus(error, performance.now() - started);
+  renderStatus(error, performance.now() - started);
 }
 
 // ── events wiring ──────────────────────────────────────────────────────────

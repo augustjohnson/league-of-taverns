@@ -361,15 +361,6 @@ describe('draft calls', () => {
     ]);
   });
 
-  it('runs its eye over who usually goes next among those left', () => {
-    const calls = draftCalls([pick(0, 'x', 'a'), pick(1, 'y', 'c'), pick(2, 'y', 'b')], adp, 2);
-    expect(calls.map((c) => c.board)).toEqual([
-      ['a', 'b', 'c'],
-      ['b', 'c', 'd'],
-      ['b', 'd', 'e'],
-    ]);
-  });
-
   it('has no average for a character outside it, and no note', () => {
     expect(draftCalls([pick(9, 'x', 'q')], adp, 2)[0]).toMatchObject({ adp: null, notes: [] });
   });

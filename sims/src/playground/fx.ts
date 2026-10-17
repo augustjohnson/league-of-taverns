@@ -168,6 +168,8 @@ function reorder(items: ReadonlyArray<HTMLElement>, order: ReadonlyArray<HTMLEle
 export async function raceWeek(msg: HTMLElement, pace: Pacer): Promise<void> {
   const race = msg.querySelector<HTMLElement>('.race');
   if (race === null || reducedMotion()) return;
+  // Watching again starts from nothing: whatever the last race showed is held back again.
+  for (const el of msg.querySelectorAll('.shown')) el.classList.remove('shown');
   const { sleep } = pace;
   const lanes = [...race.querySelectorAll<HTMLElement>(':scope > .lane')];
   const num = (el: HTMLElement, key: string): number => Number(el.dataset[key] ?? 0);

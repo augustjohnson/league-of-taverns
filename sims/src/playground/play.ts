@@ -75,7 +75,24 @@ import {
   tavernName,
   violationList,
 } from './shared';
-import { bestWeek, checkLabel, draftBoard, formatCr, formatCrTotal, parseRetreat, partyFrom, pct, retreatValue, seedWords, signed, taleSteps, waiverReasonLabel, weekOutcome } from './view';
+import {
+  bestWeek,
+  checkLabel,
+  draftBoard,
+  formatCr,
+  formatCrTotal,
+  parseRetreat,
+  partyFrom,
+  pct,
+  ranked,
+  retreatValue,
+  seedWords,
+  signed,
+  tableMoves,
+  taleSteps,
+  waiverReasonLabel,
+  weekOutcome,
+} from './view';
 import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
 
 /** The room's name, in one place. */
@@ -190,6 +207,8 @@ const presence = { week: 0, ready: new Map<number, string[]>(), said: [] as Arra
 interface Pump {
   readonly pace: Pacer;
   typing: { readonly tavern: string | null; readonly label: string; readonly verb: string } | null;
+  /** A "Watch again" of a week already told: it gives way to anything new in the log. */
+  readonly replay?: boolean;
 }
 let pump: Pump | null = null;
 /** Keys of the items the room has presented; anything else is new. */
@@ -282,7 +301,7 @@ function start(): void {
   try {
     const session = newSession(game.manager, seed);
     clearRoom();
-    Object.assign(game, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', confirmReset: false, confirmHex: false });
+    Object.assign(game, { session, seed, moves: [], filter: '', picks: [], retreat: 'never', builderWeek: 0, add: '', drop: '', hexTarget: '', hexAbility: 'wis', hexWeek: 1, confirmReset: false, confirmHex: false });
     save();
     // The preseason is already done when the room opens; the tavern pick is told as it happens.
     const first = session.events.findIndex((e) => e.type === 'tavern.chosen');
@@ -366,7 +385,10 @@ const REST: Partial<Record<FeedItem['kind'], number>> = { divider: 200, season: 
  */
 async function tell(): Promise<void> {
   const s = game.session;
-  if (s === null || pump !== null) return;
+  if (s === null) return;
+  // A replay gives way: the log has news, and the room tells it.
+  if (pump?.replay === true) pump.pace.skip();
+  else if (pump !== null) return;
   const pace = pacer();
   const mine: Pump = { pace, typing: null };
   pump = mine;
@@ -408,25 +430,40 @@ async function present(pace: Pacer | null, landed: LeagueEvent | null): Promise<
   const s = game.session;
   if (s === null) return;
   const items = roomItems();
-  for (const item of items) {
-    if (presented.has(item.key)) continue;
-    presented.add(item.key);
-    renderFeed(items.filter((it) => presented.has(it.key)), item.key);
-    if (pace === null || pace.skipped) continue;
-    await momentFor(item, pace);
-    await pace.sleep(REST[item.kind] ?? 0);
+  const told = (): ReadonlyArray<FeedItem> => items.filter((it) => presented.has(it.key));
+  if (pace === null || pace.skipped) {
+    // Nothing to pace: every new item lands in one render.
+    const fresh = new Set(items.flatMap((it) => (presented.has(it.key) ? [] : [it.key])));
+    for (const key of fresh) presented.add(key);
+    renderFeed(told(), fresh);
+  } else {
+    for (const item of items) {
+      if (presented.has(item.key)) continue;
+      presented.add(item.key);
+      renderFeed(told(), new Set([item.key]));
+      if (pace.skipped) continue;
+      await momentFor(item, pace);
+      await pace.sleep(REST[item.kind] ?? 0);
+    }
+    // Items that grew (a draft round) re-render in place.
+    renderFeed(told(), new Set());
   }
-  // Items that grew (a draft round) re-render in place.
-  renderFeed(items.filter((it) => presented.has(it.key)), null);
   if (landed?.type === 'tavern.chosen' || landed?.type === 'week.finalized') renderWork();
   if (landed?.type === 'draft.pick') {
     const line = $('g-feed').querySelector<HTMLElement>(`[data-seq="${landed.seq}"]`);
     line?.classList.add('fresh');
     followFeed();
     if (pace !== null && !pace.skipped) {
-      stampTaken(landed.payload.character, landed.payload.tavern);
-      if (landed.payload.tavern === s.humanTavern) await pace.sleep(500);
-      else await pace.sleep(200);
+      const { character, tavern } = landed.payload;
+      if (tavern === s.humanTavern) {
+        // Your pick lands in your roster and turns over into your colours.
+        renderWork();
+        turnCard($('g-work').querySelector<HTMLElement>(`#g-roster [data-card="${CSS.escape(character)}"]`));
+        await pace.sleep(500);
+      } else {
+        stampTaken(character, tavern);
+        await pace.sleep(200);
+      }
     }
   }
   renderHead();
@@ -555,7 +592,7 @@ async function lockIn(moves: ReadonlyArray<PlayMove>): Promise<void> {
 /** A bot's pick lands: if its card is in your free agents, it is stamped taken until the list catches up. */
 function stampTaken(character: string, tavern: string): void {
   const card = $('g-work').querySelector<HTMLElement>(`#g-fa [data-card="${CSS.escape(character)}"], #g-fa tr[data-row="${CSS.escape(character)}"]`);
-  if (card !== null && tavern !== game.session?.humanTavern) {
+  if (card !== null) {
     card.classList.add('taken');
     card.insertAdjacentHTML('beforeend', `<span class="stamp"${bannerAttr(tavern)}>${flagOf(tavern)} ${esc(tavernName(tavern))}</span>`);
   }
@@ -586,8 +623,8 @@ function roomItems(): ReadonlyArray<FeedItem> {
   });
 }
 
-/** Re-render the room from `items`, keeping every message whose markup hasn't changed; `fresh` is the one just added. */
-function renderFeed(items: ReadonlyArray<FeedItem>, fresh: string | null): void {
+/** Re-render the room from `items`, keeping every message whose markup hasn't changed; `fresh` are the ones just added. */
+function renderFeed(items: ReadonlyArray<FeedItem>, fresh: ReadonlySet<string>): void {
   const feed = $('g-feed');
   if (game.session === null) {
     feed.innerHTML = setupHtml();
@@ -608,7 +645,7 @@ function renderFeed(items: ReadonlyArray<FeedItem>, fresh: string | null): void 
       const next = tpl.content.firstElementChild as HTMLElement | null;
       if (next === null) continue;
       next.dataset.html = hashOf(html);
-      if (item.key === fresh) next.classList.add('fresh');
+      if (fresh.has(item.key)) next.classList.add('fresh');
       if (el === null) {
         if (prev === null) feed.prepend(next);
         else prev.after(next);
@@ -618,7 +655,7 @@ function renderFeed(items: ReadonlyArray<FeedItem>, fresh: string | null): void 
     prev = el;
   }
   for (const [key, el] of existing) if (!keep.has(key)) el.remove();
-  if (fresh !== null || atBottom) followFeed();
+  if (fresh.size > 0 || atBottom) followFeed();
 }
 
 /** A short hash of a message's markup, to tell whether it changed. */
@@ -1307,13 +1344,18 @@ function builderLineup(): Lineup | null {
 }
 
 /** Whether the lineup on screen can play, and why not. With no legal lineup on the roster at all, the week still plays (and scores 0). */
-function lineupCheck(s: SeasonSession, week: number): { readonly ok: boolean; readonly why: string; readonly stuck: boolean } {
+function lineupCheck(
+  s: SeasonSession,
+  week: number,
+): { readonly ok: boolean; readonly why: string; readonly stuck: boolean; readonly lineup: Lineup | null; readonly violations: ReturnType<typeof validateLineup>; readonly hurt: ReturnType<typeof injuredFor> } {
   syncBuilder(s, week);
   const lineup = builderLineup();
   const hurt = injuredFor(s.state, week);
-  const violations = lineup === null ? [{ code: 'empty', message: 'Pick your starters first.' }] : validateLineup(lineup, { tavern: s.humanTavern!, characters: myRoster(s) }, crOf, config, { unavailable: hurt });
-  const stuck = violations.length > 0 && s.suggestLineup() === null;
-  return { ok: violations.length === 0 || stuck, why: violations.length === 0 ? '' : stuck ? 'No legal lineup exists on your roster: you will score 0.' : violations.map((v) => v.message).join(' '), stuck };
+  const violations = lineup === null ? [] : validateLineup(lineup, { tavern: s.humanTavern!, characters: myRoster(s) }, crOf, config, { unavailable: hurt });
+  const bad = lineup === null || violations.length > 0;
+  const stuck = bad && s.suggestLineup() === null;
+  const why = !bad ? '' : stuck ? 'No legal lineup exists on your roster: you will score 0.' : lineup === null ? 'Pick your starters first.' : violations.map((v) => v.message).join(' ');
+  return { ok: !bad || stuck, why, stuck, lineup, violations, hurt };
 }
 
 function homeLine(s: SeasonSession, week: number): string {
@@ -1329,10 +1371,9 @@ function workWeek(s: SeasonSession, week: number): string {
   const title = input.schedule.find((x) => x.week === week)?.title ?? mission.id;
   const roster = myRoster(s);
   const check = lineupCheck(s, week);
-  const lineup = builderLineup();
-  const hurt = injuredFor(s.state, week);
-  const violations = lineup === null ? [] : validateLineup(lineup, { tavern: me, characters: roster }, crOf, config, { unavailable: hurt });
-  const projection = lineup === null ? null : projectMission(partyFrom(lineup.starters, input.statsOf, hexOn(s.state, me, week)), mission, input.baseOf, input.battleModel, { retreat: lineup.retreat });
+  const { lineup, violations, hurt } = check;
+  const party = lineup === null ? null : partyFrom(lineup.starters, input.statsOf, hexOn(s.state, me, week));
+  const projection = lineup === null || party === null ? null : projectMission(party, mission, input.baseOf, input.battleModel, { retreat: lineup.retreat });
   const home = homeTavern(s.state, week) === me;
   const total = game.picks.reduce((t, id) => t + crOf(id), 0);
 
@@ -1364,7 +1405,7 @@ function workWeek(s: SeasonSession, week: number): string {
       : `<div class="kv"><div><span class="label">expected points</span><span class="v">${projectedPoints(projection.expectedScore, config.scoring, home).toFixed(1)}</span></div>` +
         `<div><span class="label">chance of DNF</span><span class="v">${pct(projection.pDnf)}</span></div>` +
         `<div><span class="label">chance to turn back</span><span class="v">${pct(projection.pRetreat)}</span></div></div>` +
-        retreatTable(partyFrom(lineup!.starters, input.statsOf, hexOn(s.state, me, week)), mission, game.retreat, home) +
+        retreatTable(party!, mission, game.retreat, home) +
         fold('work:graph', false, '<span class="small">The mission map, with your chance to reach each step</span>', graphSvg(layouts.get(week)!, { reach: projection.reach }) + graphLegend({ reach: projection.reach }))) +
     `<div class="row spread lock-row"><span class="small">${check.ok ? (check.stuck ? '<span class="fail">No legal lineup exists on your roster, so you will score 0.</span>' : 'Ready when you are.') : `<span class="fail">${esc(check.why)}</span>`}</span>` +
     `<button type="button" class="primary" data-action="g-lock" ${check.ok && !game.locking ? '' : 'disabled'}>Lock in · play week ${week}</button></div>` +
@@ -1456,13 +1497,11 @@ function renderTable(): void {
   const before = played.length < 2 ? null : (() => {
     const prev = new Map<string, number>();
     for (const w of played.slice(0, -1)) for (const [t, r] of state.results.get(w) ?? []) prev.set(t, (prev.get(t) ?? 0) + r.points);
-    const list = [...state.taverns.keys()].map((t) => ({ tavern: t, points: prev.get(t) ?? 0 }));
-    return new Map(list.map((r) => [r.tavern, 1 + list.filter((o) => o.points > r.points).length]));
+    return tableMoves(ranked([...state.taverns.keys()].map((t) => ({ tavern: t, points: prev.get(t) ?? 0 }))), rows);
   })();
   const body = rows
     .map((r) => {
-      const was = before?.get(r.tavern);
-      const rose = was === undefined ? 0 : was - r.rank;
+      const rose = before?.get(r.tavern)?.rose ?? 0;
       const mv = before === null ? '' : `<td class="n move">${rose > 0 ? `<span class="pass">▲${rose}</span>` : rose < 0 ? `<span class="fail">▼${-rose}</span>` : '<span class="muted">–</span>'}</td>`;
       const m = state.taverns.get(r.tavern)?.managerId ?? '';
       const mine = r.tavern === me;
@@ -1541,12 +1580,7 @@ function onClick(action: string, el: HTMLElement): void {
       if (id !== undefined) move([{ t: 'tavern', id }]);
       return;
     case 'g-draft':
-      if (id !== undefined) {
-        move([{ t: 'draft', id }]);
-        // Your pick lands in your roster and turns over into your colours.
-        renderWork();
-        turnCard($('g-work').querySelector<HTMLElement>(`#g-roster [data-card="${CSS.escape(id)}"]`));
-      }
+      if (id !== undefined) move([{ t: 'draft', id }]);
       return;
     case 'g-start-char':
       if (id !== undefined && game.picks.length < config.roster.starters && !game.picks.includes(id)) {
@@ -1609,12 +1643,17 @@ function onClick(action: string, el: HTMLElement): void {
       const msgEl = key === undefined ? null : $('g-feed').querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
       if (msgEl === null || pump !== null) return;
       const pace = pacer();
-      pump = { pace, typing: null };
+      const mine: Pump = { pace, typing: null, replay: true };
+      pump = mine;
       renderBar();
       void raceWeek(msgEl, pace).then(() => {
+        // A move made meanwhile took the room over (tell), or a new season cleared it: either way this is done.
+        if (pump !== mine) return;
         pump = null;
-        renderBar();
         if (!pace.skipped) weekMoment(msgEl, bannerColours(game.session?.humanTavern ?? null));
+        // Rivals who readied while it replayed are told now.
+        void present(null, null);
+        renderBar();
       });
       return;
     }

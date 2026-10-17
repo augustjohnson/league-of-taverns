@@ -10,7 +10,7 @@
  * changed.
  */
 import type { Ability, LeagueEvent, Lineup, RunResult } from '@league-of-taverns/engine';
-import { draftCalls, tableMoves, type DraftCall } from './view';
+import { draftCalls, ranked, tableMoves, type DraftCall } from './view';
 
 export interface FeedRun {
   readonly tavern: string;
@@ -84,11 +84,6 @@ export interface FeedOptions {
    * forgets it.
    */
   readonly ready?: ReadonlyArray<{ readonly week: number; readonly tavern: string; readonly at: number }>;
-}
-
-/** Rank by points, highest first; equal points share a rank, and the next rank skips (1, 1, 3). */
-function ranked<T extends { readonly points: number }>(rows: ReadonlyArray<T>): ReadonlyArray<T & { readonly rank: number }> {
-  return rows.map((r) => ({ ...r, rank: 1 + rows.filter((o) => o.points > r.points).length }));
 }
 
 /** The room's items for `events`, in the order they happened. */
