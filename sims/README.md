@@ -86,11 +86,21 @@ three bots, with keepers' names so the table reads like people.
 - **The action bar** says what's next: your pick, or in an episode "Run the
   challenge" and "Go to the vote", with your call shown.
 
-Before the first season you give your name and name your tavern, "The
-<adjective> <noun>", under one of six banners; both are kept in localStorage
-for later seasons. You bring that tavern (`HumanSeat.tavern`): no bot takes
-it, and a season tavern flying the same banner sits the season out. Your seat
-and the seed are random. The season is saved in localStorage as its seed,
+The page is the League of Taverns site, and the game is **The Lich's
+Assistant** (`SITE_NAME` and `GAME_NAME` in `src/playground/shared.ts`).
+Your **profile** (`src/playground/profile.ts`) belongs to the site, not the
+game: on your first visit a sheet asks your name and your tavern, "The
+<adjective> <noun>", under one of six banners, before anything else, and the
+chip in the header opens it again. There are no accounts yet, so it is kept
+in localStorage; the rest of the page reads it through `getProfile()` and the
+`lot:profile` event, so sign-in can replace it later. A change mid-season
+applies from your next season. Before a season, the Common Room shows the
+game and a Start button.
+
+You bring your tavern (`HumanSeat.tavern`): no bot takes it, a season tavern
+flying the same banner sits the season out, and if none does, the seed picks
+one that does, so there is one tavern per seat. Your seat and the seed are
+random. The season is saved in localStorage as its seed,
 seat, your tavern and your moves, and replayed on reload. When it ends it is audited like any run and loads into
 **the workshop** (`src/playground/workshop.ts`): a bot run for any seed (with
 the replay and seed-audit checks and the NDJSON hash), standings and points

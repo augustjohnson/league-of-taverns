@@ -1,8 +1,10 @@
 # League of Taverns
 
-A fantasy league for the **Lich's contest**: a dozen monsters compete to
-become the Lich's new assistant, Survivor style, and people at the bar draft
-them and watch.
+A fantasy league where you keep a tavern, draft monsters and watch them
+compete. The site can host more than one game; the first, and for now the
+only one, is **The Lich's Assistant**: a dozen monsters compete to become the
+Lich's new assistant, Survivor style, and people at the bar draft them and
+watch. The game is built for phones first.
 
 Every episode the Lich sets a task (a **challenge**: a series of skill checks
 run as elimination rounds). The winner is immune, and the rest **vote** one of
@@ -28,8 +30,10 @@ pnpm install
 pnpm --filter @league-of-taverns/sims playground
 ```
 
-Then open `sims/output/playground/index.html`. One season against three bot
-taverns, told in the Common Room; the Workshop button has the tools.
+Then open `sims/output/playground/index.html`. On your first visit you give
+your name and your tavern; then The Lich's Assistant plays one season against
+three bot taverns, told in the Common Room. The header's menu has the
+Workshop, the tools.
 
 ```bash
 pnpm sim -- --runs 100

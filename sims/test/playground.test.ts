@@ -17,12 +17,14 @@ import {
   bannerCss,
   banneredTaverns,
   checkLabel,
+  checkProfile,
   decidedAfter,
   draftBoard,
   draftCalls,
   formatCr,
   ranksOf,
   readingOrder,
+  rivalTaverns,
   REACH_PICKS,
   runningTally,
   seedWords,
@@ -31,6 +33,7 @@ import {
   tableMoves,
   tagPhrase,
   tavernId,
+  tavernOf,
   tavernWord,
   tavernWords,
   voteOrdinal,
@@ -153,6 +156,33 @@ describe('view helpers', () => {
     expect(`The ${adjective} ${noun}`).toBe('The Amber Ale');
   });
 
+  it('tidies a profile, and turns away a blank name, a bad word, a rival tavern or an unknown banner', () => {
+    const rivals = [{ id: 'the-rusty-tankard', name: 'The Rusty Tankard' }];
+    const form = { name: '  Ada   Brisk ', adjective: 'salty', noun: 'anvil', banner: 'moss' };
+    expect(checkProfile(form, rivals)).toEqual({ profile: { name: 'Ada Brisk', adjective: 'Salty', noun: 'Anvil', banner: 'moss' } });
+    expect(tavernOf({ adjective: 'Salty', noun: 'Anvil' })).toEqual({ id: 'the-salty-anvil', name: 'The Salty Anvil' });
+    expect(checkProfile({ ...form, name: '  ' }, rivals).error).toMatch(/your name/);
+    expect(checkProfile({ ...form, name: 'x'.repeat(25) }, rivals).error).toMatch(/takes 24/);
+    expect(checkProfile({ ...form, noun: 'two words' }, rivals).error).toMatch(/one word each/);
+    expect(checkProfile({ ...form, adjective: 'rusty', noun: 'tankard' }, rivals).error).toMatch(/rival's tavern/);
+    expect(checkProfile({ ...form, banner: 'plaid' }, rivals).error).toMatch(/banner/);
+  });
+
+  it('seats one rival fewer than the seats, never one flying your banner', () => {
+    const taverns = [
+      { id: 'a', mark: 'red' },
+      { id: 'b', mark: 'blue' },
+      { id: 'c', mark: 'green' },
+      { id: 'd', mark: 'gold' },
+    ];
+    const ids = (mark: string, rand: () => number): string[] => rivalTaverns(taverns, (t) => t.mark, mark, 4, rand).map((t) => t.id);
+    // Your banner clashes with one: it sits out, and the rest are just enough.
+    expect(ids('blue', () => 0)).toEqual(['a', 'c', 'd']);
+    // No clash: one sits out all the same, as the dice say.
+    expect(ids('pink', () => 0)).toEqual(['b', 'c', 'd']);
+    expect(ids('pink', () => 0.99)).toEqual(['a', 'b', 'c']);
+  });
+
   it('offers six well-formed banners, each its own colour and texture', () => {
     for (const b of BANNER_CHOICES) expect(bannerSchema.safeParse(b.banner).success).toBe(true);
     expect(new Set(BANNER_CHOICES.map((b) => b.banner.mark)).size).toBe(BANNER_CHOICES.length);
@@ -244,7 +274,7 @@ describe('playground build', () => {
 
   it('writes one self-contained page under 2 MiB, pure ASCII', () => {
     const html = readFileSync(out, 'utf8');
-    expect(html.startsWith("<title>The Lich's Contest</title>")).toBe(true);
+    expect(html.startsWith('<title>League of Taverns</title>')).toBe(true);
     expect(html).not.toMatch(/<(html|head|body)\b|<!doctype/i);
     expect(html.match(/<script\b/g)).toHaveLength(1);
     expect(html).toContain('var __PLAYGROUND_DATA__=');
