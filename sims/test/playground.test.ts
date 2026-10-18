@@ -9,7 +9,8 @@ import { deepEqual } from '../src/deep-equal';
 import { loadSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, type PlaygroundData } from '../src/playground/data';
-import { currentDraftRound, feedItems, latestEpisode, type FeedItem, type FeedOptions } from '../src/playground/feed';
+import { currentDraftRound, feedItems, latestEpisode, TEACH_ROUNDS, type FeedItem, type FeedOptions } from '../src/playground/feed';
+import { CALL_MARKS, FACES, MEANINGS, SHARE_LINE_MAX, shareEmoji, shareText, type Share } from '../src/playground/share';
 import { bannerSchema } from '@league-of-taverns/scripts/lib/banner';
 import {
   BANNER_CHOICES,
@@ -211,6 +212,87 @@ describe('the Common Room', () => {
       for (const k of seen) expect(keys.has(k), k).toBe(true);
       seen = keys;
     }
+  });
+});
+
+describe('the share', () => {
+  const me = sim1.state.draft.order[0]!;
+  const opts: FeedOptions = { me, teams: input.managers.length, rounds: input.config.roster.size, ranks: new Map() };
+  const items = feedItems(sim1.events, opts);
+  const votes = items.filter((i) => i.kind === 'vote') as Array<Extract<FeedItem, { kind: 'vote' }>>;
+  const finale = items.find((i) => i.kind === 'finale') as Extract<FeedItem, { kind: 'finale' }>;
+  const roster = sim1.state.taverns.get(me)!.roster;
+  const roundOfVote = (episode: number): number => {
+    let end = 0;
+    for (const [i, n] of input.config.schedule.rounds.entries()) if (episode <= (end += n)) return i + 1;
+    return input.config.schedule.rounds.length;
+  };
+
+  it('reads in four parts: the vote, the exit prediction, the tavern and the head-to-head', () => {
+    const share: Share = { kind: 'vote', episode: 6, votes: 9, call: CALL_MARKS.none, faces: [FACES.safe, FACES.gone, FACES.immune], h2h: { mine: 19, theirs: 22, rival: 'The Sleeping Giant' } };
+    expect(shareText(share)).toBe('Vote 6 of 9\nExit Prediction:\n💤\nMy Tavern:\n😌🪦🛡️\nHead to Head:\n19–22 (The Sleeping Giant)');
+    expect(shareText({ kind: 'finale', right: 6, votes: 9, faces: [FACES.winner, FACES.gone, FACES.gone], h2h: null })).toBe('The finale\nExit Prediction:\n6 of 9\nMy Tavern:\n👑🪦🪦');
+    expect(shareEmoji(share)).toEqual(['💤', '😌', '🛡️', '🪦']);
+  });
+
+  it(`keeps every line within ${SHARE_LINE_MAX} characters, so no chat bubble wraps it`, () => {
+    const long: Share = { kind: 'vote', episode: 2, votes: 9, call: CALL_MARKS.right, faces: [FACES.safe], h2h: { mine: 104, theirs: 98, rival: 'The Tarnished Wyvernmonger' } };
+    expect(shareText(long).split('\n').slice(-2)).toEqual(['104–98', '(The Tarnished Wyvernmonger)']);
+    for (const card of [...votes.map((v) => v.share!), finale.share!]) {
+      for (const line of shareText(card.share).split('\n')) expect([...line].length, line).toBeLessThanOrEqual(SHARE_LINE_MAX);
+    }
+  });
+
+  it('marks your exit prediction from your call: right, early, or none', () => {
+    for (const v of votes) {
+      const call = v.calls.find((c) => c.tavern === me)!;
+      const mark = v.share!.share.kind === 'vote' ? v.share!.share.call : null;
+      if (call.target === null) expect(mark).toBe(CALL_MARKS.none);
+      else if (call.right) expect(mark).toBe(call.early ? CALL_MARKS.early : CALL_MARKS.right);
+      else expect(mark).toBe(v.vote.ballots.some((b) => b.target === call.target) ? CALL_MARKS.close : CALL_MARKS.missed);
+    }
+  });
+
+  it('gives each of your monsters one face, in draft order, and keeps the gone in their slots', () => {
+    const out = new Set<string>();
+    for (const v of votes) {
+      const faces = v.share!.share.faces;
+      expect(faces).toHaveLength(roster.length);
+      roster.forEach((id, i) => {
+        if (out.has(id)) expect(faces[i]).toBe(FACES.gone);
+        else if (id === v.vote.boot) expect(faces[i]).toBe(FACES.out);
+        else if (id === v.immune) expect(faces[i]).toBe(FACES.immune);
+        else expect([FACES.safe, FACES.scared]).toContain(faces[i]);
+      });
+      out.add(v.vote.boot);
+    }
+    const crowned = roster.map((id) => (id === sim1.state.finale!.winner ? FACES.winner : sim1.state.finale!.finalists.includes(id) ? FACES.finalist : FACES.gone));
+    expect(finale.share!.share.faces).toEqual(crowned);
+  });
+
+  it("ends each round's last vote on the score the round's results report", () => {
+    const rounds = items.filter((i) => i.kind === 'round') as Array<Extract<FeedItem, { kind: 'round' }>>;
+    for (const round of rounds) {
+      const m = round.matchups.find((x) => x.home === me || x.away === me)!;
+      const [mine, theirs] = m.home === me ? [m.homePoints, m.awayPoints] : [m.awayPoints, m.homePoints];
+      const last = round.final ? finale.share!.share : votes.filter((v) => roundOfVote(v.episode) === round.round).at(-1)!.share!.share;
+      expect(last.h2h).toMatchObject({ mine, theirs });
+    }
+  });
+
+  it(`explains every emoji in round ${TEACH_ROUNDS}'s shares, then only ones not seen before`, () => {
+    const seen = new Set<string>();
+    for (const card of [...votes.map((v) => ({ round: roundOfVote(v.episode), card: v.share! })), { round: Infinity, card: finale.share! }]) {
+      const used = shareEmoji(card.card.share);
+      expect(card.card.teach).toEqual(card.round <= TEACH_ROUNDS ? used : used.filter((e) => !seen.has(e)));
+      for (const e of used) seen.add(e);
+    }
+    for (const e of seen) expect(MEANINGS[e as keyof typeof MEANINGS]).toBeTruthy();
+  });
+
+  it('has no share without a tavern of your own', () => {
+    const none = feedItems(sim1.events, { ...opts, me: null });
+    for (const i of none) if (i.kind === 'vote' || i.kind === 'finale') expect(i.share).toBeNull();
   });
 });
 
