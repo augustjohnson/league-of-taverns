@@ -10,7 +10,9 @@ import { loadSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, type PlaygroundData } from '../src/playground/data';
 import { currentDraftRound, feedItems, latestEpisode, type FeedItem, type FeedOptions } from '../src/playground/feed';
+import { bannerSchema } from '@league-of-taverns/scripts/lib/banner';
 import {
+  BANNER_CHOICES,
   artCss,
   bannerCss,
   banneredTaverns,
@@ -28,6 +30,9 @@ import {
   strategyLine,
   tableMoves,
   tagPhrase,
+  tavernId,
+  tavernWord,
+  tavernWords,
   voteOrdinal,
 } from '../src/playground/view';
 import { runSeason, seasonInput } from '../src/season-runner';
@@ -134,6 +139,24 @@ describe('view helpers', () => {
     expect([1, 2, 4, 8, 100].map(formatCr)).toEqual(['1/8', '1/4', '1/2', '1', '12 1/2']);
     expect(seedWords(() => 0)).toBe('amber-ale-0');
     expect(seedWords(() => 0.999)).not.toContain('/');
+  });
+
+  it('takes one word per slot of a tavern name, capitalised, and files it under a kebab id', () => {
+    expect(tavernWord('  salty ')).toBe('Salty');
+    expect(tavernWord("hog's")).toBe("Hog's");
+    expect(tavernWord('half-drunk')).toBe('Half-drunk');
+    expect(tavernWord('Ölbräu')).toBe('Ölbräu');
+    for (const bad of ['', 'two words', 'r2d2', '-dash', "trail'", 'x'.repeat(15)]) expect(tavernWord(bad)).toBeNull();
+    expect(tavernId("The Hog's Anvil")).toBe('the-hogs-anvil');
+    expect(tavernId('The Ölbräu Mug')).toBe('the-olbrau-mug');
+    const { adjective, noun } = tavernWords(() => 0);
+    expect(`The ${adjective} ${noun}`).toBe('The Amber Ale');
+  });
+
+  it('offers six well-formed banners, each its own colour and texture', () => {
+    for (const b of BANNER_CHOICES) expect(bannerSchema.safeParse(b.banner).success).toBe(true);
+    expect(new Set(BANNER_CHOICES.map((b) => b.banner.mark)).size).toBe(BANNER_CHOICES.length);
+    expect(new Set(BANNER_CHOICES.map((b) => b.banner.texture)).size).toBe(BANNER_CHOICES.length);
   });
 
   it('gives each tavern its previous row and the places it rose', () => {

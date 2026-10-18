@@ -28,6 +28,18 @@ describe('a season with a person', () => {
     expect(s.stage.kind === 'draft' && s.stage.tavern).toBe(s.humanTavern);
   });
 
+  it('gives the person the tavern they bring on their turn, and no bot takes it', () => {
+    const mine = input.taverns.at(-1)!.id;
+    for (const seed of ['bring-1', 'bring-2', 'bring-3']) {
+      const s = new ContestSession(input, { seed, human: { ...human, tavern: mine } });
+      s.advanceDraft();
+      expect(s.humanTavern).toBe(mine);
+      expect(s.openTaverns()).not.toContain(mine);
+      expect(s.stage.kind).toBe('draft');
+    }
+    expect(() => new ContestSession(input, { seed: 'bring-4', human: { ...human, tavern: 'no-such-tavern' } })).toThrow(/no tavern/);
+  });
+
   it('rejects an illegal pick and leaves the session unchanged', () => {
     const s = new ContestSession(input, { seed: 'person-2', human });
     s.advanceDraft();

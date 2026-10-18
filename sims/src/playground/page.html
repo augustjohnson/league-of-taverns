@@ -516,6 +516,19 @@ header.top h1 { font-size: 1.6rem; }
 .feed { list-style: none; margin: 0; padding: 8px 6px 14px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 1px; }
 .feed > .welcome { list-style: none; padding: 8px; }
 .feed > .welcome .card { gap: 12px; }
+/* Setup: your name, your tavern's two words and its banner, with a preview of how it will fly. */
+.setup { display: grid; gap: 12px; }
+.setup .field { display: grid; gap: 4px; margin: 0; padding: 0; border: none; min-width: 0; }
+.setup .field > input { max-width: 22em; }
+.setup .tavern-name { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.setup .tavern-name .the { font: 400 1.15rem/1 var(--font-display); }
+.setup .tavern-name input { flex: 1 1 5em; min-width: 0; max-width: 10em; font-family: var(--font-display); font-size: 1.05rem; }
+.bpicks { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
+.bpick { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--banner-bg); cursor: pointer; font-size: 12.5px; }
+.bpick input { margin: 0; accent-color: var(--banner-line); }
+.bpick:has(input:checked) { border-color: var(--banner-line); box-shadow: inset 0 0 0 1px var(--banner-line); font-weight: 600; color: var(--banner-ink); }
+.bpick:has(input:focus-visible) { outline: 2px solid var(--brass); outline-offset: 1px; }
+.setup .you { flex: none; }
 .divider { display: flex; align-items: center; gap: 10px; margin: 12px 8px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
 .msg { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 2px 10px; padding: 6px 8px; border-radius: 6px; }
