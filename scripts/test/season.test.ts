@@ -54,7 +54,7 @@ const banner = (mark: string): Record<string, string> => ({ field: '#dde8f0', ch
 
 /**
  * A small contest under `root`/seasons/<id>/: a cast of 4, the final 2 (2
- * votes), one tavern with roster 2, one round.
+ * votes), one tavern with roster 2.
  */
 function makeSeason(root: string, id: string, fixture: SeasonFixture = {}): void {
   const dir = join(root, 'seasons', id);
@@ -72,7 +72,6 @@ function makeSeason(root: string, id: string, fixture: SeasonFixture = {}): void
     draft: { format: 'snake', order: { mode: 'seeded' } },
     contest: { castSize: 4, finalists: 2, lapDc: 1 },
     scoring: { survive: 2, immunity: 3, juryVote: 2, winner: 10, call: 2, earlyCallBonus: 1 },
-    schedule: { rounds: [2] },
     ...fixture.config,
   };
   write(join(dir, 'config.yaml'), toYaml(config));
@@ -93,7 +92,6 @@ describe('season-01 (in preparation)', () => {
     const { config, name } = loadSeasonConfig('season-01');
     expect(name).toBe('Season One');
     expect(config.contest).toMatchObject({ castSize: 12, finalists: 3 });
-    expect(config.schedule.rounds.reduce((a, b) => a + b, 0)).toBe(9);
     expect(loadTaverns('season-01').map((t) => t.id)).toEqual(['the-gilded-flagon']);
     expect(loadManagers('season-01').managers.length).toBeGreaterThan(0);
   });

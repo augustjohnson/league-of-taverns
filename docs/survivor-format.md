@@ -25,9 +25,9 @@ one of their own out. Voted-out monsters form the jury that picks the winner.
 
 Managers run taverns. Before the season they snake-draft a few monsters each.
 After that they **only watch**: the one recurring decision is **calling the
-boot**, a prediction of who is voted out at each vote. Taverns meet in
-round-robin head-to-head matchups, scored on their monsters' results plus
-their correct calls.
+boot**, a prediction of who is voted out at each vote. Taverns score for
+their monsters' results plus their correct calls; the most points after the
+finale wins the season.
 
 ## 2. Goals
 
@@ -188,10 +188,9 @@ Calling keeps a manager in contention even after their monsters are gone.
   immunity win, for jury votes received, and a bonus for the winner. These
   are the categories every fantasy Survivor league uses.
 - **Call points:** per §5.2.
-- **Head-to-head** (Decided): taverns play a round-robin schedule. A
-  matchup compares the two taverns' points over the same stretch of votes.
-- **Standings** (Proposed): win–loss record first, total points as the
-  tiebreaker.
+- **Standings** (Decided, 2026-10-18): total points over the season; the
+  most points after the finale wins. Head-to-head matchups were dropped:
+  they added a schedule and a record without adding a decision.
 - **Season ratings** (Decided in principle): every monster's results are
   recorded over the season. Proposed on top of that: rate monsters against
   what a typical undrafted monster earned, so a season MVP and draft
@@ -199,9 +198,9 @@ Calling keeps a manager in contention even after their monsters are gone.
 
 ### 5.4 Pacing
 
-**Open.** The game may run daily rather than weekly. That decides how many
-votes a matchup covers, and how many episodes run at a time. The user will
-decide after simulation and playtesting. The rules above don't depend on it.
+**Open.** The game may run daily rather than weekly. Proposed: a challenge
+one day and its vote the next, so 9 episodes take 18 days plus the finale,
+with one check-in a day. The rules above don't depend on it.
 
 ## 6. Impact on the code
 
@@ -213,7 +212,7 @@ decide after simulation and playtesting. The rules above don't depend on it.
 | `engine/src/resolution` | Keep check odds. Remove battles, injuries, the mission run and loot scoring. Add challenge resolution, the vote and the jury vote. |
 | `engine/src/projection` | The exact projection over the mission graph goes. Boot odds will come from seeded sampling of the vote. |
 | `engine/src/roster` | Keep the snake draft. Remove lineups, the CR budget, retreat orders, waivers and trades. |
-| `engine/src/league` | Season config: cast size, finale size, scoring values, the head-to-head schedule. Standings become win–loss. |
+| `engine/src/league` | Season config: cast size, finale size, scoring values. Standings by total points. |
 | `engine/src/events` | Remove tavern pick, lineup, hex, waiver, trade and mission events. Add call events, call locks, and an episode result (challenge, votes, boot) plus the finale. |
 | `bots/src/strategies` | Keep draft strategies (retuned). Replace lineup, waiver and hex bots with a calling bot. |
 | `sims/` | Season runner for the contest. Reports per §7. |
@@ -232,7 +231,7 @@ Run thousands of seasons and report:
 - **Boot predictability:** how often the most likely boot actually goes
   home. Somewhere around 60–70% should make calling feel skilful without
   being solved.
-- **Call value:** how often calls decide a head-to-head matchup.
+- **Call value:** how often calls decide the title.
 
 ## 8. Open decisions
 

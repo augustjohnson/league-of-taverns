@@ -32,8 +32,7 @@ playtesting can move it. None of them is a rule until it lands in
 | Early-call bonus | +1 on a correct early call (a call is worth 2) | `scoring.earlyCallBonus` |
 | Missing call | Scores 0 | rule |
 | Monster points | survive a vote 2, immunity 3, jury vote 2, winner 10 | `scoring.*` |
-| Head-to-head | Round-robin of the 4 taverns: 3 rounds of 3 episodes, the finale in round 3 | `schedule.rounds` |
-| Standings | Wins, then total points | `engine/src/league` |
+| Standings | Total points over the season; the most after the finale wins (head-to-head dropped 2026-10-18) | `engine/src/league` |
 | Pacing | One episode at a time, at the player's click | playground |
 | Boot odds | Hidden from the player; the workshop shows them | playground |
 | Draft information | The cards, the season's ability mix, and the scouts' rating as 1–5 stars (from simulated contests with stand-in challenges) | playground |
@@ -56,8 +55,7 @@ rendering and the moments in `fx.ts`.
 
 - `engine/src/adapters/open5e`: `BaseStats` gains `subtype` and `alignment`.
 - `engine/src/events`: the event set is rewritten for the contest (§3).
-- `engine/src/league`: the contest config, the round-robin schedule, scoring
-  and win–loss standings.
+- `engine/src/league`: the contest config, scoring and standings by points.
 - `bots`: draft bots reworked around contest value; a calling bot replaces
   the lineup, waiver and hex bots.
 - `sims`: `ContestSession` replaces `SeasonSession`; the CLI and the batch
@@ -86,10 +84,9 @@ reports, battle calibration, and the mission-only scripts.
 | `challenge.resolved` | episode, challenge, sha256, rounds, winner | matches the commitment and the seeded run |
 | `vote.resolved` | episode, ballots, revote, draw, boot | boot is a legal target |
 | `finale.resolved` | finalists, jury ballots, winner | after the last vote |
-| `round.finalized` | round | every episode in the round is done |
 
 A call is **early** when it lands before its episode's `challenge.resolved`
-and is not replaced after it. Scores, matchups and standings are selectors
+and is not replaced after it. Scores and standings are selectors
 over this log; nothing derived is stored.
 
 The contest itself is a pure function of the season seed, the cast and the
@@ -101,7 +98,7 @@ the audit recomputes them from the seed.
 1. **Contest core** (`engine/src/contest/`): challenge schema and
    resolution, the cards' tags, strategies, affinity, the vote, the jury,
    and `bootOdds` by seeded sampling. Unit tests.
-2. **League layer:** config, round-robin, scoring, standings, the new
+2. **League layer:** config, scoring, standings, the new
    events, reducers, selectors and replay. Tests.
 3. **Bots:** draft value by simulating contests over the public cards with
    generic challenges; calling bots of different skill; the tavern pick.
@@ -111,7 +108,7 @@ the audit recomputes them from the seed.
 5. **Content:** the lich-season fixture: strategies for the 48, 9
    challenges with their story, tavern banners.
 6. **Playground:** the game (draft, episodes, calls, the scrying ball on the
-   challenge, the vote read one parchment at a time, matchups, the finale)
+   challenge, the vote read one parchment at a time, the table, the finale)
    and the contest lab.
 7. **Remove the old format:** delete the modules, scripts, tests and
    fixtures in §2's last list, and point the docs at this plan.
@@ -135,8 +132,8 @@ the audit recomputes them from the seed.
    prediction and a face per monster, sent through
    the phone's share sheet or copied. The first round explains its emoji;
    after that, only new ones.
-6. After the round's last episode: the round's head-to-head results and the
-   table.
+6. The crier posts the table as it stands, with each tavern's points
+   from the vote.
 7. The finale: the jury's votes are read, the Lich names his assistant, and
    the season ends.
 
@@ -157,6 +154,11 @@ that, the betrayal moved from the final 7 to the final 5, and
 power vs place r = 0.41, 36 different winners in 100 seasons, strategy win
 rates 6–13% (par 8.3%), calls 20% of points and decide 10% of matchups, and
 `sharp` takes 33% of titles (par 25%), `brawn` 29%, `gossip` 21%, `scout` 18%.
+
+On 2026-10-18 head-to-head was dropped for **standings by total points**. The
+contest is unchanged; the same 100 seasons give: calls 20% of points and
+decide 17% of titles (the champion would change without them), and `sharp`
+takes 30.5% of titles, `brawn` 28%, `gossip` 21%, `scout` 20.5%.
 
 The original tuning, `pnpm sim -- --runs 200 --seed final` with 20 of 48
 drawn per season and six bot taverns:

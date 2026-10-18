@@ -40,6 +40,3 @@ scoring:
   winner: 10
   call: 2
   earlyCallBonus: 1
-
-schedule:
-  rounds: [3, 3, 3]                 # episodes per head-to-head round; the finale is in the last

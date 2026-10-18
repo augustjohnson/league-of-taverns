@@ -431,17 +431,13 @@ td.move { width: 3.2em; font-size: 12px; }
 .parchments > li.boot-line { background: var(--bad-soft); border-left-color: var(--bad); }
 .parchments > li.boot-line.mine { box-shadow: inset 0 0 0 1px var(--bad); }
 .parchments > li.winner-line { background: var(--good-soft); border-left-color: var(--good); font-weight: 600; }
-.calls-out, .matchups, .ballots, .schedule { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
-.calls-out > li, .matchups > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 2px 6px; border-radius: var(--radius); }
-.calls-out .flag, .matchups .flag, .schedule .flag { width: 20px; height: 13px; border-left-width: 4px; }
+.calls-out, .ballots { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.calls-out > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 2px 6px; border-radius: var(--radius); }
+.calls-out .flag { width: 20px; height: 13px; border-left-width: 4px; }
 .calls-out .pts { margin-left: auto; font-weight: 600; }
-:is(.calls-out, .matchups) > li.mine[data-banner] { background: var(--banner-bg); }
-.matchups .side.won b { text-decoration: underline; text-decoration-color: var(--good); text-decoration-thickness: 2px; }
-.matchups .vs { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.calls-out > li.mine[data-banner] { background: var(--banner-bg); }
 .ballots { font-size: 12.5px; grid-template-columns: repeat(auto-fill, minmax(15em, 1fr)); }
 .ballots .pt.sm { width: 18px; height: 18px; }
-.schedule { gap: 8px; }
-.schedule > li > .matchups { margin-left: 8px; }
 .headline { font-size: 14px; margin-bottom: 2px; }
 .share-card { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--brass); border-radius: var(--radius); background: color-mix(in oklch, var(--brass-soft) 55%, transparent); display: grid; gap: 6px; max-width: 26em; }
 .share-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }

@@ -83,7 +83,6 @@ export const seasonConfigSchema = z.strictObject({
     call: count,
     earlyCallBonus: count,
   }),
-  schedule: z.strictObject({ rounds: z.array(positiveInt).min(1) }),
 });
 
 const challengeRollSchema = z.strictObject({
@@ -161,7 +160,6 @@ export const payloadSchemas = {
   }),
   'vote.resolved': z.strictObject({ episode: positiveInt, vote: voteResultSchema }),
   'finale.resolved': z.strictObject({ result: finaleResultSchema }),
-  'round.finalized': z.strictObject({ round: positiveInt }),
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -206,7 +204,6 @@ export const eventSchema = z.discriminatedUnion('type', [
   envelope('challenge.resolved'),
   envelope('vote.resolved'),
   envelope('finale.resolved'),
-  envelope('round.finalized'),
 ]);
 
 // ---------------------------------------------------------------------------

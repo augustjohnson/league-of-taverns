@@ -138,7 +138,7 @@ function renderStandings(r: Run): string {
     .map(
       (row) =>
         `<tr class="${row.rank === 1 ? 'champ' : ''}"${bannerAttr(row.tavern)}><td class="n">${row.rank}</td><td>${flagOf(row.tavern)} <b>${esc(tavernName(row.tavern))}</b></td><td class="small">${esc(row.bot)}</td>` +
-        `<td class="n"><b>${row.wins}–${row.losses}${row.ties > 0 ? `–${row.ties}` : ''}</b></td><td class="n">${row.points}</td><td class="n">${row.callPoints}</td>` +
+        `<td class="n"><b>${row.points}</b></td><td class="n">${row.callPoints}</td>` +
         `<td><span class="faces">${(summary.taverns.find((t) => t.tavern === row.tavern)?.roster ?? []).map((id) => `<span title="${esc(charName(id))}, ${ordinal(summary.cast.find((c) => c.id === id)?.place ?? 0)}">${portrait(id, 'sm')}</span>`).join('')}</span></td></tr>`,
     )
     .join('');
@@ -152,7 +152,7 @@ function renderStandings(r: Run): string {
     })
     .join('');
   return (
-    `<section class="card"><h2>Standings</h2><div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>bot</th><th class="n">W–L</th><th class="n">pts</th><th class="n">from calls</th><th>candidates</th></tr></thead><tbody>${rows}</tbody></table></div></section>` +
+    `<section class="card"><h2>Standings</h2><div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>bot</th><th class="n">pts</th><th class="n">from calls</th><th>candidates</th></tr></thead><tbody>${rows}</tbody></table></div></section>` +
     `<section class="card"><h2>Episode by episode</h2><p class="hint">Points each tavern scored at each vote (✓ = called it). The favourite is the most likely boot by the public odds once immunity was known.</p>` +
     `<div class="scroll"><table><thead><tr><th class="n">ep</th><th>immune</th><th>boot</th><th>favourite</th>${summary.standings.map((s) => `<th class="n" title="${esc(tavernName(s.tavern))}">${flagOf(s.tavern) || esc(tavernName(s.tavern).slice(4, 9))}</th>`).join('')}</tr></thead><tbody>${perEpisode}</tbody></table></div></section>`
   );
@@ -336,7 +336,7 @@ function renderBatch(): string {
       `<div><span class="label">power vs finish</span><span class="v">${totals.powerPlacement.toFixed(2)}</span><span class="small muted">r, + is stronger lasts</span></div>` +
       `<div><span class="label">different winners</span><span class="v">${totals.distinctWinners}</span></div>` +
       `<div><span class="label">points from calls</span><span class="v">${pct(totals.callPointShare)}</span></div>` +
-      `<div><span class="label">matchups calls decided</span><span class="v">${pct(totals.callDecidedShare)}</span></div></div>` +
+      `<div><span class="label">titles calls decided</span><span class="v">${pct(totals.callDecidedShare)}</span></div></div>` +
       `<p class="small">Win rate by strategy (par ${pct(1 / config.contest.castSize)}): ${Object.entries(totals.strategyWins)
         .map(([k, s]) => `${esc(k)} ${pct(s.rate)}`)
         .join(', ')}.</p>` +

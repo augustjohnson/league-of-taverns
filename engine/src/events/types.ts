@@ -4,7 +4,7 @@ import type { SeasonConfig } from '../league';
 import type { Ability, CrEighths } from '../vocabulary';
 
 /**
- * The event log is the only source of truth. Rosters, scores, matchups and
+ * The event log is the only source of truth. Rosters, scores and
  * standings are folds over it and are never stored.
  *
  * One NDJSON line per event. Field-level docs: docs/lich-contest-plan.md §3.
@@ -109,10 +109,6 @@ export interface PayloadByType {
   /** The jury picks the Lich's new assistant. */
   'finale.resolved': {
     readonly result: FinaleResult;
-  };
-  /** A head-to-head round is over: its matchups count. */
-  'round.finalized': {
-    readonly round: number;
   };
 }
 

@@ -4,8 +4,8 @@
  *
  * The Common Room is the season's running story: the tavern pick, the draft
  * pick by pick, every episode's calls, the challenge in the scrying ball,
- * the vote read one parchment at a time, each head-to-head round's results
- * and the finale, as messages in a chat no one can type into (the items
+ * the vote read one parchment at a time, the table after each vote, and the
+ * finale, as messages in a chat no one can type into (the items
  * come from the event log, ./feed.ts). Beside it sit a workspace for your
  * move (the taverns, the draft, the episode's cast to call from) and the
  * standings.
@@ -24,12 +24,12 @@
  * Your season is saved in this browser as its seed, seat, your tavern and
  * your moves, and replayed on reload.
  */
-import { applyEvent, episodeScore, initialState, roundMatchups, roundOf, seasonStandings } from '@league-of-taverns/engine';
+import { applyEvent, initialState, seasonStandings } from '@league-of-taverns/engine';
 import type { LeagueEvent, LeagueState } from '@league-of-taverns/engine';
 import type { Banner } from '@league-of-taverns/scripts/lib/banner';
 import { ContestSession } from '../season-runner';
 import { currentDraftRound, feedItems, latestEpisode, type FeedItem, type ShareCard } from './feed';
-import { clockBack, crownChampion, hailChampion, micron, pacer, raiseBanner, readJury, readVotes, reducedMotion, revealChallenge, roundMoment, slideStandings, turnCard, type Pacer } from './fx';
+import { clockBack, crownChampion, hailChampion, micron, pacer, raiseBanner, readJury, readVotes, reducedMotion, revealChallenge, slideStandings, tableMoment, turnCard, type Pacer } from './fx';
 import { finaleShare, MEANINGS, shareText, voteShare } from './share';
 import {
   $,
@@ -386,15 +386,13 @@ function typingFor(e: LeagueEvent, me: string | null): { tavern: string | null; 
       return { tavern: null, label: 'The Lich', verb: 'is collecting the ballots', ms: 1100 };
     case 'finale.resolved':
       return { tavern: null, label: 'The jury', verb: 'is shuffling in', ms: 1300 };
-    case 'round.finalized':
-      return { tavern: null, label: 'The crier', verb: 'is tallying the round', ms: 700 };
     default:
       return null;
   }
 }
 
 /** How long the room rests after an item lands, by kind. */
-const REST: Partial<Record<FeedItem['kind'], number>> = { divider: 200, season: 600, tavern: 450, 'draft-done': 900, 'episode-open': 500, call: 150, challenge: 600, vote: 700, round: 900, finale: 900 };
+const REST: Partial<Record<FeedItem['kind'], number>> = { divider: 200, season: 600, tavern: 450, 'draft-done': 900, 'episode-open': 500, call: 150, challenge: 600, vote: 700, table: 500, finale: 900 };
 
 /**
  * Tell the room what the log holds and it hasn't shown: an event at a time, each with its typing pause, each new item
@@ -524,12 +522,11 @@ async function momentFor(item: FeedItem, pace: Pacer): Promise<void> {
       await readJury(el, pace);
       hush();
       return;
-    case 'round': {
+    case 'table': {
       slideStandings(el.querySelector('table'));
-      const mine = item.matchups.find((m) => m.home === me || m.away === me);
-      const outcome = mine === undefined ? 'none' : mine.winner === null ? 'tied' : mine.winner === me ? 'won' : 'lost';
-      roundMoment(el, outcome, bannerColours(me));
-      if (item.final) {
+      const mine = item.rows.find((r) => r.tavern === me);
+      if (!item.final) tableMoment(el, mine === undefined || mine.rose <= 0 ? 'none' : mine.rank === 1 ? 'lead' : 'rose', bannerColours(me));
+      else {
         const champs = item.rows.filter((r) => r.rank === 1).map((r) => r.tavern);
         await pace.sleep(900);
         if (me !== null && champs.includes(me)) crownChampion(el, bannerColours(me));
@@ -709,7 +706,7 @@ function itemHtml(item: FeedItem, ctx: Ctx): string {
           `The Lich wants a new assistant, and ${item.cast.length} monsters have come for the job. Every episode he sets a task: the winner is safe, and the rest vote one of their own out. ` +
           `When ${config.contest.finalists} are left, the voted-out choose the winner.` +
           `<p>Each tavern drafts ${config.roster.size}, then watches. Call the boot each episode for ${config.scoring.call} (+${config.scoring.earlyCallBonus} if you call before the challenge). ` +
-          `Taverns meet head to head over ${config.schedule.rounds.length} rounds: best record wins the season.</p>` +
+          `The tavern with the most points after the finale wins the season.</p>` +
           (pickOrder.length === 0 ? '' : `<p class="small muted">Taverns are chosen in reverse draft order: ${pickOrder.map((m) => esc(keeper(m))).join(' → ')}.</p>`),
       });
     }
@@ -766,8 +763,6 @@ function itemHtml(item: FeedItem, ctx: Ctx): string {
     }
     case 'episode-open': {
       const mine = myRoster(state, me).filter((id) => item.alive.includes(id));
-      const pair = me === null ? undefined : roundMatchups(state, item.round).find((m) => m.home === me || m.away === me);
-      const rival = pair === undefined ? null : pair.home === me ? pair.away : pair.home;
       const last = item.episode === VOTES;
       const riders = item.alive.filter((id) => input.cardOf(id).strategy.kind === 'coattails');
       const turning =
@@ -777,11 +772,11 @@ function itemHtml(item: FeedItem, ctx: Ctx): string {
       return msg(item, {
         avatar: sysAvatar('lich'),
         author: 'The Lich',
-        note: `episode ${item.episode} of ${VOTES} · round ${item.round}`,
+        note: `episode ${item.episode} of ${VOTES}`,
         body:
           (last ? `Final ${item.alive.length}. One more task, one more vote, and then the dead will choose.` : `${item.alive.length} of you left. I have another little job.`) +
           `<p class="small muted">${mine.length === 0 ? 'None of your monsters is still in. ' : `Yours still in: <span class="faces">${mine.map((id) => monster(id, state, me)).join('')}</span>. `}` +
-          `${rival === null ? '' : `This round you face ${flagOf(rival)} <b>${esc(tavernName(rival))}</b>. `}Calls are open.</p>` +
+          'Calls are open.</p>' +
           turning,
       });
     }
@@ -810,8 +805,8 @@ function itemHtml(item: FeedItem, ctx: Ctx): string {
       return voteHtml(item, ctx);
     case 'finale':
       return finaleHtml(item, ctx);
-    case 'round':
-      return roundHtml(item, ctx);
+    case 'table':
+      return tableHtml(item, ctx);
   }
 }
 
@@ -1066,62 +1061,62 @@ function shareCard(el: HTMLElement, sheet: boolean): void {
   }
 }
 
-// ── a head-to-head round ───────────────────────────────────────────────────
+// ── the table ──────────────────────────────────────────────────────────────
 
-function roundHtml(item: Extract<FeedItem, { kind: 'round' }>, ctx: Ctx): string {
+/** Where you stand, in words: leading, level, or how far behind whom. */
+function standing(rows: ReadonlyArray<{ readonly tavern: string; readonly rank: number; readonly points: number }>, me: string): string {
+  const mine = rows.find((r) => r.tavern === me);
+  if (mine === undefined) return '';
+  const leaders = rows.filter((r) => r.rank === 1);
+  if (mine.rank === 1) {
+    if (leaders.length > 1) return `You share the lead on <b>${num(mine.points)}</b>.`;
+    const next = rows.find((r) => r.rank > 1);
+    return `<b class="pass">You lead</b>${next === undefined ? '' : ` by ${num(mine.points - next.points)}`}.`;
+  }
+  return `You're <b>${ordinal(mine.rank)}</b>, ${num(leaders[0]!.points - mine.points)} behind ${flagOf(leaders[0]!.tavern)} <b>${esc(tavernName(leaders[0]!.tavern))}</b>.`;
+}
+
+function tableHtml(item: Extract<FeedItem, { kind: 'table' }>, ctx: Ctx): string {
   const { me } = ctx;
-  const matchups = item.matchups
-    .map((m) => {
-      const mine = m.home === me || m.away === me;
-      const side = (t: string, pts: number): string => `<span class="side${m.winner === t ? ' won' : ''}">${flagOf(t)} <b>${esc(who(t, me))}</b> <span class="num">${pts}</span></span>`;
-      return `<li class="${mine ? 'mine' : ''}"${mine && me !== null ? bannerAttr(me) : ''}>${side(m.home, m.homePoints)}<span class="vs">${m.winner === null ? 'tie' : 'v'}</span>${side(m.away, m.awayPoints)}</li>`;
-    })
-    .join('');
+  const first = item.episode === 1 && !item.final;
   const rows = item.rows
     .map((r) => {
-      const move = item.round === 1 ? '' : `<td class="n move">${r.rose > 0 ? `<span class="pass">▲${r.rose}</span>` : r.rose < 0 ? `<span class="fail">▼${-r.rose}</span>` : '<span class="muted">–</span>'}</td>`;
+      const move = first ? '' : `<td class="n move">${r.rose > 0 ? `<span class="pass">▲${r.rose}</span>` : r.rose < 0 ? `<span class="fail">▼${-r.rose}</span>` : '<span class="muted">–</span>'}</td>`;
       const mine = r.tavern === me;
       return (
         `<tr class="${mine ? 'mine' : ''}${item.final && r.rank === 1 ? ' champ' : ''}"${mine ? bannerAttr(r.tavern) : ''} data-was="${r.wasRow}"><td class="n">${r.rank}</td>${move}` +
-        `<td>${flagOf(r.tavern)} <b>${esc(who(r.tavern, me))}</b></td><td class="n">${r.wins}–${r.losses}${r.ties > 0 ? `–${r.ties}` : ''}</td><td class="n">${r.points}</td></tr>`
+        `<td>${flagOf(r.tavern)} <b>${esc(who(r.tavern, me))}</b></td><td class="n muted">+${r.gained}</td><td class="n">${r.points}</td></tr>`
       );
     })
     .join('');
-  const table = `<table class="mini-table"><thead><tr><th class="n">#</th>${item.round === 1 ? '' : '<th></th>'}<th>tavern</th><th class="n">W–L</th><th class="n">pts</th></tr></thead><tbody>${rows}</tbody></table>`;
-  const myMatch = item.matchups.find((m) => m.home === me || m.away === me);
-  const headline =
-    myMatch === undefined || me === null
-      ? ''
-      : `<p class="headline">${myMatch.winner === null ? 'You <b>tie</b>' : myMatch.winner === me ? '<b class="pass">You win</b>' : 'You <b>lose</b>'} round ${item.round}, ${myMatch.home === me ? myMatch.homePoints : myMatch.awayPoints}–${myMatch.home === me ? myMatch.awayPoints : myMatch.homePoints}.</p>`;
+  const table = `<table class="mini-table"><thead><tr><th class="n">#</th>${first ? '' : '<th></th>'}<th>tavern</th><th class="n">${item.final ? 'finale' : 'vote'}</th><th class="n">pts</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const mine = item.rows.find((r) => r.tavern === me);
+  const headline = me === null || mine === undefined ? '' : `<p class="headline">${standing(item.rows, me)} <span class="small muted">+${mine.gained} ${item.final ? 'at the finale' : 'this vote'}.</span></p>`;
   if (!item.final) {
+    const latest = item.episode === ctx.episode || item.episode === ctx.episode - 1;
     return msg(item, {
       avatar: sysAvatar('crier'),
       author: 'The crier',
-      note: `round ${item.round} of ${config.schedule.rounds.length}`,
-      body: headline + `<ul class="matchups">${matchups}</ul>` + fold(item.key, true, '<span class="small">The table</span>', table),
+      note: `the table after vote ${item.episode} of ${VOTES}`,
+      body: headline + fold(item.key, latest, '<span class="small">The table</span>', table),
     });
   }
   const champs = item.rows.filter((r) => r.rank === 1).map((r) => r.tavern);
-  const mine = item.rows.find((r) => r.tavern === me);
-  if (me !== null && champs.includes(me)) {
+  if (me !== null && mine !== undefined && champs.includes(me)) {
     return (
-      `<li class="msg round season-final champion banner-card" data-key="${esc(item.key)}"${bannerAttr(me)}><div class="pennant" aria-hidden="true"></div>` +
+      `<li class="msg table season-final champion banner-card" data-key="${esc(item.key)}"${bannerAttr(me)}><div class="pennant" aria-hidden="true"></div>` +
       `<h2>${flagOf(me)} ${champs.length === 1 ? 'Champions of the Contest' : 'Co-champions'}</h2>` +
-      `<p class="banner-call">${esc(tavernName(me))} ${champs.length === 1 ? 'takes the season' : 'shares the season'} at ${mine?.wins ?? 0}–${mine?.losses ?? 0}, with ${num(mine?.points ?? 0)} points.</p>` +
-      headline +
-      `<ul class="matchups">${matchups}</ul>` +
+      `<p class="banner-call">${esc(tavernName(me))} ${champs.length === 1 ? 'takes the season' : 'shares the season'} with ${num(mine.points)} points.</p>` +
       table +
       `</li>`
     );
   }
   const champLine = champs.map((t) => `<span class="champ-line"${bannerAttr(t)}>${flagOf(t)} <b>${esc(tavernName(t))}</b></span>`).join(' and ');
   return (
-    `<li class="msg round season-final" data-key="${esc(item.key)}"><div class="av">${sysAvatar('crier')}</div><div class="mbody">` +
+    `<li class="msg table season-final" data-key="${esc(item.key)}"><div class="av">${sysAvatar('crier')}</div><div class="mbody">` +
     `<div class="meta"><b class="author">The crier</b> <span class="note">the season is over</span></div><div class="text">` +
-    headline +
-    `<ul class="matchups">${matchups}</ul>` +
-    `<h2>Final standings</h2><p>${champLine} ${champs.length === 1 ? 'wins' : 'share'} the season.</p>` +
-    (mine === undefined ? '' : `<p class="finish">You finish <b>${ordinal(mine.rank)} of ${item.rows.length}</b>, ${mine.wins}–${mine.losses}${mine.ties > 0 ? `–${mine.ties}` : ''}, with ${num(mine.points)} points.</p>`) +
+    `<h2>Final standings</h2><p>${champLine} ${champs.length === 1 ? 'wins' : 'share'} the season with ${num(item.rows[0]!.points)} points.</p>` +
+    (mine === undefined ? '' : `<p class="finish">You finish <b>${ordinal(mine.rank)} of ${item.rows.length}</b>, with ${num(mine.points)} points.</p>`) +
     table +
     `</div></div></li>`
   );
@@ -1154,7 +1149,7 @@ function setupHtml(): string {
     `<div class="row spread"><h2>The Lich's contest</h2><span class="chip brass">Play vs bots</span></div>` +
     (game.known && f.name.trim() !== '' ? `<p><b>Welcome back, ${esc(f.name.trim())}.</b></p>` : '') +
     `<p>The Lich wants a new assistant. ${config.contest.castSize} monsters compete: each episode one wins his task and is safe, and the rest vote one of their own out. The voted-out choose the winner.</p>` +
-    `<p>You keep a tavern against ${rivals} bot taverns. Draft ${config.roster.size} monsters, then watch, and call the boot each episode. Taverns meet head to head; the best record after ${config.schedule.rounds.length} rounds wins.</p>` +
+    `<p>You keep a tavern against ${rivals} bot taverns. Draft ${config.roster.size} monsters, then watch, and call the boot each episode. The most points after the finale wins.</p>` +
     `<form class="setup" id="g-setup" novalidate>` +
     `<div class="field"><label class="label" for="g-name">Your name</label><input type="text" id="g-name" data-action="g-name" value="${esc(f.name)}" maxlength="${KEEPER_NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="What the regulars call you"></div>` +
     `<div class="field"><span class="label" id="g-tavern-label">Your tavern</span><div class="tavern-name" role="group" aria-labelledby="g-tavern-label">` +
@@ -1266,10 +1261,10 @@ function renderHead(): void {
             ? 'Season complete'
             : voted >= VOTES
               ? 'The finale'
-              : `Episode ${voted + 1} of ${VOTES} · round ${roundOf(config, voted + 1)}`;
+              : `Episode ${voted + 1} of ${VOTES}`;
   const rows = seasonStandings(st);
   const row = rows.find((r) => r.tavern === me);
-  const rec = row === undefined || st.finalizedRounds.size === 0 ? '' : ` · ${row.wins}–${row.losses}${row.ties > 0 ? `–${row.ties}` : ''}, ${ordinal(row.rank)}`;
+  const rec = row === undefined || voted === 0 ? '' : ` · ${ordinal(row.rank)}, ${num(row.points)} pts`;
   const chrome = told ? tavernChrome[me] : undefined;
   const reset =
     s === null
@@ -1490,15 +1485,7 @@ function workCast(s: ContestSession, told: boolean): string {
           '<span class="small">Who voted for whom last time</span>',
           `<ul class="ballots">${lastVote.ballots.map((b) => `<li>${portrait(b.voter, 'sm')} ${esc(charName(b.voter))} → <b>${esc(charName(b.target))}</b></li>`).join('')}</ul>`,
         );
-  const pair = episode === null ? undefined : roundMatchups(state, roundOf(config, episode)).find((m) => m.home === me || m.away === me);
-  const rival = pair === undefined ? null : pair.home === me ? pair.away : pair.home;
-  const roundPts = (t: string): number => {
-    if (episode === null) return 0;
-    const r = roundOf(config, episode);
-    let n = 0;
-    for (let e = 1; e <= state.jury.length; e++) if (roundOf(config, e) === r) n += episodeScore(state, t, e).total;
-    return n;
-  };
+  const table = seasonStandings(state);
   const head =
     episode === null
       ? `<h2>The final ${state.alive.length}</h2><p class="small">Every vote is in. The jury of ${state.jury.length} is waiting.</p>`
@@ -1510,7 +1497,7 @@ function workCast(s: ContestSession, told: boolean): string {
               : `Call who goes home for ${config.scoring.call} if right.`
             : `Your call: <b>${esc(charName(call.target))}</b>${call.early ? ` (early: ${config.scoring.call + config.scoring.earlyCallBonus} if right; changing it now makes it late)` : ''}.`
         }</p>` +
-        (rival === null ? '' : `<p class="small">Round ${roundOf(config, episode)}: you ${roundPts(me)} – ${roundPts(rival)} ${flagOf(rival)} ${esc(tavernName(rival))}, so far.</p>`);
+        (state.jury.length === 0 ? '' : `<p class="small">${standing(table, me)}</p>`);
   return (
     `<section class="card">${head}</section>` +
     `<section class="card"><div class="row spread"><h3>Still in · ${state.alive.length}</h3><span class="small muted">yours first</span></div><div class="deck" id="g-cast">${cards}</div>${lastBallots}</section>` +
@@ -1547,31 +1534,15 @@ function renderTable(): void {
       const mine = r.tavern === me;
       return (
         `<tr class="${mine ? 'mine' : ''}"${mine ? bannerAttr(r.tavern) : ''}><td class="n">${r.rank}</td><td>${flagOf(r.tavern)} <b>${esc(tavernName(r.tavern))}</b></td>` +
-        `<td class="small">${mine ? esc(game.profile === null ? 'you' : `${game.profile.name} (you)`) : `${esc(keeper(m))} <span class="muted">${esc(botOfManager.get(m) ?? '')}</span>`}</td><td class="n"><b>${r.wins}–${r.losses}${r.ties > 0 ? `–${r.ties}` : ''}</b></td><td class="n">${r.points}</td></tr>`
+        `<td class="small">${mine ? esc(game.profile === null ? 'you' : `${game.profile.name} (you)`) : `${esc(keeper(m))} <span class="muted">${esc(botOfManager.get(m) ?? '')}</span>`}</td><td class="n"><b>${r.points}</b></td></tr>`
       );
     })
     .join('');
   const table =
     state.taverns.size === 0
       ? '<p class="muted">No taverns chosen yet.</p>'
-      : `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>keeper</th><th class="n">W–L</th><th class="n">pts</th></tr></thead><tbody>${body}</tbody></table></div>` +
-        `<p class="hint">Ranked by record (a tie counts half), then points over the rounds played.</p>`;
-  const rounds = config.schedule.rounds
-    .map((_, i) => {
-      const round = i + 1;
-      const done = state.finalizedRounds.has(round);
-      const list = roundMatchups(state, round)
-        .map((m) => {
-          const mine = m.home === me || m.away === me;
-          const pts = (t: string, p: number): string => `${flagOf(t)} ${esc(tavernName(t))}${done || p > 0 ? ` <span class="num">${p}</span>` : ''}`;
-          return `<li class="${mine ? 'mine' : ''}"${mine && me !== null ? bannerAttr(me) : ''}>${pts(m.home, m.homePoints)} <span class="muted">v</span> ${pts(m.away, m.awayPoints)}${done ? (m.winner === null ? ' <span class="muted">tie</span>' : '') : ''}</li>`;
-        })
-        .join('');
-      const eps = config.schedule.rounds.slice(0, i).reduce((a, b) => a + b, 0);
-      const span = `episodes ${eps + 1}–${eps + config.schedule.rounds[i]!}${round === config.schedule.rounds.length ? ' and the finale' : ''}`;
-      return `<li><b>Round ${round}</b> <span class="small muted">${span}${done ? ', final' : ''}</span><ul class="matchups small">${list}</ul></li>`;
-    })
-    .join('');
+      : `<div class="scroll"><table><thead><tr><th class="n">#</th><th>tavern</th><th>keeper</th><th class="n">pts</th></tr></thead><tbody>${body}</tbody></table></div>` +
+        `<p class="hint">Ranked by points: every vote so far, and the finale. The most points wins the season.</p>`;
   const rosters = [...state.taverns.values()]
     .map(
       (t) =>
@@ -1581,8 +1552,7 @@ function renderTable(): void {
     )
     .join('');
   el.innerHTML =
-    `<section class="card"><div class="row spread"><h2>Standings</h2><span class="small muted">${state.finalizedRounds.size === 0 ? 'no round played yet' : `after round ${state.finalizedRounds.size} of ${config.schedule.rounds.length}`}</span></div>${table}</section>` +
-    (state.draft.order.length === 0 ? '' : `<section class="card"><h3>Head to head</h3><ol class="schedule">${rounds}</ol></section>`) +
+    `<section class="card"><div class="row spread"><h2>Standings</h2><span class="small muted">${state.phase === 'complete' ? 'final' : state.jury.length === 0 ? 'no vote yet' : `after vote ${state.jury.length} of ${VOTES}`}</span></div>${table}</section>` +
     (rosters === '' ? '' : `<section class="card"><h3>Candidates</h3><ul class="rosters">${rosters}</ul></section>`);
 }
 

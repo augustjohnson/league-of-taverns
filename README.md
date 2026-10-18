@@ -9,8 +9,9 @@ run as elimination rounds). The winner is immune, and the rest **vote** one of
 their own out, each following the **voting strategy** printed on its card.
 When three are left, the voted-out monsters, now the **jury**, choose the
 winner. Managers run **taverns**: they snake-draft three monsters each, then
-only watch, except to **call the boot** at each vote. Taverns meet head to
-head in a round-robin, scored on their monsters' results plus their calls.
+only watch, except to **call the boot** at each vote. Taverns score for
+their monsters' results plus their calls, and the most points after the finale
+wins the season.
 
 The story is in [docs/lore.md](docs/lore.md), the design in
 [docs/survivor-format.md](docs/survivor-format.md), and what is built, with
@@ -84,8 +85,8 @@ engine/src/          pure game engine (no I/O)
   checks.ts            check odds and modifiers
   contest/             the Lich's contest: cards, challenges, the vote model, the jury, odds
   roster/              the snake draft
-  league/              season config, round-robin, standings
-  events/              event schema, reducers, selectors (scores, matchups), replay, the seed audit
+  league/              season config, standings
+  events/              event schema, reducers, selectors (scores, standings), replay, the seed audit
 engine/test/
 bots/                draft and calling strategies
 scripts/             the I/O edge: snapshot, validate, draft-images, package-characters

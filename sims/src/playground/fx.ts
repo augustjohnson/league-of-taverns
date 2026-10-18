@@ -250,15 +250,15 @@ export async function readJury(msg: HTMLElement, pace: Pacer): Promise<void> {
   finishReveal(msg);
 }
 
-/** A head-to-head round ends: confetti in your colours if you won your matchup, a nod if you tied. */
-export function roundMoment(msg: HTMLElement, outcome: 'won' | 'lost' | 'tied' | 'none', banner?: Banner): void {
+/** The table after a vote: confetti in your colours if you just took the lead, a nod if you climbed. */
+export function tableMoment(msg: HTMLElement, outcome: 'lead' | 'rose' | 'none', banner?: Banner): void {
   if (reducedMotion() || !msg.isConnected) return;
-  const line = msg.querySelector<HTMLElement>('.matchups li.mine');
-  if (outcome === 'won') {
+  const line = msg.querySelector<HTMLElement>('.mini-table tr.mine');
+  if (outcome === 'lead') {
     const colours = (banner === undefined ? ['#d5aa4c', '#24704a'] : [banner.mark, banner.mark, banner.charge, banner.field]).map((hex) => Color.fromHex(hex));
     micron(line, 'tada', { duration: 0.8 });
-    confetti(line ?? msg, { count: variation.range(35, 50), size: variation.range(0.7, 1.1), color: colours });
-  } else if (outcome === 'tied') {
+    confetti(line ?? msg, { count: variation.range(25, 35), size: variation.range(0.6, 1), color: colours });
+  } else if (outcome === 'rose') {
     micron(line, 'jelly', { duration: 0.6 });
   }
 }
