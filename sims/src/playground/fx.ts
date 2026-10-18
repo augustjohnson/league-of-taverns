@@ -5,12 +5,12 @@
  *
  * Effects come in tiers so the big ones stay rare and keep meaning something:
  * a nod (one micron interaction on one element), a cheer (one burst of
- * party.js sparkles) and a fanfare (confetti), which only topping a week
- * earns. A week's result picks its tier by how it went (`weekMoment`).
+ * party.js sparkles) and a fanfare (confetti), which only winning a
+ * head-to-head round or the season earns.
  * The CSS half is page.html § Moments, with micron's CSS vendored below it.
  */
 import { Color, Rect, confetti, settings, sparkles, variation } from 'party-js';
-import type { Banner } from '@league-of-taverns/scripts/lib/god-schema';
+import type { Banner } from '@league-of-taverns/scripts/lib/banner';
 
 // party.js's own default, set here so it holds even if the default changes: it must be set before the first effect.
 settings.respectReducedMotion = true;
@@ -55,7 +55,7 @@ export function micron(el: Element | null, interaction: MicronInteraction, { dur
 
 /**
  * Choosing your tavern: its banner goes up. The pennant unfurls, the card
- * glows and the god's call rises in (the `.raised` animations), the tavern
+ * glows and the regulars' toast rises in (the `.raised` animations), the tavern
  * sign swings, and one burst of sparkles leaves the pennant in the banner's
  * colours: its mark twice as often as its charge. The field is left out: it
  * is the card's own colour, so it would vanish against it. A cheer, once a
@@ -110,216 +110,156 @@ export function pacer(): Pacer {
   };
 }
 
-/** Milliseconds for each beat of a week's race: a rival's step, the pause before your run, your checks and battles, an ending line. */
-const BEAT = { pip: 230, gap: 700, step: 380, check: 800, battle: 1400, tail: 900, count: 450, curse: 1500 } as const;
 const BRASS = Color.fromHex('#d5aa4c');
 
-/** Count `el` up (or down) to `target` over `ms`, eased; stops early if `stop()` says so. */
-function countUp(el: HTMLElement | null, from: number, target: number, stop: () => boolean, ms = BEAT.count): void {
-  if (el === null || Number.isNaN(target)) return;
-  const start = performance.now();
-  const tick = (now: number): void => {
-    if (stop() || !el.isConnected) return;
-    const t = Math.min(1, (now - start) / ms);
-    el.textContent = String(Math.round(from + (target - from) * (1 - (1 - t) ** 3)));
-    if (t < 1) requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+/** Milliseconds for each beat of the reveals: a challenge round, the drop-outs, a ballot, the boot, the calls. */
+const BEAT = { round: 900, out: 700, replay: 900, winner: 1400, ballot: 750, tie: 1200, boot: 1800, calls: 500, jury: 1300 } as const;
+
+/** Show `el` (it was held back by its message's `.revealing`), with a nod. */
+function show(el: Element | null, nod: MicronInteraction | null = null): void {
+  if (!(el instanceof HTMLElement)) return;
+  el.classList.add('shown');
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (nod !== null) micron(el, nod, { duration: 0.45 });
 }
 
-/** Move `items` into `order` inside their parent, sliding each from where it stood (FLIP). */
-function reorder(items: ReadonlyArray<HTMLElement>, order: ReadonlyArray<HTMLElement>, animate: boolean): void {
-  const parent = items[0]?.parentElement;
-  if (parent == null) return;
-  const before = new Map(items.map((el) => [el, el.getBoundingClientRect().top]));
-  for (const el of order) parent.append(el);
-  if (!animate) return;
-  for (const el of order) {
-    const dy = (before.get(el) ?? 0) - el.getBoundingClientRect().top;
-    if (Math.abs(dy) < 1) continue;
-    el.style.transition = 'none';
-    el.style.transform = `translateY(${dy}px)`;
-  }
-  void parent.offsetHeight;
-  order.forEach((el, i) => {
-    if (el.style.transform === '') return;
-    el.style.transition = `transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) ${0.04 * i}s`;
-    el.style.transform = '';
-    window.setTimeout(() => (el.style.transition = ''), 900);
-  });
+/** End a reveal: everything held back shows, at once. */
+function finishReveal(msg: HTMLElement): void {
+  if (!msg.isConnected) return;
+  msg.classList.remove('revealing');
+  for (const el of msg.querySelectorAll('.tally [data-count]')) el.textContent = (el as HTMLElement).dataset.count ?? el.textContent;
 }
 
 /**
- * A week's race in the Common Room (play.ts resultsHtml): every tavern's run
- * as a strip of steps, green for a pass or a win and red for a fail or a
- * loss, ending home, turned back or beaten.
+ * The scrying ball shows a challenge (play.ts challengeHtml): round by round,
+ * the check, then who drops out (their faces fade from the field), the
+ * count of those left, and at last the winner, immune tonight, in a burst
+ * of sparks (your banner's colours when the winner is yours).
  *
- * The lanes start in draft order with yours last, so the order gives nothing
- * away. The rivals' strips fill in together, a step a beat, each tavern's
- * loot landing as its strip ends. Then the scrying ball plays your run back
- * line by line: the die tumbles before it settles, the outcome lands, your
- * strip grows and the loot counter climbs; a DNF drains it to 0. Last, the
- * ranks show and the lanes slide into the week's order.
- *
- * The message already holds the whole result: this only holds pieces back
- * (while it is `.racing`) and brings them in, so a reload, a skip or reduced
- * motion shows the same thing. Resolves when it ends, skipped or not.
+ * The message already holds the whole result; this only holds pieces back
+ * while it is `.revealing`, so a reload, a skip or reduced motion shows the
+ * same thing. Resolves when it ends, skipped or not.
  */
-export async function raceWeek(msg: HTMLElement, pace: Pacer): Promise<void> {
-  const race = msg.querySelector<HTMLElement>('.race');
-  if (race === null || reducedMotion()) return;
-  // Watching again starts from nothing: whatever the last race showed is held back again.
-  for (const el of msg.querySelectorAll('.shown')) el.classList.remove('shown');
-  const { sleep } = pace;
-  const lanes = [...race.querySelectorAll<HTMLElement>(':scope > .lane')];
-  const num = (el: HTMLElement, key: string): number => Number(el.dataset[key] ?? 0);
-  const ranked = [...lanes].sort((a, b) => num(a, 'rank') - num(b, 'rank') || num(a, 'order') - num(b, 'order'));
+export async function revealChallenge(msg: HTMLElement, pace: Pacer, banner?: Banner): Promise<void> {
+  if (reducedMotion()) return;
   const stop = (): boolean => pace.skipped || !msg.isConnected;
-
-  const land = (lane: HTMLElement): void => {
-    lane.querySelector('.run-end')?.classList.add('shown');
-    const pts = lane.querySelector<HTMLElement>('.pts');
-    if (pts === null) return;
-    pts.classList.add('shown');
-    countUp(pts, 0, num(pts, 'pts'), stop);
-  };
-  const finish = (): void => {
-    if (!msg.isConnected) return;
-    for (const el of msg.querySelectorAll('.rolling')) el.classList.remove('rolling');
-    for (const pts of msg.querySelectorAll<HTMLElement>('.pts[data-pts]')) pts.textContent = pts.dataset.pts ?? pts.textContent;
-    const counter = msg.querySelector<HTMLElement>('[data-loot]');
-    if (counter !== null) counter.textContent = counter.dataset.loot ?? counter.textContent;
-    msg.classList.remove('racing');
-    reorder(lanes, ranked, !pace.skipped);
-  };
-
-  reorder(lanes, [...lanes].sort((a, b) => num(a, 'order') - num(b, 'order')), false);
-  msg.classList.add('racing');
-
-  // The rivals, together.
-  const rivals = lanes.filter((l) => !l.classList.contains('mine'));
-  const pips = new Map(rivals.map((l) => [l, [...l.querySelectorAll<HTMLElement>('.strip .pip')]]));
-  const steps = Math.max(0, ...[...pips.values()].map((p) => p.length));
-  for (const lane of rivals) if (pips.get(lane)!.length === 0) land(lane);
-  for (let i = 0; i < steps && !stop(); i++) {
-    for (const lane of rivals) {
-      const row = pips.get(lane)!;
-      row[i]?.classList.add('shown');
-      if (i === row.length - 1) land(lane);
-    }
-    await sleep(BEAT.pip);
+  for (const el of msg.querySelectorAll('.shown')) el.classList.remove('shown');
+  for (const el of msg.querySelectorAll('.field .out')) el.classList.remove('out');
+  msg.classList.add('revealing');
+  const field = new Map([...msg.querySelectorAll<HTMLElement>('.field [data-id]')].map((el) => [el.dataset.id!, el]));
+  for (const round of msg.querySelectorAll<HTMLElement>('.rounds > li')) {
+    if (stop()) break;
+    show(round);
+    await pace.sleep(round.dataset.replay === '1' ? BEAT.replay : BEAT.round);
+    if (stop()) break;
+    const outs = (round.dataset.out ?? '').split(' ').filter((x) => x !== '');
+    show(round.querySelector('.dropped'));
+    for (const id of outs) field.get(id)?.classList.add('out');
+    if (outs.length > 0) await pace.sleep(BEAT.out);
   }
-
-  // Yours, in the scrying ball.
-  const mine = lanes.find((l) => l.classList.contains('mine'));
-  if (mine !== undefined && !stop()) {
-    await sleep(BEAT.gap);
-    const details = mine.querySelector('details');
-    if (details !== null) details.open = true;
-    const myPips = [...mine.querySelectorAll<HTMLElement>('.strip .pip')];
-    const counter = msg.querySelector<HTMLElement>('[data-loot]');
-    let shown = 0;
-    if (counter !== null) counter.textContent = '0';
-    const countTo = (target: number): void => {
-      countUp(counter, shown, target, stop);
-      shown = target;
-    };
-    /** Tumble the die for `ms`, then show what it really rolled. */
-    const roll = async (die: HTMLElement | null, ms: number): Promise<void> => {
-      if (die === null) return sleep(ms);
-      const final = die.textContent ?? '';
-      const unit = die.dataset.roll === 'unit';
-      die.classList.add('rolling');
-      const spin = window.setInterval(() => {
-        die.textContent = unit ? Math.random().toFixed(3) : String(1 + Math.floor(Math.random() * 20));
-      }, 70);
-      await sleep(ms);
-      window.clearInterval(spin);
-      die.textContent = final;
-      die.classList.remove('rolling');
-    };
-    for (const line of mine.querySelectorAll<HTMLElement>('.tale > li')) {
-      if (stop()) break;
-      line.classList.add('shown');
-      line.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      if (line.dataset.head === 'curse') {
-        micron(line, 'flicker', { duration: 0.8, delay: 0.2 });
-        await sleep(BEAT.curse);
-        continue;
-      }
-      if (line.dataset.tail !== undefined) {
-        countTo(Number(line.dataset.total));
-        if (line.dataset.tail === 'dnf') micron(counter, 'shake', { duration: 0.6 });
-        if (line.dataset.tail === 'injury') micron(line.querySelector('[data-hurt]'), 'flicker', { duration: 0.7 });
-        await sleep(BEAT.tail);
-        continue;
-      }
-      line.classList.add('rolling');
-      const die = line.querySelector<HTMLElement>('[data-roll]');
-      await roll(die, line.dataset.kind === 'battle' ? BEAT.battle : BEAT.check);
-      line.classList.remove('rolling');
-      myPips[Number(line.dataset.step)]?.classList.add('shown');
-      countTo(Number(line.dataset.total));
-      // Small nods for good news: the loot tag pops, and a natural 20 throws a few sparks.
-      micron(line.querySelector('[data-bank]'), 'pop', { duration: 0.4 });
-      if (!stop() && die?.dataset.roll === 'd20' && die.textContent === '20') {
-        sparkles(die, { count: variation.range(8, 12), size: variation.range(0.4, 0.8), speed: variation.range(60, 140), color: BRASS });
-      }
-      await sleep(BEAT.step);
+  if (!stop()) {
+    const winner = msg.querySelector<HTMLElement>('[data-winner]');
+    show(winner, 'tada');
+    const face = winner?.querySelector<HTMLElement>('.pt') ?? winner;
+    if (face !== null && face !== undefined) {
+      const colours = (banner === undefined ? ['#d5aa4c', '#ecdfb9'] : [banner.mark, banner.charge]).map((hex) => Color.fromHex(hex));
+      sparkles(face, { count: variation.range(14, 22), size: variation.range(0.5, 1), speed: variation.range(70, 170), color: winner?.dataset.mine === '1' ? colours : BRASS });
     }
-    for (const pip of myPips) pip.classList.add('shown');
-    land(mine);
-    await sleep(BEAT.count + 250);
+    await pace.sleep(BEAT.winner);
   }
-  finish();
+  finishReveal(msg);
 }
 
 /**
- * Declaring your hex: spite, once a season. The new hex in the list jolts
- * (micron's jerk) and throws a few embers in your banner's mark. A cheer,
- * kept small: a curse is mischief, not a party.
+ * The Lich reads the votes (play.ts voteHtml), one parchment at a time,
+ * Survivor style: each name lands, its tally climbs, a tie holds its breath.
+ * Then the revote and the draw if there were any, then the boot leaves for
+ * the jury, and last the calls are unsealed with what each tavern scored.
+ * Calling it right with your own call throws a few sparks in your colours.
  */
-export function layCurse(row: HTMLElement | null, banner?: Banner): void {
-  if (row === null || reducedMotion()) return;
-  row.classList.add('laid');
-  micron(row, 'jerk', { duration: 0.6 });
-  sparkles(row.querySelector<HTMLElement>('.flag') ?? row, {
-    count: variation.range(10, 14),
-    size: variation.range(0.4, 0.8),
-    speed: variation.range(50, 120),
-    color: Color.fromHex(banner?.mark ?? '#a8352a'),
-    shapes: 'circle',
-  });
+export async function readVotes(msg: HTMLElement, pace: Pacer, banner?: Banner): Promise<void> {
+  if (reducedMotion()) return;
+  const stop = (): boolean => pace.skipped || !msg.isConnected;
+  for (const el of msg.querySelectorAll('.shown')) el.classList.remove('shown');
+  msg.classList.add('revealing');
+  const tallies = new Map([...msg.querySelectorAll<HTMLElement>('.tally [data-target]')].map((el) => [el.dataset.target!, el]));
+  for (const el of tallies.values()) {
+    const n = el.querySelector<HTMLElement>('[data-count]');
+    if (n !== null) n.textContent = '0';
+  }
+  for (const step of msg.querySelectorAll<HTMLElement>('[data-step]')) {
+    if (stop()) break;
+    const kind = step.dataset.step;
+    if (kind === 'ballot') {
+      show(step, 'pop');
+      const chip = tallies.get(step.dataset.target ?? '');
+      const n = chip?.querySelector<HTMLElement>('[data-count]');
+      if (chip !== undefined && n !== null && n !== undefined) {
+        chip.classList.add('shown');
+        n.textContent = step.dataset.tally ?? n.textContent;
+        micron(chip, 'bounce', { duration: 0.4 });
+      }
+      await pace.sleep(step.dataset.tie === '1' ? BEAT.tie : BEAT.ballot);
+    } else if (kind === 'boot') {
+      await pace.sleep(400);
+      show(step, 'squeeze');
+      await pace.sleep(BEAT.boot);
+    } else {
+      show(step);
+      await pace.sleep(kind === 'calls' ? BEAT.calls : BEAT.ballot);
+    }
+  }
+  if (!stop()) {
+    const right = msg.querySelector<HTMLElement>('.calls-out li.mine.right');
+    if (right !== null && banner !== undefined) {
+      sparkles(right, { count: variation.range(12, 18), size: variation.range(0.5, 0.9), speed: variation.range(60, 150), color: [banner.mark, banner.charge].map((hex) => Color.fromHex(hex)) });
+    }
+  }
+  finishReveal(msg);
 }
 
 /**
- * The end of a week's reveal, sized to how the week went (`data-outcome`,
- * from view.ts weekOutcome):
- *
- * | outcome | feeling      | effect                                                          |
- * |---------|--------------|-----------------------------------------------------------------|
- * | top     | triumph      | confetti from the headline in your banner's colours; it tadas   |
- * | good    | satisfaction | a few sparkles off the loot counter                             |
- * | retreat | relief       | the counter breathes out (micron fade); the kept loot is marked |
- * | dnf     | loss         | (the drain and shake happen in the reveal) the run dims         |
- * | quiet   | none         | nothing                                                         |
- *
- * The marks that stay (the dimmed run, the kept loot) are page.html CSS on
- * `data-outcome`, so a reload shows them too.
+ * The jury's votes (play.ts finaleHtml): each juror's ballot, then the
+ * Lich names his new assistant.
  */
-export function weekMoment(card: HTMLElement, banner?: Banner): void {
-  if (reducedMotion() || !card.isConnected) return;
-  const outcome = card.dataset.outcome;
-  const counter = card.querySelector('[data-loot]');
-  const colours = (banner === undefined ? ['#d5aa4c', '#24704a'] : [banner.mark, banner.mark, banner.charge, banner.field]).map((hex) => Color.fromHex(hex));
-  if (outcome === 'top') {
-    const headline = card.querySelector<HTMLElement>('[data-headline]');
-    micron(headline, 'tada', { duration: 0.8 });
-    confetti(headline ?? card, { count: variation.range(45, 65), size: variation.range(0.7, 1.1), color: colours });
-  } else if (outcome === 'good' && counter instanceof HTMLElement) {
-    sparkles(counter, { count: variation.range(10, 16), size: variation.range(0.5, 0.9), speed: variation.range(70, 160), color: colours.slice(0, 3) });
-  } else if (outcome === 'retreat') {
-    micron(counter, 'fade', { duration: 0.9 });
+export async function readJury(msg: HTMLElement, pace: Pacer): Promise<void> {
+  if (reducedMotion()) return;
+  const stop = (): boolean => pace.skipped || !msg.isConnected;
+  for (const el of msg.querySelectorAll('.shown')) el.classList.remove('shown');
+  msg.classList.add('revealing');
+  const tallies = new Map([...msg.querySelectorAll<HTMLElement>('.tally [data-target]')].map((el) => [el.dataset.target!, el]));
+  for (const el of tallies.values()) {
+    const n = el.querySelector<HTMLElement>('[data-count]');
+    if (n !== null) n.textContent = '0';
+  }
+  for (const step of msg.querySelectorAll<HTMLElement>('[data-step]')) {
+    if (stop()) break;
+    show(step, step.dataset.step === 'winner' ? 'tada' : 'pop');
+    const chip = tallies.get(step.dataset.target ?? '');
+    const n = chip?.querySelector<HTMLElement>('[data-count]');
+    if (step.dataset.step === 'ballot' && n !== null && n !== undefined) {
+      n.textContent = step.dataset.tally ?? n.textContent;
+      micron(chip ?? null, 'bounce', { duration: 0.4 });
+    }
+    await pace.sleep(step.dataset.step === 'winner' ? BEAT.boot : BEAT.jury);
+  }
+  if (!stop()) {
+    const winner = msg.querySelector<HTMLElement>('[data-step="winner"]');
+    if (winner !== null) confetti(winner, { count: variation.range(40, 60), size: variation.range(0.7, 1.1), color: [BRASS, Color.fromHex('#ecdfb9')] });
+  }
+  finishReveal(msg);
+}
+
+/** A head-to-head round ends: confetti in your colours if you won your matchup, a nod if you tied. */
+export function roundMoment(msg: HTMLElement, outcome: 'won' | 'lost' | 'tied' | 'none', banner?: Banner): void {
+  if (reducedMotion() || !msg.isConnected) return;
+  const line = msg.querySelector<HTMLElement>('.matchups li.mine');
+  if (outcome === 'won') {
+    const colours = (banner === undefined ? ['#d5aa4c', '#24704a'] : [banner.mark, banner.mark, banner.charge, banner.field]).map((hex) => Color.fromHex(hex));
+    micron(line, 'tada', { duration: 0.8 });
+    confetti(line ?? msg, { count: variation.range(35, 50), size: variation.range(0.7, 1.1), color: colours });
+  } else if (outcome === 'tied') {
+    micron(line, 'jelly', { duration: 0.6 });
   }
 }
 
@@ -356,7 +296,7 @@ export function crownChampion(card: HTMLElement, banner?: Banner): void {
 /**
  * The season ends and a rival won: no fanfare for you. The champion's flag
  * swings and throws a small burst in their colours, and your finish line
- * nods. The champion's colours show because they won the league, which acts
+ * nods. The champion's colours show because they won the season, which acts
  * on everyone.
  */
 export function hailChampion(card: HTMLElement, banner?: Banner): void {
@@ -390,8 +330,8 @@ export function turnCard(card: HTMLElement | null): void {
 }
 
 /**
- * The clock comes back to you: the rivals have picked (or chosen, or readied)
- * and it is your move, so the action bar glows once and its call to you
+ * The clock comes back to you: the rivals have picked (or chosen), or an
+ * episode waits on you, so the action bar glows once and its call to you
  * (`[data-clock]`) bounces. A nod, once each time it comes back; it never
  * pulses the whole time you are on the clock.
  */
@@ -404,18 +344,9 @@ export function clockBack(bar: HTMLElement | null): void {
 }
 
 /**
- * The CR meter answers a change to the lineup: a jelly when it still fits the
- * budget, a shake when it no longer does. Only the meter moves; the engine's
- * reason shows below it as before. A nod.
- */
-export function nodMeter(meter: Element | null, result: 'fits' | 'over'): void {
-  micron(meter, result === 'over' ? 'shake' : 'jelly', { duration: result === 'over' ? 0.5 : 0.45 });
-}
-
-/**
- * The table moves: each row starts where it stood last week (`data-was`)
- * and slides to where it stands now, a little after the one above it, so a
- * climb or a fall is felt every week and not only at the season's end. The
+ * The table moves: each row starts where it stood after the last round
+ * (`data-was`) and slides to where it stands now, a little after the one
+ * above it, so a climb or a fall is felt every round. The
  * ▲/▼ column says the same thing in words and stays put.
  */
 export function slideStandings(table: HTMLTableElement | null): void {

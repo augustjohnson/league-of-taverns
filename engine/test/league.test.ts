@@ -1,229 +1,70 @@
 import { describe, expect, it } from 'vitest';
-import { projectedPoints, runPoints, sponsoredTavern, standings, validateSponsors, type SeasonConfig, type WeekResult } from '../src/league';
-import { draftOrder, snakePickOwner } from '../src/roster';
-import type { Rng } from '../src/rng';
-import type { CrEighths } from '../src/vocabulary';
+import { configIssues, episodesOf, roundOf, roundRobin, standings, votesIn, type MatchupResult } from '../src/league';
+import { miniConfig } from './support/league-log';
 
-// T4.3, T4.6.
+describe('the season shape', () => {
+  const config = miniConfig();
 
-/** Deterministic stand-in for rngFor: cycles through `values`, counting draws. */
-function fakeRng(values: ReadonlyArray<number>): Rng & { draws: number } {
-  let i = 0;
-  const rng = (() => {
-    rng.draws++;
-    return values[i++ % values.length]!;
-  }) as Rng & { draws: number };
-  rng.draws = 0;
-  return rng;
-}
-
-function makeConfig(overrides: { order?: SeasonConfig['draft']['order'] } = {}): SeasonConfig {
-  return {
-    id: 'season-test',
-    snapshot: 'open5e-test',
-    modifierRegistryVersion: 1,
-    weeks: 6,
-    budget: { partyCr: (12 * 8) as CrEighths, modifierPointsPerCharacter: 3 },
-    roster: { size: 7, starters: 4, ownership: 'exclusive' },
-    draft: { format: 'snake', rounds: 7, order: overrides.order ?? { mode: 'seeded' }, pickWindowHours: 24, onTimeout: 'autopick' },
-    scoring: { pointsScale: 100, homeBonus: 1.25 },
-    waivers: { priority: 'rolling', initialOrder: 'reverse_draft' },
-    trades: { vetoWindowHours: 24, vetoBy: 'commissioner', deadlineWeek: 4 },
-    missedLineup: 'carry_over',
-    schedules: { lineupLock: '0 18 * * 4', weeklyRun: '15 18 * * 4', waivers: '0 12 * * 5' },
-    secrecy: 'encrypted',
-    seedSalt: 'none',
-    missions: {} as SeasonConfig['missions'],
-    carryover: { mode: 'none', keepersPerTavern: 0, keeperCost: 'none', championBonusKeepers: 0, maxModifierChangePoints: 0 },
-  };
-}
-
-const taverns = (n: number): string[] => Array.from({ length: n }, (_, i) => `t${i}`);
-
-describe('draftOrder', () => {
-  const four = ['a', 'b', 'c', 'd'] as const;
-
-  it('same fake rng gives the same order, and it is a permutation drawing n − 1 values', () => {
-    const values = [0.42, 0.17, 0.93, 0.6];
-    const r1 = fakeRng(values);
-    const r2 = fakeRng(values);
-    const o1 = draftOrder(four, makeConfig(), r1);
-    const o2 = draftOrder(four, makeConfig(), r2);
-    expect(o1).toEqual(o2);
-    expect([...o1].sort()).toEqual([...four]);
-    expect(r1.draws).toBe(3);
+  it('votes run until the finalists are left', () => {
+    expect(votesIn(config)).toBe(8);
   });
 
-  it('is a Fisher–Yates shuffle of the input', () => {
-    // j = i every step: identity.
-    expect(draftOrder(four, makeConfig(), fakeRng([0.999]))).toEqual(['a', 'b', 'c', 'd']);
-    // j = 0 every step: [d,b,c,a] → [c,b,d,a] → [b,c,d,a].
-    expect(draftOrder(four, makeConfig(), fakeRng([0]))).toEqual(['b', 'c', 'd', 'a']);
+  it('maps episodes to head-to-head rounds and back', () => {
+    expect([1, 2, 3, 4, 5, 6, 7, 8].map((e) => roundOf(config, e))).toEqual([1, 1, 1, 2, 2, 2, 3, 3]);
+    expect(episodesOf(config, 2)).toEqual([4, 5, 6]);
+    expect(() => roundOf(config, 9)).toThrow(/past the schedule/);
   });
 
-  it('different rng streams can give different orders', () => {
-    const orders = new Set([0, 0.3, 0.6, 0.999].map((v) => draftOrder(four, makeConfig(), fakeRng([v])).join()));
-    expect(orders.size).toBeGreaterThan(1);
-  });
-
-  it('never mutates the input', () => {
-    const input = ['a', 'b', 'c', 'd'];
-    draftOrder(input, makeConfig(), fakeRng([0]));
-    expect(input).toEqual(['a', 'b', 'c', 'd']);
-  });
-
-  it('manual mode returns the configured permutation without drawing', () => {
-    const rng = fakeRng([0.5]);
-    const config = makeConfig({ order: { mode: 'manual', managers: ['c', 'a', 'd', 'b'] } });
-    expect(draftOrder(four, config, rng)).toEqual(['c', 'a', 'd', 'b']);
-    expect(rng.draws).toBe(0);
-  });
-
-  it('manual mode rejects lists that are not a permutation of the managers', () => {
-    const manual = (list: string[]) => () => draftOrder(four, makeConfig({ order: { mode: 'manual', managers: list } }), fakeRng([0]));
-    expect(manual(['a', 'b', 'c'])).toThrow(/missing.*"d"/);
-    expect(manual(['a', 'b', 'c', 'd', 'e'])).toThrow(/unknown manager "e"/);
-    expect(manual(['a', 'b', 'c', 'c'])).toThrow(/"c" more than once/);
-  });
-
-  it('rejects duplicate taverns', () => {
-    expect(() => draftOrder(['a', 'a'], makeConfig(), fakeRng([0]))).toThrow(/duplicates/);
+  it('checks the contest fits the taverns and the schedule covers the votes', () => {
+    expect(configIssues(config, 4)).toEqual([]);
+    expect(configIssues(config, 6).join()).toMatch(/more than the cast/);
+    expect(configIssues(miniConfig({ schedule: { rounds: [3, 3] } }), 4).join()).toMatch(/cover 6 episodes/);
+    expect(configIssues(miniConfig({ contest: { castSize: 2, finalists: 2, lapDc: 1, model: {} } }), 1).join()).toMatch(/must be more than finalists/);
   });
 });
 
-describe('snakePickOwner', () => {
-  it('runs A B C C B A A B C … for three taverns', () => {
-    const order = ['A', 'B', 'C'];
-    expect(Array.from({ length: 9 }, (_, p) => snakePickOwner(order, p)).join(' ')).toBe('A B C C B A A B C');
-  });
-
-  it.each([3, 4, 5])('reverses on odd rounds for %i taverns across five rounds', (n) => {
-    const order = taverns(n);
-    const expected = Array.from({ length: 5 }, (_, round) => (round % 2 === 0 ? order : [...order].reverse())).flat();
-    expect(expected.map((_, p) => snakePickOwner(order, p))).toEqual(expected);
-  });
-
-  it('gives each tavern exactly one pick per round', () => {
-    const order = taverns(5);
-    for (let round = 0; round < 7; round++) {
-      const picks = order.map((_, slot) => snakePickOwner(order, round * order.length + slot));
-      expect([...picks].sort()).toEqual([...order].sort());
+describe('round-robin', () => {
+  it('meets every pair exactly once in n − 1 rounds, each tavern once a round', () => {
+    const taverns = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const rounds = roundRobin(taverns, 5);
+    const pairs = new Set<string>();
+    for (const round of rounds) {
+      expect(round).toHaveLength(3);
+      expect(new Set(round.flat()).size).toBe(6);
+      for (const [x, y] of round) pairs.add([x, y].sort().join('-'));
     }
+    expect(pairs.size).toBe(15);
   });
 
-  it('throws on a negative or non-integer pick, or an empty order', () => {
-    expect(() => snakePickOwner(['a'], -1)).toThrow(/non-negative/);
-    expect(() => snakePickOwner(['a'], 1.5)).toThrow(/non-negative integer/);
-    expect(() => snakePickOwner([], 0)).toThrow(/empty/);
+  it('gives one tavern a bye each round when the count is odd', () => {
+    const rounds = roundRobin(['a', 'b', 'c'], 3);
+    expect(rounds.every((r) => r.length === 1)).toBe(true);
+    expect(new Set(rounds.map((r) => r[0]!.slice().sort().join('-'))).size).toBe(3);
   });
 });
 
 describe('standings', () => {
-  const result = (week: number, tavern: string, points: number, dnf = false): WeekResult => ({ week, tavern, points, projected: 0, checksPassed: 0, dnf });
+  const m = (round: number, home: string, away: string, h: number, a: number): MatchupResult => ({
+    round,
+    home,
+    away,
+    homePoints: h,
+    awayPoints: a,
+    winner: h === a ? null : h > a ? home : away,
+  });
 
-  it('ranks by total points over all weeks', () => {
-    const rows = standings(['a', 'b', 'c'], [result(1, 'a', 50), result(1, 'b', 70), result(1, 'c', 10), result(2, 'a', 40), result(2, 'b', 5), result(2, 'c', 90)]);
-    expect(rows).toEqual([
-      { rank: 1, tavern: 'c', points: 100, dnfs: 0 },
-      { rank: 2, tavern: 'a', points: 90, dnfs: 0 },
-      { rank: 3, tavern: 'b', points: 75, dnfs: 0 },
+  it('ranks by record (a tie counts half), then points', () => {
+    const rows = standings(['a', 'b', 'c', 'd'], [m(1, 'a', 'b', 10, 5), m(1, 'c', 'd', 7, 7), m(2, 'a', 'c', 4, 9), m(2, 'b', 'd', 8, 1)], new Map([['a', 14], ['b', 13], ['c', 16], ['d', 8]]));
+    expect(rows.map((r) => [r.tavern, r.rank, r.wins, r.losses, r.ties])).toEqual([
+      ['c', 1, 1, 0, 1],
+      ['a', 2, 1, 1, 0],
+      ['b', 3, 1, 1, 0],
+      ['d', 4, 0, 1, 1],
     ]);
   });
 
-  it('equal totals share a rank, with no tiebreak; display order falls back to tavern id', () => {
-    const rows = standings(['d', 'c', 'b', 'a'], [result(1, 'd', 60), result(1, 'c', 60), result(1, 'b', 30), result(1, 'a', 30)]);
-    expect(rows.map((r) => [r.rank, r.tavern])).toEqual([
-      [1, 'c'],
-      [1, 'd'],
-      [3, 'a'],
-      [3, 'b'],
-    ]);
-  });
-
-  it('includes taverns with no results, and taverns only seen in results', () => {
-    const rows = standings(['a', 'z'], [result(1, 'a', 10), result(1, 'q', 20)]);
-    expect(rows).toEqual([
-      { rank: 1, tavern: 'q', points: 20, dnfs: 0 },
-      { rank: 2, tavern: 'a', points: 10, dnfs: 0 },
-      { rank: 3, tavern: 'z', points: 0, dnfs: 0 },
-    ]);
-    expect(standings([], [])).toEqual([]);
-  });
-
-  it('breaks a tie for first by fewer DNFs, only when asked (the season-end rule, D-14)', () => {
-    // a and b tie on 100; a has 1 DNF and b 2. c and d tie on 40 below.
-    const results = [
-      result(1, 'a', 30, true),
-      result(2, 'a', 70),
-      result(1, 'b', 50, true),
-      result(2, 'b', 50, true),
-      result(1, 'c', 40),
-      result(1, 'd', 40, true),
-    ];
-    expect(standings(['a', 'b', 'c', 'd'], results).map((r) => [r.rank, r.tavern, r.dnfs])).toEqual([
-      [1, 'a', 1],
-      [1, 'b', 2],
-      [3, 'c', 0],
-      [3, 'd', 1],
-    ]);
-    // Only first place is broken: c and d still share third.
-    expect(standings(['a', 'b', 'c', 'd'], results, { breakFirstTie: true }).map((r) => [r.rank, r.tavern])).toEqual([
-      [1, 'a'],
-      [2, 'b'],
-      [3, 'c'],
-      [3, 'd'],
-    ]);
-  });
-
-  it('keeps co-champions when the DNFs are tied too, and leaves the rest of a three-way tie on rank 2', () => {
-    const results = [result(1, 'a', 60, true), result(1, 'b', 60, true), result(1, 'c', 60, true), result(2, 'c', 0, true)];
-    expect(standings(['a', 'b', 'c'], results, { breakFirstTie: true }).map((r) => [r.rank, r.tavern])).toEqual([
-      [1, 'a'],
-      [1, 'b'],
-      [2, 'c'],
-    ]);
-  });
-
-  it('rejects duplicate results for one tavern-week', () => {
-    expect(() => standings(['h'], [result(1, 'h', 1), result(1, 'h', 2)])).toThrow(/duplicate/);
-  });
-});
-
-describe('sponsors and the home bonus', () => {
-  const gods = [
-    { id: 'the-sea', tavern: 'a' },
-    { id: 'the-sky', tavern: 'b' },
-  ];
-  const weeks = [
-    { week: 1, sponsor: 'the-sea' },
-    { week: 2, sponsor: null },
-    { week: 3, sponsor: 'the-sky' },
-  ];
-
-  it('finds each week\'s home tavern; unsponsored or unknown weeks have none', () => {
-    expect([1, 2, 3, 4].map((w) => sponsoredTavern(gods, weeks, w))).toEqual(['a', null, 'b', null]);
-  });
-
-  it('accepts a valid package, including unsponsored weeks and sponsors without a week', () => {
-    expect(validateSponsors(gods, weeks)).toEqual([]);
-    expect(validateSponsors([...gods, { id: 'the-earth', tavern: 'c' }], weeks)).toEqual([]);
-    expect(validateSponsors([], [{ week: 1, sponsor: null }])).toEqual([]);
-  });
-
-  it('flags duplicate gods, two gods on one tavern, unknown sponsors and a god on two weeks', () => {
-    const codes = (s: Parameters<typeof validateSponsors>[0], w: Parameters<typeof validateSponsors>[1]) => validateSponsors(s, w).map((i) => i.code);
-    expect(codes([...gods, { id: 'the-sea', tavern: 'c' }], weeks)).toEqual(['duplicate_sponsor']);
-    expect(codes([...gods, { id: 'the-earth', tavern: 'a' }], weeks)).toEqual(['duplicate_tavern']);
-    expect(codes(gods, [...weeks, { week: 4, sponsor: 'the-moon' }])).toEqual(['unknown_sponsor']);
-    expect(codes(gods, [...weeks, { week: 4, sponsor: 'the-sea' }])).toEqual(['sponsor_reused']);
-  });
-
-  it('scales points by homeBonus at home only; homeBonus 1 turns it off', () => {
-    const scoring = { pointsScale: 100, homeBonus: 1.25 };
-    expect(runPoints(0.7, scoring, false)).toBe(70);
-    expect(runPoints(0.7, scoring, true)).toBe(88); // 87.5 rounds half up
-    expect(runPoints(0.7, { ...scoring, homeBonus: 1 }, true)).toBe(70);
-    expect(projectedPoints(0.5, scoring, true)).toBe(62.5);
-    expect(projectedPoints(0.5, scoring, false)).toBe(50);
+  it('taverns level on record and points share a rank', () => {
+    const rows = standings(['a', 'b'], [], new Map());
+    expect(rows.map((r) => r.rank)).toEqual([1, 1]);
   });
 });

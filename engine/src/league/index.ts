@@ -1,235 +1,193 @@
 /**
- * League structure: season config and standings.
+ * League structure for the Lich's contest: the season config, the
+ * head-to-head schedule, scoring and standings
+ * (docs/lich-contest-plan.md §1).
  *
- * Responsibilities:
- * - Define `SeasonConfig`, the parsed and normalized form of
- *   seasons/<id>/config.yaml. The YAML loader lives in scripts/; this is the
- *   shape the engine receives (CR values already in eighths).
- * - Sponsors and the home bonus (D-47, D-48): which tavern is home in a
- *   week, and the points a run earns there. The GM's season package says
- *   who sponsors whom and the bonus size. The engine only applies it.
- * - Rank taverns by total loot from finalized weeks (a league table, D-04).
+ * - `SeasonConfig` is the parsed form of seasons/<id>/config.yaml. The YAML
+ *   loader lives in scripts/.
+ * - Taverns meet in a round-robin. Each round covers a stretch of episodes
+ *   (`schedule.rounds`), and the finale falls in the last round.
+ * - A tavern scores for its monsters (surviving votes, immunity, jury votes,
+ *   winning) and for its correct calls. A matchup compares two taverns'
+ *   points over the round's episodes; standings rank by wins, then points.
  *
- * Standings are always derived from events and never stored.
+ * Everything here is derived from events and never stored.
  */
-import type { MissionRules } from '../missions';
-import type { CrEighths } from '../vocabulary';
+import type { VoteModel } from '../contest/model';
 
 export interface SeasonConfig {
   readonly id: string;
   readonly snapshot: string;
   readonly modifierRegistryVersion: number;
-  readonly weeks: number;
   readonly budget: {
-    /** B: total CR of the four starters must be ≤ this. */
-    readonly partyCr: CrEighths;
     readonly modifierPointsPerCharacter: number;
   };
   readonly roster: {
+    /** Monsters each tavern drafts. Taverns × size must not exceed the cast. */
     readonly size: number;
-    readonly starters: 4;
-    readonly ownership: 'exclusive' | 'shared';
   };
   readonly draft: {
     readonly format: 'snake';
-    readonly rounds: number;
-    /** Over managers: the seeded shuffle, or a manual list of manager ids. Taverns are then chosen in reverse (D-52). */
+    /** Over managers: the seeded shuffle, or a manual list of manager ids. Taverns are then chosen in reverse. */
     readonly order: { readonly mode: 'seeded' } | { readonly mode: 'manual'; readonly managers: ReadonlyArray<string> };
-    readonly pickWindowHours: number;
-    readonly onTimeout: 'autopick' | 'skip' | 'wait';
+  };
+  readonly contest: {
+    /** Monsters in the contest, drawn from the pool. */
+    readonly castSize: number;
+    /** Monsters left to face the jury. Votes = castSize − finalists. */
+    readonly finalists: number;
+    /** DC added each time a challenge's checks come round again. */
+    readonly lapDc: number;
+    /** Overrides for the vote model's dials (contest/model.ts `VOTE_MODEL`). */
+    readonly model: Partial<VoteModel>;
   };
   readonly scoring: {
-    /** Points = round(score × pointsScale × homeBonus at home, else × 1). */
-    readonly pointsScale: number;
-    /** Loot multiplier for a tavern on its sponsor's mission (D-47). 1 turns the bonus off. */
-    readonly homeBonus: number;
+    /** Each owned monster still in after a vote. */
+    readonly survive: number;
+    /** An owned monster wins immunity. */
+    readonly immunity: number;
+    /** Each jury vote an owned finalist receives. */
+    readonly juryVote: number;
+    /** An owned monster wins the contest. */
+    readonly winner: number;
+    /** A correct call. */
+    readonly call: number;
+    /** Added to a correct call made before the challenge. */
+    readonly earlyCallBonus: number;
   };
-  /**
-   * `reverse_standings` (D-05): each window's order is the standings reversed,
-   * and winning a claim doesn't move a tavern. `rolling`: a winner moves to
-   * the back. Both start from reverse draft order.
-   */
-  readonly waivers: { readonly priority: 'rolling' | 'reverse_standings'; readonly initialOrder: 'reverse_draft' };
-  readonly trades: {
-    readonly vetoWindowHours: number;
-    readonly vetoBy: 'commissioner';
-    readonly deadlineWeek: number | null;
-  };
-  readonly missedLineup: 'carry_over';
-  /** Actions cron expressions (UTC). The engine never evaluates them. They ride along for scripts. */
-  readonly schedules: { readonly lineupLock: string; readonly weeklyRun: string; readonly waivers: string };
-  /** `open` (D-08, decided): missions are public in the repo. The others are kept in case secrecy returns. */
-  readonly secrecy: 'open' | 'private_repo' | 'commit_reveal' | 'encrypted';
-  readonly seedSalt: 'none' | 'revealed_with_mission';
-  /** Mission rules. `haul` is required here: every season has a fixed haul (docs/decisions.md D-45). */
-  readonly missions: Omit<MissionRules, 'partyCr' | 'haul'> & { readonly haul: number; readonly battleModel: string };
-  readonly carryover: {
-    readonly mode: 'none' | 'keeper';
-    readonly keepersPerTavern: number;
-    readonly keeperCost: 'none' | 'round_of_last_season_pick' | 'fixed_round';
-    readonly championBonusKeepers: number;
-    readonly maxModifierChangePoints: number;
+  readonly schedule: {
+    /**
+     * Episodes per head-to-head round, in order. They must add up to the
+     * number of votes; the finale belongs to the last round.
+     */
+    readonly rounds: ReadonlyArray<number>;
   };
 }
 
-/** The most taverns, and so managers, a league can have (D-01). A season is one week per tavern (D-48). */
+/** The most taverns, and so managers, a league can have. */
 export const MAX_TAVERNS = 6;
 
-/** A god from the GM's season package and the tavern it sponsors (D-44). Names and voice are chrome. */
-export interface Sponsor {
-  readonly id: string;
-  readonly tavern: string;
+/** Votes in a season: one per episode, until the finalists are left. */
+export function votesIn(config: SeasonConfig): number {
+  return config.contest.castSize - config.contest.finalists;
 }
 
-/** The part of a schedule entry sponsors care about. */
-export interface SponsoredWeek {
-  readonly week: number;
-  /** The sponsor whose mission this week is, or null for an unsponsored week. */
-  readonly sponsor: string | null;
-}
-
-export interface SponsorIssue {
-  readonly code: 'duplicate_sponsor' | 'duplicate_tavern' | 'unknown_sponsor' | 'sponsor_reused';
-  readonly message: string;
-}
-
-/**
- * Check the season package's sponsors against its schedule:
- * - sponsor ids are unique, and so are their taverns (one god per tavern);
- * - every week's sponsor is a listed sponsor;
- * - a sponsor sets at most one week's mission (D-48).
- *
- * A week with no sponsor, or a sponsor with no week, is allowed. Whether the
- * taverns exist is checked where taverns are known (managers.yaml, the draft).
- */
-export function validateSponsors(sponsors: ReadonlyArray<Sponsor>, schedule: ReadonlyArray<SponsoredWeek>): ReadonlyArray<SponsorIssue> {
-  const issues: SponsorIssue[] = [];
-  const ids = new Set<string>();
-  const taverns = new Map<string, string>();
-  for (const { id, tavern } of sponsors) {
-    if (ids.has(id)) issues.push({ code: 'duplicate_sponsor', message: `sponsor "${id}" is listed twice` });
-    ids.add(id);
-    const other = taverns.get(tavern);
-    if (other !== undefined) issues.push({ code: 'duplicate_tavern', message: `"${tavern}" is sponsored by both "${other}" and "${id}"` });
-    else taverns.set(tavern, id);
+/** The round an episode belongs to (1-based), or throws if it is outside the schedule. */
+export function roundOf(config: SeasonConfig, episode: number): number {
+  let end = 0;
+  for (const [i, n] of config.schedule.rounds.entries()) {
+    end += n;
+    if (episode <= end) return i + 1;
   }
-  const weekOf = new Map<string, number>();
-  for (const { week, sponsor } of schedule) {
-    if (sponsor === null) continue;
-    if (!ids.has(sponsor)) issues.push({ code: 'unknown_sponsor', message: `week ${week} names sponsor "${sponsor}", which is not listed` });
-    const first = weekOf.get(sponsor);
-    if (first !== undefined) issues.push({ code: 'sponsor_reused', message: `sponsor "${sponsor}" sets both week ${first} and week ${week}` });
-    else weekOf.set(sponsor, week);
-  }
+  throw new Error(`episode ${episode} is past the schedule's ${end} episodes`);
+}
+
+/** The episodes in round `round` (1-based), in order. */
+export function episodesOf(config: SeasonConfig, round: number): ReadonlyArray<number> {
+  const before = config.schedule.rounds.slice(0, round - 1).reduce((a, b) => a + b, 0);
+  const n = config.schedule.rounds[round - 1] ?? 0;
+  return Array.from({ length: n }, (_, i) => before + i + 1);
+}
+
+/** Problems with a config's contest shape, in words. Empty when it is consistent. */
+export function configIssues(config: SeasonConfig, taverns: number): ReadonlyArray<string> {
+  const issues: string[] = [];
+  const { castSize, finalists } = config.contest;
+  if (finalists < 1) issues.push(`contest.finalists must be at least 1, got ${finalists}`);
+  if (castSize <= finalists) issues.push(`contest.castSize (${castSize}) must be more than finalists (${finalists})`);
+  if (taverns * config.roster.size > castSize) issues.push(`${taverns} taverns × roster ${config.roster.size} is more than the cast of ${castSize}`);
+  const scheduled = config.schedule.rounds.reduce((a, b) => a + b, 0);
+  if (scheduled !== votesIn(config)) issues.push(`schedule.rounds cover ${scheduled} episodes, but the season has ${votesIn(config)} votes`);
+  if (config.schedule.rounds.some((n) => !Number.isInteger(n) || n < 1)) issues.push('schedule.rounds must be positive integers');
   return issues;
 }
 
-/** The home tavern for `week`: the tavern its sponsor backs, or null for an unsponsored week. */
-export function sponsoredTavern(sponsors: ReadonlyArray<Sponsor>, schedule: ReadonlyArray<SponsoredWeek>, week: number): string | null {
-  const sponsor = schedule.find((w) => w.week === week)?.sponsor ?? null;
-  if (sponsor === null) return null;
-  return sponsors.find((s) => s.id === sponsor)?.tavern ?? null;
+// ── head-to-head ──────────────────────────────────────────────────────────
+
+/**
+ * A round-robin by the circle method: `taverns` in their given order (the
+ * draft order), the first fixed and the rest rotating. Gives n − 1 rounds of
+ * n / 2 matchups for an even n; for an odd n, one tavern sits out each round
+ * (a bye: it is left out of that round's pairs). Each pair meets once.
+ * `rounds` > n − 1 repeats the cycle.
+ */
+export function roundRobin(taverns: ReadonlyArray<string>, rounds: number): ReadonlyArray<ReadonlyArray<readonly [string, string]>> {
+  const ring: Array<string | null> = [...taverns];
+  if (ring.length % 2 === 1) ring.push(null);
+  const n = ring.length;
+  const out: Array<Array<readonly [string, string]>> = [];
+  if (n < 2) return Array.from({ length: rounds }, () => []);
+  let order = [...ring];
+  for (let r = 0; r < rounds; r++) {
+    const pairs: Array<readonly [string, string]> = [];
+    for (let i = 0; i < n / 2; i++) {
+      const a = order[i]!;
+      const b = order[n - 1 - i]!;
+      if (a !== null && b !== null) pairs.push(r % 2 === 0 ? [a, b] : [b, a]);
+    }
+    out.push(pairs);
+    order = [order[0]!, order[n - 1]!, ...order.slice(1, n - 1)];
+  }
+  return out;
 }
 
-/** The points multiplier a tavern gets: `homeBonus` at home, else 1. */
-export function pointsMultiplier(scoring: SeasonConfig['scoring'], home: boolean): number {
-  return home ? scoring.homeBonus : 1;
-}
-
-/** A run's points: round(score × pointsScale × the home multiplier). */
-export function runPoints(score: number, scoring: SeasonConfig['scoring'], home: boolean): number {
-  return Math.round(score * scoring.pointsScale * pointsMultiplier(scoring, home));
-}
-
-/** Exact expected points, unrounded like the projection itself: expectedScore × pointsScale × the home multiplier. */
-export function projectedPoints(expectedScore: number, scoring: SeasonConfig['scoring'], home: boolean): number {
-  return expectedScore * scoring.pointsScale * pointsMultiplier(scoring, home);
-}
-
-/** One finalized week for one tavern, as read from `week.finalized`. */
-export interface WeekResult {
-  readonly week: number;
-  readonly tavern: string;
-  readonly points: number;
-  readonly projected: number;
-  readonly checksPassed: number;
-  /** True when the party lost a battle. A tavern with no lineup did not DNF. */
-  readonly dnf: boolean;
+/** One matchup's result. Equal points are a tie. */
+export interface MatchupResult {
+  readonly round: number;
+  readonly home: string;
+  readonly away: string;
+  readonly homePoints: number;
+  readonly awayPoints: number;
+  /** The winner, or null on a tie. */
+  readonly winner: string | null;
 }
 
 export interface StandingRow {
-  /** 1-based. Taverns on equal points share a rank (1, 1, 3), except as the first-place tiebreak decides. */
+  /** 1-based. Rows equal on wins, ties and points share a rank. */
   readonly rank: number;
   readonly tavern: string;
-  /** Total loot over the given weeks. */
+  readonly wins: number;
+  readonly losses: number;
+  readonly ties: number;
+  /** Total points over the rounds counted. */
   readonly points: number;
-  /** DNFs over the given weeks: the season-end tiebreak for first (D-14). */
-  readonly dnfs: number;
-}
-
-export interface StandingsOptions {
-  /**
-   * Break a tie for first by fewer DNFs (D-14): the season-end rule. The
-   * taverns tied on points with the fewest DNFs keep rank 1 (co-champions
-   * only if that is tied too), and the rest of that tie share rank 2. Ties
-   * below first always share a rank.
-   */
-  readonly breakFirstTie?: boolean;
 }
 
 /**
- * A league table: every tavern ranked by total points over `results`, with
- * no head-to-head (docs/decisions.md D-04).
- *
- * - Every tavern in `taverns` or `results` gets a row, even with no results.
- * - Equal totals share a rank, unless `options.breakFirstTie` breaks a tie
- *   for first by DNFs (D-14).
- * - Rows sort by rank, then points desc, then tavern id, for a stable
- *   display order only.
- *
- * Pass one week's results for that week's table.
+ * The table from finished matchups and every tavern's points: by record
+ * (a win 1, a tie ½), then by total points. Every tavern in `taverns` gets a
+ * row. Display order breaks remaining ties by `taverns` order.
  */
 export function standings(
   taverns: ReadonlyArray<string>,
-  results: ReadonlyArray<WeekResult>,
-  options: StandingsOptions = {},
+  matchups: ReadonlyArray<MatchupResult>,
+  points: ReadonlyMap<string, number>,
 ): ReadonlyArray<StandingRow> {
-  const seen = new Set<string>();
-  const totals = new Map<string, { points: number; dnfs: number }>(taverns.map((t) => [t, { points: 0, dnfs: 0 }]));
-  for (const r of results) {
-    const k = `${r.week}\u0000${r.tavern}`;
-    if (seen.has(k)) throw new Error(`standings: duplicate result for tavern "${r.tavern}" in week ${r.week}`);
-    seen.add(k);
-    const total = totals.get(r.tavern) ?? { points: 0, dnfs: 0 };
-    totals.set(r.tavern, { points: total.points + r.points, dnfs: total.dnfs + (r.dnf ? 1 : 0) });
+  const rec = new Map(taverns.map((t) => [t, { wins: 0, losses: 0, ties: 0 }]));
+  for (const m of matchups) {
+    const h = rec.get(m.home) ?? { wins: 0, losses: 0, ties: 0 };
+    const a = rec.get(m.away) ?? { wins: 0, losses: 0, ties: 0 };
+    if (m.winner === null) {
+      h.ties++;
+      a.ties++;
+    } else if (m.winner === m.home) {
+      h.wins++;
+      a.losses++;
+    } else {
+      a.wins++;
+      h.losses++;
+    }
+    rec.set(m.home, h);
+    rec.set(m.away, a);
   }
-  const sorted = [...totals].sort(([a, x], [b, y]) => y.points - x.points || cmp(a, b));
-  const rows = sorted.map(([tavern, { points, dnfs }]) => ({
-    rank: sorted.findIndex(([, t]) => t.points === points) + 1,
-    tavern,
-    points,
-    dnfs,
-  }));
-  const first = rows.filter((row) => row.rank === 1);
-  if (options.breakFirstTie !== true || first.length < 2) return rows;
-  const fewest = Math.min(...first.map((row) => row.dnfs));
-  const ranked = rows.map((row) => (row.rank === 1 && row.dnfs > fewest ? { ...row, rank: 2 } : row));
-  return ranked.sort((a, b) => a.rank - b.rank || b.points - a.points || cmp(a.tavern, b.tavern));
-}
-
-/**
- * Reverse-standings waiver priority (D-05): lowest total first. Ties go to
- * reverse draft order, so the tavern that drafted later claims first, as in
- * week 1. `rows` are the standings (ranks are ignored, points decide).
- * Taverns in `draftOrder` with no row count as 0 points.
- */
-export function reverseStandingsPriority(rows: ReadonlyArray<StandingRow>, draftOrder: ReadonlyArray<string>): ReadonlyArray<string> {
-  const points = new Map(rows.map((row) => [row.tavern, row.points]));
-  const reverse = [...draftOrder].reverse();
-  return [...reverse].sort((a, b) => (points.get(a) ?? 0) - (points.get(b) ?? 0) || reverse.indexOf(a) - reverse.indexOf(b));
-}
-
-/** Code-unit string order, independent of locale. */
-function cmp(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+  const score = (t: string): number => {
+    const r = rec.get(t)!;
+    return r.wins + r.ties / 2;
+  };
+  const sorted = [...rec.keys()].sort((x, y) => score(y) - score(x) || (points.get(y) ?? 0) - (points.get(x) ?? 0) || taverns.indexOf(x) - taverns.indexOf(y));
+  return sorted.map((tavern) => {
+    const r = rec.get(tavern)!;
+    const rank = 1 + sorted.findIndex((o) => score(o) === score(tavern) && (points.get(o) ?? 0) === (points.get(tavern) ?? 0));
+    return { rank, tavern, wins: r.wins, losses: r.losses, ties: r.ties, points: points.get(tavern) ?? 0 };
+  });
 }

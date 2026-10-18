@@ -32,7 +32,7 @@ describe('recruiting bundle', () => {
     cpSync(join(repo, 'data', 'open5e'), join(root, 'data', 'open5e'), { recursive: true });
     mkdirSync(join(root, 'seasons', 's1'), { recursive: true });
     writeFileSync(join(root, 'seasons', 's1', 'config.yaml'), readFileSync(join(repo, 'seasons', 'season-01', 'config.yaml'), 'utf8').replace(/^id: .*$/m, 'id: s1'));
-    writeFileSync(join(root, 'seasons', 's1', 'pool.yaml'), 'season: s1\nregistry: 1\ncharacters:\n  - id: ogre-one\n    modifiers:\n      - { kind: trait, trait: thick-skull }\n');
+    writeFileSync(join(root, 'seasons', 's1', 'pool.yaml'), 'season: s1\nregistry: 1\ncharacters:\n  - id: ogre-one\n    strategy: { kind: floater }\n    modifiers:\n      - { kind: trait, trait: thick-skull }\n');
 
     character(
       'ogre-one',

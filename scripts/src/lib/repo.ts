@@ -3,16 +3,13 @@
  *
  * Responsibilities:
  * - Resolve paths (seasons/<id>/config.yaml, characters/<id>/character.yaml,
- *   gods/<id>/god.yaml, data/open5e/manifest.json,
- *   seasons/<id>/events/events.ndjson).
+ *   data/open5e/manifest.json, seasons/<id>/events/events.ndjson).
  * - Load and schema-check YAML, then hand the engine chrome-free data.
  *   `loadCharacterRef` returns `{ id, base }` only. Chrome is loaded
- *   separately by `loadCharacterChrome`, which only the publish and chrome
- *   scripts call. A god's file is chrome only (`loadGodChrome`).
- * - Load mission YAML and shape-check it with the engine's `parseMission`.
+ *   separately by `loadCharacterChrome`, for display only.
  * - Load a pinned Open5e snapshot with its manifest sha256 verified
- *   (`loadSnapshot`). Season files (config, pool, managers, schedule) load
- *   through ./season.ts, which builds on the helpers here.
+ *   (`loadSnapshot`). Season files (config, pool, managers, taverns,
+ *   challenges) load through ./season.ts, which builds on the helpers here.
  * - Errors name the file (relative to the repo root) and the field path, and
  *   are `ValidationFailure`s so scripts exit 1.
  * - Append events (`appendEvent`): read the log, replay, apply the candidate
@@ -30,17 +27,14 @@ import type {
   EventType,
   LeagueEvent,
   LeagueState,
-  Mission,
   Open5eMonster,
   SchemaIssue,
 } from '@league-of-taverns/engine';
-import { applyEvent, kebabIdSchema, lineHash, parseLog, parseMission, replayLog, serializeEvent, toSchemaIssues } from '@league-of-taverns/engine';
+import { applyEvent, kebabIdSchema, lineHash, parseLog, replayLog, serializeEvent, toSchemaIssues } from '@league-of-taverns/engine';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import { characterFileSchema } from './character-schema';
 import type { CharacterChrome, CharacterFile } from './character-schema';
-import { godFileSchema } from './god-schema';
-import type { GodChrome } from './god-schema';
 import { ValidationFailure } from './main';
 
 export const REPO_ROOT = new URL('../../../', import.meta.url);
@@ -117,18 +111,6 @@ export function loadCharacterChrome(characterId: string, root: RepoRoot = REPO_R
   return loadCharacterFile(characterId, root).chrome;
 }
 
-/**
- * Load and shape-check a mission file (seasons/<season>/missions/…). Relative
- * paths resolve against the repo root. Graph rules are `validateMission`'s.
- */
-export function loadMission(path: string, root: RepoRoot = REPO_ROOT): Mission {
-  const file = resolve(rootDir(root), path);
-  const label = displayPath(file, root);
-  const result = parseMission(readYaml(file, label));
-  if (!result.ok) throw issuesFailure(label, result.issues);
-  return result.value;
-}
-
 /** characters/<id>/character.yaml, schema-checked, with the folder name matching `id`. */
 function loadCharacterFile(characterId: string, root: RepoRoot): CharacterFile {
   if (!kebabIdSchema.safeParse(characterId).success) {
@@ -144,24 +126,6 @@ function loadCharacterFile(characterId: string, root: RepoRoot): CharacterFile {
     );
   }
   return result.data;
-}
-
-/**
- * gods/<id>/god.yaml, schema-checked, with the folder name matching `id`.
- * Chrome for display: must never be passed into the engine.
- */
-export function loadGodChrome(godId: string, root: RepoRoot = REPO_ROOT): GodChrome {
-  if (!kebabIdSchema.safeParse(godId).success) {
-    throw new ValidationFailure(`invalid god id ${JSON.stringify(godId)}: expected a kebab-case folder name`);
-  }
-  const file = join(rootDir(root), 'gods', godId, 'god.yaml');
-  const label = displayPath(file, root);
-  const result = godFileSchema.safeParse(readYaml(file, label));
-  if (!result.success) throw issuesFailure(label, toSchemaIssues(result.error));
-  if (result.data.id !== godId) {
-    throw new ValidationFailure(`${label}: id: ${JSON.stringify(result.data.id)} does not match its folder name ${JSON.stringify(godId)}`);
-  }
-  return result.data.chrome;
 }
 
 /** The root as an absolute filesystem path. */

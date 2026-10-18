@@ -2,12 +2,12 @@
 
 The story frame for the game, and the few places where it touches the rules.
 
-> **Status: new premise, ahead of the rules.** This page describes the
-> direction agreed on 2026-10-17: a Survivor-style contest, run as fantasy.
-> [rules.md](rules.md) and [decisions.md](decisions.md) still describe the
-> earlier format (gods, sponsored trials, parties, loot) until they are
-> rewritten. Where they disagree on story, this page wins. Where they
-> disagree on rules, nothing is decided until a decision lands.
+> **Status: in playtest.** This page describes the direction agreed on
+> 2026-10-17: a Survivor-style contest, run as fantasy. The playground plays
+> it ([lich-contest-plan.md](lich-contest-plan.md)). [rules.md](rules.md) and
+> [decisions.md](decisions.md) still describe the earlier format (gods,
+> sponsored trials, parties, loot) until they are rewritten. Where they
+> disagree on story, this page wins.
 
 ## The premise
 

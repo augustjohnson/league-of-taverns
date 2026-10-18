@@ -1,5 +1,29 @@
 # TODO
 
+## Now: the Lich's contest (2026-10-17)
+
+The game moved from the mission league to the Lich's contest
+([docs/lich-contest-plan.md](docs/lich-contest-plan.md)). The contest, the
+fantasy layer, the bots, the sims and the playground are built and playable.
+The workstreams below describe the **mission format** and are historical
+where they touch missions, battles, lineups, waivers, trades, hexes or gods:
+that code is gone. What carries over (snapshot, adapter, RNG, event codec,
+characters, modifiers, the snake draft, the image pipeline) is unchanged.
+
+Next, in order:
+
+- [ ] **Playtest** the playground and the sims; decide pacing, scoring
+  values, noise, the betrayal point, and whether boot odds are ever shown.
+- [ ] Rewrite rules.md, schema.md, decisions.md, glossary.md and
+  season-lifecycle.md for the contest, from the plan and the playtest.
+- [ ] Season-01: author the pool's strategies (at least 12 characters) and
+  its 9 challenges, then `pnpm validate -- --season season-01`.
+- [ ] Rebuild the live-league scripts on the new events: seal the challenges,
+  run an episode, apply a call (issue form), publish.
+- [ ] Bots: `sharp` wins about 33% of all-bot titles (par 25%) on its
+  scouted draft plus odds-reading calls. Decide whether the table needs a
+  weaker expert, or whether players should see the bar's read on the odds.
+
 Work is split into **workstreams** (W1–W11). Each one can go to a single
 subagent with minimal overlap. A workstream owns its files. When it needs
 something from another, it depends on a task id and doesn't edit that file.

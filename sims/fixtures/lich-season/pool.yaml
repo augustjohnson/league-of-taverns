@@ -1,0 +1,146 @@
+# The lich-season pool: 48 of the real cast (../../../characters/), each with
+# its voting strategy for the Lich's contest and its season modifiers.
+# Each season's cast is `contest.castSize` of them, drawn by the season seed.
+# Schema: docs/lich-contest-plan.md; strategies: engine/src/contest/types.ts.
+#
+# strategy: loyal (protects a tag: type, subtype, law, moral, size) | threat |
+#           coattails | grudge | floater. Shown openly on the card.
+# Modifiers are mock-season mechanics only, each within the 3-point budget.
+
+season: lich-season
+registry: 1
+characters:
+  - id: lady-constance-fopsworth
+    strategy: { kind: coattails }   # rides with whoever is winning, and invoices them
+    modifiers:
+      - { kind: skill_bonus, skill: persuasion, value: 2 }
+  - id: vix-dunmore
+    strategy: { kind: loyal, tag: "law:lawful" }   # wants a law-abiding landlord in the job
+    modifiers:
+      - { kind: trait, trait: keen-nose }
+  - id: carmichael
+    strategy: { kind: floater }   # goes sideways with the crowd
+  - id: tiffany
+    strategy: { kind: coattails }   # sticks to the strongest neck in the room
+  - id: gizzik
+    strategy: { kind: threat }   # wants the trophy, so the favourites go first
+    modifiers:
+      - { kind: skill_bonus, skill: stealth, value: 1 }
+  - id: wren-ashby
+    strategy: { kind: loyal, tag: "size:tiny" }   # sticks up for the small
+    modifiers:
+      - { kind: grant_sense, sense: darkvision, feet: 60 }
+  - id: lenore
+    strategy: { kind: floater }   # swallows whatever the room decides
+  - id: doug
+    strategy: { kind: loyal, tag: "size:tiny" }   # will not see a small creature sent home
+  - id: nell-malone
+    strategy: { kind: loyal, tag: "type:undead" }   # wants one of the dead to win
+  - id: the-ratsby-collective
+    strategy: { kind: floater }   # votes with the majority, by referendum
+  - id: ghhurzh
+    strategy: { kind: loyal, tag: "type:fiend" }   # wants a fiend in the job
+  - id: professor-albright
+    strategy: { kind: grudge }   # never forgets a question, or a vote
+    modifiers:
+      - { kind: skill_bonus, skill: athletics, value: 2 }
+      - { kind: trait, trait: thick-skull }
+  - id: randall-pike
+    strategy: { kind: floater }   # goes where the party is
+  - id: barb
+    strategy: { kind: loyal, tag: "type:beast" }   # wants a beast to win
+  - id: hyekh-kaa
+    strategy: { kind: loyal, tag: "type:humanoid" }   # laughs along with his own kind
+    modifiers:
+      - { kind: skill_bonus, skill: stealth, value: 2 }
+  - id: morga-thane
+    strategy: { kind: grudge }   # writes a sonnet about every betrayal, then acts on it
+    modifiers:
+      - { kind: skill_bonus, skill: athletics, value: 1 }
+      - { kind: save_bonus, ability: wis, value: 1 }
+  - id: pierre
+    strategy: { kind: coattails }   # hangs on the strongest hat rack
+  - id: rocco
+    strategy: { kind: coattails }   # collects winners
+  - id: big-linda
+    strategy: { kind: loyal, tag: "type:beast" }   # protects her den: the beasts
+    modifiers:
+      - { kind: trait, trait: thick-skull }
+      - { kind: skill_bonus, skill: athletics, value: 2 }
+  - id: mortimer
+    strategy: { kind: loyal, tag: "law:lawful" }   # wants the forms filled in by someone lawful
+  - id: vera-shrike
+    strategy: { kind: threat }   # cuts down anyone who might outsing her
+  - id: patsy
+    strategy: { kind: floater }   # laughs along with the crowd
+  - id: grimbold
+    strategy: { kind: grudge }   # files a complaint against every vote against him
+    modifiers:
+      - { kind: skill_bonus, skill: investigation, value: 2 }
+  - id: lou-varga
+    strategy: { kind: loyal, tag: "type:undead" }   # wants one of the dead to win
+    modifiers:
+      - { kind: advantage, on: {type: skill, skill: stealth} }
+  - id: hoss
+    strategy: { kind: coattails }   # swallows his pride and rides the strong
+  - id: vincent
+    strategy: { kind: grudge }   # haunts whoever voted against him
+  - id: bruno-the-bruiser
+    strategy: { kind: loyal, tag: "type:giant" }   # wants a giant in the job
+    modifiers:
+      - { kind: skill_bonus, skill: intimidation, value: 2 }
+      - { kind: trait, trait: thick-skull }
+  - id: krrth
+    strategy: { kind: floater }   # stands very still and votes with the room
+  - id: helga-dunn
+    strategy: { kind: threat }   # goes after the strongest in the room
+  - id: herb
+    strategy: { kind: threat }   # charges at the front-runner
+    modifiers:
+      - { kind: skill_bonus, skill: survival, value: 2 }
+  - id: ronnie-vermicelli
+    strategy: { kind: loyal, tag: "type:humanoid" }   # wants a people person in the job
+  - id: jenkins
+    strategy: { kind: floater }   # leads everyone the way they were already going
+  - id: dolores
+    strategy: { kind: loyal, tag: "subtype:shapechanger" }   # trusts a fellow pretender
+  - id: babble
+    strategy: { kind: floater }   # agrees with the loudest mouth
+  - id: mhruugh
+    strategy: { kind: threat }   # hunts down the favourite
+    modifiers:
+      - { kind: skill_bonus, skill: survival, value: 1 }
+      - { kind: trait, trait: thick-skull }
+  - id: maude
+    strategy: { kind: coattails }   # hugs the strongest
+    modifiers:
+      - { kind: trait, trait: keen-nose }
+      - { kind: trait, trait: thick-skull }
+  - id: kevin
+    strategy: { kind: loyal, tag: "type:humanoid" }   # wants a people person in the job
+  - id: zhaal
+    strategy: { kind: coattails }   # follows the strongest master
+  - id: stanley
+    strategy: { kind: threat }   # stares down the strongest
+  - id: nobody-special
+    strategy: { kind: floater }   # votes like everyone else, as everyone else
+  - id: hrok-and-hrok
+    strategy: { kind: loyal, tag: "type:giant" }   # wants a giant in the job
+  - id: kluu
+    strategy: { kind: grudge }   # settles every score, with loaded dice
+  - id: peanut
+    strategy: { kind: grudge }   # keeps a list of every vote against her
+  - id: thungk
+    strategy: { kind: loyal, tag: "type:giant" }   # wants a giant in the job
+    modifiers:
+      - { kind: save_bonus, ability: dex, value: 2 }
+  - id: vrraal
+    strategy: { kind: grudge }   # comes back for whoever voted against him
+    modifiers:
+      - { kind: trait, trait: amphibious }
+  - id: pete
+    strategy: { kind: coattails }   # attaches himself to the strongest
+  - id: rhaa-baeh-skraa
+    strategy: { kind: floater }   # three heads, so goes with the majority
+  - id: mavis
+    strategy: { kind: threat }   # turns the competition to stone, starting with the best

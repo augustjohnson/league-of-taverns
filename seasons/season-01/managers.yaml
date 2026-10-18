@@ -6,8 +6,8 @@
 commissioner: { login: augustjohnson, githubId: null }   # TODO: fill githubId
 gm: { login: augustjohnson, githubId: null }             # OPEN D-09: may the GM also manage a tavern?
 
-managers:                           # at most 6 (D-01). Taverns and their gods are in schedule.yaml (D-52)
+managers:                           # at most 6 (D-01). Taverns are in taverns.yaml
   - id: example-manager
     account: { login: example-manager, githubId: null }
-  # - id: bot-value
-  #   account: { bot: value }        # bot seats: OPEN D-36
+  # - id: bot-sharp
+  #   account: { bot: sharp }        # bot seats: OPEN D-36

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Headless bot managers: draft, lineup and waiver strategies for mock seasons.",
+  "description": "Headless bot managers: draft and calling strategies for the Lich's contest.",
   "exports": {
     ".": "./src/index.ts"
   },

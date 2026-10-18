@@ -44,7 +44,6 @@ describe('modifierCost', () => {
   it('charges per point, flat, and per trait', () => {
     expect(modifierCost([{ kind: 'skill_bonus', skill: 'stealth', value: 3 }], TRAITS)).toBe(3);
     expect(modifierCost([{ kind: 'save_bonus', ability: 'wis', value: 2 }], TRAITS)).toBe(2);
-    expect(modifierCost([{ kind: 'battle_bonus', value: 1 }], TRAITS)).toBe(2);
     expect(modifierCost([{ kind: 'advantage', on: { type: 'save', ability: 'dex' } }], TRAITS)).toBe(2);
     expect(modifierCost([{ kind: 'grant_speed', speed: 'fly', feet: 30 }], TRAITS)).toBe(3);
     expect(modifierCost([{ kind: 'grant_sense', sense: 'darkvision', feet: 60 }], TRAITS)).toBe(1);
@@ -70,7 +69,6 @@ describe('validateModifiers', () => {
         [
           { kind: 'skill_bonus', skill: 'stealth', value: 3 },
           { kind: 'save_bonus', ability: 'dex', value: 2 },
-          { kind: 'battle_bonus', value: 1 },
           { kind: 'advantage', on: { type: 'ability', ability: 'str' } },
           { kind: 'grant_speed', speed: 'climb', feet: 30 },
           { kind: 'grant_sense', sense: 'tremorsense', feet: 30 },
@@ -93,7 +91,7 @@ describe('validateModifiers', () => {
     expect(codes([{ kind: 'skill_bonus', skill: 'stealth', value: 4 }], 10)).toEqual(['out_of_range']);
     expect(codes([{ kind: 'skill_bonus', skill: 'stealth', value: 0 }])).toEqual(['out_of_range']);
     expect(codes([{ kind: 'save_bonus', ability: 'dex', value: 3 }])).toEqual(['out_of_range']);
-    expect(codes([{ kind: 'battle_bonus', value: 2 }], 10)).toEqual(['out_of_range']);
+    expect(codes([{ kind: 'save_bonus', ability: 'wis', value: 3 }], 10)).toEqual(['out_of_range']);
     expect(codes([{ kind: 'skill_bonus', skill: 'stealth', value: 1.5 }])).toEqual(['out_of_range']);
     expect(codes([{ kind: 'grant_sense', sense: 'darkvision', feet: 0 }])).toEqual(['out_of_range']);
   });
@@ -213,6 +211,7 @@ describe('schema', () => {
   it('parses the season-01 pool entry for Bruno', () => {
     const entry = PoolEntrySchema.parse({
       id: 'bruno-the-bruiser',
+      strategy: { kind: 'loyal', tag: 'type:giant' },
       modifiers: [
         { kind: 'skill_bonus', skill: 'intimidation', value: 2 },
         { kind: 'trait', trait: 'thick-skull' },
@@ -222,8 +221,10 @@ describe('schema', () => {
     expect(modifierCost(entry.modifiers, TRAITS)).toBe(3);
   });
 
-  it('defaults missing modifiers to none', () => {
-    expect(PoolEntrySchema.parse({ id: 'plain-ogre' }).modifiers).toEqual([]);
+  it('defaults missing modifiers to none, and needs a strategy', () => {
+    expect(PoolEntrySchema.parse({ id: 'plain-ogre', strategy: { kind: 'floater' } }).modifiers).toEqual([]);
+    expect(PoolEntrySchema.safeParse({ id: 'plain-ogre' }).success).toBe(false);
+    expect(PoolEntrySchema.safeParse({ id: 'plain-ogre', strategy: { kind: 'loyal', tag: 'giants' } }).success).toBe(false);
   });
 
   it('parses every primitive kind', () => {
@@ -235,7 +236,6 @@ describe('schema', () => {
       { kind: 'advantage', on: { type: 'ability', ability: 'str' } },
       { kind: 'grant_speed', speed: 'swim', feet: 30 },
       { kind: 'grant_sense', sense: 'darkvision', feet: 60 },
-      { kind: 'battle_bonus', value: 1 },
       { kind: 'trait', trait: 'amphibious' },
     ];
     for (const m of all) expect(ModifierSchema.parse(m)).toEqual(m);

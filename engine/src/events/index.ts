@@ -1,20 +1,41 @@
 /**
  * Events: the schema, reducers and replay for the append-only league log.
- * See ./types.ts for the event union and docs/schema.md § Events.
+ * See ./types.ts and docs/lich-contest-plan.md §3.
  */
 export type * from './types';
 export type * from './state';
-export { HEXES_PER_SEASON, InvalidEventError, applyEvent, initialState } from './reducers';
-export { LogParseError, ReplayError, lineHash, parseLog, replay, replayLog, serializeEvent, verifyResolutions } from './replay';
-export { freeAgents, hexOn, homeTavern, injuredFor, onTheClock, seasonStandings, tavernPickOnTheClock, waiverPriority, weekResults } from './selectors';
+export { InvalidEventError, applyEvent, initialState } from './reducers';
+export { LogParseError, ReplayError, parseLog, replay, replayLog, serializeEvent, verifyContest } from './replay';
+export type { ContestMismatch } from './replay';
+export { canonicalJson, challengeSha256, lineHash } from './canonical';
 export {
+  aliveAt,
+  contestState,
+  episodeScore,
+  episodeStage,
+  finaleScore,
+  freeAgents,
+  immuneAt,
+  matchups,
+  onTheClock,
+  openEpisode,
+  roundMatchups,
+  roundPoints,
+  schedule,
+  seasonPoints,
+  seasonStandings,
+  seasonVotes,
+  tavernPickOnTheClock,
+} from './selectors';
+export type { ScoreLine } from './selectors';
+export {
+  challengeResultSchema,
   crEighthsSchema,
   eventSchema,
-  lineupSchema,
+  finaleResultSchema,
   modifierSchema,
   payloadSchemas,
-  runResultSchema,
   seasonConfigSchema,
   sha256HexSchema,
+  voteResultSchema,
 } from './schema';
-export type { ResolutionMismatch } from './replay';

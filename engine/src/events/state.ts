@@ -1,7 +1,6 @@
 import type { Modifier } from '../characters';
+import type { ChallengeResult, FinaleResult, VoteResult, VotingStrategy } from '../contest/types';
 import type { SeasonConfig } from '../league';
-import type { Mission } from '../missions';
-import type { Lineup } from '../roster';
 import type { CrEighths } from '../vocabulary';
 import type { ManagerAccount, PayloadByType } from './types';
 
@@ -10,8 +9,12 @@ import type { ManagerAccount, PayloadByType } from './types';
  * written to disk, so there is nothing to drift from the log.
  *
  * Maps and arrays keep insertion order, which is log order: `managers` is in
- * join order, `taverns` in the order they were chosen, `pool` in pooling order, and each roster in acquisition order
- * (draft order first). Selectors and the fallback lineup rely on that.
+ * join order, `taverns` in the order they were chosen, `pool` in pooling
+ * order (the cast order), and each roster in draft order.
+ *
+ * The contest's results (immunity, ballots, boots) are folded here; the vote
+ * model's own state (affinity, grudges) needs the cards' stats and is
+ * rebuilt from these results by `contestState` (selectors.ts).
  */
 export interface LeagueState {
   readonly lastSeq: number;
@@ -21,27 +24,26 @@ export interface LeagueState {
    * line, so it leaves this unchanged.
    */
   readonly lastHash: string | null;
-  readonly phase: 'empty' | 'preseason' | 'drafting' | 'regular' | 'complete';
+  readonly phase: 'empty' | 'preseason' | 'drafting' | 'contest' | 'complete';
   readonly config: SeasonConfig | null;
-  /** The public schedule from `season.created`, including each week's commitment. */
-  readonly schedule: PayloadByType['season.created']['schedule'];
-  /** The sponsors from `season.created`: which god backs which tavern (D-44, D-47). */
-  readonly sponsors: PayloadByType['season.created']['sponsors'];
-  /** The season package's taverns from `season.created`, chosen or not (D-52). */
+  /** The season's taverns from `season.created`, chosen or not. */
   readonly tavernList: PayloadByType['season.created']['taverns'];
+  /** Each episode's challenge commitment, in episode order. */
+  readonly commitments: PayloadByType['season.created']['challenges'];
+  readonly abilityMix: PayloadByType['season.created']['abilityMix'] | null;
   /** Every manager who joined, in join order, with the tavern they chose (null until then). */
   readonly managers: ReadonlyMap<string, ManagerState>;
-  readonly pool: ReadonlyMap<string, { readonly base: string; readonly cr: CrEighths; readonly modifiers: ReadonlyArray<Modifier> }>;
+  /** The cast, in pooling order. */
+  readonly pool: ReadonlyMap<string, PooledEntry>;
   /** The chosen taverns, in the order they were chosen. Rosters live here. */
   readonly taverns: ReadonlyMap<string, TavernState>;
-  /** characterId → tavernId for every owned character. Absent = free agent. */
+  /** characterId → tavernId for every drafted monster. Absent = undrafted. */
   readonly owner: ReadonlyMap<string, string>;
   /**
    * `managerOrder` (manager ids) is empty until the first `tavern.chosen`
-   * freezes it; taverns are chosen in its reverse (D-52). `order` (tavern ids,
-   * the managers' taverns in `managerOrder`) is empty until the first pick
-   * freezes it. `picks` counts picks made. `complete` flips after the last
-   * pick.
+   * freezes it; taverns are chosen in its reverse. `order` (tavern ids, the
+   * managers' taverns in `managerOrder`) is empty until the first pick
+   * freezes it. `picks` counts picks made. `complete` flips after the last pick.
    */
   readonly draft: {
     readonly managerOrder: ReadonlyArray<string>;
@@ -49,30 +51,37 @@ export interface LeagueState {
     readonly picks: number;
     readonly complete: boolean;
   };
-  /** Keepers placed before the draft, in log order, with the round each forfeits (D-11, still OPEN). */
-  readonly retained: ReadonlyArray<PayloadByType['character.retained']>;
-  /** Lineups submitted (not yet locked), by week then tavern. */
-  readonly pendingLineups: ReadonlyMap<number, ReadonlyMap<string, Lineup>>;
-  readonly lockedLineups: ReadonlyMap<number, PayloadByType['lineup.locked']['lineups']>;
-  readonly waivers: {
-    readonly pending: ReadonlyArray<PayloadByType['waiver.claimed']>;
-    /** Rolling priority, first = highest. Reverse draft order after the draft. */
-    readonly priority: ReadonlyArray<string>;
-    /** Weeks whose `waiver.resolved` has been applied. Waivers resolve once per week. */
-    readonly resolvedWeeks: ReadonlySet<number>;
-  };
-  readonly trades: ReadonlyMap<string, TradeState>;
-  readonly revealed: ReadonlyMap<number, Mission>;
-  readonly results: ReadonlyMap<number, ReadonlyMap<string, PayloadByType['mission.resolved']>>;
-  /**
-   * characterId → the week it can't start, from an injury in the week before
-   * (D-51). Injuries last one week and don't stack: a later one replaces the
-   * entry. Read with `injuredFor`.
-   */
-  readonly injuries: ReadonlyMap<string, number>;
-  /** Every declared hex, in log order (D-52). Read with `hexOn`. */
-  readonly hexes: ReadonlyArray<PayloadByType['hex.declared']>;
-  readonly finalizedWeeks: ReadonlySet<number>;
+  /** Still in the contest, in cast order. */
+  readonly alive: ReadonlyArray<string>;
+  /** Voted out, in the order they left. */
+  readonly jury: ReadonlyArray<string>;
+  /** Episodes in order; the last may be under way (challenge run, vote not yet). */
+  readonly episodes: ReadonlyArray<EpisodeState>;
+  /** Calls by episode, then tavern. */
+  readonly calls: ReadonlyMap<number, ReadonlyMap<string, CallState>>;
+  readonly finale: FinaleResult | null;
+  readonly finalizedRounds: ReadonlySet<number>;
+}
+
+export interface PooledEntry {
+  readonly base: string;
+  readonly cr: CrEighths;
+  readonly modifiers: ReadonlyArray<Modifier>;
+  readonly strategy: VotingStrategy;
+}
+
+export interface EpisodeState {
+  readonly episode: number;
+  readonly challenge: { readonly id: string; readonly result: ChallengeResult } | null;
+  readonly vote: VoteResult | null;
+}
+
+export interface CallState {
+  readonly target: string;
+  /** Made before the episode's challenge (and not changed after it): earns the early bonus when correct. */
+  readonly early: boolean;
+  /** seq of the `call.made` that set it. */
+  readonly seq: number;
 }
 
 export interface ManagerState {
@@ -90,9 +99,4 @@ export interface TavernState {
   /** The manager's account: who may act for this tavern. */
   readonly manager: ManagerAccount;
   readonly roster: ReadonlyArray<string>;
-}
-
-export interface TradeState {
-  readonly terms: PayloadByType['trade.proposed'];
-  readonly status: 'proposed' | 'accepted' | 'vetoed' | 'completed' | 'cancelled';
 }

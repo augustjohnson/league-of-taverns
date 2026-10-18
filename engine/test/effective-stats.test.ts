@@ -48,7 +48,6 @@ describe('effectiveStats', () => {
     expect(bruno.speeds).toEqual(OGRE.speeds);
     expect(bruno.senses).toEqual(OGRE.senses);
     expect(bruno.advantages.size).toBe(0);
-    expect(bruno.battleBonus).toBe(0);
     expect(bruno.base).toBe(OGRE);
   });
 
@@ -59,7 +58,6 @@ describe('effectiveStats', () => {
     expect(stats.speeds).toEqual(OGRE.speeds);
     expect(stats.senses).toEqual(OGRE.senses);
     expect(stats.advantages.size).toBe(0);
-    expect(stats.battleBonus).toBe(0);
   });
 
   it('abilityMods come from the base ability scores', () => {
@@ -113,16 +111,6 @@ describe('effectiveStats', () => {
     expect(apply([{ kind: 'grant_sense', sense: 'tremorsense', feet: 10 }]).senses).toEqual({ darkvision: 60, tremorsense: 10 });
   });
 
-  it('battle_bonus sums', () => {
-    expect(apply([{ kind: 'battle_bonus', value: 1 }]).battleBonus).toBe(1);
-    expect(
-      apply([
-        { kind: 'battle_bonus', value: 1 },
-        { kind: 'battle_bonus', value: 1 },
-      ]).battleBonus,
-    ).toBe(2);
-  });
-
   it('never changes CR', () => {
     const everything: ReadonlyArray<Modifier> = [
       { kind: 'skill_bonus', skill: 'athletics', value: 3 },
@@ -130,7 +118,6 @@ describe('effectiveStats', () => {
       { kind: 'advantage', on: { type: 'skill', skill: 'stealth' } },
       { kind: 'grant_speed', speed: 'fly', feet: 60 },
       { kind: 'grant_sense', sense: 'truesight', feet: 30 },
-      { kind: 'battle_bonus', value: 1 },
       { kind: 'trait', trait: 'amphibious' },
     ];
     expect(apply(everything).cr).toBe(OGRE.cr);

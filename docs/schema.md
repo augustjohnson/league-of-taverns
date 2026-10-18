@@ -1,5 +1,11 @@
 # Schemas (draft)
 
+> **Superseded for the playtest.** This page describes the earlier mission
+> format (parties, missions, battles, loot, gods). The game is now the Lich's
+> contest: see [lich-contest-plan.md](lich-contest-plan.md) for what is built
+> and its playtest defaults, and [survivor-format.md](survivor-format.md) for
+> the design. This page will be rewritten once the playtest settles the rules.
+
 Draft schemas for every authored file and every event. The TypeScript types
 in `engine/src/` and `scripts/src/lib/` are the source of truth. This doc
 explains them. Runtime validation (zod, [D-22](decisions.md)) is built from

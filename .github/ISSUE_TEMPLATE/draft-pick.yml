@@ -1,4 +1,4 @@
-# Draft pick. Parsed by scripts/src/lib/issue-forms.ts. Your tavern comes from
+# Draft pick. The parser comes back with the live-league scripts (docs/lich-contest-plan.md §6). Your tavern comes from
 # your GitHub account via managers.yaml, never from this form.
 name: Draft pick
 description: Make your draft pick when you are on the clock.

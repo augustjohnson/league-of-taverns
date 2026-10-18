@@ -6,13 +6,13 @@
  * the page comes from the engine or from the season runner, the same code
  * the CLI runs, so a seed here gives exactly the CLI's season.
  *
- * Two modes: the game (./play.ts), a season against the bots told in the
- * Common Room, which is what the page opens to; and the workshop
- * (./workshop.ts), the tools for checking the league by hand. Shared
+ * Two modes: the game (./play.ts), a season of the Lich's contest against
+ * the bots told in the Common Room, which is what the page opens to; and the
+ * workshop (./workshop.ts), the tools for checking the contest by hand. Shared
  * rendering lives in ./shared.ts, pure helpers in ./view.ts and ./feed.ts.
  */
 import { initGame, showGame } from './play';
-import { $, config, esc, input, storageGet, storageSet } from './shared';
+import { $, config, data, esc, input, storageGet, storageSet } from './shared';
 import { loadPlayedSeason, openWorkshop } from './workshop';
 
 // Theme: auto → light → dark.
@@ -50,7 +50,7 @@ $('mode').addEventListener('click', () => setMode(document.body.dataset.mode ===
 document.addEventListener('lot:mode', (ev) => setMode((ev as CustomEvent<Mode>).detail));
 
 $('subtitle').innerHTML =
-  `<b>${esc(config.id)}</b> · ${config.weeks} weeks · ${input.managers.length} taverns · engine ${esc(input.engineVersion)}`;
+  `<b>${esc(data.name)}</b> · ${config.contest.castSize} monsters · ${input.managers.length} taverns · engine ${esc(input.engineVersion)}`;
 
 // The game lays itself out in its own mode's frame, so the mode comes first. A finished season loads into the
 // workshop's tabs, like a seed run.

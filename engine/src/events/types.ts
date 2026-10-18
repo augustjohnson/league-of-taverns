@@ -1,16 +1,13 @@
 import type { Modifier } from '../characters';
-import type { SeasonConfig, Sponsor } from '../league';
-import type { Mission } from '../missions';
-import type { RunResult } from '../resolution';
-import type { Lineup } from '../roster';
+import type { Challenge, ChallengeResult, FinaleResult, VoteResult, VotingStrategy } from '../contest/types';
+import type { SeasonConfig } from '../league';
 import type { Ability, CrEighths } from '../vocabulary';
 
 /**
- * The event log is the only source of truth. Rosters, standings, records and
- * stats are folds over it and are never stored.
+ * The event log is the only source of truth. Rosters, scores, matchups and
+ * standings are folds over it and are never stored.
  *
- * One NDJSON line per event in seasons/<id>/events/events.ndjson, written only
- * by Actions. Field-level docs: docs/schema.md § Events.
+ * One NDJSON line per event. Field-level docs: docs/lich-contest-plan.md §3.
  */
 export interface EventEnvelope<T extends EventType, P> {
   /** Envelope schema version. */
@@ -19,7 +16,7 @@ export interface EventEnvelope<T extends EventType, P> {
   readonly seq: number;
   readonly type: T;
   readonly season: string;
-  /** ISO-8601 UTC, stamped by the Action. Reducers never compare it to "now". */
+  /** ISO-8601 UTC, stamped by the writer. Reducers never compare it to "now". */
   readonly at: string;
   readonly actor: Actor;
   readonly source?: EventSource;
@@ -49,49 +46,34 @@ export interface PayloadByType {
     /** sha256 of config.yaml at creation, so later edits are detectable. */
     readonly configSha256: string;
     readonly engineVersion: string;
-    /** Public schedule plus each week's sealed-mission commitment (docs/decisions.md D-08) and sponsor (D-48). */
-    readonly schedule: ReadonlyArray<{
-      readonly week: number;
-      readonly title: string;
-      readonly environment: string;
-      readonly theme: string;
-      /** What the mission tests, in the D-42 vocabulary (`missionKeywords`). The GM may leave things out, never add. */
-      readonly keywords: ReadonlyArray<string>;
-      readonly commitment: string | null;
-      readonly sponsor: string | null;
-    }>;
-    /** The gods of the GM's season package and the tavern each sponsors (D-44). */
-    readonly sponsors: ReadonlyArray<Sponsor>;
-    /**
-     * The season's taverns, each already blessed by one god (D-52). Managers
-     * choose among them (`tavern.chosen`). At most `MAX_TAVERNS` (D-01).
-     */
+    /** The season's taverns: team names, chosen by managers in reverse draft order. At most `MAX_TAVERNS`. */
     readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+    /**
+     * One commitment per episode: the sha256 of its challenge's canonical
+     * JSON, sealed before the season. `challenge.resolved` must match it.
+     */
+    readonly challenges: ReadonlyArray<{ readonly episode: number; readonly sha256: string }>;
+    /** The public hint: how many checks across the season's challenges use each ability. */
+    readonly abilityMix: Readonly<Record<Ability, number>>;
   };
+  /** A monster joins the cast, with its card's mechanical data. */
   'character.pooled': {
     readonly character: string;
     readonly base: string;
     readonly cr: CrEighths;
     readonly modifiers: ReadonlyArray<Modifier>;
+    readonly strategy: VotingStrategy;
   };
-  /** A manager joins the league. They choose a tavern later, in reverse draft order (D-52). */
+  /** A manager joins the league. They choose a tavern later, in reverse draft order. */
   'manager.joined': {
     /** The manager's id in managers.yaml (kebab-case), stable for the season. */
     readonly manager: string;
     readonly account: ManagerAccount;
   };
-  /** A manager takes one of the season's taverns, with its god, boon and hex (D-52). */
+  /** A manager takes one of the season's taverns. */
   'tavern.chosen': {
     readonly manager: string;
     readonly tavern: string;
-  };
-  'character.retained': {
-    readonly tavern: string;
-    readonly character: string;
-    readonly fromSeason: string;
-    readonly basis: 'keeper' | 'champion_reward';
-    /** Draft round forfeited for this keeper, or null if free. OPEN: docs/decisions.md D-11. */
-    readonly costRound: number | null;
   };
   'draft.pick': {
     /** 0-based overall pick number. Must equal the number of prior picks. */
@@ -100,79 +82,38 @@ export interface PayloadByType {
     readonly character: string;
     readonly auto: boolean;
   };
-  'lineup.set': {
-    readonly tavern: string;
-    readonly week: number;
-    readonly lineup: Lineup;
-  };
-  'lineup.locked': {
-    readonly week: number;
-    /** Every tavern's lineup for the week, and where it came from. */
-    readonly lineups: ReadonlyArray<{
-      readonly tavern: string;
-      readonly lineup: Lineup | null;
-      readonly source: 'submitted' | 'carried' | 'fallback' | 'none';
-    }>;
-  };
   /**
-   * Once a season, a tavern curses a rival for one week: disadvantage on every
-   * check and save using `ability` (D-52, after *Bestow Curse*). Public as
-   * soon as it is declared.
+   * A tavern calls the boot for an episode: who it thinks is voted out. A
+   * later call replaces an earlier one. Sealed until the vote.
    */
-  'hex.declared': {
+  'call.made': {
+    readonly episode: number;
     readonly tavern: string;
     readonly target: string;
-    readonly ability: Ability;
-    readonly week: number;
   };
-  'waiver.claimed': {
-    readonly claim: string;
-    readonly tavern: string;
-    readonly add: string;
-    readonly drop: string | null;
-  };
-  'waiver.resolved': {
-    /** Waivers resolve once per week, after that week's run. */
-    readonly week: number;
-    readonly outcomes: ReadonlyArray<{ readonly claim: string; readonly awarded: boolean; readonly reason: string }>;
-    readonly priorityAfter: ReadonlyArray<string>;
-  };
-  'trade.proposed': {
-    readonly trade: string;
-    readonly from: string;
-    readonly to: string;
-    readonly give: ReadonlyArray<string>;
-    readonly receive: ReadonlyArray<string>;
-  };
-  'trade.accepted': { readonly trade: string };
-  'trade.vetoed': { readonly trade: string; readonly reason: string };
-  /** Added beyond the brief: makes the end of the veto window an explicit event (docs/decisions.md D-41). */
-  'trade.completed': { readonly trade: string };
-  /** Added beyond the brief: declined, withdrawn, expired, or invalidated by roster changes (D-41). */
-  'trade.cancelled': { readonly trade: string; readonly reason: 'declined' | 'withdrawn' | 'expired' | 'invalid' };
-  'mission.revealed': {
-    readonly week: number;
-    readonly mission: Mission;
-    /** sha256 of the canonical mission JSON. Must match the commitment in `season.created`. */
+  /** The Lich's task for an episode: the challenge, revealed, and its run. */
+  'challenge.resolved': {
+    readonly episode: number;
+    readonly challenge: Challenge;
+    /** Must match the episode's commitment in `season.created`. */
     readonly sha256: string;
-    /** Per-week seed salt if the season uses one (D-13). */
-    readonly salt: string | null;
-  };
-  'mission.resolved': {
-    readonly week: number;
-    readonly tavern: string;
-    readonly mission: string;
+    /** The contest seed the dice came from (`contestSeed`). */
     readonly seed: string;
-    readonly engineVersion: string;
-    readonly battleModel: string;
-    readonly lineup: Lineup;
-    /** The single seeded run: per-node rolls, actors, path, score. */
-    readonly run: RunResult;
-    readonly projected: { readonly expectedScore: number; readonly pDnf: number };
-    readonly points: number;
-    readonly projectedPoints: number;
+    readonly result: ChallengeResult;
   };
-  'week.finalized': { readonly week: number };
+  /** The vote: every ballot, any revote or draw, and the boot. */
+  'vote.resolved': {
+    readonly episode: number;
+    readonly vote: VoteResult;
+  };
+  /** The jury picks the Lich's new assistant. */
+  'finale.resolved': {
+    readonly result: FinaleResult;
+  };
+  /** A head-to-head round is over: its matchups count. */
+  'round.finalized': {
+    readonly round: number;
+  };
 }
 
 export type EventType = keyof PayloadByType;

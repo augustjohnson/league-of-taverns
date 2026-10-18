@@ -1,8 +1,8 @@
 /**
  * Build the browser playground: one self-contained HTML file.
  *
- * 1. Load the mock season in Node with the scripts loaders (./load.ts), and
- *    each pooled character's chrome, with a thumbnail of its portrait.
+ * 1. Load the season in Node with the scripts loaders (./load.ts), and each
+ *    pooled character's chrome, with a thumbnail of its portrait.
  * 2. Serialize what the page needs (./playground/data.ts).
  * 3. Bundle ./playground/app.ts with esbuild as a minified browser IIFE.
  * 4. Inline the data and the bundle into ./playground/page.html as one
@@ -12,16 +12,15 @@
  * added at publish time), and it opens fine straight from disk too.
  * ./build-playground.ts is the CLI.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { webImage } from '@league-of-taverns/scripts/lib/images/postprocess';
 import { cropImage, faceRect } from '@league-of-taverns/scripts/lib/images/face';
 import { decodePng, encodeIndexedPng } from '@league-of-taverns/scripts/lib/images/png';
 import { build } from 'esbuild';
-import { REPO_ROOT, loadCharacterChrome, loadGodChrome, rootDir } from '@league-of-taverns/scripts/lib/repo';
-import { DEFAULT_SEASON_DIR, charactersRootOf, loadMockSeasonParts } from './load';
-import { averageDraftPositions, seasonInput } from './season-runner';
+import { loadCharacterChrome } from '@league-of-taverns/scripts/lib/repo';
+import { DEFAULT_SEASON_DIR, charactersRootOf, loadSeasonParts, loadSimSeason } from './load';
 import { serializeSeason, type PlaygroundChrome, type PlaygroundData } from './playground/data';
 
 const PLAYGROUND_SRC = join(dirname(fileURLToPath(import.meta.url)), 'playground');
@@ -112,19 +111,15 @@ export function renderPage(template: string, data: PlaygroundData, bundle: strin
 
 /** Load the season in `dir`, bundle the app and return the page. */
 export async function buildPlaygroundHtml(dir: string = DEFAULT_SEASON_DIR): Promise<{ readonly html: string; readonly data: PlaygroundData }> {
-  const parts = loadMockSeasonParts(dir);
+  const season = loadSimSeason(dir);
+  const parts = loadSeasonParts(dir);
   const chrome = playgroundChrome(
     parts.pool.map((p) => p.character.ref.id),
     charactersRootOf(dir),
   );
-  // Each sponsoring god's chrome (name, call, banner), from the season's own gods/ when it keeps one (the mock
-  // season does), else beside its characters, for display only.
-  const seasonDir = resolve(rootDir(REPO_ROOT), dir);
-  const godsRoot = existsSync(join(seasonDir, 'gods')) ? seasonDir : charactersRootOf(dir);
-  const gods = Object.fromEntries(parts.sponsors.map(({ id }) => [id, loadGodChrome(id, godsRoot)]));
-  // Where the bots usually draft each character, rounded to a tenth: the draft log's yardstick for a steal or a reach.
-  const adp = Object.fromEntries([...averageDraftPositions(seasonInput(parts))].map(([id, at]) => [id, Math.round(at * 10) / 10]));
-  const data = serializeSeason(parts, dir, chrome, gods, adp);
+  const taverns = Object.fromEntries(season.taverns.map((t) => [t.id, { banner: t.banner, ...(t.toast === undefined ? {} : { toast: t.toast }) }]));
+  const challenges = Object.fromEntries(season.challenges.map((c) => [c.episode, c.chrome]));
+  const data = serializeSeason(parts, dir, season.name, chrome, taverns, challenges);
   const template = readFileSync(join(PLAYGROUND_SRC, 'page.html'), 'utf8');
   const html = renderPage(template, data, await bundleApp());
   return { html, data };

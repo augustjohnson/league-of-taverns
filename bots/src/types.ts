@@ -1,102 +1,58 @@
-import type { BaseStats, BattleModel, CrEighths, EffectiveStats, LeagueState, Lineup, Mission, Rng } from '@league-of-taverns/engine';
-import type { HexStrategy } from './strategies/hex';
+import type { CallState, ContestState, Contestant, EpisodeOdds, LeagueState, Rng, SeasonConfig, VoteModel } from '@league-of-taverns/engine';
 import type { TavernStrategy } from './strategies/tavern';
 
 /**
- * What a bot is allowed to know: exactly what a human manager could see.
- *
- * Missions are open (docs/decisions.md D-08), so a human can read every
- * week's mission structure in the repo before the lock and work out exact
- * projections with the engine (D-42, whose default embraces this). A bot gets
- * the same: the structure, the stat blocks of the creatures in it, and the
- * season's battle model. Nothing here is private to the commissioner, and
- * nothing describes the dice: the real roll (D-13) is not in the view.
+ * What a bot is allowed to know: exactly what a person at the table could
+ * see. The cards are public, every ballot is read out, and the vote model
+ * is in the repo, so the odds of each boot can be worked out by anyone. The
+ * challenges are secret until they run, and the seed is never in the view.
  *
  * Everything is read-only. A bot returns a decision and never mutates the
- * view. Every decision is then validated by the engine like any human command.
+ * view. Every decision is then validated by the engine like any command.
  */
 export interface PublicView {
-  /** League state folded from the public event log: pool, rosters, owners, results. */
+  /** League state folded from the public event log. */
   readonly state: LeagueState;
   /** The tavern this bot manages. */
   readonly tavern: string;
+  readonly config: SeasonConfig;
+  /** The cast's cards, in cast order. */
+  readonly cast: ReadonlyArray<Contestant>;
+  /** The season's vote model (`voteModel(config.contest.model)`). */
+  readonly model: VoteModel;
+  /** The vote model's state after every vote so far. */
+  contest(): ContestState;
   /**
-   * Effective stats (base + this season's modifiers) for a pooled character.
-   * Public: bases are SRD stat blocks and modifiers are announced with the
-   * pool (docs/rules.md §11, "Season announced").
+   * The odds for the open episode's vote: before the challenge (`immune`
+   * null) or after it. Shared by every bot at the table: it is public
+   * arithmetic, worked out once.
    */
-  readonly statsOf: (characterId: string) => EffectiveStats;
-  /** The public schedule: week → environment and theme (docs/rules.md §6). */
-  readonly schedule: ReadonlyArray<{ readonly week: number; readonly environment: string; readonly theme: string }>;
-  /**
-   * The mission for `week`, or null if none is known (e.g. not yet selected,
-   * or a sim that withholds missions to measure what reading them is worth).
-   * Public because missions are open (D-08) and the default for D-42 is to
-   * embrace pre-lock projections.
-   */
-  readonly missionFor: (week: number) => Mission | null;
-  /**
-   * Base stats for an encounter creature by Open5e slug. Public: the pinned
-   * snapshot is in the repo (data/open5e/), and encounter refs are part of
-   * the open mission structure.
-   */
-  readonly baseOf: (slug: string) => BaseStats;
-  /**
-   * The season's battle model (`config.missions.battleModel`, looked up in
-   * `BATTLE_MODELS`). Public: the config and the engine are both in the repo.
-   */
-  readonly battleModel: BattleModel;
-  /**
-   * CR of a pooled character, in eighths. Optional: when absent, bots read
-   * `state.pool` and then `statsOf(id).cr`. Public: CRs are in the pool.
-   */
-  readonly crOf?: (characterId: string) => CrEighths;
+  odds(immune: string | null): EpisodeOdds;
   /** Bot-private randomness, from rngFor(simSeed, 'bot:' + tavern + ':' + decision). */
   readonly rng: Rng;
 }
 
 export interface DraftStrategy {
   readonly id: string;
-  /** One of `available`. Never returns a pick that leaves the roster unable to field a legal lineup, if any pick avoids it. */
+  /** One of `available`. */
   pick(view: PublicView, available: ReadonlyArray<string>): string;
 }
 
-/** The best lineup a strategy finds for one roster in one week, scored by the strategy's own objective. */
-export interface ScoredLineup {
-  readonly lineup: Lineup;
-  /** Higher is better. Comparable only between calls of one strategy for one week. */
-  readonly score: number;
-}
-
-export interface LineupStrategy {
+export interface CallStrategy {
   readonly id: string;
+  /** Before the challenge: a call to make now, or null to wait. */
+  early(view: PublicView, episode: number): string | null;
   /**
-   * The lineup to submit for `week` from the bot's own roster. It always
-   * passes `validateLineup`. Null only when the roster has no legal lineup at
-   * all, in which case the tavern scores 0 for the week (docs/rules.md §5)
-   * and the bot submits nothing.
+   * After the challenge: a call to make (new, or replacing `current`), or
+   * null to keep `current` (or to make none, if there is none).
    */
-  lineup(view: PublicView, week: number): Lineup | null;
-  /**
-   * The best lineup and its score for any roster (a list of character ids in
-   * draft order), or null if it has no legal lineup. Waivers use it to score
-   * hypothetical rosters with the same objective the lineup uses.
-   */
-  best(view: PublicView, roster: ReadonlyArray<string>, week: number): ScoredLineup | null;
-}
-
-export interface WaiverStrategy {
-  readonly id: string;
-  /** Claims in preference order. The engine resolves them under rolling priority (docs/rules.md §9). */
-  claims(view: PublicView, freeAgents: ReadonlyArray<string>): ReadonlyArray<{ readonly add: string; readonly drop: string | null }>;
+  late(view: PublicView, episode: number, current: CallState | undefined): string | null;
 }
 
 /** A full bot manager: one strategy per decision. Named combinations live in ./strategies. */
 export interface BotManager {
   readonly id: string;
   readonly tavern: TavernStrategy;
-  readonly hex: HexStrategy;
   readonly draft: DraftStrategy;
-  readonly lineup: LineupStrategy;
-  readonly waivers: WaiverStrategy;
+  readonly calls: CallStrategy;
 }

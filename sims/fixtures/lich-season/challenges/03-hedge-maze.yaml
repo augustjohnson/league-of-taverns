@@ -1,0 +1,12 @@
+# Episode 3. Chrome: title, story and each check's line. The checks under them are the rules.
+id: hedge-maze
+episode: 3
+title: Find the Way Out of the Hedge Maze
+story: >-
+  I have had a hedge maze put in. I have not been out of it since Tuesday.
+  Find the way out and tell me where it is.
+checks:
+  - { type: skill, skill: survival, dc: 12, line: "follow the moss to the north" }
+  - { type: skill, skill: perception, dc: 12, line: "spot the gap in the hedge" }
+  - { type: ability, ability: int, dc: 12, line: "remember every turn so far" }
+  - { type: save, ability: con, dc: 12, line: "push on through the thorns" }

@@ -1,11 +1,11 @@
 /**
- * Test builders for resolution and projection: synthetic starters, parties,
- * small missions and fake battle models. Test-only.
+ * Test builders for the contest: synthetic monsters with chosen modifiers,
+ * strategies and tags, and small casts. Test-only.
  */
 import { toBaseStats, type BaseStats } from '../../src/adapters/open5e';
 import type { EffectiveStats } from '../../src/characters';
-import type { BattleNode, CheckNode, CheckSpec, Encounter, Mission, MissionEdge, MissionNode } from '../../src/missions';
-import type { BattleModel, Party } from '../../src/resolution';
+import { challengePower } from '../../src/contest/cards';
+import type { Contestant, VotingStrategy } from '../../src/contest/types';
 import { ABILITIES, SKILLS, type Ability, type SenseKind, type Skill, type SpeedKind } from '../../src/vocabulary';
 import { loadFixture } from '../fixtures/open5e';
 
@@ -22,6 +22,8 @@ export function baseOf(slug: string): BaseStats {
 }
 
 export interface MemberSpec {
+  /** Added to every skill, save and ability modifier. */
+  readonly all?: number;
   readonly skills?: Partial<Record<Skill, number>>;
   readonly saves?: Partial<Record<Ability, number>>;
   readonly abilityMods?: Partial<Record<Ability, number>>;
@@ -32,71 +34,33 @@ export interface MemberSpec {
 }
 
 /**
- * A synthetic starter: every skill, save and ability modifier is 0 unless
+ * Synthetic stats: every skill, save and ability modifier is `all` (0) unless
  * given, walk 30 ft, no senses, no advantages. The base is the ogre fixture,
- * only so the type is complete; resolution never reads it for checks.
+ * only so the type is complete.
  */
 export function member(id: string, spec: MemberSpec = {}): EffectiveStats {
-  const zeros = <K extends string>(keys: ReadonlyArray<K>): Record<K, number> =>
-    Object.fromEntries(keys.map((k) => [k, 0])) as Record<K, number>;
+  const flat = <K extends string>(keys: ReadonlyArray<K>): Record<K, number> => Object.fromEntries(keys.map((k) => [k, spec.all ?? 0])) as Record<K, number>;
   const base = baseOf('ogre');
   return {
     characterId: id,
     base,
     cr: base.cr,
-    skills: { ...zeros(SKILLS), ...spec.skills },
-    saves: { ...zeros(ABILITIES), ...spec.saves },
-    abilityMods: { ...zeros(ABILITIES), ...spec.abilityMods },
+    skills: { ...flat(SKILLS), ...spec.skills },
+    saves: { ...flat(ABILITIES), ...spec.saves },
+    abilityMods: { ...flat(ABILITIES), ...spec.abilityMods },
     advantages: new Set(spec.advantages ?? []),
     speeds: { walk: 30, ...spec.speeds },
     senses: { ...spec.senses },
-    battleBonus: 0,
   };
 }
 
-/** A party in lineup order. */
-export function partyOf(members: ReadonlyArray<EffectiveStats>): Party {
-  return { members };
+/** A contestant from synthetic stats, with the given strategy and tags (default: floater, no tags). */
+export function card(id: string, spec: MemberSpec = {}, strategy: VotingStrategy = { kind: 'floater' }, tags: ReadonlyArray<string> = []): Contestant {
+  const stats = member(id, spec);
+  return { id, stats, strategy, tags, power: challengePower(stats) };
 }
 
-// ── missions ────────────────────────────────────────────────────────────────
-
-export const start = (id = 'start'): MissionNode => ({ id, rank: 0, kind: 'start' });
-export const end = (id: string, rank: number): MissionNode => ({ id, rank, kind: 'end' });
-/** A check banking `loot` on a pass (1 by default, so a mission's haul is its most passable checks). */
-export const check = (id: string, rank: number, spec: CheckSpec, loot = 1): CheckNode => ({ id, rank, kind: 'check', check: spec, loot });
-export const skillCheck = (id: string, rank: number, skill: Skill, dc: number, loot = 1): CheckNode =>
-  check(id, rank, { type: 'skill', skill, dc }, loot);
-export const battle = (id: string, rank: number, creatures: Encounter['creatures'] = [{ ref: 'bat', count: 1 }]): BattleNode => ({
-  id,
-  rank,
-  kind: 'battle',
-  encounter: { creatures },
-});
-export const edge = (from: string, to: string, on: MissionEdge['on']): MissionEdge => ({ from, to, on });
-
-export function missionOf(nodes: ReadonlyArray<MissionNode>, edges: ReadonlyArray<MissionEdge>, id = 'test-mission'): Mission {
-  return { schemaVersion: 1, id, season: 'season-01', environment: 'swamp', nodes, edges };
+/** `n` plain floaters `m1`…`mn`, each one point stronger than the one before. */
+export function castOf(n: number): ReadonlyArray<Contestant> {
+  return Array.from({ length: n }, (_, i) => card(`m${i + 1}`, { all: i }));
 }
-
-// ── fake battle models ──────────────────────────────────────────────────────
-
-/** Always `p`. */
-export function constantModel(p: number): BattleModel {
-  return { id: `constant-${p}`, pWin: () => p };
-}
-
-/**
- * A simple deterministic stand-in for the real model (T6.2): a logistic in
- * (party CR + 2 × battle bonus − encounter CR), in eighths, clamped to
- * [0.05, 0.95]. Stronger party → higher p, more foes → lower p.
- */
-export const crModel: BattleModel = {
-  id: 'fake-cr-logistic',
-  pWin(party, foes) {
-    const partyCr = party.members.reduce((sum, m) => sum + m.cr + 2 * m.battleBonus, 0);
-    const foeCr = foes.reduce((sum, f) => sum + f.count * f.stats.cr, 0);
-    const p = 1 / (1 + Math.exp(-(partyCr - foeCr) / 24));
-    return Math.min(0.95, Math.max(0.05, p));
-  },
-};

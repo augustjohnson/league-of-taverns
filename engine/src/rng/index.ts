@@ -74,19 +74,23 @@ export function rollD20(rng: Rng): number {
   return 1 + Math.floor(20 * rng());
 }
 
-/** Inputs to the seed for one tavern's run of one week. */
-export interface WeekSeedInput {
-  /** Season id, e.g. `season-01`. Non-empty, no `/`. */
-  readonly season: string;
-  /** Week number, a positive integer. */
-  readonly week: number;
-  /** Tavern id. Non-empty, no `/`. */
-  readonly tavern: string;
-  /**
-   * Optional per-week secret, appended as `/salt:<salt>`. `undefined` means
-   * the seed is (season, week, tavern) only. Non-empty when given.
-   */
-  readonly salt?: string;
+/**
+ * Canonical seed for a season's contest: `<season>/contest`, plus
+ * `/salt:<salt>` when a salt is given. Every die in the contest comes from
+ * `rngFor(contestSeed, stream)`, one stream per challenge, vote and the finale
+ * (contest/run.ts). Sims and the playground salt it with their own seed so
+ * each run is a different contest.
+ *
+ * Throws if `season` is empty or contains `/`, or if `salt` is given but empty.
+ */
+export function contestSeed(season: string, salt?: string): string {
+  assertSeedPart('contestSeed', 'season', season);
+  const base = `${season}/contest`;
+  if (salt === undefined) return base;
+  if (typeof salt !== 'string' || salt.length === 0) {
+    throw new Error(`contestSeed: salt must be a non-empty string when given, got ${JSON.stringify(salt)}`);
+  }
+  return `${base}/salt:${salt}`;
 }
 
 /** Throws unless `value` is a non-empty string with no `/` (the seed separator). */
@@ -97,34 +101,6 @@ function assertSeedPart(fn: string, field: string, value: string): void {
   if (value.includes('/')) {
     throw new Error(`${fn}: ${field} must not contain "/", got ${JSON.stringify(value)}`);
   }
-}
-
-/**
- * Canonical seed string for one tavern's weekly run (docs/schema.md § Seeds):
- * `<season>/week-<n>/tavern:<tavern>`, plus `/salt:<salt>` when a salt is
- * given, e.g. `season-01/week-3/tavern:the-gilded-flagon`. Per-node dice come
- * from `rngFor(weekSeed, 'roll:' + nodeId)`.
- *
- * Per docs/decisions.md D-13, a live week's result may instead be a single
- * real random roll recorded in the event. This seed still drives sims, tests
- * and the difficulty report.
- *
- * Throws if `week` is not a positive integer, if `season` or `tavern` is empty
- * or contains `/`, or if `salt` is given but empty.
- */
-export function weekSeed(input: WeekSeedInput): string {
-  const { season, week, tavern, salt } = input;
-  assertSeedPart('weekSeed', 'season', season);
-  if (!Number.isInteger(week) || week < 1) {
-    throw new Error(`weekSeed: week must be a positive integer, got ${String(week)}`);
-  }
-  assertSeedPart('weekSeed', 'tavern', tavern);
-  const base = `${season}/week-${week}/tavern:${tavern}`;
-  if (salt === undefined) return base;
-  if (typeof salt !== 'string' || salt.length === 0) {
-    throw new Error(`weekSeed: salt must be a non-empty string when given, got ${JSON.stringify(salt)}`);
-  }
-  return `${base}/salt:${salt}`;
 }
 
 /**

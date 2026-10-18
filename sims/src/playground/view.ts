@@ -1,241 +1,13 @@
 /**
- * Pure view-model helpers for the playground: mission graph layout, score
- * histograms, Monte Carlo sampling, the draft board, the banner stylesheet,
- * and the small formatters the page uses. No DOM, so tests run them in Node.
+ * Pure view-model helpers for the playground: the draft board and the
+ * crier's draft notes, how a card's strategy and a challenge's checks read,
+ * the order the votes are read in, the banner and card-art stylesheets, and
+ * the small formatters the page uses. No DOM, so tests run them in Node.
  */
-import { SKILLS, replay, retreatOptions, runMission, rngFor } from '@league-of-taverns/engine';
-import type {
-  Ability,
-  Actor,
-  BaseStats,
-  BattleModel,
-  CheckSpec,
-  EffectiveStats,
-  LeagueEvent,
-  Mission,
-  MissionNode,
-  Modifier,
-  NodeRecord,
-  Party,
-  RetreatOrder,
-  RunOptions,
-  RunResult,
-  Skill,
-} from '@league-of-taverns/engine';
-import type { GodChrome } from '@league-of-taverns/scripts/lib/god-schema';
+import { SKILLS } from '@league-of-taverns/engine';
+import type { Actor, Ballot, ChallengeCheck, EffectiveStats, LeagueEvent, Modifier, Skill, VotingStrategy } from '@league-of-taverns/engine';
 import type { Aggregate } from '../season-runner';
-
-// ── mission graph layout ───────────────────────────────────────────────────
-
-export interface LaidOutNode {
-  readonly id: string;
-  readonly kind: MissionNode['kind'];
-  readonly rank: number;
-  readonly x: number;
-  readonly y: number;
-  readonly w: number;
-  readonly h: number;
-  /** One short line under the id: what the node tests. */
-  readonly detail: string;
-}
-
-export interface LaidOutEdge {
-  readonly from: string;
-  readonly to: string;
-  readonly on: string;
-  /** SVG path data, a cubic from the source's right edge to the target's left edge. */
-  readonly d: string;
-  /** Label anchor: the curve's midpoint. */
-  readonly lx: number;
-  readonly ly: number;
-}
-
-export interface GraphLayout {
-  readonly width: number;
-  readonly height: number;
-  readonly nodes: ReadonlyArray<LaidOutNode>;
-  readonly edges: ReadonlyArray<LaidOutEdge>;
-}
-
-export const GRAPH = { nodeW: 132, nodeH: 46, colGap: 32, rowGap: 22, pad: 14 } as const;
-
-/**
- * Lay a mission out as columns by rank. Within a column, nodes sit in the
- * mean row of their predecessors (a single barycenter pass, left to right),
- * ties broken by file order, which keeps most edges short and uncrossed.
- * Columns are centred vertically on the tallest one.
- */
-export function layoutMission(mission: Mission): GraphLayout {
-  const { nodeW, nodeH, colGap, rowGap, pad } = GRAPH;
-  const ranks = [...new Set(mission.nodes.map((n) => n.rank))].sort((a, b) => a - b);
-  const column = new Map(ranks.map((rank, i) => [rank, i]));
-  const fileIndex = new Map(mission.nodes.map((n, i) => [n.id, i]));
-  const row = new Map<string, number>();
-  const byRank = new Map<number, MissionNode[]>();
-  for (const node of mission.nodes) byRank.set(node.rank, [...(byRank.get(node.rank) ?? []), node]);
-
-  for (const rank of ranks) {
-    const nodes = byRank.get(rank)!;
-    const centre = (node: MissionNode): number => {
-      const preds = mission.edges.filter((e) => e.to === node.id).map((e) => row.get(e.from));
-      const known = preds.filter((r): r is number => r !== undefined);
-      return known.length === 0 ? fileIndex.get(node.id)! : known.reduce((a, b) => a + b, 0) / known.length;
-    };
-    const keyed = nodes.map((node) => ({ node, key: centre(node) }));
-    keyed.sort((a, b) => a.key - b.key || fileIndex.get(a.node.id)! - fileIndex.get(b.node.id)!);
-    keyed.forEach(({ node }, i) => row.set(node.id, i));
-  }
-
-  const tallest = Math.max(1, ...ranks.map((r) => byRank.get(r)!.length));
-  const height = pad * 2 + tallest * nodeH + (tallest - 1) * rowGap;
-  const width = pad * 2 + ranks.length * nodeW + Math.max(0, ranks.length - 1) * colGap;
-  const placed = new Map<string, LaidOutNode>();
-  for (const node of mission.nodes) {
-    if (placed.has(node.id)) continue;
-    const count = byRank.get(node.rank)!.length;
-    const offset = ((tallest - count) * (nodeH + rowGap)) / 2;
-    placed.set(node.id, {
-      id: node.id,
-      kind: node.kind,
-      rank: node.rank,
-      x: pad + column.get(node.rank)! * (nodeW + colGap),
-      y: pad + offset + row.get(node.id)! * (nodeH + rowGap),
-      w: nodeW,
-      h: nodeH,
-      detail: nodeDetail(node),
-    });
-  }
-
-  const edges: LaidOutEdge[] = [];
-  for (const edge of mission.edges) {
-    const a = placed.get(edge.from);
-    const b = placed.get(edge.to);
-    if (a === undefined || b === undefined) continue;
-    const x0 = a.x + a.w;
-    const y0 = a.y + a.h / 2;
-    const x3 = b.x;
-    const y3 = b.y + b.h / 2;
-    const dx = Math.max(18, (x3 - x0) / 2);
-    edges.push({
-      from: edge.from,
-      to: edge.to,
-      on: edge.on,
-      d: `M${r1(x0)},${r1(y0)} C${r1(x0 + dx)},${r1(y0)} ${r1(x3 - dx)},${r1(y3)} ${r1(x3)},${r1(y3)}`,
-      lx: r1((x0 + x3) / 2),
-      ly: r1((y0 + y3) / 2),
-    });
-  }
-  return { width, height, nodes: [...placed.values()], edges };
-}
-
-function r1(x: number): number {
-  return Math.round(x * 10) / 10;
-}
-
-/** "athletics DC 13", "save con DC 12 · fly", "ogre, 4 orc", "start". */
-export function nodeDetail(node: MissionNode): string {
-  switch (node.kind) {
-    case 'check':
-      return checkLabel(node.check);
-    case 'battle':
-      return node.encounter.creatures.map((c) => (c.count === 1 ? c.ref : `${c.count} ${c.ref}`)).join(', ');
-    default:
-      return node.kind;
-  }
-}
-
-export function checkLabel(check: CheckSpec): string {
-  const what = check.type === 'skill' ? check.skill.replaceAll('_', ' ') : `${check.type} ${check.ability}`;
-  const gate = check.requires === undefined ? '' : ` · needs ${'speed' in check.requires ? check.requires.speed : check.requires.sense}`;
-  return `${what} DC ${check.dc}${gate}`;
-}
-
-// ── scores and sampling ────────────────────────────────────────────────────
-
-/** Same score within floating error (scores are small fractions). */
-export function sameScore(a: number, b: number): boolean {
-  return Math.abs(a - b) < 1e-9;
-}
-
-/**
- * Count `samples` against a known support (the projection's score values).
- * `other` counts samples that match no support value: with a correct engine
- * it is always 0, so the page shows it as a check.
- */
-export function scoreHistogram(samples: ReadonlyArray<number>, support: ReadonlyArray<number>): { readonly counts: ReadonlyArray<number>; readonly other: number } {
-  const counts = support.map(() => 0);
-  let other = 0;
-  for (const s of samples) {
-    const i = support.findIndex((v) => sameScore(v, s));
-    if (i < 0) other++;
-    else counts[i]!++;
-  }
-  return { counts, other };
-}
-
-export interface SampleResult {
-  readonly n: number;
-  readonly scores: ReadonlyArray<number>;
-  readonly dnfs: number;
-  readonly mean: number;
-}
-
-/**
- * `n` independent runs of `party` on `mission`. Run i draws its dice from
- * `rngFor(seed, i + ':roll:' + node)`, so a seed reproduces the whole batch.
- */
-export function sampleMission(
-  party: Party,
-  mission: Mission,
-  baseOf: (slug: string) => BaseStats,
-  model: BattleModel,
-  n: number,
-  seed: string,
-  options: RunOptions = {},
-): SampleResult {
-  const scores: number[] = [];
-  let dnfs = 0;
-  let total = 0;
-  for (let i = 0; i < n; i++) {
-    const run = runMission(party, mission, (node) => rngFor(seed, `${i}:roll:${node}`), baseOf, model, options);
-    scores.push(run.score);
-    total += run.score;
-    if (run.dnf) dnfs++;
-  }
-  return { n, scores, dnfs, mean: n === 0 ? 0 : total / n };
-}
-
-/** A party in lineup order, as the season runner builds it, under a rival's hex if any (D-52). */
-export function partyFrom(starters: ReadonlyArray<string>, statsOf: (id: string) => EffectiveStats, hex?: Ability): Party {
-  const members = starters.map(statsOf);
-  return hex === undefined ? { members } : { members, hex };
-}
-
-// ── retreat orders (D-49) ──────────────────────────────────────────────────
-
-/** A retreat order in words. */
-export function retreatLabel(retreat: RetreatOrder): string {
-  if (retreat === 'never') return 'never turn back';
-  if (retreat === 'avoid_battles') return 'avoid every battle';
-  return `turn back with ${retreat.bank}+ loot`;
-}
-
-/** A retreat order as a `<select>` value: `never`, `avoid_battles` or `bank:N`. */
-export function retreatValue(retreat: RetreatOrder): string {
-  return typeof retreat === 'string' ? retreat : `bank:${retreat.bank}`;
-}
-
-/** The inverse of `retreatValue`. Anything unreadable is `never`, the default. */
-export function parseRetreat(value: string): RetreatOrder {
-  if (value === 'avoid_battles') return 'avoid_battles';
-  const bank = /^bank:(\d+)$/.exec(value);
-  return bank === null ? 'never' : { bank: Number(bank[1]) };
-}
-
-/** The retreat orders a picker offers: the engine's `retreatOptions` (D-49). */
-export function retreatChoices(haul: number): ReadonlyArray<RetreatOrder> {
-  return retreatOptions(haul);
-}
+import type { TavernChrome } from './data';
 
 // ── draft board ────────────────────────────────────────────────────────────
 
@@ -270,48 +42,191 @@ export function draftBoard(order: ReadonlyArray<string>, picks: ReadonlyArray<Dr
 }
 
 /**
- * The crier's notes on a pick (the draft's rounds in the Common Room, play.ts):
- * each pick against where the bots usually take that character (its average draft
- * position, `adp`, 0-based). A steal comes `STEAL_ROUNDS` rounds or more
- * after it, a reach `REACH_ROUNDS` or more before it.
+ * The crier's notes on a pick: each pick against where the scouts rank the
+ * monster (0-based, best first). A steal is taken `STEAL_PICKS` or more
+ * picks after its rank, a reach `REACH_PICKS` or more before it.
  */
 export type DraftNote = 'steal' | 'reach';
 
-/**
- * Rounds from the average draft position that make a steal or a reach. A reach
- * needs more: the random bot often takes someone who usually goes undrafted.
- * On the mock season each fires on about one pick in ten (steal 12%, reach 7%).
- */
-export const STEAL_ROUNDS = 1;
-export const REACH_ROUNDS = 3;
+export const STEAL_PICKS = 4;
+export const REACH_PICKS = 6;
 
 export interface DraftCall extends DraftCell {
-  /** Where the bots usually take the character (0-based), or null when `adp` has no entry. */
-  readonly adp: number | null;
+  /** The scouts' rank (0-based), or null when `ranks` has no entry. */
+  readonly rank: number | null;
   readonly notes: ReadonlyArray<DraftNote>;
 }
 
-export function draftCalls(
-  picks: ReadonlyArray<DraftCell>,
-  adp: ReadonlyMap<string, number>,
-  teams: number,
-): ReadonlyArray<DraftCall> {
+export function draftCalls(picks: ReadonlyArray<DraftCell>, ranks: ReadonlyMap<string, number>): ReadonlyArray<DraftCall> {
   return picks.map((p) => {
-    const at = adp.get(p.character) ?? null;
+    const at = ranks.get(p.character) ?? null;
     const notes: DraftNote[] = [];
-    if (at !== null && p.pick - at >= STEAL_ROUNDS * teams) notes.push('steal');
-    if (at !== null && at - p.pick >= REACH_ROUNDS * teams) notes.push('reach');
-    return { ...p, adp: at, notes };
+    if (at !== null && p.pick - at >= STEAL_PICKS) notes.push('steal');
+    if (at !== null && at - p.pick >= REACH_PICKS) notes.push('reach');
+    return { ...p, rank: at, notes };
   });
 }
 
-// ── rosters over time ──────────────────────────────────────────────────────
+/** Ranks (0-based, best first) from values, ties by the given order. */
+export function ranksOf(values: ReadonlyMap<string, number>): ReadonlyMap<string, number> {
+  return new Map(
+    [...values]
+      .map(([id, v], i) => ({ id, v, i }))
+      .sort((a, b) => b.v - a.v || a.i - b.i)
+      .map(({ id }, rank) => [id, rank]),
+  );
+}
 
-/** Each tavern's roster at week `week`'s lineup lock, by replaying the log up to that `lineup.locked`. Final rosters if the week has no lock. */
-export function rostersAtLock(events: ReadonlyArray<LeagueEvent>, week: number): ReadonlyMap<string, ReadonlyArray<string>> {
-  const at = events.findIndex((e) => e.type === 'lineup.locked' && e.payload.week === week);
-  const state = replay(at < 0 ? events : events.slice(0, at + 1));
-  return new Map([...state.taverns.values()].map((t) => [t.id, t.roster]));
+// ── the card ───────────────────────────────────────────────────────────────
+
+const ARTICLE_NOUNS: Readonly<Record<string, string>> = {
+  aberration: 'an aberration',
+  beast: 'a beast',
+  construct: 'a construct',
+  dragon: 'a dragon',
+  elemental: 'an elemental',
+  fey: 'one of the fey',
+  fiend: 'a fiend',
+  giant: 'a giant',
+  humanoid: 'a humanoid',
+  monstrosity: 'a monstrosity',
+  ooze: 'an ooze',
+  plant: 'a plant',
+  undead: 'one of the dead',
+};
+
+/** A tag as a phrase: `type:undead` → "one of the dead", `law:lawful` → "someone lawful", `subtype:goblinoid` → "a goblinoid". */
+export function tagPhrase(tag: string): string {
+  const [axis, value = ''] = tag.split(':');
+  switch (axis) {
+    case 'type':
+      return ARTICLE_NOUNS[value] ?? `a ${value}`;
+    case 'subtype':
+      return `${/^[aeiou]/.test(value) ? 'an' : 'a'} ${value}`;
+    case 'law':
+    case 'moral':
+    case 'size':
+      return `someone ${value}`;
+    default:
+      return tag;
+  }
+}
+
+/** A tag as a short label: `type:undead` → "undead", `law:lawful` → "lawful". */
+export function tagLabel(tag: string): string {
+  return tag.split(':')[1] ?? tag;
+}
+
+/** A strategy's name. */
+export function strategyName(strategy: VotingStrategy): string {
+  switch (strategy.kind) {
+    case 'loyal':
+      return 'Loyal';
+    case 'threat':
+      return 'Threat hunter';
+    case 'coattails':
+      return 'Coattails';
+    case 'grudge':
+      return 'Grudge';
+    case 'floater':
+      return 'Floater';
+  }
+}
+
+/** What a strategy does, in a line, as the card says it. `betrayAt` is when coattails riders turn (`VoteModel.betrayAt`). */
+export function strategyLine(strategy: VotingStrategy, betrayAt?: number): string {
+  switch (strategy.kind) {
+    case 'loyal':
+      return `wants ${tagPhrase(strategy.tag)} to win`;
+    case 'threat':
+      return 'cuts down whoever looks strongest';
+    case 'coattails':
+      return betrayAt === undefined ? 'flatters the strong, votes out the weak, then turns on them' : `flatters the strong, votes out the weak; at the final ${betrayAt}, turns on the strongest`;
+    case 'grudge':
+      return 'goes after whoever voted against it';
+    case 'floater':
+      return 'votes with the biggest bloc';
+  }
+}
+
+/** A check's target in words: "Athletics", "Con save", "Int check". */
+export function checkName(check: Pick<ChallengeCheck, 'type'> & ({ readonly skill: Skill } | { readonly ability: string })): string {
+  if ('skill' in check) return check.skill.replaceAll('_', ' ').replace(/^\w/, (c) => c.toUpperCase());
+  const ability = check.ability.charAt(0).toUpperCase() + check.ability.slice(1);
+  return check.type === 'save' ? `${ability} save` : `${ability} check`;
+}
+
+/** A challenge check in full: "Athletics DC 12, swim speed: advantage". */
+export function checkLabel(check: ChallengeCheck, dc = check.dc): string {
+  const req = (r: ChallengeCheck['advantage']): string => (r === undefined ? '' : 'speed' in r ? `${r.speed} speed` : r.sense);
+  const extras = [check.advantage === undefined ? '' : `${req(check.advantage)}: advantage`, check.requires === undefined ? '' : `needs ${req(check.requires)}`].filter((x) => x !== '');
+  return `${checkName(check as never)} DC ${dc}${extras.length === 0 ? '' : `, ${extras.join(', ')}`}`;
+}
+
+/** The six ability modifiers as a compact list: [["Str", +3], ...]. */
+export function abilityLine(stats: EffectiveStats): ReadonlyArray<readonly [string, number]> {
+  return (['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map((a) => [a.charAt(0).toUpperCase() + a.slice(1), stats.abilityMods[a]] as const);
+}
+
+// ── the vote, read aloud ───────────────────────────────────────────────────
+
+/**
+ * The order the Lich reads the ballots in, Survivor style: the boot's votes
+ * spread through the reading so the count stays close, a rival's vote in
+ * between, and the boot's last vote read last. Every ballot appears once.
+ */
+export function readingOrder(ballots: ReadonlyArray<Ballot>, boot: string): ReadonlyArray<Ballot> {
+  const bootVotes = ballots.filter((b) => b.target === boot);
+  const groups = new Map<string, Ballot[]>();
+  for (const b of ballots) if (b.target !== boot) groups.set(b.target, [...(groups.get(b.target) ?? []), b]);
+  const out: Ballot[] = [];
+  const last = bootVotes.at(-1);
+  const bootLeft = bootVotes.slice(0, -1);
+  let turn = 0;
+  for (;;) {
+    const others = [...groups.values()].filter((g) => g.length > 0).sort((a, b) => b.length - a.length);
+    if (bootLeft.length === 0 && others.length === 0) break;
+    if (bootLeft.length > 0 && (turn % 2 === 1 || others.length === 0)) out.push(bootLeft.shift()!);
+    else if (others.length > 0) out.push(others[0]!.shift()!);
+    turn++;
+  }
+  if (last !== undefined) out.push(last);
+  return out;
+}
+
+/** The running tally after each ballot in `order`: how many votes each target has once it is read. */
+export function runningTally(order: ReadonlyArray<Ballot>): ReadonlyArray<number> {
+  const count = new Map<string, number>();
+  return order.map((b) => {
+    const n = (count.get(b.target) ?? 0) + 1;
+    count.set(b.target, n);
+    return n;
+  });
+}
+
+/**
+ * How many ballots in `order` the Lich has to read before nobody can catch
+ * `boot`: once the boot leads every other target by more than the ballots
+ * left, the rest can't change it. `order.length` when it is only settled at
+ * the end (or never: a tie).
+ */
+export function decidedAfter(order: ReadonlyArray<Ballot>, boot: string): number {
+  const count = new Map<string, number>();
+  for (let i = 0; i < order.length; i++) {
+    count.set(order[i]!.target, (count.get(order[i]!.target) ?? 0) + 1);
+    const left = order.length - i - 1;
+    const b = count.get(boot) ?? 0;
+    const rival = Math.max(0, ...[...count].filter(([t]) => t !== boot).map(([, n]) => n));
+    if (rival + left < b) return i + 1;
+  }
+  return order.length;
+}
+
+const ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+
+/** "First vote", "Second vote", …, then "Vote 11". */
+export function voteOrdinal(i: number): string {
+  return ORDINALS[i] === undefined ? `Vote ${i + 1}` : `${ORDINALS[i]} vote`;
 }
 
 // ── formatting ─────────────────────────────────────────────────────────────
@@ -329,47 +244,12 @@ export function formatCr(eighths: number): string {
   return whole === 0 ? `${num}/${den}` : `${whole} ${num}/${den}`;
 }
 
-/**
- * A CR total from eighths as a decimal: 58 → "7.25", 96 → "12". Totals are
- * compared with the budget, and "7 1/4 of 12" reads like a ratio.
- */
-export function formatCrTotal(eighths: number): string {
-  return String(Math.round((eighths / 8) * 1000) / 1000);
-}
-
-/** A waiver outcome reason in words. */
-export function waiverReasonLabel(reason: string): string {
-  switch (reason) {
-    case 'awarded':
-      return 'awarded';
-    case 'add_unavailable':
-      return 'already taken';
-    case 'drop_not_owned':
-      return 'drop no longer on roster';
-    case 'roster_full':
-      return 'roster full';
-    default:
-      return reason.replaceAll('_', ' ');
-  }
-}
-
 export function signed(n: number): string {
   return n >= 0 ? `+${n}` : `−${Math.abs(n)}`;
 }
 
 export function pct(x: number, digits = 1): string {
   return `${(100 * x).toFixed(digits)}%`;
-}
-
-/** A score in [0, 1] as its smallest fraction with denominator ≤ 24 ("2/3"), else 3 decimals. */
-export function scoreFraction(x: number): string {
-  if (sameScore(x, 0)) return '0';
-  if (sameScore(x, 1)) return '1';
-  for (let d = 2; d <= 24; d++) {
-    const n = Math.round(x * d);
-    if (sameScore(n / d, x)) return `${n}/${d}`;
-  }
-  return x.toFixed(3);
 }
 
 export function formatModifier(m: Modifier): string {
@@ -386,8 +266,6 @@ export function formatModifier(m: Modifier): string {
       return `${m.speed} ${m.feet} ft`;
     case 'grant_sense':
       return `${m.sense} ${m.feet} ft`;
-    case 'battle_bonus':
-      return `battle ${signed(m.value)}`;
   }
 }
 
@@ -414,48 +292,42 @@ export function actorLabel(actor: Actor): string {
 export function eventSummary(event: LeagueEvent): string {
   switch (event.type) {
     case 'season.created':
-      return `${event.payload.config.id}: ${event.payload.config.weeks} weeks, B = ${formatCr(event.payload.config.budget.partyCr)}`;
+      return `${event.payload.config.id}: cast ${event.payload.config.contest.castSize}, ${event.payload.challenges.length} episodes, roster ${event.payload.config.roster.size}`;
     case 'character.pooled':
-      return `${event.payload.character} (${event.payload.base}, CR ${formatCr(event.payload.cr)})${event.payload.modifiers.length > 0 ? ` +${event.payload.modifiers.length} mod` : ''}`;
+      return `${event.payload.character} (${event.payload.base}, CR ${formatCr(event.payload.cr)}) ${event.payload.strategy.kind}${event.payload.strategy.kind === 'loyal' ? ` ${event.payload.strategy.tag}` : ''}`;
     case 'manager.joined':
       return `${event.payload.manager} (${'bot' in event.payload.account ? event.payload.account.bot : event.payload.account.login})`;
     case 'tavern.chosen':
       return `${event.payload.manager} chooses ${event.payload.tavern}`;
     case 'draft.pick':
       return `#${event.payload.pick + 1} ${event.payload.tavern} takes ${event.payload.character}`;
-    case 'lineup.set':
-      return `wk ${event.payload.week} ${event.payload.tavern}: ${event.payload.lineup.starters.join(', ')} (${retreatLabel(event.payload.lineup.retreat)})`;
-    case 'lineup.locked':
-      return `wk ${event.payload.week}: ${event.payload.lineups.length} lineups (${event.payload.lineups.map((l) => l.source).join(', ')})`;
-    case 'mission.revealed':
-      return `wk ${event.payload.week}: ${event.payload.mission.id}`;
-    case 'mission.resolved': {
-      const p = event.payload;
-      return `wk ${p.week} ${p.tavern}: ${p.points} pts (proj ${p.projectedPoints.toFixed(1)})${p.run.dnf ? ' DNF' : ''}`;
+    case 'call.made':
+      return `ep ${event.payload.episode} ${event.payload.tavern} calls ${event.payload.target}`;
+    case 'challenge.resolved':
+      return `ep ${event.payload.episode} ${event.payload.challenge.id}: ${event.payload.result.winner} wins in ${event.payload.result.rounds.length} rounds`;
+    case 'vote.resolved': {
+      const v = event.payload.vote;
+      return `ep ${event.payload.episode}: ${v.boot} out${v.revote === null ? '' : ' (revote)'}${v.draw === null ? '' : ' (draw)'}`;
     }
-    case 'week.finalized':
-      return `wk ${event.payload.week} final`;
-    case 'waiver.claimed':
-      return `${event.payload.tavern}: +${event.payload.add}${event.payload.drop === null ? '' : ` −${event.payload.drop}`}`;
-    case 'waiver.resolved':
-      return `wk ${event.payload.week}: ${event.payload.outcomes.filter((o) => o.awarded).length}/${event.payload.outcomes.length} awarded`;
-    default:
-      return '';
+    case 'finale.resolved':
+      return `the jury chooses ${event.payload.result.winner}`;
+    case 'round.finalized':
+      return `round ${event.payload.round} final`;
   }
 }
 
-/** The CLI's aggregate table (mock-season.ts `print`), as rows of cells. */
+/** The CLI's per-bot table (sim.ts `print`), as rows of cells. */
 export function aggregateRows(totals: Aggregate): { readonly header: ReadonlyArray<string>; readonly rows: ReadonlyArray<ReadonlyArray<string>> } {
-  const header = ['bot', 'seats', 'titles', 'titles/seat', 'week top%', 'mean pts', 'mean proj', 'DNF%'];
+  const header = ['bot', 'seats', 'titles', 'titles/seat', 'mean W', 'mean pts', 'calls right', 'early'];
   const rows = Object.entries(totals.byBot).map(([bot, a]) => [
     bot,
     String(a.seats),
     Number.isInteger(a.titles) ? String(a.titles) : a.titles.toFixed(1),
     a.titlesPerSeat.toFixed(3),
-    pct(a.weekTopRate),
+    a.meanWins.toFixed(2),
     a.meanPoints.toFixed(1),
-    a.meanProjected.toFixed(1),
-    pct(a.dnfRate),
+    pct(a.callRate),
+    pct(a.earlyShare),
   ]);
   return { header, rows };
 }
@@ -471,82 +343,7 @@ export function seedWords(rand: () => number): string {
   return `${pick(SEED_ADJECTIVES)}-${pick(SEED_NOUNS)}-${Math.floor(rand() * 100)}`;
 }
 
-// ── the week reveal ────────────────────────────────────────────────────────
-
-/** One node of a run, in path order, as the week reveal plays it. */
-export interface TaleStep {
-  readonly node: string;
-  /** The node before it on the path, null for the first. */
-  readonly from: string | null;
-  /** The check or battle rolled here, null for a node with no roll (start, end). */
-  readonly record: NodeRecord | null;
-  /** Loot this node banked: a passed check's `loot`, a won battle's bounty, else 0. */
-  readonly bank: number;
-  /** Loot banked so far, this node included. A DNF loses it all afterwards (D-54). */
-  readonly total: number;
-}
-
-/**
- * The steps of a run in path order, with the loot banked along the way. The
- * last step's `total` is `run.loot` unless the run ended in a DNF, which
- * carries nothing home.
- */
-export function taleSteps(mission: Mission, run: RunResult): ReadonlyArray<TaleStep> {
-  const nodes = new Map(mission.nodes.map((n) => [n.id, n]));
-  const records = new Map(run.nodes.map((r) => [r.node, r]));
-  let total = 0;
-  return run.path.map((id, i) => {
-    const node = nodes.get(id);
-    const record = records.get(id) ?? null;
-    const bank =
-      record === null || node === undefined
-        ? 0
-        : record.kind === 'check' && node.kind === 'check' && record.outcome === 'pass'
-          ? node.loot
-          : record.kind === 'battle' && node.kind === 'battle' && record.outcome === 'win'
-            ? (node.loot ?? 0)
-            : 0;
-    total += bank;
-    return { node: id, from: i === 0 ? null : run.path[i - 1]!, record, bank, total };
-  });
-}
-
-/**
- * How a week went for one tavern, which sets the size of its moment (fx.ts
- * weekMoment). One per week, the first that holds: a DNF (loss), topping the
- * week (triumph), turning back (relief), beating the scrying ball's own
- * projection (satisfaction), else quiet, which gets no effect at all so the
- * others keep meaning something.
- */
-export type WeekOutcome = 'dnf' | 'top' | 'retreat' | 'good' | 'quiet';
-
-export function weekOutcome(week: {
-  readonly rank: number;
-  readonly points: number;
-  readonly projected: number;
-  readonly dnf: boolean;
-  readonly retreated: boolean;
-}): WeekOutcome {
-  if (week.dnf) return 'dnf';
-  if (week.rank === 1 && week.points > 0) return 'top';
-  if (week.retreated) return 'retreat';
-  if (week.points > week.projected) return 'good';
-  return 'quiet';
-}
-
-/** A tavern's best week of a season: the most points, the earliest on a tie, and whether it topped that week. Null with no weeks. */
-export function bestWeek(
-  weeks: ReadonlyArray<{ readonly week: number; readonly points: number; readonly rank: number }>,
-): { readonly week: number; readonly points: number; readonly topped: boolean } | null {
-  let best: { week: number; points: number; rank: number } | null = null;
-  for (const w of weeks) if (best === null || w.points > best.points || (w.points === best.points && w.week < best.week)) best = w;
-  return best === null ? null : { week: best.week, points: best.points, topped: best.rank === 1 && best.points > 0 };
-}
-
-/** Rank by points, highest first; equal points share a rank, and the next rank skips (1, 1, 3). */
-export function ranked<T extends { readonly points: number }>(rows: ReadonlyArray<T>): ReadonlyArray<T & { readonly rank: number }> {
-  return rows.map((r) => ({ ...r, rank: 1 + rows.filter((o) => o.points > r.points).length }));
-}
+// ── tables ─────────────────────────────────────────────────────────────────
 
 /**
  * How each tavern moved in a table since the one before it: the row it was in
@@ -571,33 +368,25 @@ export function tableMoves(
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HEX = /^#[0-9a-f]{6}$/;
 
-/**
- * The gods that get a banner: those whose id, colours and texture name are
- * well formed. The build validates every god file; this keeps a bad value
- * out of a selector or a style attribute all the same.
- */
-export function bannerGods(gods: Readonly<Record<string, GodChrome>>): ReadonlySet<string> {
+/** The taverns that get a banner: those whose id, colours and texture name are well formed. */
+export function banneredTaverns(taverns: Readonly<Record<string, TavernChrome>>): ReadonlySet<string> {
   return new Set(
-    Object.entries(gods)
-      .filter(([god, { banner: b }]) => KEBAB.test(god) && HEX.test(b.field) && HEX.test(b.charge) && HEX.test(b.mark) && KEBAB.test(b.texture))
-      .map(([god]) => god),
+    Object.entries(taverns)
+      .filter(([id, { banner: b }]) => KEBAB.test(id) && HEX.test(b.field) && HEX.test(b.charge) && HEX.test(b.mark) && KEBAB.test(b.texture))
+      .map(([id]) => id),
   );
 }
 
 /**
- * The banner stylesheet: per god, its mark as `--mark-<god>` on :root (for
- * swatches and chart lines anywhere) and, on `[data-banner="<god>"]`, its
- * colours and texture as custom properties. page.html § Banners turns those
- * into every banner surface, so no god has CSS of its own. Only `bannerGods`.
+ * The banner stylesheet: per tavern, its mark as `--mark-<tavern>` on :root
+ * and, on `[data-banner="<tavern>"]`, its colours and texture as custom
+ * properties. page.html § Banners turns those into every banner surface.
  */
-export function bannerCss(gods: Readonly<Record<string, GodChrome>>): string {
-  return [...bannerGods(gods)]
-    .map((god) => {
-      const b = gods[god]!.banner;
-      return (
-        `:root{--mark-${god}:${b.mark}}\n` +
-        `[data-banner="${god}"]{--banner-field:${b.field};--banner-charge:${b.charge};--banner-mark:${b.mark};--banner-pattern:var(--tex-${b.texture})}`
-      );
+export function bannerCss(taverns: Readonly<Record<string, TavernChrome>>): string {
+  return [...banneredTaverns(taverns)]
+    .map((id) => {
+      const b = taverns[id]!.banner;
+      return `:root{--mark-${id}:${b.mark}}\n[data-banner="${id}"]{--banner-field:${b.field};--banner-charge:${b.charge};--banner-mark:${b.mark};--banner-pattern:var(--tex-${b.texture})}`;
     })
     .join('\n');
 }
@@ -608,9 +397,9 @@ const PNG_URI = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
 
 /**
  * The card art stylesheet: per character with a face crop, its face and its
- * thumbnail as `--art-face` and `--art-thumb` on `[data-art="<id>"]`. Kept out of the
- * card markup, which the page rebuilds on every move, so each image is parsed
- * once. Ids and images that aren't well formed are skipped.
+ * thumbnail as `--art-face` and `--art-thumb` on `[data-art="<id>"]`. Kept out
+ * of the card markup, which the page rebuilds on every move, so each image is
+ * parsed once. Ids and images that aren't well formed are skipped.
  */
 export function artCss(chrome: Readonly<Record<string, { readonly face?: string; readonly portrait?: string }>>): string {
   return Object.entries(chrome)

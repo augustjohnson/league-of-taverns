@@ -1,0 +1,12 @@
+# Episode 2. Chrome: title, story and each check's line. The checks under them are the rules.
+id: dust-the-crypt
+episode: 2
+title: Dust the Crypt
+story: >-
+  My crypt is a disgrace. Cobwebs. Dust. A skeleton in the corner who swears
+  he is not one of mine. Clean it. The last one dusting is safe.
+checks:
+  - { type: skill, skill: investigation, dc: 12, line: "find every last cobweb" }
+  - { type: save, ability: dex, dc: 12, line: "dodge the falling urns" }
+  - { type: save, ability: wis, dc: 12, line: "ignore the whispering from the walls" }
+  - { type: save, ability: con, dc: 12, line: "breathe through the dust" }

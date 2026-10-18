@@ -1,26 +1,30 @@
 /**
  * Test-only builders for event logs: a `LogBuilder` that stamps envelopes,
- * chains `prev` hashes and folds each event as it goes, plus a scripted
- * mini-season (4 taverns, 24 pooled characters, 2 weeks) with state
- * checkpoints for precondition tests.
+ * chains `prev` hashes and folds each event as it goes, and a scripted
+ * mini-season of the contest (4 taverns, a cast of 10, roster 2, 8 votes,
+ * the final 2) with state checkpoints for precondition tests.
  */
-import { projectedPoints, runPoints, type SeasonConfig } from '../../src/league';
-import type { Mission } from '../../src/missions';
-import { projectMission } from '../../src/projection';
-import { runMission, type BattleModel } from '../../src/resolution';
+import { contestant } from '../../src/contest/cards';
+import { genericChallenge } from '../../src/contest/challenge';
+import { voteModel } from '../../src/contest/model';
+import { castMap, playChallenge, playFinale, playVote } from '../../src/contest/run';
+import { applyEpisode, initialContest } from '../../src/contest/state';
+import type { Challenge, VotingStrategy } from '../../src/contest/types';
+import { challengeSha256, lineHash } from '../../src/events/canonical';
 import { applyEvent, initialState } from '../../src/events/reducers';
-import { lineHash, serializeEvent } from '../../src/events/replay';
-import { freeAgents, homeTavern, onTheClock, tavernPickOnTheClock } from '../../src/events/selectors';
+import { serializeEvent } from '../../src/events/replay';
+import { onTheClock, tavernPickOnTheClock } from '../../src/events/selectors';
 import type { LeagueState } from '../../src/events/state';
 import type { Actor, EventOf, EventType, LeagueEvent, PayloadByType } from '../../src/events/types';
-import { rngFor, weekSeed } from '../../src/rng';
-import { carriedLineup, resolveWaivers, type Lineup, type WaiverClaim } from '../../src/roster';
+import { episodesOf, type SeasonConfig } from '../../src/league';
+import { contestSeed, rngFor } from '../../src/rng';
 import type { CrEighths } from '../../src/vocabulary';
-import { baseOf, battle, constantModel, edge, end, member, partyOf, skillCheck, start } from './builders';
+import type { EffectiveStats } from '../../src/characters';
+import { member } from './builders';
 
 export const SEASON = 'season-01';
 export const AT = '2026-11-02T18:04:11Z';
-export const SYSTEM: Actor = { kind: 'system', workflow: 'weekly-run' };
+export const SYSTEM: Actor = { kind: 'system', workflow: 'episode' };
 export const COMMISSIONER: Actor = { kind: 'commissioner', githubId: 1, login: 'gm' };
 export const MANAGER: Actor = { kind: 'manager', githubId: 101, login: 'flagon' };
 
@@ -30,7 +34,6 @@ export const TAVERNS = ['the-gilded-flagon', 'the-rusty-nail', 'the-salty-dog', 
 /** Managers in join order. `manager-i` chooses `TAVERNS[i]` when its turn in the tavern pick comes. */
 export const MANAGERS = ['manager-0', 'manager-1', 'manager-2', 'manager-3'] as const;
 
-/** The package's taverns for `season.created`. */
 export function tavernList(): PayloadByType['season.created']['taverns'] {
   return TAVERNS.map((id) => ({ id, name: id }));
 }
@@ -40,85 +43,56 @@ export function miniConfig(overrides: Partial<SeasonConfig> = {}): SeasonConfig 
     id: SEASON,
     snapshot: 'open5e-v1-2026-10',
     modifierRegistryVersion: 1,
-    weeks: 2,
-    budget: { partyCr: 40 as CrEighths, modifierPointsPerCharacter: 3 },
-    roster: { size: 6, starters: 4, ownership: 'exclusive' },
-    draft: { format: 'snake', rounds: 5, order: { mode: 'seeded' }, pickWindowHours: 24, onTimeout: 'autopick' },
-    scoring: { pointsScale: 100, homeBonus: 1.25 },
-    waivers: { priority: 'rolling', initialOrder: 'reverse_draft' },
-    trades: { vetoWindowHours: 24, vetoBy: 'commissioner', deadlineWeek: 2 },
-    missedLineup: 'carry_over',
-    schedules: { lineupLock: '0 18 * * 4', weeklyRun: '15 18 * * 4', waivers: '0 12 * * 5' },
-    secrecy: 'open',
-    seedSalt: 'none',
-    missions: {
-      dcBand: { min: 8, max: 20 },
-      maxNodes: 14,
-      maxRank: 8,
-      battlesPerPath: { min: 0, max: 3 },
-      encounterCrRatio: 1,
-      haul: 100,
-      battleModel: 'constant-0.6',
-    },
-    carryover: { mode: 'keeper', keepersPerTavern: 1, keeperCost: 'round_of_last_season_pick', championBonusKeepers: 1, maxModifierChangePoints: 1 },
+    budget: { modifierPointsPerCharacter: 3 },
+    roster: { size: 2 },
+    draft: { format: 'snake', order: { mode: 'seeded' } },
+    contest: { castSize: 10, finalists: 2, lapDc: 1, model: {} },
+    scoring: { survive: 2, immunity: 3, juryVote: 2, winner: 10, call: 2, earlyCallBonus: 1 },
+    schedule: { rounds: [3, 3, 2] },
     ...overrides,
   };
 }
 
-/**
- * 24 characters, `char-01`…`char-24`, with CRs cycling 1/2, 1, 1 1/2, 2, 1 (in
- * eighths). A five-step cycle against a four-tavern snake gives every roster a
- * legal lineup under B = 5 and none a trivially cheap one.
- */
-export const POOL: ReadonlyArray<{ readonly id: string; readonly cr: CrEighths }> = Array.from({ length: 24 }, (_, i) => ({
-  id: `char-${String(i + 1).padStart(2, '0')}`,
-  cr: ([4, 8, 12, 16, 8] as const)[i % 5]! as CrEighths,
-}));
+const STRATEGIES: ReadonlyArray<VotingStrategy> = [{ kind: 'threat' }, { kind: 'coattails' }, { kind: 'grudge' }, { kind: 'floater' }, { kind: 'loyal', tag: 'type:giant' }];
 
-/** A week-2 commitment, to exercise the `sha256` = commitment rule. */
-export const WEEK2_COMMITMENT = lineHash('mission-w2');
+/** The cast: `char-01`…`char-10`, rising strength, cycling strategies. All on the ogre fixture. */
+export const CAST: ReadonlyArray<{ readonly id: string; readonly strategy: VotingStrategy; readonly stats: EffectiveStats }> = Array.from({ length: 10 }, (_, i) => {
+  const id = `char-${String(i + 1).padStart(2, '0')}`;
+  return { id, strategy: STRATEGIES[i % STRATEGIES.length]!, stats: member(id, { all: i % 5 }) };
+});
 
-export function schedule(): PayloadByType['season.created']['schedule'] {
-  return [
-    { week: 1, title: 'The Drowned Toll', environment: 'swamp', theme: 'A flooded road.', keywords: ['survival'], commitment: null, sponsor: 'the-drowned-saint' },
-    { week: 2, title: 'The Sunken Bell', environment: 'swamp', theme: 'A bell under the bog.', keywords: ['survival', 'bat fight'], commitment: WEEK2_COMMITMENT, sponsor: 'the-bog-king' },
-  ];
-}
+/** Stats by id, for `verifyContest`. */
+export const statsOf = (id: string): EffectiveStats => {
+  const c = CAST.find((x) => x.id === id);
+  if (c === undefined) throw new Error(`no ${id}`);
+  return c.stats;
+};
 
-/** Two gods: week 1 is the Gilded Flagon's home mission, week 2 the Rusty Nail's. */
-export function sponsors(): PayloadByType['season.created']['sponsors'] {
-  return [
-    { id: 'the-drowned-saint', tavern: 'the-gilded-flagon' },
-    { id: 'the-bog-king', tavern: 'the-rusty-nail' },
-  ];
-}
+/** One challenge per episode, drawn from a fixed stream. */
+export const CHALLENGES: ReadonlyArray<Challenge> = Array.from({ length: 8 }, (_, i) => ({ ...genericChallenge(rngFor('mini', `challenge:${i}`)), id: `task-${i + 1}` }));
 
-/** start → survival check (100 loot, the haul); pass → end, fail → battle → end. */
-export function missionFor(week: number): Mission {
-  return {
-    schemaVersion: 1,
-    id: `mission-w${week}`,
-    season: SEASON,
-    environment: 'swamp',
-    nodes: [start(), skillCheck('find-path', 1, 'survival', 11, 100), battle('bog', 2), end('crossed', 3)],
-    edges: [edge('start', 'find-path', 'always'), edge('find-path', 'crossed', 'pass'), edge('find-path', 'bog', 'fail'), edge('bog', 'crossed', 'win')],
-  };
-}
+export const SEED = contestSeed(SEASON, 'mini');
 
-export const MODEL: BattleModel = constantModel(0.6);
-
-/** Stamps envelopes, chains `prev`, and folds every appended event through `applyEvent`. */
+/** Stamps envelopes, chains `prev` and folds every event, as an Action would. */
 export class LogBuilder {
   readonly events: LeagueEvent[] = [];
   readonly lines: string[] = [];
   state: LeagueState = initialState();
 
   append<T extends EventType>(type: T, payload: EventOf<T>['payload'], actor: Actor = SYSTEM): EventOf<T> {
-    const event = candidate(this.state, type, payload, actor, this.lines.length === 0 ? null : lineHash(this.lines.at(-1)!));
+    const event = this.draft(type, payload, actor);
     this.state = applyEvent(this.state, event);
+    const line = serializeEvent(event);
+    this.state = { ...this.state, lastHash: lineHash(line) };
     this.events.push(event);
-    this.lines.push(serializeEvent(event));
+    this.lines.push(line);
     return event;
+  }
+
+  /** The next event, stamped but not applied. */
+  draft<T extends EventType>(type: T, payload: EventOf<T>['payload'], actor: Actor = SYSTEM): EventOf<T> {
+    const prev = this.lines.length === 0 ? null : lineHash(this.lines.at(-1)!);
+    return { v: 1, seq: this.state.lastSeq + 1, type, season: SEASON, at: AT, actor, prev, payload } as unknown as EventOf<T>;
   }
 
   get ndjson(): string {
@@ -126,247 +100,78 @@ export class LogBuilder {
   }
 }
 
-/** An event that would come next after `state` (seq = lastSeq + 1). `prev` is a placeholder unless given. */
-export function candidate<T extends EventType>(
-  state: LeagueState,
-  type: T,
-  payload: EventOf<T>['payload'],
-  actor: Actor = SYSTEM,
-  prev: string | null = null,
-): EventOf<T> {
-  return { v: 1, seq: state.lastSeq + 1, type, season: SEASON, at: AT, actor, prev, payload } as unknown as EventOf<T>;
-}
-
-export function crOfState(state: LeagueState): (id: string) => CrEighths {
-  return (id) => {
-    const entry = state.pool.get(id);
-    if (entry === undefined) throw new Error(`unknown ${id}`);
-    return entry.cr;
-  };
-}
-
-/** The best-CR legal lineup for `tavern` (the D-27 fallback), as a test's stand-in for a manager's choice. */
-export function bestLineup(state: LeagueState, tavern: string, previous: Lineup | null = null): Lineup {
-  const roster = state.taverns.get(tavern)!.roster;
-  const lineup = carriedLineup(previous, { tavern, characters: roster }, crOfState(state), state.config!);
-  if (lineup === null) throw new Error(`${tavern} has no legal lineup`);
-  return lineup;
-}
-
-/** The recorded `mission.resolved` payload for one tavern's run, built with `runMission` and the week seed. */
-export function resolution(state: LeagueState, week: number, tavern: string, lineup: Lineup): PayloadByType['mission.resolved'] {
-  const mission = state.revealed.get(week)!;
-  const ids = lineup.starters;
-  // Survival modifier from CR, so lineups differ.
-  const party = partyOf(ids.map((id) => member(id, { skills: { survival: state.pool.get(id)!.cr / 4 } })));
-  const seed = weekSeed({ season: SEASON, week, tavern });
-  const run = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), baseOf, MODEL);
-  const projection = projectMission(party, mission, baseOf, MODEL);
-  const home = homeTavern(state, week) === tavern;
-  return {
-    week,
-    tavern,
-    mission: mission.id,
-    seed,
-    engineVersion: '0.0.0',
-    battleModel: MODEL.id,
-    lineup,
-    run,
-    projected: { expectedScore: projection.expectedScore, pDnf: projection.pDnf },
-    points: runPoints(run.score, state.config!.scoring, home),
-    projectedPoints: projectedPoints(projection.expectedScore, state.config!.scoring, home),
-  };
-}
-
-/**
- * The `waiver.resolved` payload the waivers Action would build for `week`:
- * `resolveWaivers` over the pending claims (log order as seq), the current
- * priority, every roster and the free agents.
- */
-export function waiverResolution(state: LeagueState, week: number): PayloadByType['waiver.resolved'] {
-  const ids = new Map<WaiverClaim, string>();
-  const claims = state.waivers.pending.map((c, seq) => {
-    const claim: WaiverClaim = { tavern: c.tavern, add: c.add, drop: c.drop, seq };
-    ids.set(claim, c.claim);
-    return claim;
-  });
-  const rosters = [...state.taverns.values()].map((t) => ({ tavern: t.id, characters: t.roster }));
-  const { awards, priority } = resolveWaivers(claims, state.waivers.priority, rosters, new Set(freeAgents(state)), state.config!);
-  return {
-    week,
-    outcomes: awards.map((a) => ({ claim: ids.get(a.claim)!, awarded: a.awarded, reason: a.reason })),
-    priorityAfter: priority,
-  };
-}
-
 export interface MiniSeason {
   readonly log: LogBuilder;
-  /** States at named points, for precondition tests. */
-  readonly at: {
-    readonly created: LeagueState;
-    /** Every manager joined, no tavern chosen yet. */
-    readonly joined: LeagueState;
-    /** Every tavern chosen, no draft pick yet. */
-    readonly preseason: LeagueState;
-    readonly drafting: LeagueState;
-    readonly drafted: LeagueState;
-    readonly w1Pending: LeagueState;
-    readonly w1Locked: LeagueState;
-    readonly w1Revealed: LeagueState;
-    readonly w1Resolved: LeagueState;
-    readonly w1Finalized: LeagueState;
-    readonly claimsPending: LeagueState;
-    readonly waiversResolved: LeagueState;
-    readonly tradeAccepted: LeagueState;
-    readonly tradeCompleted: LeagueState;
-    readonly w2Locked: LeagueState;
-    readonly final: LeagueState;
-  };
-  /** Character the waiver claim `claim-1` added for the first tavern. */
-  readonly claimed: string;
-  /** Trade-1 pieces: the first tavern gives `give`, receives `receive` from the second. */
-  readonly traded: { readonly give: string; readonly receive: string };
+  readonly afterPreseason: LeagueState;
+  readonly afterDraft: LeagueState;
+  /** After episode 1's challenge, before its vote. */
+  readonly midEpisode1: LeagueState;
+  readonly final: LeagueState;
+}
+
+/** The setup events: season, cast, managers. */
+export function preseason(log: LogBuilder, config: SeasonConfig = miniConfig()): void {
+  log.append(
+    'season.created',
+    {
+      config,
+      configSha256: lineHash('config'),
+      engineVersion: '0.0.0',
+      taverns: tavernList(),
+      challenges: CHALLENGES.map((c, i) => ({ episode: i + 1, sha256: challengeSha256(c) })),
+      abilityMix: { str: 5, dex: 5, con: 6, int: 5, wis: 6, cha: 5 },
+    },
+    COMMISSIONER,
+  );
+  for (const c of CAST) log.append('character.pooled', { character: c.id, base: 'ogre', cr: 16 as CrEighths, modifiers: [], strategy: c.strategy }, COMMISSIONER);
+  for (const m of MANAGERS) log.append('manager.joined', { manager: m, account: { bot: 'test' } }, COMMISSIONER);
+}
+
+/** The tavern pick and the snake draft, each manager taking the next open tavern and the first free monster. */
+export function draft(log: LogBuilder): void {
+  for (let m = tavernPickOnTheClock(log.state); m !== null; m = tavernPickOnTheClock(log.state)) {
+    const tavern = TAVERNS[MANAGERS.indexOf(m as (typeof MANAGERS)[number])]!;
+    log.append('tavern.chosen', { manager: m, tavern }, { kind: 'bot', strategy: 'test' });
+  }
+  for (let t = onTheClock(log.state); t !== null; t = onTheClock(log.state)) {
+    const free = [...log.state.pool.keys()].find((id) => !log.state.owner.has(id))!;
+    log.append('draft.pick', { pick: log.state.draft.picks, tavern: t, character: free, auto: false }, { kind: 'bot', strategy: 'test' });
+  }
 }
 
 /**
- * A whole 2-week season: created → pooled → managers joined → tavern pick →
- * full snake draft →
- * week 1 (all submitted) → waivers (one award, one loss, from
- * `resolveWaivers`) → trades (one completed, one cancelled, one vetoed) →
- * week 2 (submitted, carried, and one tavern with no lineup) → complete.
+ * The whole mini season: every tavern calls the first monster still in before
+ * each challenge, the first tavern changes its call after it, and the
+ * contest plays from `SEED`.
  */
 export function miniSeason(): MiniSeason {
   const log = new LogBuilder();
   const config = miniConfig();
-  const [a, b, c, d] = TAVERNS;
-
-  log.append(
-    'season.created',
-    { config, configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors(), taverns: tavernList() },
-    COMMISSIONER,
-  );
-  const created = log.state;
-  for (const [i, { id, cr }] of POOL.entries()) {
-    const modifiers = i % 5 === 0 ? [{ kind: 'skill_bonus', skill: 'survival', value: 2 } as const] : [];
-    log.append('character.pooled', { character: id, base: 'ogre', cr, modifiers }, COMMISSIONER);
+  const model = voteModel(config.contest.model);
+  preseason(log, config);
+  const afterPreseason = log.state;
+  draft(log);
+  const afterDraft = log.state;
+  // The same cards `verifyContest` builds.
+  const cast = CAST.map((c) => contestant(c.stats, c.strategy));
+  const map = castMap(cast);
+  let s = initialContest(cast, model);
+  let midEpisode1: LeagueState | null = null;
+  for (let episode = 1; episode <= CHALLENGES.length; episode++) {
+    for (const t of TAVERNS) log.append('call.made', { episode, tavern: t, target: s.alive[0]! }, { kind: 'bot', strategy: 'test' });
+    const result = playChallenge(s, map, CHALLENGES[episode - 1]!, SEED, episode, config.contest.lapDc);
+    log.append('challenge.resolved', { episode, challenge: CHALLENGES[episode - 1]!, sha256: challengeSha256(CHALLENGES[episode - 1]!), seed: SEED, result });
+    if (episode === 1) midEpisode1 = log.state;
+    const late = s.alive.find((id) => id !== result.winner && id !== s.alive[0])!;
+    log.append('call.made', { episode, tavern: TAVERNS[0], target: late }, MANAGER);
+    const vote = playVote(s, map, result.winner, SEED, episode, model);
+    log.append('vote.resolved', { episode, vote });
+    s = applyEpisode(s, { episode, immune: result.winner, vote }, model);
+    const round = config.schedule.rounds.findIndex((_, i) => episodesOf(config, i + 1).at(-1) === episode) + 1;
+    if (round > 0 && round < config.schedule.rounds.length) log.append('round.finalized', { round });
   }
-  for (const [i, manager] of MANAGERS.entries()) {
-    const account = i === 3 ? { bot: 'value' } : { githubId: 101 + i, login: `manager-${i}` };
-    log.append('manager.joined', { manager, account }, COMMISSIONER);
-  }
-  const joined = log.state;
-  // The tavern pick, in reverse draft order (D-52).
-  for (let manager = tavernPickOnTheClock(log.state); manager !== null; manager = tavernPickOnTheClock(log.state)) {
-    log.append('tavern.chosen', { manager, tavern: TAVERNS[MANAGERS.indexOf(manager as (typeof MANAGERS)[number])]! }, MANAGER);
-  }
-  const preseason = log.state;
-
-  let drafting: LeagueState | undefined;
-  while (!log.state.draft.complete) {
-    const tavern = onTheClock(log.state)!;
-    log.append('draft.pick', { pick: log.state.draft.picks, tavern, character: freeAgents(log.state)[0]!, auto: false }, MANAGER);
-    drafting ??= log.state;
-  }
-  const drafted = log.state;
-
-  // Week 1: everyone submits.
-  for (const tavern of TAVERNS) log.append('lineup.set', { tavern, week: 1, lineup: bestLineup(log.state, tavern) }, MANAGER);
-  const w1Pending = log.state;
-  const pending1 = log.state.pendingLineups.get(1)!;
-  log.append('lineup.locked', { week: 1, lineups: TAVERNS.map((tavern) => ({ tavern, lineup: pending1.get(tavern)!, source: 'submitted' as const })) });
-  const w1Locked = log.state;
-  log.append('mission.revealed', { week: 1, mission: missionFor(1), sha256: lineHash('mission-w1'), salt: null });
-  const w1Revealed = log.state;
-  for (const tavern of TAVERNS) log.append('mission.resolved', resolution(log.state, 1, tavern, pending1.get(tavern)!));
-  const w1Resolved = log.state;
-  log.append('week.finalized', { week: 1 });
-  const w1Finalized = log.state;
-
-  // Waivers: a claims a free agent outright; c claims the same one (dropping)
-  // and loses, since the seeded priority (reverse draft order) puts a ahead
-  // of c (and behind b and d).
-  const claimed = freeAgents(log.state)[0]!;
-  log.append('waiver.claimed', { claim: 'claim-1', tavern: a, add: claimed, drop: null }, MANAGER);
-  log.append('waiver.claimed', { claim: 'claim-2', tavern: c, add: claimed, drop: log.state.taverns.get(c)!.roster.at(-1)! }, MANAGER);
-  const claimsPending = log.state;
-  log.append('waiver.resolved', waiverResolution(log.state, 1));
-  const waiversResolved = log.state;
-
-  // Trades: trade-1 completes, trade-2 is withdrawn, trade-3 is vetoed.
-  const give = log.state.taverns.get(a)!.roster[0]!;
-  const receive = log.state.taverns.get(b)!.roster[0]!;
-  log.append('trade.proposed', { trade: 'trade-1', from: a, to: b, give: [give], receive: [receive] }, MANAGER);
-  log.append('trade.accepted', { trade: 'trade-1' }, MANAGER);
-  const tradeAccepted = log.state;
-  log.append('trade.completed', { trade: 'trade-1' });
-  const tradeCompleted = log.state;
-  const cPiece = log.state.taverns.get(c)!.roster[0]!;
-  const dPiece = log.state.taverns.get(d)!.roster[0]!;
-  log.append('trade.proposed', { trade: 'trade-2', from: c, to: d, give: [cPiece], receive: [dPiece] }, MANAGER);
-  log.append('trade.cancelled', { trade: 'trade-2', reason: 'withdrawn' }, MANAGER);
-  // An uneven 2-for-1 (D-06): d has an open slot.
-  const cSecond = log.state.taverns.get(c)!.roster[1]!;
-  log.append('trade.proposed', { trade: 'trade-3', from: c, to: d, give: [cPiece, cSecond], receive: [dPiece] }, MANAGER);
-  log.append('trade.accepted', { trade: 'trade-3' }, MANAGER);
-  log.append('trade.vetoed', { trade: 'trade-3', reason: 'lopsided' }, COMMISSIONER);
-
-  // Week 2: a and c submit, b carries over (or falls back), d plays nobody.
-  log.append('lineup.set', { tavern: a, week: 2, lineup: bestLineup(log.state, a) }, MANAGER);
-  log.append('lineup.set', { tavern: c, week: 2, lineup: bestLineup(log.state, c) }, MANAGER);
-  const pending2 = log.state.pendingLineups.get(2)!;
-  const carried = bestLineup(log.state, b, pending1.get(b)!);
-  log.append('lineup.locked', {
-    week: 2,
-    lineups: [
-      { tavern: a, lineup: pending2.get(a)!, source: 'submitted' },
-      { tavern: b, lineup: carried, source: 'carried' },
-      { tavern: c, lineup: pending2.get(c)!, source: 'submitted' },
-      { tavern: d, lineup: null, source: 'none' },
-    ],
-  });
-  const w2Locked = log.state;
-  log.append('mission.revealed', { week: 2, mission: missionFor(2), sha256: WEEK2_COMMITMENT, salt: null });
-  for (const entry of log.state.lockedLineups.get(2)!) {
-    if (entry.lineup !== null) log.append('mission.resolved', resolution(log.state, 2, entry.tavern, entry.lineup));
-  }
-  log.append('week.finalized', { week: 2 });
-  log.append('waiver.resolved', waiverResolution(log.state, 2));
-  const final = log.state;
-
-  return {
-    log,
-    at: {
-      created,
-      joined,
-      preseason,
-      drafting: drafting!,
-      drafted,
-      w1Pending,
-      w1Locked,
-      w1Revealed,
-      w1Resolved,
-      w1Finalized,
-      claimsPending,
-      waiversResolved,
-      tradeAccepted,
-      tradeCompleted,
-      w2Locked,
-      final,
-    },
-    claimed,
-    traded: { give, receive },
-  };
+  log.append('finale.resolved', { result: playFinale(s, map, SEED, model) });
+  log.append('round.finalized', { round: config.schedule.rounds.length });
+  return { log, afterPreseason, afterDraft, midEpisode1: midEpisode1!, final: log.state };
 }
 
-/**
- * Serialize `events` as a log with a valid `prev` chain, whatever their own
- * `prev` says: for building tampered logs whose chain is intact, so the
- * reducers (not the chain check) must catch the problem.
- */
-export function chained(events: ReadonlyArray<LeagueEvent>): string {
-  const lines: string[] = [];
-  for (const event of events) {
-    lines.push(serializeEvent({ ...event, prev: lines.length === 0 ? null : lineHash(lines.at(-1)!) }));
-  }
-  return `${lines.join('\n')}\n`;
-}
