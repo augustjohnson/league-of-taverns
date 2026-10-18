@@ -30,9 +30,11 @@ import type { Banner } from '@league-of-taverns/scripts/lib/banner';
 import { ContestSession } from '../season-runner';
 import { currentDraftRound, feedItems, latestEpisode, type FeedItem } from './feed';
 import { clockBack, crownChampion, hailChampion, micron, pacer, raiseBanner, readJury, readVotes, reducedMotion, revealChallenge, roundMoment, slideStandings, turnCard, type Pacer } from './fx';
+import { bannerChoice, choiceAttr, getProfile, noteSeason, openProfile } from './profile';
 import {
   $,
   ABILITY_NAMES,
+  GAME_NAME,
   VOTES,
   bannerAttr,
   bannerOf,
@@ -58,10 +60,6 @@ import {
   tavernName,
 } from './shared';
 import {
-  BANNER_CHOICES,
-  KEEPER_NAME_MAX,
-  TAVERN_WORD_MAX,
-  bannerCss,
   checkLabel,
   decidedAfter,
   draftBoard,
@@ -71,10 +69,9 @@ import {
   runningTally,
   seedWords,
   signed,
-  tavernId,
-  tavernWord,
-  tavernWords,
+  tavernOf,
   voteOrdinal,
+  type Profile,
 } from './view';
 
 /** The room's name, in one place. */
@@ -99,56 +96,6 @@ function who(tavern: string, me: string | null, object = false): string {
 /** Your possessive or the tavern's. */
 function whose(tavern: string, me: string | null): string {
   return tavern === me ? 'your' : `${tavernName(tavern)}'s`;
-}
-
-// ── you and your tavern ────────────────────────────────────────────────────
-
-/** Who you are at the table: your name, your tavern's two words ("The <adjective> <noun>") and its banner, a `BANNER_CHOICES` id. */
-interface Profile {
-  readonly name: string;
-  readonly adjective: string;
-  readonly noun: string;
-  readonly banner: string;
-}
-
-const PROFILE_KEY = 'lot-player';
-
-function loadProfile(): Profile | null {
-  try {
-    const p = JSON.parse(storageGet(PROFILE_KEY) ?? 'null') as Partial<Profile> | null;
-    if (p === null || typeof p.name !== 'string' || typeof p.adjective !== 'string' || typeof p.noun !== 'string' || typeof p.banner !== 'string') return null;
-    return checkProfile(p as Profile).profile ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** Your profile tidied, or why it can't be used. */
-function checkProfile(form: Profile): { readonly profile?: Profile; readonly error?: string } {
-  const name = form.name.trim().replace(/\s+/g, ' ');
-  if (name.length === 0) return { error: 'Tell the room your name.' };
-  if (name.length > KEEPER_NAME_MAX) return { error: `Your name is ${name.length} characters; the ledger takes ${KEEPER_NAME_MAX}.` };
-  const adjective = tavernWord(form.adjective);
-  const noun = tavernWord(form.noun);
-  if (adjective === null || noun === null) {
-    return { error: `Your tavern is "The", then an adjective, then a noun: one word each, letters only, up to ${TAVERN_WORD_MAX} long.` };
-  }
-  const tavern = `The ${adjective} ${noun}`;
-  if (tavernId(tavern) === '' || tavernId(tavern) === 'the') return { error: 'Your tavern\'s name needs letters a to z the ledger can file it under.' };
-  if (input.taverns.some((t) => t.id === tavernId(tavern) || t.name.toLowerCase() === tavern.toLowerCase())) return { error: `${tavern} is a rival's tavern. Name yours something else.` };
-  if (!BANNER_CHOICES.some((b) => b.id === form.banner)) return { error: 'Choose a banner to fly.' };
-  return { profile: { name, adjective, noun, banner: form.banner } };
-}
-
-const tavernOf = (p: Profile): { readonly id: string; readonly name: string } => {
-  const name = `The ${p.adjective} ${p.noun}`;
-  return { id: tavernId(name), name };
-};
-const bannerChoice = (id: string): (typeof BANNER_CHOICES)[number] => BANNER_CHOICES.find((b) => b.id === id) ?? BANNER_CHOICES[0]!;
-
-/** A blank form: a suggested tavern under a random banner. */
-function freshForm(): Profile {
-  return { name: '', ...tavernWords(cryptoRand), banner: BANNER_CHOICES[Math.floor(cryptoRand() * BANNER_CHOICES.length)]!.id };
 }
 
 // ── moves, saved ───────────────────────────────────────────────────────────
@@ -180,10 +127,6 @@ const VIEWS: ReadonlyArray<View> = ['room', 'work', 'table'];
 
 const game = {
   session: null as ContestSession | null,
-  /** The setup form: you and your tavern, as typed. Starts as your saved profile. */
-  form: loadProfile() ?? freshForm(),
-  /** True when this browser has seen you before. */
-  known: loadProfile() !== null,
   /** The profile the season in play was started with. */
   profile: null as Profile | null,
   error: null as string | null,
@@ -305,19 +248,17 @@ function restore(): void {
 function start(): void {
   game.error = null;
   game.notice = null;
-  const { profile, error } = checkProfile(game.form);
-  if (profile === undefined) {
-    game.error = error ?? 'Your tavern is not ready.';
-    renderAll();
+  const profile = getProfile();
+  if (profile === null) {
+    openProfile();
     return;
   }
-  storageSet(PROFILE_KEY, JSON.stringify(profile));
   // You take a random bot's seat; the draft order is the seed's either way.
   const manager = input.managers[Math.floor(cryptoRand() * input.managers.length)]!.id;
   try {
     const session = newSession(manager, seedWords(cryptoRand), profile);
     clearRoom();
-    Object.assign(game, { session, profile, form: profile, known: true, moves: [], filter: '', confirmReset: false });
+    Object.assign(game, { session, profile, moves: [], filter: '', confirmReset: false });
     save();
     // The preseason is already done when the room opens; the tavern pick is told as it happens.
     const first = session.events.findIndex((e) => e.type === 'tavern.chosen');
@@ -608,7 +549,7 @@ function roomItems(): ReadonlyArray<FeedItem> {
 function renderFeed(items: ReadonlyArray<FeedItem>, fresh: ReadonlySet<string>): void {
   const feed = $('g-feed');
   if (game.session === null) {
-    feed.innerHTML = setupHtml();
+    feed.innerHTML = lobbyHtml();
     return;
   }
   const ctx: Ctx = { me: game.session.humanTavern, round: currentDraftRound(items), episode: latestEpisode(items), state: shown.state };
@@ -1034,62 +975,26 @@ function roundHtml(item: Extract<FeedItem, { kind: 'round' }>, ctx: Ctx): string
 
 // ── setup ──────────────────────────────────────────────────────────────────
 
-/** The banner choices' colours, once, as `choice-<id>` banners for the setup's swatches and preview. */
-const choiceStyle = document.createElement('style');
-choiceStyle.textContent = bannerCss(Object.fromEntries(BANNER_CHOICES.map((b) => [`choice-${b.id}`, { banner: b.banner }])));
-document.head.append(choiceStyle);
-
-/** Your tavern as the form has it, for the preview: its name (or a stand-in while a word is missing) and banner. */
-function previewOf(form: Profile): { readonly name: string; readonly keeper: string } {
-  const word = (raw: string, stand: string): string => tavernWord(raw) ?? (raw.trim() === '' ? stand : raw.trim());
-  return { name: `The ${word(form.adjective, '…')} ${word(form.noun, '…')}`, keeper: form.name.trim() === '' ? 'kept by you' : `kept by ${form.name.trim()}` };
-}
-
-function setupHtml(): string {
-  const f = game.form;
-  const preview = previewOf(f);
+/** Before a season: the game, who you are, and a button to start. */
+function lobbyHtml(): string {
+  const p = getProfile();
   const rivals = input.managers.length - 1;
-  const banners = BANNER_CHOICES.map(
-    (b) =>
-      `<label class="bpick" data-banner="choice-${esc(b.id)}"><input type="radio" name="g-banner" value="${esc(b.id)}" data-action="g-banner"${b.id === f.banner ? ' checked' : ''}>` +
-      `<i class="flag" data-banner="choice-${esc(b.id)}" aria-hidden="true"></i><span>${esc(b.label)}</span></label>`,
-  ).join('');
   return (
-    `<li class="welcome" data-key="welcome"><div class="card">` +
-    `<div class="row spread"><h2>The Lich's contest</h2><span class="chip brass">Play vs bots</span></div>` +
-    (game.known && f.name.trim() !== '' ? `<p><b>Welcome back, ${esc(f.name.trim())}.</b></p>` : '') +
+    `<li class="welcome" data-key="welcome"><div class="card lobby">` +
+    `<div class="row spread"><h2>${esc(GAME_NAME)}</h2><span class="chip brass">vs ${rivals} bots</span></div>` +
+    (p === null ? '' : `<p><b>Welcome, ${esc(p.name)}.</b></p>`) +
     `<p>The Lich wants a new assistant. ${config.contest.castSize} monsters compete: each episode one wins his task and is safe, and the rest vote one of their own out. The voted-out choose the winner.</p>` +
     `<p>You keep a tavern against ${rivals} bot taverns. Draft ${config.roster.size} monsters, then watch, and call the boot each episode. Taverns meet head to head; the best record after ${config.schedule.rounds.length} rounds wins.</p>` +
-    `<form class="setup" id="g-setup" novalidate>` +
-    `<div class="field"><label class="label" for="g-name">Your name</label><input type="text" id="g-name" data-action="g-name" value="${esc(f.name)}" maxlength="${KEEPER_NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="What the regulars call you"></div>` +
-    `<div class="field"><span class="label" id="g-tavern-label">Your tavern</span><div class="tavern-name" role="group" aria-labelledby="g-tavern-label">` +
-    `<span class="the">The</span>` +
-    `<input type="text" id="g-adj" data-action="g-adj" value="${esc(f.adjective)}" maxlength="${TAVERN_WORD_MAX}" aria-label="Adjective" placeholder="Adjective" spellcheck="false" autocomplete="off">` +
-    `<input type="text" id="g-noun" data-action="g-noun" value="${esc(f.noun)}" maxlength="${TAVERN_WORD_MAX}" aria-label="Noun" placeholder="Noun" spellcheck="false" autocomplete="off">` +
-    `<button type="button" class="small" data-action="g-suggest" title="Suggest a name">Suggest</button></div></div>` +
-    `<fieldset class="field"><legend class="label">Your banner</legend><div class="bpicks">${banners}</div></fieldset>` +
-    `<div class="you banner-card" id="g-preview" data-banner="choice-${esc(bannerChoice(f.banner).id)}"><div class="pennant" aria-hidden="true"></div>` +
-    `<div class="you-line"><i class="flag" aria-hidden="true"></i><b class="you-name" id="g-preview-name">${esc(preview.name)}</b><span class="small" id="g-preview-keeper">${esc(preview.keeper)}</span></div></div>` +
+    (p === null
+      ? ''
+      : `<div class="you banner-card"${choiceAttr(p)}><div class="pennant" aria-hidden="true"></div>` +
+        `<div class="you-line"><i class="flag" aria-hidden="true"></i><b class="you-name">${esc(tavernOf(p).name)}</b><span class="small">kept by ${esc(p.name)} · <button type="button" class="link" data-action="g-profile">Change</button></span></div></div>`) +
     (game.error === null ? '' : `<div class="error" role="alert">${esc(game.error)}</div>`) +
     (game.notice === null ? '' : `<p class="hint" role="status">${esc(game.notice)}</p>`) +
-    `<div class="row"><button type="submit" class="primary">Play vs the bots</button></div>` +
-    `</form>` +
-    `<p class="hint">Everything that happens is told here, in ${ROOM}. Your name and tavern are kept in this browser for your next season, and the season itself is saved as you play.</p>` +
+    `<button type="button" class="primary start" data-action="g-start">Start a season</button>` +
+    `<p class="hint">Everything that happens is told here, in ${ROOM}. Your season is saved in this browser as you play.</p>` +
     `</div></li>`
   );
-}
-
-/** The setup's text boxes, by action, and the profile field each fills. */
-const FORM_FIELDS: Readonly<Record<string, 'name' | 'adjective' | 'noun'>> = { 'g-name': 'name', 'g-adj': 'adjective', 'g-noun': 'noun' };
-
-/** Follow the form as you type, without re-rendering it. */
-function updatePreview(): void {
-  const el = document.getElementById('g-preview');
-  if (el === null) return;
-  const p = previewOf(game.form);
-  el.dataset.banner = `choice-${bannerChoice(game.form.banner).id}`;
-  $('g-preview-name').textContent = p.name;
-  $('g-preview-keeper').textContent = p.keeper;
 }
 
 // ── the action bar ─────────────────────────────────────────────────────────
@@ -1162,7 +1067,7 @@ function renderHead(): void {
   const voted = st.jury.length;
   const where =
     s === null
-      ? 'Play vs bots'
+      ? GAME_NAME
       : st.taverns.size < s.state.managers.size
         ? `Tavern pick · ${st.taverns.size + 1} of ${s.state.managers.size}`
         : !st.draft.complete
@@ -1496,7 +1401,8 @@ function renderTable(): void {
 function renderAll(): void {
   renderHead();
   renderTabs();
-  if (game.session === null) $('g-feed').innerHTML = setupHtml();
+  $('game').toggleAttribute('data-idle', game.session === null);
+  if (game.session === null) $('g-feed').innerHTML = lobbyHtml();
   else void present(null, null);
   renderBar();
   renderWork();
@@ -1514,11 +1420,11 @@ function onClick(action: string, el: HTMLElement): void {
   const id = el.dataset.id;
   const s = game.session;
   switch (action) {
-    case 'g-suggest':
-      game.form = { ...game.form, ...tavernWords(cryptoRand) };
-      ($('g-adj') as HTMLInputElement).value = game.form.adjective;
-      ($('g-noun') as HTMLInputElement).value = game.form.noun;
-      updatePreview();
+    case 'g-start':
+      start();
+      return;
+    case 'g-profile':
+      openProfile();
       return;
     case 'g-skip':
       skip();
@@ -1596,10 +1502,6 @@ function onClick(action: string, el: HTMLElement): void {
 
 function onChange(action: string, target: HTMLInputElement | HTMLSelectElement): void {
   switch (action) {
-    case 'g-banner':
-      game.form = { ...game.form, banner: target.value };
-      updatePreview();
-      return;
     case 'g-sort':
       game.draftSort = target.value as typeof game.draftSort;
       renderWork();
@@ -1628,22 +1530,12 @@ export function initGame({ onComplete }: { readonly onComplete: (s: ContestSessi
     const el = target.closest<HTMLElement>('[data-action]');
     if (el?.dataset.action !== undefined && !(el instanceof HTMLSelectElement) && !(el instanceof HTMLInputElement)) onClick(el.dataset.action, el);
   });
-  root.addEventListener('submit', (ev) => {
-    if ((ev.target as HTMLElement).id !== 'g-setup') return;
-    ev.preventDefault();
-    start();
-  });
   root.addEventListener('change', (ev) => {
     const target = ev.target as HTMLInputElement | HTMLSelectElement;
     if (target.dataset.action !== undefined) onChange(target.dataset.action, target);
   });
   root.addEventListener('input', (ev) => {
     const target = ev.target as HTMLInputElement;
-    const field = FORM_FIELDS[target.dataset.action ?? ''];
-    if (field !== undefined) {
-      game.form = { ...game.form, [field]: target.value };
-      updatePreview();
-    }
     if (target.dataset.action === 'g-filter') {
       game.filter = target.value;
       renderWork();
@@ -1662,6 +1554,15 @@ export function initGame({ onComplete }: { readonly onComplete: (s: ContestSessi
     ev.preventDefault();
     setView(next);
     document.querySelector<HTMLButtonElement>(`#g-tabs button[data-view="${next}"]`)?.focus();
+  });
+  // A new name or tavern shows in the lobby at once; a season in play keeps the one it started with.
+  document.addEventListener('lot:profile', () => {
+    if (game.session === null) renderAll();
+  });
+  noteSeason(() => {
+    const s = game.session;
+    if (s === null || s.stage.kind === 'complete' || game.profile === null) return null;
+    return `The season in play keeps ${tavernOf(game.profile).name}, kept by ${game.profile.name}. A change here takes effect from your next season.`;
   });
   restore();
   // A restored season is shown whole: everything in the log is already told.
