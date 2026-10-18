@@ -388,6 +388,18 @@ export function tavernWords(rand: () => number): { readonly adjective: string; r
   return { adjective: pick(SEED_ADJECTIVES), noun: pick(SEED_NOUNS) };
 }
 
+/**
+ * The season's taverns that sit at the table beside yours: none flying your
+ * banner's mark, and one fewer than the seats, so every tavern at the table
+ * looks different and none goes unchosen. When more than enough remain,
+ * `rand` picks which sit the season out.
+ */
+export function rivalTaverns<T>(taverns: ReadonlyArray<T>, markOf: (t: T) => string | undefined, mark: string, seats: number, rand: () => number): ReadonlyArray<T> {
+  const rivals = taverns.filter((t) => markOf(t) !== mark);
+  while (rivals.length > seats - 1) rivals.splice(Math.floor(rand() * rivals.length), 1);
+  return rivals;
+}
+
 // ── tables ─────────────────────────────────────────────────────────────────
 
 /**

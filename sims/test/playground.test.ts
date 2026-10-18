@@ -23,6 +23,7 @@ import {
   formatCr,
   ranksOf,
   readingOrder,
+  rivalTaverns,
   REACH_PICKS,
   runningTally,
   seedWords,
@@ -151,6 +152,21 @@ describe('view helpers', () => {
     expect(tavernId('The Ölbräu Mug')).toBe('the-olbrau-mug');
     const { adjective, noun } = tavernWords(() => 0);
     expect(`The ${adjective} ${noun}`).toBe('The Amber Ale');
+  });
+
+  it('seats one rival fewer than the seats, never one flying your banner', () => {
+    const taverns = [
+      { id: 'a', mark: 'red' },
+      { id: 'b', mark: 'blue' },
+      { id: 'c', mark: 'green' },
+      { id: 'd', mark: 'gold' },
+    ];
+    const ids = (mark: string, rand: () => number): string[] => rivalTaverns(taverns, (t) => t.mark, mark, 4, rand).map((t) => t.id);
+    // Your banner clashes with one: it sits out, and the rest are just enough.
+    expect(ids('blue', () => 0)).toEqual(['a', 'c', 'd']);
+    // No clash: one sits out all the same, as the dice say.
+    expect(ids('pink', () => 0)).toEqual(['b', 'c', 'd']);
+    expect(ids('pink', () => 0.99)).toEqual(['a', 'b', 'c']);
   });
 
   it('offers six well-formed banners, each its own colour and texture', () => {

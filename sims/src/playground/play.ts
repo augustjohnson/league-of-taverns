@@ -24,7 +24,7 @@
  * Your season is saved in this browser as its seed, seat, your tavern and
  * your moves, and replayed on reload.
  */
-import { applyEvent, episodeScore, initialState, roundMatchups, roundOf, seasonStandings } from '@league-of-taverns/engine';
+import { applyEvent, episodeScore, initialState, rngFor, roundMatchups, roundOf, seasonStandings } from '@league-of-taverns/engine';
 import type { LeagueEvent, LeagueState } from '@league-of-taverns/engine';
 import type { Banner } from '@league-of-taverns/scripts/lib/banner';
 import { ContestSession } from '../season-runner';
@@ -67,6 +67,7 @@ import {
   draftBoard,
   ranksOf,
   readingOrder,
+  rivalTaverns,
   runningTally,
   seedWords,
   signed,
@@ -232,13 +233,13 @@ const folds = new Map<string, boolean>();
 
 /**
  * A season with you in `manager`'s seat, bringing your tavern. The season's own taverns stay for the bots, less any
- * flying your banner, so every tavern at the table looks different.
+ * flying your banner and enough others (by the seed) that there is one tavern per seat.
  */
 function newSession(manager: string, seed: string, profile: Profile): ContestSession {
   const tavern = tavernOf(profile);
   const { banner } = bannerChoice(profile.banner);
   setPlayerTavern(tavern, { banner });
-  const rivals = input.taverns.filter((t) => tavernChrome[t.id]?.banner.mark !== banner.mark);
+  const rivals = rivalTaverns(input.taverns, (t) => tavernChrome[t.id]?.banner.mark, banner.mark, input.managers.length, rngFor(seed, 'playground/rivals'));
   const session = new ContestSession({ ...input, taverns: [...rivals, tavern] }, { seed, human: { manager, login: 'you', githubId: 1, tavern: tavern.id } });
   session.advanceDraft();
   return session;
