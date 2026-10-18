@@ -1,12 +1,8 @@
 /**
- * Tavern pick (docs/decisions.md D-52): before the draft, each manager
- * chooses one of the season's taverns, in reverse draft order.
- *
- * Until boons exist (T6.10), taverns differ only in which god's week is
- * theirs, and with no home bonus (D-47) that changes nothing. So every bot
- * chooses uniformly at random among the taverns still open, from `rng`. That
- * also spreads each tavern evenly across strategies, so per-tavern results in
- * the balance report aren't confounded with who chose it.
+ * The tavern pick: before the draft, each manager chooses one of the
+ * season's taverns, in reverse draft order. Taverns are team names and
+ * banners, so nothing rides on the choice: every bot chooses uniformly at
+ * random among those still open, from `rng`.
  */
 import type { Rng } from '@league-of-taverns/engine';
 

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The I/O edge: read and write repo files, call the engine, and append events. Run by humans and by Actions.",
+  "description": "The I/O edge: read and validate repo files, snapshot Open5e, and draft and package character art.",
   "exports": {
     "./lib/*": "./src/lib/*.ts"
   },
@@ -11,17 +11,7 @@
     "typecheck": "tsc -p .",
     "snapshot": "tsx src/snapshot.ts",
     "validate": "tsx src/validate.ts",
-    "draft-missions": "tsx src/draft-missions.ts",
-    "difficulty-report": "tsx src/difficulty-report.ts",
-    "draft-chrome": "tsx src/draft-chrome.ts",
     "draft-images": "tsx src/draft-images.ts",
-    "lock-check": "tsx src/lock-check.ts",
-    "seal": "tsx src/seal.ts",
-    "reveal": "tsx src/reveal.ts",
-    "apply-command": "tsx src/apply-command.ts",
-    "run-week": "tsx src/run-week.ts",
-    "offseason": "tsx src/offseason.ts",
-    "publish": "tsx src/publish.ts",
     "package-characters": "tsx src/package-characters.ts"
   },
   "dependencies": {

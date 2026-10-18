@@ -1,5 +1,11 @@
 # Rules (draft)
 
+> **Superseded for the playtest.** This page describes the earlier mission
+> format (parties, missions, battles, loot, gods). The game is now the Lich's
+> contest: see [lich-contest-plan.md](lich-contest-plan.md) for what is built
+> and its playtest defaults, and [survivor-format.md](survivor-format.md) for
+> the design. This page will be rewritten once the playtest settles the rules.
+
 > Draft rulebook for Season 1. Items tagged **[OPEN D-xx]** are defaults
 > pending [decisions.md](decisions.md). Every number here is a per-season
 > setting in `seasons/<id>/config.yaml`. Where this file and the config

@@ -1,35 +1,30 @@
 /**
  * @league-of-taverns/bots
  *
- * Bot managers that play a season headless through the same commands humans
- * use. Each decision returns a command that the engine reducers validate,
- * exactly like an issue form. Bots never bypass rules.
+ * Bot managers that play a season through the same commands people use:
+ * choose a tavern, draft, and call the boot. Each decision is validated by
+ * the engine's reducers. Bots never bypass rules and never see the seed or
+ * a challenge before it runs.
  *
- * Used by sims/ for balance testing, and possibly to fill empty seats in a
- * live league (docs/decisions.md D-36).
+ * Used by sims/ for balance testing and by the playground for the rival
+ * taverns.
  */
 export type * from './types';
 export {
   BOT_IDS,
+  CALL_STRATEGIES,
   DRAFT_STRATEGIES,
-  LINEUP_STRATEGIES,
-  bestAvailable,
   botManager,
-  costliestAbility,
-  crGreedyDraft,
-  environmentFitLineup,
-  keepsLineupPossible,
-  leaderHex,
-  maxCrLineup,
-  projectionLineup,
+  gossipCalls,
+  hunchCalls,
+  oracleCalls,
+  powerDraft,
+  randomCalls,
   randomDraft,
   randomTavern,
-  skillCoverageDraft,
-  valueDraft,
+  scoutDraft,
+  scoutSeed,
+  socialDraft,
 } from './strategies';
-export type { BotId } from './strategies';
-export { battleStrength, coveredSkills, poolInfo, referenceFoe, valueOf } from './metrics';
-export type { PoolInfo } from './metrics';
-export { checkFit, fitWeights } from './environment';
-export { legalSubsets, lineupFrom, startable } from './view';
-export type { Subset } from './view';
+export type { BotId, TavernStrategy } from './strategies';
+export { VALUE_RUNS, expectedPoints, warmth } from './value';

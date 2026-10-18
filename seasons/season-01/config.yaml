@@ -1,72 +1,45 @@
-# Season configuration. Schema: docs/schema.md § Season config.
-# Values marked OPEN are defaults pending docs/decisions.md. Every value is per
-# season. Copied into season.created at creation, and later edits to this file
-# have no effect on a running season (CI flags them).
+# Season configuration for the Lich's contest. Schema: engine/src/league
+# (SeasonConfig) and docs/lich-contest-plan.md. Values are the playtest
+# defaults from sims/fixtures/lich-season/config.yaml until the playtest
+# settles them. Copied into season.created at creation; later edits to this
+# file have no effect on a running season.
+#
+# Status: in preparation. The pool needs at least `contest.castSize`
+# characters with strategies, and challenges/ needs one challenge per
+# episode, before `validate --season season-01` passes.
 
 id: season-01
 name: Season One
-snapshot: open5e-v1-2026-10        # id in data/open5e/manifest.json (not yet pulled: T1.1)
+snapshot: open5e-v1-2026-10        # id in data/open5e/manifest.json
 modifierRegistryVersion: 1          # engine/src/characters/registry.ts
-weeks: 6
-schedule: schedule.yaml
 pool: pool.yaml
 managers: managers.yaml
+taverns: taverns.yaml
+challenges: challenges
 
 budget:
-  partyCr: 12                       # B: four starters, total CR ≤ B. Fractions allowed ("1/2").
   modifierPointsPerCharacter: 3     # per-season modifier budget per pooled character (D-31)
 
 roster:
-  size: 7                           # OPEN D-03
-  starters: 4                       # four starters, no captain (D-12)
-  ownership: exclusive              # OPEN D-01
+  size: 3                           # monsters each tavern drafts, kept all season (4 taverns × 3 = the cast)
 
 draft:
-  format: snake                     # OPEN D-02
-  rounds: 7                         # = roster.size minus keepers (D-11)
-  order: { mode: seeded }           # seeded from rngFor(draftOrderSeed(season), 'order') | { mode: manual, taverns: [...] }
-  pickWindowHours: 24
-  onTimeout: autopick               # OPEN D-26: autopick (bot strategy "value") | skip | wait
+  format: snake
+  order: { mode: seeded }           # seeded from rngFor(draftOrderSeed(season), 'order') | { mode: manual, managers: [...] }
+
+contest:
+  castSize: 12
+  finalists: 3
+  lapDc: 1
+  model: {}                         # vote-model overrides (engine/src/contest/model.ts)
 
 scoring:
-  pointsScale: 100                  # points = round(score × 100 × home multiplier)
-  homeBonus: 1                      # D-47: dropped 2026-10-13 (was 1.25). 1 = off
+  survive: 2
+  immunity: 3
+  juryVote: 2
+  winner: 10
+  call: 2
+  earlyCallBonus: 1
 
-waivers:
-  priority: reverse_standings       # D-05: lowest on the table claims first; winning doesn't move you (or: rolling)
-  initialOrder: reverse_draft
-
-trades:
-  vetoWindowHours: 24               # OPEN D-06
-  vetoBy: commissioner
-  deadlineWeek: 4                   # no trades accepted after week 4 locks
-
-missedLineup: carry_over            # OPEN D-07 (fallback when the carried lineup is illegal: D-27)
-
-schedules:                          # Actions cron, UTC
-  lineupLock: "0 18 * * 4"          # Thursdays 18:00: lineup.locked
-  weeklyRun: "15 18 * * 4"          # then reveal + run + finalize
-  waivers: "0 12 * * 5"             # Fridays 12:00: waiver.resolved
-
-secrecy: open                       # D-08: public for now; hidden until the lock later (not built). (private_repo | commit_reveal | encrypted kept for later)
-seedSalt: none                      # D-13: live weeks will use a real random roll. Seeds remain for sims
-
-spellcasters:                       # D-43: battle model can't see spells yet
-  maxInPool: 4
-  maxPerEncounter: 0
-
-missions:
-  dcBand: { min: 8, max: 20 }
-  maxNodes: 14
-  maxRank: 8
-  battlesPerPath: { min: 0, max: 3 }
-  encounterCrRatio: 1.0             # total encounter CR ≤ ratio × B
-  haul: 100                         # fixed haul: loot on every mission's best path (D-45)
-  battleModel: ev-ttk-v0            # engine/src/resolution BattleModel id (T6.2)
-
-carryover:                          # D-11 (decided): 1 keeper, no champion bonus. Applies when season-02 is created.
-  mode: keeper
-  keepersPerTavern: 1
-  keeperCost: round_of_last_season_pick   # or: none | fixed_round
-  championBonusKeepers: 0
-  maxModifierChangePoints: 1        # a kept character's modifiers may shift by at most this many points
+schedule:
+  rounds: [3, 3, 3]                 # episodes per head-to-head round; the finale is in the last

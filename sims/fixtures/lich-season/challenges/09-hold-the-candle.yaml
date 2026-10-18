@@ -1,0 +1,12 @@
+# Episode 9. Chrome: title, story and each check's line. The checks under them are the rules.
+id: hold-the-candle
+episode: 9
+title: Hold the Candle
+story: >-
+  Final four. One last task, and it is my favourite: hold this candle, and
+  keep holding it. Last one holding a lit candle is safe.
+checks:
+  - { type: save, ability: con, dc: 13, line: "keep their arm up" }
+  - { type: save, ability: wis, dc: 13, line: "keep their mind on it" }
+  - { type: save, ability: dex, dc: 13, line: "shield the flame from the draught" }
+  - { type: save, ability: cha, dc: 13, line: "stare the Lich in the eye" }

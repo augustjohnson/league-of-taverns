@@ -3,7 +3,7 @@
  *
  * Usage:
  *   validate --season season-01
- *   validate --dir sims/fixtures/mock-season [--characters sims/fixtures/mock-season]
+ *   validate --dir sims/fixtures/lich-season [--characters sims/fixtures/lich-season]
  *
  * `--season` reads seasons/<id>/. `--dir` reads a season directory elsewhere;
  * its characters resolve under `--characters` (default: the directory itself
@@ -12,12 +12,12 @@
  *
  * Checks, each reporting every violation (see lib/validate-season.ts):
  * - Snapshot integrity (manifest sha256).
- * - config.yaml, managers.yaml, schedule.yaml, pool.yaml parse and match schema.
+ * - config.yaml, managers.yaml, taverns.yaml, pool.yaml and challenges/*.yaml
+ *   parse and match schema.
  * - Every pooled character exists in characters/, its base slug exists in the
- *   pinned snapshot, its modifiers fit the vocabulary and budget, and the pool
- *   is within the spellcaster limit.
- * - Every mission (candidates and selected) passes the engine validator.
- * - Not yet: chrome coverage and the token and mechanical-fact lints (T8.x).
+ *   pinned snapshot, its modifiers fit the vocabulary and budget, and a loyal
+ *   strategy names a tag someone else carries.
+ * - There is one challenge per episode, and the contest fits the taverns.
  * Exit 1 on any violation.
  */
 import { existsSync } from 'node:fs';
@@ -53,11 +53,8 @@ runMain((argv) => {
   if (issues.length > 0) {
     throw new ValidationFailure(`${issues.join('\n')}\n\n${issues.length} problem${issues.length === 1 ? '' : 's'} found.`);
   }
-  const missions = checked.missions;
-  const selected = missions.filter((m) => m.status === 'selected').length;
-  console.log(
-    `${checked.season ?? '?'}: OK. ${checked.characters} pooled characters, ${checked.taverns} taverns, ${checked.weeks} weeks, ` +
-      `${missions.length} missions (${missions.length - selected} candidates, ${selected} selected).`,
-  );
-  console.log('Skipped: chrome coverage and lints (T8.x).');
+  const mix = Object.entries(checked.abilityMix ?? {})
+    .map(([ability, n]) => `${ability} ${n}`)
+    .join(', ');
+  console.log(`${checked.season ?? '?'}: OK. ${checked.characters} pooled characters, ${checked.taverns} taverns, ${checked.challenges} challenges (checks: ${mix}).`);
 });

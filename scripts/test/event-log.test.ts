@@ -4,7 +4,9 @@ import { dirname, join } from 'node:path';
 import { InvalidEventError, LogParseError, ReplayError, lineHash, replayLog } from '@league-of-taverns/engine';
 import type { Actor, EventOf, EventType, LeagueEvent } from '@league-of-taverns/engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AT, COMMISSIONER, POOL, SEASON, miniConfig, schedule, sponsors, tavernList } from '../../engine/test/support/league-log';
+import { AT, CAST, CHALLENGES, COMMISSIONER, SEASON, miniConfig, tavernList } from '../../engine/test/support/league-log';
+import { challengeSha256 } from '@league-of-taverns/engine';
+import type { CrEighths } from '@league-of-taverns/engine';
 import { ValidationFailure } from '../src/lib/main';
 import { appendEvent, eventLogPath, readEventLog, type EventDraft } from '../src/lib/repo';
 
@@ -24,8 +26,15 @@ function draft<T extends EventType>(type: T, payload: EventOf<T>['payload'], act
   return { v: 1, type, season: SEASON, at: AT, actor, payload } as EventDraft;
 }
 
-const created = draft('season.created', { config: miniConfig(), configSha256: lineHash('config'), engineVersion: '0.0.0', schedule: schedule(), sponsors: sponsors(), taverns: tavernList() });
-const pooled = (i: number) => draft('character.pooled', { character: POOL[i]!.id, base: 'ogre', cr: POOL[i]!.cr, modifiers: [] });
+const created = draft('season.created', {
+  config: miniConfig(),
+  configSha256: lineHash('config'),
+  engineVersion: '0.0.0',
+  taverns: tavernList(),
+  challenges: CHALLENGES.map((c, i) => ({ episode: i + 1, sha256: challengeSha256(c) })),
+  abilityMix: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+});
+const pooled = (i: number) => draft('character.pooled', { character: CAST[i]!.id, base: 'ogre', cr: 16 as CrEighths, modifiers: [], strategy: CAST[i]!.strategy });
 const joined = (manager: string, githubId: number) => draft('manager.joined', { manager, account: { githubId, login: `m${githubId}` } });
 
 const logFile = () => eventLogPath(SEASON, root);
@@ -62,7 +71,7 @@ describe('appendEvent', () => {
     const state = replayLog(text);
     expect(state.lastSeq).toBe(3);
     expect(state.phase).toBe('preseason');
-    expect([...state.pool.keys()]).toEqual([POOL[0]!.id]);
+    expect([...state.pool.keys()]).toEqual([CAST[0]!.id]);
     expect([...state.managers.keys()]).toEqual(['flagon-manager']);
     expect(results.at(-1)!.state).toEqual(state);
     expect(results.map((r) => r.event.seq)).toEqual([1, 2, 3]);

@@ -1,0 +1,12 @@
+# Episode 5. Chrome: title, story and each check's line. The checks under them are the rules.
+id: round-up-the-bats
+episode: 5
+title: Round Up the Bats
+story: >-
+  The bats have got into the ballroom. They are my bats, so be gentle, but I
+  want them out. Most bats wins.
+checks:
+  - { type: skill, skill: acrobatics, dc: 12, advantage: { speed: fly }, line: "chase them through the rafters" }
+  - { type: skill, skill: perception, dc: 12, advantage: { sense: darkvision }, line: "spot them in the dark" }
+  - { type: skill, skill: athletics, dc: 12, line: "wrestle them into a sack" }
+  - { type: save, ability: dex, dc: 12, line: "dodge the one that bites" }

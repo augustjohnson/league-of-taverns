@@ -1,0 +1,12 @@
+# Episode 8. Chrome: title, story and each check's line. The checks under them are the rules.
+id: the-talent-show
+episode: 8
+title: The Talent Show
+story: >-
+  The staff want a talent show. I don't. But I am a fair employer, so you will
+  put one on, and I will hate it least.
+checks:
+  - { type: skill, skill: performance, dc: 12, line: "do their act" }
+  - { type: skill, skill: acrobatics, dc: 12, line: "stick the big finish" }
+  - { type: skill, skill: deception, dc: 12, line: "pretend the Lich is smiling" }
+  - { type: save, ability: cha, dc: 12, line: "take the heckling" }

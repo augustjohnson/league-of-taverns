@@ -1,140 +1,89 @@
 /**
- * The mock season loop (T9.2), as pure functions over in-memory data.
+ * The Lich's contest, played as a season with bot taverns, as pure
+ * functions over in-memory data.
  *
- * - `seasonParts` checks a loaded season (scripts' `loadSeason`) and its
- *   missions and reduces them to `SeasonParts`: plain, JSON-safe data.
- *   `seasonInput` turns parts into a `SeasonInput`: everything a run needs,
- *   with one `statsOf` and one `baseOf` shared by every run, so the bots'
- *   per-(statsOf, pool) cache keeps hitting. `prepareSeason` does both. The
- *   browser playground ships parts as JSON and calls `seasonInput` itself.
- * - `runMockSeason` plays one whole season headless with bot managers and
- *   returns the event log, the folded state and a summary. Every event goes
- *   through the engine's `applyEvent` as it is built, so bots obey the real
- *   rules. At the end the log is replayed from its NDJSON (`replayLog`) and
- *   audited (`verifyResolutions`), and any disagreement throws.
+ * - `seasonParts` checks a loaded season (scripts' `loadSeason`) and reduces
+ *   it to `SeasonParts`: plain, JSON-safe data. `seasonInput` turns parts
+ *   into a `SeasonInput` with the cards built once. The browser playground
+ *   ships parts as JSON and calls `seasonInput` itself.
+ * - `ContestSession` plays one season a step at a time, with at most one
+ *   tavern run by a person: the tavern pick, the draft, then each episode's
+ *   challenge and vote, the finale and the head-to-head rounds. Every event
+ *   goes through the engine's `applyEvent`, so bots and people obey the same
+ *   rules. `runSeason` is a session with no person, driven straight through.
+ * - `finish()` replays the NDJSON (`replayLog`), recomputes the contest from
+ *   the seed (`verifyContest`), and throws on any disagreement.
  *
- * No I/O, no clock, no ambient randomness: the sim seed drives the bots'
- * randomness, the per-week dice salt and the event timestamps, so the same
- * input and seed always give byte-identical NDJSON. ./load.ts reads the files
- * and ./mock-season.ts is the CLI.
- *
- * Seeds (docs/decisions.md D-13): a live week rolls real dice once, but sims
- * use `weekSeed({ season, week, tavern, salt: simSeed })` so every run is
- * reproducible. The draft order is the engine's (`draftOrderSeed(config.id)`),
- * but the runner shuffles tavern join order per sim seed, so each seat's draft
- * slot varies across runs.
+ * No I/O, no clock, no ambient randomness: the sim seed draws the cast,
+ * salts the contest seed and drives the bots, so the same input and seed
+ * always give byte-identical NDJSON. ./load.ts reads the files and
+ * ./sim.ts is the CLI.
  */
-import { BOT_IDS, botManager, valueOf } from '@league-of-taverns/bots';
+import { BOT_IDS, botManager, expectedPoints, scoutSeed } from '@league-of-taverns/bots';
 import type { BotId, BotManager, PublicView } from '@league-of-taverns/bots';
 import {
-  BATTLE_MODELS,
   TRAITS,
   applyEvent,
-  carriedLineup,
+  castMap,
+  challengeSha256,
+  contestSeed,
+  contestState,
+  contestant,
   cyrb128,
   effectiveStats,
+  episodeOdds,
+  episodeScore,
+  episodeStage,
+  episodesOf,
   freeAgents,
-  homeTavern,
-  hexOn,
   initialState,
-  injuredFor,
   lineHash,
+  matchups,
   onTheClock,
-  tavernPickOnTheClock,
-  projectMission,
-  projectedPoints,
+  playChallenge,
+  playFinale,
+  playVote,
   replayLog,
-  resolveWaivers,
   rngFor,
-  runMission,
-  runPoints,
+  roundOf,
   seasonStandings,
-  waiverPriority,
-  standings,
   serializeEvent,
+  tavernPickOnTheClock,
   toBaseStats,
-  validateLineup,
-  verifyResolutions,
-  weekResults,
-  weekSeed,
+  verifyContest,
+  voteModel,
 } from '@league-of-taverns/engine';
 import type {
   Ability,
   Actor,
+  CallState,
   BaseStats,
-  BattleModel,
+  Challenge,
+  ContestMismatch,
+  ContestState,
+  Contestant,
   CrEighths,
   EffectiveStats,
+  EpisodeOdds,
   EventOf,
   EventType,
   LeagueEvent,
   LeagueState,
-  Lineup,
-  Mission,
   Open5eMonster,
-  Party,
-  PayloadByType,
   PooledCharacter,
-  ResolutionMismatch,
   SeasonConfig,
-  WaiverClaim,
+  VoteModel,
+  VotingStrategy,
 } from '@league-of-taverns/engine';
 import { deepEqual } from './deep-equal';
 
 // ── input ──────────────────────────────────────────────────────────────────
 
-export type ScheduleEntry = PayloadByType['season.created']['schedule'][number];
-export type SponsorEntry = PayloadByType['season.created']['sponsors'][number];
-
-export interface SeasonInput {
-  readonly config: SeasonConfig;
-  /** sha256 of config.yaml's text, for `season.created`. */
-  readonly configSha256: string;
-  /** engine/package.json `version`. */
-  readonly engineVersion: string;
-  /** The public schedule, with every `commitment` null (missions are open, D-08). */
-  readonly schedule: ReadonlyArray<ScheduleEntry>;
-  /** The GM's sponsors: which god backs which tavern (D-44). */
-  readonly sponsors: ReadonlyArray<SponsorEntry>;
-  /** In pool-file order: the order `character.pooled` events are written. */
-  readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
-  /** The season's taverns, in package order (schedule.yaml): managers choose among them (D-52). */
-  readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
-  /** In managers-file order. Each is a bot, unless a person takes its seat. */
-  readonly managers: ReadonlyArray<{ readonly id: string; readonly bot: BotId }>;
-  /** The commissioner as an actor, or null without a GitHub id (setup events then use the system actor). */
-  readonly commissioner: { readonly githubId: number; readonly login: string } | null;
-  /** Each week's mission and the sha256 of its canonical JSON. */
-  readonly missions: ReadonlyMap<number, { readonly mission: Mission; readonly sha256: string }>;
-  /** Base stats by Open5e slug, for encounter creatures. */
-  readonly baseOf: (slug: string) => BaseStats;
-  /** Effective stats (base + modifiers) by pooled character id. */
-  readonly statsOf: (characterId: string) => EffectiveStats;
-  /** `BATTLE_MODELS[config.missions.battleModel]`. */
-  readonly battleModel: BattleModel;
-}
-
-/**
- * What `seasonParts` reads from a loaded season. Scripts' `LoadedSeason`
- * satisfies it; it is spelled out here so this module (and the browser
- * bundle) never imports the I/O layer.
- */
-export interface SeasonSource {
-  readonly config: SeasonConfig;
-  readonly snapshot: ReadonlyArray<Open5eMonster>;
-  readonly pool: { readonly characters: ReadonlyArray<PooledCharacter>; readonly cr: ReadonlyMap<string, CrEighths> };
-  readonly managers: {
-    readonly commissioner: { readonly login: string; readonly githubId: number | null };
-    readonly managers: ReadonlyArray<{
-      readonly id: string;
-      readonly account: { readonly bot: BotId } | { readonly login: string; readonly githubId: number | null };
-    }>;
-  };
-  readonly schedule: {
-    readonly sponsors: ReadonlyArray<SponsorEntry>;
-    readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
-    readonly weeks: ReadonlyArray<ScheduleEntry>;
-  };
+/** One pool entry: the character, its CR and its voting strategy. */
+export interface PoolPart {
+  readonly character: PooledCharacter;
+  readonly cr: CrEighths;
+  readonly strategy: VotingStrategy;
 }
 
 /**
@@ -147,246 +96,164 @@ export interface SeasonParts {
   readonly configSha256: string;
   /** engine/package.json `version`. */
   readonly engineVersion: string;
-  /** The public schedule, with every `commitment` null (missions are open, D-08). */
-  readonly schedule: ReadonlyArray<ScheduleEntry>;
-  /** The GM's sponsors: which god backs which tavern (D-44). */
-  readonly sponsors: ReadonlyArray<SponsorEntry>;
-  /** In pool-file order. */
-  readonly pool: ReadonlyArray<{ readonly character: PooledCharacter; readonly cr: CrEighths }>;
-  /** In package order. */
+  /** The whole pool, in pool-file order. Each season's cast is drawn from it. */
+  readonly pool: ReadonlyArray<PoolPart>;
+  /** In taverns-file order. */
   readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
   /** In managers-file order. */
   readonly managers: ReadonlyArray<{ readonly id: string; readonly bot: BotId }>;
   readonly commissioner: { readonly githubId: number; readonly login: string } | null;
-  /** One mission per schedule week, in week order. */
-  readonly missions: ReadonlyArray<{ readonly week: number; readonly mission: Mission; readonly sha256: string }>;
-  /** Verbatim Open5e records, covering at least every pool base and encounter creature. The first record per slug wins. */
+  /** One challenge per episode, in order, with its commitment. */
+  readonly challenges: ReadonlyArray<{ readonly episode: number; readonly challenge: Challenge; readonly sha256: string }>;
+  /** The public hint: checks per ability over the season. */
+  readonly abilityMix: Readonly<Record<Ability, number>>;
+  /** Verbatim Open5e records, covering at least every pool base. The first record per slug wins. */
   readonly snapshot: ReadonlyArray<Open5eMonster>;
 }
 
+export interface SeasonInput extends Omit<SeasonParts, 'snapshot'> {
+  /** Effective stats (base + modifiers) by pooled character id. */
+  readonly statsOf: (characterId: string) => EffectiveStats;
+  /** A pool member's card. */
+  readonly cardOf: (characterId: string) => Contestant;
+  /** The season's vote model. */
+  readonly model: VoteModel;
+}
+
+/** What `seasonParts` reads from a loaded season: scripts' `LoadedSeason` satisfies it. */
+export interface SeasonSource {
+  readonly config: SeasonConfig;
+  readonly snapshot: ReadonlyArray<Open5eMonster>;
+  readonly pool: {
+    readonly characters: ReadonlyArray<PooledCharacter>;
+    readonly cr: ReadonlyMap<string, CrEighths>;
+    readonly strategies: ReadonlyMap<string, VotingStrategy>;
+  };
+  readonly managers: {
+    readonly commissioner: { readonly login: string; readonly githubId: number | null };
+    readonly managers: ReadonlyArray<{ readonly id: string; readonly account: { readonly bot: BotId } | { readonly login: string; readonly githubId: number | null } }>;
+  };
+  readonly taverns: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+  readonly challenges: ReadonlyArray<{ readonly episode: number; readonly challenge: Challenge }>;
+}
+
 /**
- * Check a loaded season and reduce it to `SeasonParts`. Each schedule week is
- * matched to the one mission with its environment. Throws if a week has no
- * mission or several, if a manager is a person (sims seat only bots), or if
- * a pooled character has no CR. Pure: the caller reads the files.
+ * Check a loaded season and reduce it to `SeasonParts`. Throws if a manager
+ * is a person (sims seat only bots) or a pooled character lacks a CR or a
+ * strategy. Pure: the caller reads the files.
  */
-export function seasonParts(
-  loaded: SeasonSource,
-  missions: ReadonlyArray<Mission>,
-  configText: string,
-  engineVersion: string,
-): SeasonParts {
+export function seasonParts(loaded: SeasonSource, abilityMix: Readonly<Record<Ability, number>>, configText: string, engineVersion: string): SeasonParts {
   const pool = loaded.pool.characters.map((character) => {
     const cr = loaded.pool.cr.get(character.ref.id);
-    if (cr === undefined) throw new Error(`pool: no CR for "${character.ref.id}"`);
-    return { character, cr };
+    const strategy = loaded.pool.strategies.get(character.ref.id);
+    if (cr === undefined || strategy === undefined) throw new Error(`pool: "${character.ref.id}" has no CR or strategy`);
+    return { character, cr, strategy };
   });
-
   const managers = loaded.managers.managers.map((manager) => {
-    if (!('bot' in manager.account)) throw new Error(`manager "${manager.id}" is a person; mock seasons seat only bots`);
+    if (!('bot' in manager.account)) throw new Error(`manager "${manager.id}" is a person; sims seat only bots`);
     return { id: manager.id, bot: manager.account.bot };
   });
-  const taverns = loaded.schedule.taverns.map(({ id, name }) => ({ id, name }));
-
-  const byWeek = loaded.schedule.weeks.map((week) => {
-    const matching = missions.filter((m) => m.environment === week.environment);
-    if (matching.length !== 1) {
-      throw new Error(
-        `week ${week.week} (${week.environment}) needs exactly one mission with that environment, found ${matching.length}` +
-          (matching.length > 0 ? `: ${matching.map((m) => m.id).join(', ')}` : ''),
-      );
-    }
-    const mission = matching[0]!;
-    return { week: week.week, mission, sha256: missionSha256(mission) };
-  });
-
   const { githubId, login } = loaded.managers.commissioner;
   return {
     config: loaded.config,
     configSha256: lineHash(configText),
     engineVersion,
-    schedule: loaded.schedule.weeks.map((week) => ({ ...week, commitment: null })),
-    sponsors: loaded.schedule.sponsors,
     pool,
-    taverns,
+    taverns: loaded.taverns.map(({ id, name }) => ({ id, name })),
     managers,
     commissioner: githubId === null ? null : { githubId, login },
-    missions: byWeek,
+    challenges: loaded.challenges.map(({ episode, challenge }) => ({ episode, challenge, sha256: challengeSha256(challenge) })),
+    abilityMix,
     snapshot: loaded.snapshot,
   };
 }
 
-/**
- * Build the run-ready `SeasonInput` from `SeasonParts`: base stats from the
- * snapshot records, effective stats per pooled character, the missions by
- * week and the battle model. Throws if the battle model is unknown or a pool
- * base is missing from the snapshot. Pure, and safe in a browser.
- */
+/** Build the run-ready `SeasonInput` from `SeasonParts`. Throws if a pool base is missing from the snapshot. Pure, and safe in a browser. */
 export function seasonInput(parts: SeasonParts): SeasonInput {
-  const { config } = parts;
-  const battleModel = BATTLE_MODELS[config.missions.battleModel];
-  if (battleModel === undefined) {
-    throw new Error(`unknown battle model "${config.missions.battleModel}" (known: ${Object.keys(BATTLE_MODELS).join(', ')})`);
-  }
-
   const bases = new Map<string, BaseStats>();
   for (const record of parts.snapshot) if (!bases.has(record.slug)) bases.set(record.slug, toBaseStats(record).stats);
-  const baseOf = (slug: string): BaseStats => {
-    const base = bases.get(slug);
-    if (base === undefined) throw new Error(`"${slug}" is not in snapshot ${config.snapshot}`);
-    return base;
-  };
-
   const stats = new Map<string, EffectiveStats>();
-  for (const { character } of parts.pool) stats.set(character.ref.id, effectiveStats(character, baseOf(character.ref.base), TRAITS));
-  const statsOf = (id: string): EffectiveStats => {
-    const s = stats.get(id);
-    if (s === undefined) throw new Error(`"${id}" is not pooled`);
-    return s;
-  };
-
-  return {
-    config,
-    configSha256: parts.configSha256,
-    engineVersion: parts.engineVersion,
-    schedule: parts.schedule,
-    sponsors: parts.sponsors,
-    pool: parts.pool,
-    taverns: parts.taverns,
-    managers: parts.managers,
-    commissioner: parts.commissioner,
-    missions: new Map(parts.missions.map(({ week, mission, sha256 }) => [week, { mission, sha256 }])),
-    baseOf,
-    statsOf,
-    battleModel,
-  };
-}
-
-/** `seasonInput(seasonParts(...))`: build a `SeasonInput` from a loaded season. See both. */
-export function prepareSeason(
-  loaded: SeasonSource,
-  missions: ReadonlyArray<Mission>,
-  configText: string,
-  engineVersion: string,
-): SeasonInput {
-  return seasonInput(seasonParts(loaded, missions, configText, engineVersion));
-}
-
-/**
- * sha256 of a mission's canonical JSON: keys sorted recursively (UTF-16 code
- * unit order), undefined fields dropped, arrays in order, no whitespace. The
- * same rules `serializeEvent` uses for log lines.
- */
-export function missionSha256(mission: Mission): string {
-  return lineHash(canonicalJson(mission));
-}
-
-export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') return JSON.stringify(value);
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error('canonicalJson: non-finite number');
-    return JSON.stringify(value);
+  const cards = new Map<string, Contestant>();
+  for (const { character, strategy } of parts.pool) {
+    const base = bases.get(character.ref.base);
+    if (base === undefined) throw new Error(`"${character.ref.base}" is not in snapshot ${parts.config.snapshot}`);
+    const s = effectiveStats(character, base, TRAITS);
+    stats.set(character.ref.id, s);
+    cards.set(character.ref.id, contestant(s, strategy));
   }
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (typeof value === 'object') {
-    const record = value as Readonly<Record<string, unknown>>;
-    const fields = Object.keys(record)
-      .filter((key) => record[key] !== undefined)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`);
-    return `{${fields.join(',')}}`;
-  }
-  throw new Error(`canonicalJson: cannot serialize a ${typeof value}`);
+  const lookup = <T>(m: ReadonlyMap<string, T>) => (id: string): T => {
+    const v = m.get(id);
+    if (v === undefined) throw new Error(`"${id}" is not pooled`);
+    return v;
+  };
+  const { snapshot: _snapshot, ...rest } = parts;
+  return { ...rest, statsOf: lookup(stats), cardOf: lookup(cards), model: voteModel(parts.config.contest.model) };
 }
 
 // ── output ─────────────────────────────────────────────────────────────────
 
-/** Who manages a seat in a summary: a bot, or `human` for the person's tavern in a played season. */
+/** Who manages a seat in a summary: a bot, or `human` for the person's tavern. */
 export type Seat = BotId | 'human';
 
 export interface RunOptions {
-  /** The sim seed: bot randomness, the per-week dice salt and the timestamps. Non-empty, no `/`. */
+  /** The sim seed: the cast, the contest's dice, the bots and the timestamps. Non-empty, no `/`. */
   readonly seed: string;
 }
 
-export interface TavernResult {
-  readonly tavern: string;
-  readonly bot: Seat;
-  readonly source: 'submitted' | 'carried' | 'fallback' | 'none';
-  /** In lineup order. Null when the tavern played nobody. */
-  readonly starters: ReadonlyArray<string> | null;
-  readonly points: number;
-  readonly projectedPoints: number;
-  readonly checksPassed: number;
-  readonly checksAttempted: number;
-  /** Null when the tavern played nobody. */
-  readonly dnf: boolean | null;
-  /** This week's rank by points, 1-based; equal points share a rank. */
-  readonly rank: number;
-  /** True on this tavern's sponsor's week: its points include the home bonus. */
-  readonly home: boolean;
-}
-
-export interface WeekSummary {
-  readonly week: number;
-  readonly mission: string;
-  /** The tavern whose sponsor set this week's mission, or null. */
-  readonly home: string | null;
-  readonly results: ReadonlyArray<TavernResult>;
-  /** Claims made after this week's run and how they resolved. Empty after the last week. */
-  readonly waivers: ReadonlyArray<{
-    readonly claim: string;
-    readonly tavern: string;
-    readonly add: string;
-    readonly drop: string | null;
-    readonly awarded: boolean;
-    readonly reason: string;
-  }>;
+export interface EpisodeSummary {
+  readonly episode: number;
+  readonly immune: string;
+  readonly boot: string;
+  /** The favourite to go home once immunity was known, by the public odds, and its chance. */
+  readonly favourite: string;
+  readonly favouriteChance: number;
+  readonly revote: boolean;
+  readonly draw: boolean;
+  /** Each tavern's call (null for none), whether it was early, and its points this vote. */
+  readonly taverns: ReadonlyArray<{ readonly tavern: string; readonly call: string | null; readonly early: boolean; readonly right: boolean; readonly points: number }>;
 }
 
 export interface RunSummary {
   readonly seed: string;
   readonly season: string;
   readonly events: number;
-  /** Every tavern ranked first. More than one only on an exact tie in total points. */
+  /** Every tavern ranked first. More than one only on an exact tie. */
   readonly champions: ReadonlyArray<{ readonly tavern: string; readonly bot: Seat }>;
-  readonly taverns: ReadonlyArray<{ readonly tavern: string; readonly name: string; readonly bot: Seat }>;
-  /** Final standings, best first (`seasonStandings`). */
-  readonly standings: ReadonlyArray<{
-    readonly rank: number;
-    readonly tavern: string;
-    readonly bot: Seat;
-    readonly points: number;
-  }>;
+  readonly taverns: ReadonlyArray<{ readonly tavern: string; readonly name: string; readonly bot: Seat; readonly roster: ReadonlyArray<string> }>;
+  readonly standings: ReadonlyArray<{ readonly rank: number; readonly tavern: string; readonly bot: Seat; readonly wins: number; readonly losses: number; readonly ties: number; readonly points: number; readonly callPoints: number }>;
   readonly draft: ReadonlyArray<{ readonly pick: number; readonly tavern: string; readonly bot: Seat; readonly character: string }>;
-  readonly weeks: ReadonlyArray<WeekSummary>;
+  readonly episodes: ReadonlyArray<EpisodeSummary>;
+  /** The cast in cast order: each one's strategy, power and placement (1 = winner, 20 = first out). */
+  readonly cast: ReadonlyArray<{ readonly id: string; readonly strategy: VotingStrategy['kind']; readonly power: number; readonly place: number; readonly owner: string | null }>;
+  readonly winner: string;
+  /** Matchups whose winner would change without call points. */
+  readonly callDecided: number;
+  readonly matchups: number;
 }
 
-export interface MockSeasonResult {
+export interface SeasonResult {
   readonly events: ReadonlyArray<LeagueEvent>;
   /** The canonical log, one line per event, with a trailing newline. */
   readonly ndjson: string;
   /** The folded state, with `lastHash` set as `replayLog` sets it. */
   readonly state: LeagueState;
   readonly summary: RunSummary;
-  /** The self-check every run passes before it returns (a failure throws instead). */
   readonly audit: SeasonAudit;
 }
 
-/** The replay and resolution audit `runMockSeason` runs on every season. */
+/** The replay and seed audit every season passes before it returns. */
 export interface SeasonAudit {
   /** `replayLog(ndjson)` deep-equals the state built event by event. */
   readonly replayMatches: boolean;
-  /** `verifyResolutions(events)`: empty when every `mission.resolved` checks out. */
-  readonly mismatches: ReadonlyArray<ResolutionMismatch>;
+  /** `verifyContest(events)`: empty when every challenge, vote and the finale follow from the seed. */
+  readonly mismatches: ReadonlyArray<ContestMismatch>;
 }
 
-/** Replay `ndjson` and compare it to `state`, then audit every resolution. Reports mismatches; never throws on one. */
-export function auditSeason(events: ReadonlyArray<LeagueEvent>, ndjson: string, state: LeagueState): SeasonAudit {
-  return { replayMatches: deepEqual(replayLog(ndjson), state), mismatches: verifyResolutions(events) };
+export function auditSeason(events: ReadonlyArray<LeagueEvent>, ndjson: string, state: LeagueState, statsOf: (id: string) => EffectiveStats): SeasonAudit {
+  return { replayMatches: deepEqual(replayLog(ndjson), state), mismatches: verifyContest(events, statsOf) };
 }
 
-// ── the season loop ────────────────────────────────────────────────────────
+// ── the session ────────────────────────────────────────────────────────────
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -395,6 +262,9 @@ const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 /** Thursday 2027-01-07 00:00 UTC. Seasons start on a Thursday 0–519 weeks after it, picked by the seed. */
 const EPOCH = Date.UTC(2027, 0, 7);
+
+/** Samples behind each set of public odds. */
+export const ODDS_SAMPLES = 150;
 
 /** Stamps envelopes, chains `prev`, folds every event through `applyEvent`, and keeps `lastHash` as `replayLog` does. */
 class LogBuilder {
@@ -420,12 +290,12 @@ class LogBuilder {
   }
 }
 
-/** ISO-8601 UTC to the second, e.g. `2027-01-07T18:00:00Z`. Arithmetic only: never reads the clock. */
+/** ISO-8601 UTC to the second. Arithmetic only: never reads the clock. */
 function iso(ms: number): string {
   return `${new Date(ms).toISOString().slice(0, 19)}Z`;
 }
 
-/** A human seat: which manager a person plays instead of its bot. They choose a tavern in the tavern pick (D-52). */
+/** A human seat: which manager a person plays instead of its bot. */
 export interface HumanSeat {
   /** A manager id from `SeasonInput.managers`. */
   readonly manager: string;
@@ -435,7 +305,7 @@ export interface HumanSeat {
 }
 
 export interface SessionOptions extends RunOptions {
-  /** The manager a person plays, or null/absent for an all-bot season. Its bot stays on as the advisor (`suggest*`). */
+  /** The manager a person plays, or null/absent for an all-bot season. */
   readonly human?: HumanSeat | null;
 }
 
@@ -443,41 +313,45 @@ export interface SessionOptions extends RunOptions {
 export type SessionStage =
   | { readonly kind: 'tavern'; readonly manager: string }
   | { readonly kind: 'draft'; readonly pick: number; readonly tavern: string }
-  | { readonly kind: 'week'; readonly week: number }
+  | { readonly kind: 'challenge'; readonly episode: number }
+  | { readonly kind: 'vote'; readonly episode: number }
+  | { readonly kind: 'finale' }
   | { readonly kind: 'complete' };
 
 /**
  * One season played a step at a time, with at most one tavern managed by a
- * person and the rest by bots. `runMockSeason` is a session with no person,
- * driven straight through, so both paths build the same events.
+ * person and the rest by bots.
  *
  * - `advanceDraft()` makes bot tavern choices and picks until the person is
- *   on the clock or the draft is done; `chooseTavern(id)` is the person's
- *   tavern (D-52), and `draftPick(id)` their pick.
- * - Between weeks the person may `setLineup` for the next week (again, to
- *   change it) and `claimWaiver`; claims resolve after that week's run.
- * - `playWeek()` runs the next week: bot lineups, the lock, the reveal, every
- *   resolution, `week.finalized`, then bot claims and `waiver.resolved`.
- * - `finish()` audits the completed log and returns the `MockSeasonResult`.
+ *   on the clock or the draft is done; `chooseTavern(id)` and `draftPick(id)`
+ *   are the person's moves.
+ * - In each episode the person may `call(target)` before the challenge
+ *   (early) and again after it (late, replacing an early call).
+ *   `runChallenge()` makes the bots' early calls and plays the challenge;
+ *   `runVote()` makes their late calls, plays the vote, and closes the round
+ *   when it is the round's last episode. After the last vote, `runFinale()`.
+ * - `finish()` audits the completed log and returns the `SeasonResult`.
  *
  * Every command goes through the engine's `applyEvent`, so an illegal one
  * throws an `InvalidEventError` and leaves the session unchanged.
  */
-export class SeasonSession {
+export class ContestSession {
   readonly input: SeasonInput;
   readonly seed: string;
   readonly human: HumanSeat | null;
+  /** The season's cast: its cards, in cast order. */
+  readonly cast: ReadonlyArray<Contestant>;
+  /** The contest's seed: every die in the contest comes from it. */
+  readonly contestSeed: string;
+  private readonly castById: ReadonlyMap<string, Contestant>;
   private readonly log: LogBuilder;
   private readonly start: number;
   private readonly bots: Map<string, { id: BotId; manager: BotManager; actor: Actor }>;
   private readonly humanActor: Actor | null;
-  private readonly waiverLog = new Map<number, WeekSummary['waivers']>();
-  /** Per-week claim ids → seq, for `waiver.resolved`. */
-  private claimSeq = new Map<string, number>();
-  private claimCount = 0;
   private lastAt = 0;
-  /** The next week to play. */
-  private week = 1;
+  private readonly oddsCache = new Map<string, EpisodeOdds>();
+  private readonly favourites = new Map<number, { id: string; p: number }>();
+  private contestMemo: { votes: number; state: ContestState } | null = null;
 
   constructor(input: SeasonInput, options: SessionOptions) {
     const simSeed = options.seed;
@@ -487,6 +361,9 @@ export class SeasonSession {
     this.input = input;
     this.seed = simSeed;
     this.human = human;
+    this.cast = drawCast(input, simSeed).map((id) => input.cardOf(id));
+    this.castById = castMap(this.cast);
+    this.contestSeed = contestSeed(input.config.id, simSeed);
     this.log = new LogBuilder(input.config.id);
     this.start = EPOCH + (cyrb128(`${simSeed}::start`)[0] % 520) * WEEK;
     this.bots = new Map(input.managers.map((m) => [m.id, { id: m.bot, manager: botManager(m.bot), actor: { kind: 'bot', strategy: m.bot } }]));
@@ -508,6 +385,7 @@ export class SeasonSession {
 
   get stage(): SessionStage {
     const { state } = this.log;
+    if (state.phase === 'complete') return { kind: 'complete' };
     const choosing = tavernPickOnTheClock(state);
     if (choosing !== null) return { kind: 'tavern', manager: choosing };
     if (!state.draft.complete) {
@@ -515,11 +393,12 @@ export class SeasonSession {
       if (tavern === null) throw new Error(`draft stalled at pick ${state.draft.picks}: nobody is on the clock`);
       return { kind: 'draft', pick: state.draft.picks, tavern };
     }
-    if (this.week > this.input.config.weeks) return { kind: 'complete' };
-    return { kind: 'week', week: this.week };
+    const open = episodeStage(state);
+    if (open !== null) return { kind: open.stage, episode: open.episode };
+    return { kind: 'finale' };
   }
 
-  /** The taverns in play: the ones chosen, in the order they were chosen. Empty before the tavern pick. */
+  /** The taverns in play, in the order they were chosen. */
   get taverns(): ReadonlyArray<string> {
     return [...this.log.state.taverns.keys()];
   }
@@ -529,19 +408,54 @@ export class SeasonSession {
     return this.human === null ? null : (this.log.state.managers.get(this.human.manager)?.tavern ?? null);
   }
 
-  /** True when `tavern` is the person's. */
   isHuman(tavern: string): boolean {
     return this.humanTavern === tavern;
   }
 
-  /** The season's taverns nobody has chosen yet, in package order. */
+  /** The season's taverns nobody has chosen yet, in file order. */
   openTaverns(): ReadonlyArray<string> {
     return this.input.taverns.map((t) => t.id).filter((id) => !this.log.state.taverns.has(id));
   }
 
+  /** A cast member's card. */
+  card(id: string): Contestant {
+    const c = this.castById.get(id);
+    if (c === undefined) throw new Error(`"${id}" is not in the cast`);
+    return c;
+  }
+
+  /** The vote model's state after every vote so far. */
+  contest(): ContestState {
+    const votes = this.log.state.jury.length;
+    if (this.contestMemo?.votes !== votes) this.contestMemo = { votes, state: contestState(this.log.state, this.cast, this.input.model) };
+    return this.contestMemo.state;
+  }
+
+  /**
+   * The public odds for the open episode's vote: before the challenge
+   * (`immune` null) or after it. Memoized, so every bot at the table sees the
+   * same numbers. Uses only public information.
+   */
+  odds(immune: string | null): EpisodeOdds {
+    const open = episodeStage(this.log.state);
+    const episode = open?.episode ?? 0;
+    const key = `${episode}:${immune ?? '-'}`;
+    let odds = this.oddsCache.get(key);
+    if (odds === undefined) {
+      odds = episodeOdds(this.contest(), this.castById, immune, this.input.model, `${this.seed}/odds/${key}`, ODDS_SAMPLES);
+      this.oddsCache.set(key, odds);
+    }
+    return odds;
+  }
+
+  /** The scouts' estimate: each cast member's expected points, the number the `scout` bots draft by. */
+  scouting(): ReadonlyMap<string, number> {
+    return expectedPoints(this.cast, this.input.config, this.input.model, scoutSeed(this.input.config.id));
+  }
+
   // ── the tavern pick and the draft ────────────────────────────────────────
 
-  /** Bot tavern choices, then bot picks, one an hour, until the person is on the clock or the draft is done. */
+  /** Bot tavern choices, then bot picks, until the person is on the clock or the draft is done. */
   advanceDraft(): void {
     for (let stage = this.stage; ; stage = this.stage) {
       if (stage.kind === 'tavern' && stage.manager !== this.human?.manager) {
@@ -558,17 +472,11 @@ export class SeasonSession {
     }
   }
 
-  /** The person's tavern (D-52). Throws unless it is their turn and the tavern is open. */
+  /** The person's tavern. Throws unless it is their turn and the tavern is open. */
   chooseTavern(tavern: string): void {
     const stage = this.stage;
     if (stage.kind !== 'tavern' || stage.manager !== this.human?.manager) throw new Error('it is not your turn to choose a tavern');
     this.append('tavern.chosen', { manager: stage.manager, tavern }, this.humanActor!, this.tavernPickAt());
-  }
-
-  /** What the person's advisor bot would choose now. */
-  suggestTavern(): string {
-    const human = this.requireHuman();
-    return this.botOfManager(human.manager).manager.tavern.choose(this.openTaverns(), rngFor(this.seed, `bot:${human.manager}:advice:tavern`));
   }
 
   /** The person's pick. Throws unless they are on the clock and the pick is legal. */
@@ -578,215 +486,116 @@ export class SeasonSession {
     this.append('draft.pick', { pick: stage.pick, tavern: stage.tavern, character, auto: false }, this.humanActor!, this.draftAt(stage.pick));
   }
 
-  /** What the person's advisor bot would draft now. */
-  suggestPick(): string {
+  // ── the contest ──────────────────────────────────────────────────────────
+
+  /** The person's call for the open episode (replacing any earlier one). Throws if it is illegal. */
+  call(target: string): void {
+    const tavern = this.requireHumanTavern();
     const stage = this.stage;
-    if (stage.kind !== 'draft') throw new Error('the draft is over');
-    return this.botOf(stage.tavern).manager.draft.pick(this.viewFor(stage.tavern, `advice:draft:${stage.pick}`), freeAgents(this.log.state));
+    if (stage.kind !== 'challenge' && stage.kind !== 'vote') throw new Error('no episode is open for calls');
+    const at = stage.kind === 'challenge' ? this.episodeAt(stage.episode) + 12 * HOUR : this.episodeAt(stage.episode) + 19 * HOUR;
+    this.append('call.made', { episode: stage.episode, tavern, target }, this.humanActor!, at);
   }
 
-  /** The bots' `value` rating (strength and skill breadth per CR) for each id, as the person's view sees the pool. Higher is better. */
-  draftValues(ids: ReadonlyArray<string>): ReadonlyMap<string, number> {
-    const view = this.viewFor(this.requireHumanTavern(), 'advice:value');
-    return new Map(ids.map((id) => [id, valueOf(view, id)]));
+  /** Each tavern's standing call for `episode`, as the log has it. */
+  callsFor(episode: number): ReadonlyMap<string, CallState> {
+    return this.log.state.calls.get(episode) ?? new Map();
   }
 
-  // ── between weeks ────────────────────────────────────────────────────────
-
-  /** Set (or replace) the person's lineup for the next week. Throws if it is illegal. */
-  setLineup(lineup: Lineup): void {
-    const tavern = this.requireHumanTavern();
-    const week = this.requireWeek();
-    this.append('lineup.set', { tavern, week, lineup }, this.humanActor!, this.lastAt + MINUTE);
-  }
-
-  /** What the person's advisor bot would field next week, or null if no legal lineup exists. */
-  suggestLineup(): Lineup | null {
-    const tavern = this.requireHumanTavern();
-    const week = this.requireWeek();
-    return this.botOf(tavern).manager.lineup.lineup(this.viewFor(tavern, `advice:lineup:${week}`), week);
-  }
-
-  /** The person's submitted lineup for the next week, or null if none yet (the lock then carries one over). */
-  pendingLineup(): Lineup | null {
-    return this.log.state.pendingLineups.get(this.week)?.get(this.requireHumanTavern()) ?? null;
-  }
-
-  /** Claim a free agent for the person, resolved after the next week's run. Not in the last week (no waivers follow it). */
-  claimWaiver(add: string, drop: string | null): string {
-    const tavern = this.requireHumanTavern();
-    const week = this.requireWeek();
-    if (week >= this.input.config.weeks) throw new Error('no waivers after the last week');
-    return this.claim(tavern, add, drop, this.humanActor!, this.lastAt + MINUTE);
-  }
-
-  /** The advisor bot's claims for the person right now. */
-  suggestClaims(): ReadonlyArray<{ readonly add: string; readonly drop: string | null }> {
-    const tavern = this.requireHumanTavern();
-    const week = this.requireWeek();
-    return this.botOf(tavern).manager.waivers.claims(this.viewFor(tavern, `advice:waivers:${week}`), freeAgents(this.log.state));
-  }
-
-  /** Declare the person's hex (D-52) on `target` for `week`, before that week's lock. Throws if it is illegal. */
-  declareHex(target: string, ability: Ability, week: number): void {
-    const tavern = this.requireHumanTavern();
-    this.append('hex.declared', { tavern, target, ability, week }, this.humanActor!, this.lastAt + MINUTE);
-  }
-
-  /** Claims waiting for the next resolution. */
-  pendingClaims(): LeagueState['waivers']['pending'] {
-    return this.log.state.waivers.pending;
-  }
-
-  // ── a week ───────────────────────────────────────────────────────────────
-
-  /** Play the next week: lineups, lock, reveal, runs, `week.finalized`, then (before the last week) waivers. */
-  playWeek(): void {
-    const { input } = this;
-    const { config } = input;
-    const week = this.requireWeek();
-    const season = config.id;
-    const base = this.start + (week - 1) * WEEK;
-    const scheduled = input.missions.get(week);
-    if (scheduled === undefined) throw new Error(`no mission for week ${week}`);
-    const system = (workflow: string): Actor => ({ kind: 'system', workflow });
-
-    // Hexes (D-52): each bot that still holds its hex may declare it for this week, before the lineups.
-    this.taverns.forEach((tavern, i) => {
-      if (this.isHuman(tavern) || this.log.state.hexes.some((h) => h.tavern === tavern)) return;
-      const bot = this.botOf(tavern);
-      const hex = bot.manager.hex.declare(this.viewFor(tavern, `hex:${week}`), week);
-      if (hex !== null) this.append('hex.declared', { tavern, target: hex.target, ability: hex.ability, week }, bot.actor, base + 16 * HOUR + i * MINUTE);
-    });
-
-    // Lineups, then the lock.
+  /** The bots' early calls, then the episode's challenge. */
+  runChallenge(): void {
+    const stage = this.stage;
+    if (stage.kind !== 'challenge') throw new Error(`no challenge to run: the session is at ${stage.kind}`);
+    const { episode } = stage;
+    const base = this.episodeAt(episode);
     this.taverns.forEach((tavern, i) => {
       if (this.isHuman(tavern)) return;
       const bot = this.botOf(tavern);
-      const lineup = bot.manager.lineup.lineup(this.viewFor(tavern, `lineup:${week}`), week);
-      if (lineup !== null) this.append('lineup.set', { tavern, week, lineup }, bot.actor, base + 17 * HOUR + i * MINUTE);
+      const target = bot.manager.calls.early(this.viewFor(tavern, `call:${episode}:early`), episode);
+      if (target !== null) this.append('call.made', { episode, tavern, target }, bot.actor, base + 14 * HOUR + i * MINUTE);
     });
-    const state = this.log.state;
-    const submitted = state.pendingLineups.get(week);
-    const previous = state.lockedLineups.get(week - 1);
-    const crOf = (id: string): CrEighths => {
-      const entry = state.pool.get(id);
-      if (entry === undefined) throw new Error(`"${id}" is not pooled`);
-      return entry.cr;
-    };
-    // Injured starters (D-51) can't start: a submitted or carried lineup with one falls back (D-27).
-    const unavailable = injuredFor(state, week);
-    const lineups = this.taverns.map((tavern): PayloadByType['lineup.locked']['lineups'][number] => {
-      const roster = { tavern, characters: state.taverns.get(tavern)?.roster ?? [] };
-      const own = submitted?.get(tavern);
-      if (own !== undefined && validateLineup(own, roster, crOf, config, { unavailable }).length === 0) return { tavern, lineup: own, source: 'submitted' };
-      const last = previous?.find((entry) => entry.tavern === tavern)?.lineup ?? null;
-      const lineup = carriedLineup(last, roster, crOf, config, { unavailable });
-      if (lineup === null) return { tavern, lineup: null, source: 'none' };
-      return { tavern, lineup, source: lineup === last ? 'carried' : 'fallback' };
+    const scheduled = this.input.challenges[episode - 1];
+    if (scheduled === undefined || scheduled.episode !== episode) throw new Error(`no challenge for episode ${episode}`);
+    const result = playChallenge(this.contest(), this.castById, scheduled.challenge, this.contestSeed, episode, this.input.config.contest.lapDc);
+    this.append(
+      'challenge.resolved',
+      { episode, challenge: scheduled.challenge, sha256: scheduled.sha256, seed: this.contestSeed, result },
+      { kind: 'system', workflow: 'episode' },
+      base + 18 * HOUR,
+    );
+  }
+
+  /** The bots' late calls, the vote, and the round's close if this was its last episode. */
+  runVote(): void {
+    const stage = this.stage;
+    if (stage.kind !== 'vote') throw new Error(`no vote to run: the session is at ${stage.kind}`);
+    const { episode } = stage;
+    const base = this.episodeAt(episode);
+    const immune = this.log.state.episodes[episode - 1]!.challenge!.result.winner;
+    this.taverns.forEach((tavern, i) => {
+      if (this.isHuman(tavern)) return;
+      const bot = this.botOf(tavern);
+      const target = bot.manager.calls.late(this.viewFor(tavern, `call:${episode}:late`), episode, this.callsFor(episode).get(tavern));
+      if (target !== null) this.append('call.made', { episode, tavern, target }, bot.actor, base + 20 * HOUR + i * MINUTE);
     });
-    this.append('lineup.locked', { week, lineups }, system('lineup-lock'), base + 18 * HOUR);
+    const odds = this.odds(immune).boot;
+    let fav = { id: '', p: -1 };
+    for (const [id, p] of odds) if (p > fav.p) fav = { id, p };
+    this.favourites.set(episode, fav);
+    const vote = playVote(this.contest(), this.castById, immune, this.contestSeed, episode, this.input.model);
+    const system: Actor = { kind: 'system', workflow: 'episode' };
+    this.append('vote.resolved', { episode, vote }, system, base + 21 * HOUR);
+    const { config } = this.input;
+    const round = roundOf(config, episode);
+    const last = round === config.schedule.rounds.length;
+    if (!last && episodesOf(config, round).at(-1) === episode) this.append('round.finalized', { round }, system, base + 21 * HOUR + 5 * MINUTE);
+  }
 
-    // Reveal, run, finalize.
-    const run = base + 18 * HOUR + 15 * MINUTE;
-    let r = 0;
-    const { mission, sha256 } = scheduled;
-    const home = homeTavern(this.log.state, week);
-    this.append('mission.revealed', { week, mission, sha256, salt: null }, system('weekly-run'), run + r++ * SECOND);
-    for (const { tavern, lineup } of lineups) {
-      if (lineup === null) continue;
-      const party = partyOf(lineup, input.statsOf, hexOn(this.log.state, tavern, week));
-      const seed = weekSeed({ season, week, tavern, salt: this.seed });
-      const orders = { retreat: lineup.retreat };
-      const result = runMission(party, mission, (node) => rngFor(seed, `roll:${node}`), input.baseOf, input.battleModel, orders);
-      const projection = projectMission(party, mission, input.baseOf, input.battleModel, orders);
-      this.append(
-        'mission.resolved',
-        {
-          week,
-          tavern,
-          mission: mission.id,
-          seed,
-          engineVersion: input.engineVersion,
-          battleModel: input.battleModel.id,
-          lineup,
-          run: result,
-          projected: { expectedScore: projection.expectedScore, pDnf: projection.pDnf },
-          points: runPoints(result.score, config.scoring, tavern === home),
-          // Exact expected points (docs/rules.md §7), unrounded like the projection itself.
-          projectedPoints: projectedPoints(projection.expectedScore, config.scoring, tavern === home),
-        },
-        system('weekly-run'),
-        run + r++ * SECOND,
-      );
-    }
-    this.append('week.finalized', { week }, system('weekly-run'), run + r * SECOND);
+  /** The jury's vote, then the last round closes and the season is complete. */
+  runFinale(): void {
+    const stage = this.stage;
+    if (stage.kind !== 'finale') throw new Error(`no finale yet: the session is at ${stage.kind}`);
+    const votes = this.log.state.jury.length;
+    const at = this.episodeAt(votes + 1) + 20 * HOUR;
+    const system: Actor = { kind: 'system', workflow: 'finale' };
+    this.append('finale.resolved', { result: playFinale(this.contest(), this.castById, this.contestSeed, this.input.model) }, system, at);
+    this.append('round.finalized', { round: this.input.config.schedule.rounds.length }, system, at + 5 * MINUTE);
+  }
 
-    // Waivers between weeks: every bot's claims, then one resolution.
-    if (week < config.weeks) {
-      for (const tavern of this.taverns) {
-        if (this.isHuman(tavern)) continue;
-        const bot = this.botOf(tavern);
-        const claims = bot.manager.waivers.claims(this.viewFor(tavern, `waivers:${week}`), freeAgents(this.log.state));
-        for (const { add, drop } of claims) this.claim(tavern, add, drop, bot.actor, base + 20 * HOUR + this.claimCount * SECOND);
-      }
-      const now = this.log.state;
-      // Claim ids by seq (resolveWaivers orders a tavern's claims by seq) and back.
-      const claimAt = new Map<number, string>();
-      const pending: WaiverClaim[] = now.waivers.pending.map((p) => {
-        const seq = this.claimSeq.get(p.claim);
-        if (seq === undefined) throw new Error(`pending claim "${p.claim}" was not made this week`);
-        claimAt.set(seq, p.claim);
-        return { tavern: p.tavern, add: p.add, drop: p.drop, seq };
-      });
-      const rosters = [...now.taverns.values()].map((t) => ({ tavern: t.id, characters: t.roster }));
-      const resolved = resolveWaivers(pending, waiverPriority(now), rosters, new Set(freeAgents(now)), config);
-      const outcomes = resolved.awards.map(({ claim, awarded, reason }) => ({ claim: claimAt.get(claim.seq)!, awarded, reason }));
-      const claimed = new Map(now.waivers.pending.map((p) => [p.claim, p]));
-      this.append('waiver.resolved', { week, outcomes, priorityAfter: resolved.priority }, system('waivers'), base + DAY + 12 * HOUR);
-      this.waiverLog.set(
-        week,
-        outcomes.map((o) => {
-          const p = claimed.get(o.claim)!;
-          return { claim: o.claim, tavern: p.tavern, add: p.add, drop: p.drop, awarded: o.awarded, reason: o.reason };
-        }),
-      );
-      this.claimSeq = new Map();
-      this.claimCount = 0;
+  /** Play whatever comes next until the person has a decision (the draft) or the season is over. Bots only past the draft. */
+  playToEnd(): void {
+    this.advanceDraft();
+    for (let stage = this.stage; stage.kind !== 'complete'; stage = this.stage) {
+      if (stage.kind === 'challenge') this.runChallenge();
+      else if (stage.kind === 'vote') this.runVote();
+      else if (stage.kind === 'finale') this.runFinale();
+      else throw new Error(`playToEnd: waiting on a person at ${stage.kind}`);
     }
-    this.week++;
   }
 
   /**
    * Audit the completed season and return its result. Throws if the season
-   * is not complete, the NDJSON does not replay to the built state, or
-   * `verifyResolutions` finds a mismatch.
+   * is not complete, the NDJSON does not replay to the built state, or the
+   * contest does not follow from its seed.
    */
-  finish(): MockSeasonResult {
+  finish(): SeasonResult {
     const { log } = this;
-    const simSeed = this.seed;
     if (log.state.phase !== 'complete') throw new Error(`season ended in phase "${log.state.phase}", expected "complete"`);
-    // Replay and audit: the log alone must rebuild the same state.
     const ndjson = log.ndjson;
-    const audit = auditSeason(log.events, ndjson, log.state);
-    if (!audit.replayMatches) throw new Error(`seed ${simSeed}: replayLog(ndjson) differs from the state built event by event`);
-    const { mismatches } = audit;
-    if (mismatches.length > 0) {
-      throw new Error(
-        `seed ${simSeed}: verifyResolutions found ${mismatches.length} mismatch(es):\n` +
-          mismatches.map((m) => `  seq ${m.seq} week ${m.week} ${m.tavern} ${m.field}: ${m.message}`).join('\n'),
-      );
+    const audit = auditSeason(log.events, ndjson, log.state, this.input.statsOf);
+    if (!audit.replayMatches) throw new Error(`seed ${this.seed}: replayLog(ndjson) differs from the state built event by event`);
+    if (audit.mismatches.length > 0) {
+      throw new Error(`seed ${this.seed}: verifyContest found ${audit.mismatches.length} mismatch(es):\n` + audit.mismatches.map((m) => `  seq ${m.seq} ${m.what} ${m.episode ?? ''}: ${m.message}`).join('\n'));
     }
-    return { events: log.events, ndjson, state: log.state, summary: summarize(this.input, simSeed, log.state, log.events, this.waiverLog, this.human), audit };
+    return { events: log.events, ndjson, state: log.state, summary: this.summarize(), audit };
   }
 
   // ── internals ────────────────────────────────────────────────────────────
 
-  /** 1–3. Preseason: the season, the pool, the managers. The tavern pick follows in `advanceDraft`. */
+  /** The season, the cast, the managers. The tavern pick follows in `advanceDraft`. */
   private preseason(): void {
     const { input } = this;
-    const setupActor: Actor =
-      input.commissioner === null ? { kind: 'system', workflow: 'mock-season' } : { kind: 'commissioner', ...input.commissioner };
+    const setupActor: Actor = input.commissioner === null ? { kind: 'system', workflow: 'sims' } : { kind: 'commissioner', ...input.commissioner };
     const preseason = this.start - 14 * DAY + 9 * HOUR;
     let k = 0;
     this.append(
@@ -795,24 +604,20 @@ export class SeasonSession {
         config: input.config,
         configSha256: input.configSha256,
         engineVersion: input.engineVersion,
-        schedule: input.schedule,
-        sponsors: input.sponsors,
         taverns: input.taverns,
+        challenges: input.challenges.map(({ episode, sha256 }) => ({ episode, sha256 })),
+        abilityMix: input.abilityMix,
       },
       setupActor,
       preseason + k++ * SECOND,
     );
-    for (const { character, cr } of input.pool) {
-      this.append(
-        'character.pooled',
-        { character: character.ref.id, base: character.ref.base, cr, modifiers: character.modifiers },
-        setupActor,
-        preseason + k++ * SECOND,
-      );
+    const byId = new Map(input.pool.map((p) => [p.character.ref.id, p]));
+    for (const c of this.cast) {
+      const p = byId.get(c.id)!;
+      this.append('character.pooled', { character: c.id, base: p.character.ref.base, cr: p.cr, modifiers: p.character.modifiers, strategy: p.strategy }, setupActor, preseason + k++ * SECOND);
     }
-    // Join order feeds the seeded draft-order shuffle, which is keyed by season
-    // only. Shuffling join order per sim seed varies each seat's draft slot
-    // across runs, so per-bot results aren't confounded with a fixed slot.
+    // Join order feeds the seeded draft-order shuffle, which is keyed by season only. Shuffling join order per sim
+    // seed varies each seat's draft slot across runs.
     const joinOrder = [...input.managers];
     const joinRng = rngFor(this.seed, 'join-order');
     for (let i = joinOrder.length - 1; i > 0; i--) {
@@ -826,22 +631,19 @@ export class SeasonSession {
     }
   }
 
-  /** 3½. The tavern pick (D-52), one choice an hour, the day before the draft. */
+  /** The tavern pick, one choice an hour, the day before the draft. */
   private tavernPickAt(): number {
     return this.start - 11 * DAY + 18 * HOUR + this.log.state.taverns.size * HOUR;
   }
 
-  /** 4. The draft, one pick an hour. */
+  /** The draft, one pick an hour. */
   private draftAt(pick: number): number {
     return this.start - 10 * DAY + 18 * HOUR + pick * HOUR;
   }
 
-  private claim(tavern: string, add: string, drop: string | null, actor: Actor, atMs: number): string {
-    const claim = `w${this.week}-${tavern}-${this.log.state.waivers.pending.filter((p) => p.tavern === tavern).length + 1}`;
-    const event = this.append('waiver.claimed', { claim, tavern, add, drop }, actor, atMs);
-    this.claimSeq.set(claim, event.seq);
-    this.claimCount++;
-    return claim;
+  /** Midnight on the day of `episode`: one episode a day from the season's start. */
+  private episodeAt(episode: number): number {
+    return this.start + (episode - 1) * DAY;
   }
 
   /** Append through the log, keeping timestamps in order: a person's moves can run ahead of the bots' schedule. */
@@ -865,245 +667,218 @@ export class SeasonSession {
   }
 
   private viewFor(tavern: string, decision: string): PublicView {
-    const { input } = this;
     return {
       state: this.log.state,
       tavern,
-      statsOf: input.statsOf,
-      schedule: input.schedule,
-      missionFor: (week) => input.missions.get(week)?.mission ?? null,
-      baseOf: input.baseOf,
-      battleModel: input.battleModel,
+      config: this.input.config,
+      cast: this.cast,
+      model: this.input.model,
+      contest: () => this.contest(),
+      odds: (immune) => this.odds(immune),
       rng: rngFor(this.seed, `bot:${tavern}:${decision}`),
     };
   }
 
-  private requireHuman(): HumanSeat {
-    if (this.human === null) throw new Error('this season has no human seat');
-    return this.human;
-  }
-
   private requireHumanTavern(): string {
-    this.requireHuman();
+    if (this.human === null) throw new Error('this season has no human seat');
     const tavern = this.humanTavern;
     if (tavern === null) throw new Error('you have not chosen a tavern yet');
     return tavern;
   }
 
-  private requireWeek(): number {
-    const stage = this.stage;
-    if (stage.kind !== 'week') throw new Error(stage.kind === 'complete' ? 'the season is over' : 'the draft is not over');
-    return stage.week;
+  private summarize(): RunSummary {
+    const { input } = this;
+    const state = this.log.state;
+    const human = this.human;
+    const botOfManager = new Map(input.managers.map((m) => [m.id, m.bot]));
+    const seat = (tavern: string): Seat => {
+      const m = state.taverns.get(tavern)!.managerId;
+      return m === human?.manager ? 'human' : botOfManager.get(m)!;
+    };
+    const callPoints = new Map([...state.taverns.keys()].map((t) => [t, 0]));
+    const episodes: EpisodeSummary[] = state.episodes.map((e) => {
+      const calls = state.calls.get(e.episode);
+      const fav = this.favourites.get(e.episode) ?? { id: '', p: 0 };
+      return {
+        episode: e.episode,
+        immune: e.challenge!.result.winner,
+        boot: e.vote!.boot,
+        favourite: fav.id,
+        favouriteChance: fav.p,
+        revote: e.vote!.revote !== null,
+        draw: e.vote!.draw !== null,
+        taverns: [...state.taverns.keys()].map((tavern) => {
+          const call = calls?.get(tavern);
+          const score = episodeScore(state, tavern, e.episode);
+          callPoints.set(tavern, callPoints.get(tavern)! + score.call + score.early);
+          return { tavern, call: call?.target ?? null, early: call?.early ?? false, right: call !== undefined && call.target === e.vote!.boot, points: score.total };
+        }),
+      };
+    });
+    const finale = state.finale!;
+    const finalists = [...finale.finalists].sort((a, b) => (a === finale.winner ? -1 : b === finale.winner ? 1 : 0));
+    const place = new Map<string, number>();
+    finalists.forEach((id, i) => place.set(id, i + 1));
+    [...state.jury].reverse().forEach((id, i) => place.set(id, finalists.length + i + 1));
+    const table = seasonStandings(state).map((r) => ({ ...r, bot: seat(r.tavern), callPoints: callPoints.get(r.tavern) ?? 0 }));
+    // A matchup is decided by calls when taking away both sides' call points changes its winner.
+    let callDecided = 0;
+    const all = matchups(state);
+    const callIn = (tavern: string, round: number): number => {
+      const eps = episodesOf(input.config, round);
+      return eps.reduce((sum, ep) => {
+        const s = episodeScore(state, tavern, ep);
+        return sum + s.call + s.early;
+      }, 0);
+    };
+    for (const m of all) {
+      const h = m.homePoints - callIn(m.home, m.round);
+      const a = m.awayPoints - callIn(m.away, m.round);
+      const without = h === a ? null : h > a ? m.home : m.away;
+      if (without !== m.winner) callDecided++;
+    }
+    return {
+      seed: this.seed,
+      season: input.config.id,
+      events: this.log.events.length,
+      champions: table.filter((r) => r.rank === 1).map(({ tavern, bot }) => ({ tavern, bot })),
+      taverns: [...state.taverns.values()].map((t) => ({ tavern: t.id, name: t.name, bot: seat(t.id), roster: t.roster })),
+      standings: table,
+      draft: this.log.events.flatMap((e) => (e.type === 'draft.pick' ? [{ pick: e.payload.pick, tavern: e.payload.tavern, bot: seat(e.payload.tavern), character: e.payload.character }] : [])),
+      episodes,
+      cast: this.cast.map((c) => ({ id: c.id, strategy: c.strategy.kind, power: c.power, place: place.get(c.id) ?? 0, owner: state.owner.get(c.id) ?? null })),
+      winner: finale.winner,
+      callDecided,
+      matchups: all.length,
+    };
   }
 }
 
 /**
- * Play one season with bots in every seat: `season.created` →
- * `character.pooled` × pool → `manager.joined` × managers → the tavern pick → the whole snake
- * draft → for each week `lineup.set` × bots, `lineup.locked`,
- * `mission.revealed`, `mission.resolved` × taverns with a lineup,
- * `week.finalized`, and (before the last week) `waiver.claimed` × claims and
- * `waiver.resolved`.
- *
- * Throws if the engine rejects any event (a bot or runner bug, never
- * swallowed), if the NDJSON does not replay to the built state, or if
- * `verifyResolutions` finds a mismatch.
+ * The season's cast: the whole pool when it is exactly `castSize`, else a
+ * seeded draw of `castSize` from it (stream `cast` under the sim seed), kept
+ * in pool order.
  */
-export function runMockSeason(input: SeasonInput, options: RunOptions): MockSeasonResult {
-  const session = new SeasonSession(input, { seed: options.seed });
-  session.advanceDraft();
-  while (session.stage.kind === 'week') session.playWeek();
-  return session.finish();
-}
-
-function partyOf(lineup: Lineup, statsOf: (id: string) => EffectiveStats, hex: Ability | undefined): Party {
-  const members = lineup.starters.map(statsOf);
-  return hex === undefined ? { members } : { members, hex };
-}
-
-// ── summary ────────────────────────────────────────────────────────────────
-
-function summarize(
-  input: SeasonInput,
-  seed: string,
-  state: LeagueState,
-  events: ReadonlyArray<LeagueEvent>,
-  waivers: ReadonlyMap<number, WeekSummary['waivers']>,
-  human: HumanSeat | null = null,
-): RunSummary {
-  const config = state.config!;
-  const botOfManager = new Map(input.managers.map((m) => [m.id, m.bot]));
-  const botId = new Map<string, Seat>(
-    [...state.taverns.values()].map((t) => [t.id, t.managerId === human?.manager ? 'human' : botOfManager.get(t.managerId)!]),
-  );
-  const bot = (tavern: string): Seat => botId.get(tavern)!;
-
-  const table = seasonStandings(state).map((row) => ({ ...row, bot: bot(row.tavern) }));
-  const champions = table.filter((row) => row.rank === 1).map(({ tavern, bot }) => ({ tavern, bot }));
-  if (champions.length === 0) throw new Error('summary: no standings');
-
-  const weeks: WeekSummary[] = [];
-  for (let week = 1; week <= config.weeks; week++) {
-    const locked = state.lockedLineups.get(week) ?? [];
-    const resolved = state.results.get(week);
-    const rankOf = new Map(standings([], weekResults(state, week)).map((r) => [r.tavern, r.rank]));
-    const home = homeTavern(state, week);
-    weeks.push({
-      week,
-      mission: state.revealed.get(week)?.id ?? '',
-      home,
-      results: locked.map(({ tavern, lineup, source }) => {
-        const r = resolved?.get(tavern);
-        return {
-          tavern,
-          bot: bot(tavern),
-          source,
-          starters: lineup === null ? null : lineup.starters,
-          points: r?.points ?? 0,
-          projectedPoints: r?.projectedPoints ?? 0,
-          checksPassed: r?.run.checksPassed ?? 0,
-          checksAttempted: r?.run.checksAttempted ?? 0,
-          dnf: r === undefined ? null : r.run.dnf,
-          rank: rankOf.get(tavern) ?? 1,
-          home: tavern === home,
-        };
-      }),
-      waivers: waivers.get(week) ?? [],
-    });
+export function drawCast(input: Pick<SeasonInput, 'pool' | 'config'>, seed: string): ReadonlyArray<string> {
+  const ids = input.pool.map((p) => p.character.ref.id);
+  const size = input.config.contest.castSize;
+  if (ids.length < size) throw new Error(`the pool has ${ids.length} characters, fewer than the cast of ${size}`);
+  if (ids.length === size) return ids;
+  const rng = rngFor(seed, 'cast');
+  const shuffled = [...ids];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
   }
+  const chosen = new Set(shuffled.slice(0, size));
+  return ids.filter((id) => chosen.has(id));
+}
 
-  const draft = events
-    .filter((e): e is EventOf<'draft.pick'> => e.type === 'draft.pick')
-    .map(({ payload: { pick, tavern, character } }) => ({ pick, tavern, bot: bot(tavern), character }));
-
-  return {
-    seed,
-    season: config.id,
-    events: events.length,
-    champions,
-    taverns: [...state.taverns.values()].map((t) => ({ tavern: t.id, name: t.name, bot: bot(t.id) })),
-    standings: table,
-    draft,
-    weeks,
-  };
+/** Play one season with bots in every seat, then audit it. */
+export function runSeason(input: SeasonInput, options: RunOptions): SeasonResult {
+  const session = new ContestSession(input, { seed: options.seed });
+  session.playToEnd();
+  return session.finish();
 }
 
 // ── many runs ──────────────────────────────────────────────────────────────
 
-/**
- * Each pooled character's average draft position (0-based) over `runs`
- * all-bot drafts (seeds `adp-1`, `adp-2`, ...), a character a draft left
- * unpicked counting as the pick after the last. Where the bots usually take
- * someone: the playground's draft log calls a pick against it (steal, reach).
- * Pure; drafts only, no weeks.
- */
-export function averageDraftPositions(input: SeasonInput, runs = 100): ReadonlyMap<string, number> {
-  const pool = input.pool.map((p) => p.character.ref.id);
-  const total = new Map(pool.map((id) => [id, 0]));
-  for (let n = 1; n <= runs; n++) {
-    const session = new SeasonSession(input, { seed: `adp-${n}` });
-    session.advanceDraft();
-    const at = new Map(session.events.flatMap((e) => (e.type === 'draft.pick' ? [[e.payload.character, e.payload.pick] as const] : [])));
-    for (const id of pool) total.set(id, total.get(id)! + (at.get(id) ?? at.size));
-  }
-  return new Map(pool.map((id) => [id, total.get(id)! / runs]));
-}
-
-/** Run n's seed (1-based): the base seed itself for run 1, so one run reproduces `runMockSeason({ seed })`; then `<seed>~<n>`. */
+/** Run n's seed (1-based): the base seed itself for run 1, then `<seed>~<n>`. */
 export function runSeed(seed: string, n: number): string {
   return n === 1 ? seed : `${seed}~${n}`;
 }
 
 export interface BotAggregate {
-  /** Tavern-seasons this bot managed. */
   readonly seats: number;
   /** Titles won; co-champions split one title evenly. */
   readonly titles: number;
-  /** titles / seats: the chance a given seat with this bot wins the title. 1 / taverns is par. */
+  /** titles / seats. 1 / taverns is par. */
   readonly titlesPerSeat: number;
-  /** Mean points per tavern-week (0 for a week played with nobody). */
   readonly meanPoints: number;
-  readonly meanProjected: number;
-  /** Share of this bot's runs that ended in a DNF. */
-  readonly dnfRate: number;
-  /** Share of tavern-weeks this bot topped the week (a shared top splits evenly). 1 / taverns is par. */
-  readonly weekTopRate: number;
+  readonly meanWins: number;
+  /** Share of votes this bot called right. */
+  readonly callRate: number;
+  /** Share of its calls made early. */
+  readonly earlyShare: number;
 }
 
 export interface Aggregate {
   readonly runs: number;
   readonly byBot: Readonly<Record<string, BotAggregate>>;
-  /** Titles by tavern. Managers choose taverns at random (D-52) and draft slots vary per run (join order is shuffled per seed). */
-  readonly titlesByTavern: Readonly<Record<string, number>>;
-  /** Weeks with a single highest-projected tavern, and how often it topped the week (alone or shared). */
-  readonly bestProjectedTops: { readonly weeks: number; readonly tops: number; readonly share: number };
-  /** Share of all mission runs that ended in a DNF. */
-  readonly dnfRate: number;
-  /** Tavern-weeks played with no lineup. */
-  readonly noLineupWeeks: number;
+  /** How often the favourite (by the public odds once immunity is known) went home, and its mean chance. */
+  readonly favouriteRate: number;
+  readonly favouriteChance: number;
+  /** Pearson correlation of challenge power with finishing position (higher = stronger monsters last longer). */
+  readonly powerPlacement: number;
+  /** Win share per seat, by voting strategy. 1 / cast size is par. */
+  readonly strategyWins: Readonly<Record<string, { readonly seats: number; readonly wins: number; readonly rate: number }>>;
+  readonly distinctWinners: number;
+  readonly topWinners: ReadonlyArray<{ readonly id: string; readonly wins: number }>;
+  /** Share of matchups whose winner would change without call points. */
+  readonly callDecidedShare: number;
+  /** Share of all points that came from calls. */
+  readonly callPointShare: number;
+  readonly revotesPerSeason: number;
+  readonly drawsPerSeason: number;
 }
 
 export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
-  const blank = (): { seats: number; titles: number; points: number; projected: number; weeks: number; runs: number; dnfs: number; tops: number } => ({
-    seats: 0,
-    titles: 0,
-    points: 0,
-    projected: 0,
-    weeks: 0,
-    runs: 0,
-    dnfs: 0,
-    tops: 0,
-  });
-  const tally = new Map<string, ReturnType<typeof blank>>(BOT_IDS.map((id) => [id, blank()]));
-  const of = (id: string): ReturnType<typeof blank> => {
+  const tally = new Map<string, { seats: number; titles: number; points: number; wins: number; calls: number; right: number; early: number; votes: number }>();
+  const of = (id: string) => {
     let t = tally.get(id);
-    if (t === undefined) tally.set(id, (t = blank()));
+    if (t === undefined) tally.set(id, (t = { seats: 0, titles: 0, points: 0, wins: 0, calls: 0, right: 0, early: 0, votes: 0 }));
     return t;
   };
-  const titlesByTavern: Record<string, number> = {};
-  let projectedWeeks = 0;
-  let projectedTops = 0;
-  let mission = 0;
-  let dnfs = 0;
-  let noLineup = 0;
-
+  for (const id of BOT_IDS) of(id);
+  let favHits = 0;
+  let favN = 0;
+  let favP = 0;
+  const pairs: Array<[number, number]> = [];
+  const strategy = new Map<string, { seats: number; wins: number }>();
+  const winners = new Map<string, number>();
+  let decided = 0;
+  let matchupsN = 0;
+  let callPts = 0;
+  let allPts = 0;
+  let revotes = 0;
+  let draws = 0;
   for (const run of runs) {
-    for (const t of run.taverns) {
-      of(t.bot).seats++;
-      titlesByTavern[t.tavern] ??= 0;
+    const botOf = new Map(run.taverns.map((t) => [t.tavern, t.bot]));
+    for (const row of run.standings) {
+      const t = of(row.bot);
+      t.seats++;
+      t.points += row.points;
+      t.wins += row.wins + row.ties / 2;
+      callPts += row.callPoints;
+      allPts += row.points;
     }
-    for (const c of run.champions) {
-      of(c.bot).titles += 1 / run.champions.length;
-      titlesByTavern[c.tavern] = (titlesByTavern[c.tavern] ?? 0) + 1 / run.champions.length;
-    }
-    for (const week of run.weeks) {
-      for (const r of week.results) {
-        const t = of(r.bot);
-        t.points += r.points;
-        t.projected += r.projectedPoints;
-        t.weeks++;
-        if (r.dnf === null) {
-          noLineup++;
-          continue;
-        }
-        t.runs++;
-        mission++;
-        if (r.dnf) {
-          t.dnfs++;
-          dnfs++;
-        }
-      }
-      const top = week.results.filter((r) => r.rank === 1);
-      for (const r of top) of(r.bot).tops += 1 / top.length;
-      const best = Math.max(...week.results.map((r) => r.projectedPoints));
-      const bestProjected = week.results.filter((r) => r.projectedPoints === best);
-      if (bestProjected.length === 1) {
-        projectedWeeks++;
-        if (bestProjected[0]!.rank === 1) projectedTops++;
+    for (const c of run.champions) of(c.bot).titles += 1 / run.champions.length;
+    for (const e of run.episodes) {
+      favN++;
+      favP += e.favouriteChance;
+      if (e.favourite === e.boot) favHits++;
+      if (e.revote) revotes++;
+      if (e.draw) draws++;
+      for (const t of e.taverns) {
+        const a = of(botOf.get(t.tavern)!);
+        a.votes++;
+        if (t.call !== null) a.calls++;
+        if (t.right) a.right++;
+        if (t.early) a.early++;
       }
     }
+    const n = run.cast.length;
+    for (const c of run.cast) {
+      pairs.push([c.power, n + 1 - c.place]);
+      const s = strategy.get(c.strategy) ?? { seats: 0, wins: 0 };
+      s.seats++;
+      if (c.id === run.winner) s.wins++;
+      strategy.set(c.strategy, s);
+    }
+    winners.set(run.winner, (winners.get(run.winner) ?? 0) + 1);
+    decided += run.callDecided;
+    matchupsN += run.matchups;
   }
-
   const ratio = (a: number, b: number): number => (b === 0 ? 0 : a / b);
   const byBot: Record<string, BotAggregate> = {};
   for (const [id, t] of tally) {
@@ -1112,18 +887,39 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
       seats: t.seats,
       titles: t.titles,
       titlesPerSeat: ratio(t.titles, t.seats),
-      meanPoints: ratio(t.points, t.weeks),
-      meanProjected: ratio(t.projected, t.weeks),
-      dnfRate: ratio(t.dnfs, t.runs),
-      weekTopRate: ratio(t.tops, t.weeks),
+      meanPoints: ratio(t.points, t.seats),
+      meanWins: ratio(t.wins, t.seats),
+      callRate: ratio(t.right, t.votes),
+      earlyShare: ratio(t.early, t.calls),
     };
   }
   return {
     runs: runs.length,
     byBot,
-    titlesByTavern,
-    bestProjectedTops: { weeks: projectedWeeks, tops: projectedTops, share: ratio(projectedTops, projectedWeeks) },
-    dnfRate: ratio(dnfs, mission),
-    noLineupWeeks: noLineup,
+    favouriteRate: ratio(favHits, favN),
+    favouriteChance: ratio(favP, favN),
+    powerPlacement: pearson(pairs),
+    strategyWins: Object.fromEntries([...strategy].map(([k, s]) => [k, { ...s, rate: ratio(s.wins, s.seats) }])),
+    distinctWinners: winners.size,
+    topWinners: [...winners].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, wins]) => ({ id, wins })),
+    callDecidedShare: ratio(decided, matchupsN),
+    callPointShare: ratio(callPts, allPts),
+    revotesPerSeason: ratio(revotes, runs.length),
+    drawsPerSeason: ratio(draws, runs.length),
   };
+}
+
+function pearson(pairs: ReadonlyArray<readonly [number, number]>): number {
+  if (pairs.length < 2) return 0;
+  const mx = pairs.reduce((a, p) => a + p[0], 0) / pairs.length;
+  const my = pairs.reduce((a, p) => a + p[1], 0) / pairs.length;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (const [x, y] of pairs) {
+    sxy += (x - mx) * (y - my);
+    sxx += (x - mx) ** 2;
+    syy += (y - my) ** 2;
+  }
+  return sxx === 0 || syy === 0 ? 0 : sxy / Math.sqrt(sxx * syy);
 }

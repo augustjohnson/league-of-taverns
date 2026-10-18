@@ -1,38 +1,60 @@
 # League of Taverns
 
-A fantasy-sports league where the players are 5th-edition monsters.
+A fantasy league for the **Lich's contest**: a dozen monsters compete to
+become the Lich's new assistant, Survivor style, and people at the bar draft
+them and watch.
 
-Each manager runs a **tavern** and drafts **characters** (named monsters, like
-Bruno the Bruiser, an ogre) from a curated pool of about 64. Each week the
-tavern fields a **party** of four under a CR budget.
-The party attempts that week's **mission**: a branching run of skill
-checks and battles, resolved once with real dice. Every tavern runs the same
-mission, and the season table ranks taverns by total loot.
+Every episode the Lich sets a task (a **challenge**: a series of skill checks
+run as elimination rounds). The winner is immune, and the rest **vote** one of
+their own out, each following the **voting strategy** printed on its card.
+When three are left, the voted-out monsters, now the **jury**, choose the
+winner. Managers run **taverns**: they snake-draft three monsters each, then
+only watch, except to **call the boot** at each vote. Taverns meet head to
+head in a round-robin, scored on their monsters' results plus their calls.
 
-> **Status: scaffold.** Types, stubs, draft rules and schemas only. No game
-> logic yet. Start with [TODO.md](TODO.md).
+The story is in [docs/lore.md](docs/lore.md), the design in
+[docs/survivor-format.md](docs/survivor-format.md), and what is built, with
+every playtest default, in [docs/lich-contest-plan.md](docs/lich-contest-plan.md).
+
+> **Status: playtest.** The contest, the fantasy layer, the bots, the sims
+> and the browser playground are built. The rules are playtest defaults, not
+> decisions yet; [rules.md](docs/rules.md) and the other older docs still
+> describe the earlier mission format until they are rewritten.
+
+## Play it
+
+```bash
+pnpm install
+pnpm --filter @league-of-taverns/sims playground
+```
+
+Then open `sims/output/playground/index.html`. One season against three bot
+taverns, told in the Common Room; the Workshop button has the tools.
+
+```bash
+pnpm sim -- --runs 100
+```
+
+plays 100 all-bot seasons and prints the balance numbers.
 
 ## Docs
 
 | Doc | What |
 |---|---|
-| [docs/rules.md](docs/rules.md) | Draft rulebook: roster, budget, lineups, scoring, standings, waivers, trades, reveals, carryover |
-| [docs/schema.md](docs/schema.md) | Draft schemas: character, modifiers, mission, chrome, season config, events, reducers |
-| [docs/season-lifecycle.md](docs/season-lifecycle.md) | Offseason → missions → curation → chrome → lock → draft → weekly runs → offseason |
-| [docs/decisions.md](docs/decisions.md) | Open decisions, plus every difference from the earlier specs |
-| [docs/lore.md](docs/lore.md) | Story frame: the Lich's contest for a new assistant, the taverns that front for him, and where story touches the rules |
-| [docs/survivor-format.md](docs/survivor-format.md) | Design for the Lich's contest: the Survivor-style format, what changes, what stays, open decisions |
-| [docs/glossary.md](docs/glossary.md) | Terms |
-| [docs/images.md](docs/images.md) | Painted portraits and mission covers: style, stage placement by height, `draft-images`, local ComfyUI setup |
-| [docs/specs/](docs/specs/) | Earlier specs 00–06. Superseded where decisions.md says so |
-| [TODO.md](TODO.md) | Workstreams and tasks, one subagent per workstream |
+| [docs/lich-contest-plan.md](docs/lich-contest-plan.md) | The implementation plan and the playtest defaults, with the sims behind them |
+| [docs/survivor-format.md](docs/survivor-format.md) | Design for the Lich's contest: the format, what changes, what stays, open decisions |
+| [docs/lore.md](docs/lore.md) | Story frame: the Lich's contest for a new assistant, and the taverns that front for him |
+| [docs/images.md](docs/images.md) | Painted portraits: style, stage placement by height, `draft-images`, local ComfyUI setup |
+| [docs/rules.md](docs/rules.md), [docs/schema.md](docs/schema.md), [docs/season-lifecycle.md](docs/season-lifecycle.md), [docs/decisions.md](docs/decisions.md), [docs/glossary.md](docs/glossary.md) | The earlier mission format. To be rewritten once the playtest settles the rules |
+| [docs/specs/](docs/specs/) | Earlier specs 00–06 |
+| [TODO.md](TODO.md) | Workstreams and tasks |
 
 ## Three layers per character
 
 | Layer | What | Affects game? | Lifetime |
 |---|---|---|---|
 | **Base** | Raw Open5e stat block, untouched | Yes | Pinned snapshot per season |
-| **Modifiers** | GM-authored deltas from a closed vocabulary, within a per-season budget | Yes | Per season |
+| **Modifiers and strategy** | GM-authored deltas from a closed vocabulary, within a per-season budget, and the monster's voting strategy | Yes | Per season |
 | **Chrome** | Name, epithet, backstory, portrait | **Never** | Persists across seasons |
 
 ## Boundary rules
@@ -49,38 +71,34 @@ first two.
    append-only. Rosters, standings and stats are rebuilt by replay and never
    stored.
 4. **Authored content is human-edited and changed by PR.** That covers
-   characters, pools, missions and chrome. LLMs may draft it, but a validator
+   characters, pools, challenges and chrome. LLMs may draft it, but a validator
    and then a human accept it.
 
 ## Layout
 
 ```
 engine/src/          pure game engine (no I/O)
-  rng/                 seeded RNG: rngFor(seed, key)
+  rng/                 seeded RNG: rngFor(seed, key), contestSeed
   adapters/open5e/     verbatim Open5e record → BaseStats
   characters/          base + modifiers → effective stats; modifier registry
-  roster/              ownership, CR budget, lineups, snake draft, waivers, trades
-  league/              season config type, standings (total loot)
-  missions/            mission schema + validator (no generator)
-  resolution/          check odds, battle p(win), the single seeded run
-  projection/          exact expected score by DAG propagation
-  events/              event schema, reducers, replay
+  checks.ts            check odds and modifiers
+  contest/             the Lich's contest: cards, challenges, the vote model, the jury, odds
+  roster/              the snake draft
+  league/              season config, round-robin, standings
+  events/              event schema, reducers, selectors (scores, matchups), replay, the seed audit
 engine/test/
-bots/                draft / lineup / waiver strategies
-scripts/             the I/O edge: snapshot, validate, draft-missions, difficulty-report,
-                     draft-chrome, draft-images, lock-check, seal, reveal, apply-command,
-                     run-week, offseason, publish, package-characters
-sims/                mock-season runner + balance report (output git-ignored)
-  src/playground/      browser playground: one HTML page running the real engine and
-                       bots. Unlike explorer/, it may import the engine.
+bots/                draft and calling strategies
+scripts/             the I/O edge: snapshot, validate, draft-images, package-characters
+sims/                season sims + the browser playground (output git-ignored)
+  fixtures/lich-season/  the season sims and the playground play: pool, taverns, 9 challenges
+  src/playground/      the game and the workshop: one HTML page running the real engine and bots
 data/open5e/         raw pinned snapshots + manifest
 characters/<id>/     character.yaml (id, base, chrome, status) + backstory.md + portrait.png
-seasons/season-01/   config, managers, schedule, pool, missions, chrome, events
-content/prompts/     LLM prompt templates (missions, chrome)
-content/images/      style.yaml: the fixed image style (docs/images.md)
+seasons/season-01/   the first live season, in preparation
+content/             LLM prompt templates; the fixed image style
 explorer/            placeholder, out of scope
 docs/
-.github/             issue forms, workflows
+.github/             workflows
 ```
 
 ## Development
@@ -95,8 +113,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` runs lint, typecheck and tests. Most tests are `it.todo` until
-their workstream lands.
+`pnpm check` runs lint, typecheck and tests.
 
 ## Licensing and attribution
 

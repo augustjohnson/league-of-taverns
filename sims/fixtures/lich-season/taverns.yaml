@@ -1,0 +1,24 @@
+# The season's taverns: team names, each a franchise of the Lich's front
+# company (docs/lore.md). Managers choose one in reverse draft order. Chrome
+# only: the banner and the regulars' toast never reach the engine.
+# Banner: `field` and `charge` are pale fills, `mark` is the tavern's strong
+# colour, `texture` is one of rain | waves | thorns | stipple | crosshatch | rays.
+
+season: lich-season
+taverns:
+  - id: the-rusty-tankard
+    name: The Rusty Tankard
+    toast: To the new boss. May they be late to everything.
+    banner: { field: '#dfe8d0', charge: '#f4cfd8', mark: '#e87ba4', texture: thorns }    # sage, rose
+  - id: the-gilded-flagon
+    name: The Gilded Flagon
+    toast: Whoever gets the job, the Flagon was always their favourite.
+    banner: { field: '#cdeae2', charge: '#f4efe2', mark: '#1baf7a', texture: waves }      # sea-glass, pearl
+  - id: the-sleeping-giant
+    name: The Sleeping Giant
+    toast: Wake us when there's a winner. Not before.
+    banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: rain }       # pale sky, pale lightning
+  - id: the-drowned-rat
+    name: The Drowned Rat
+    toast: Sink in, regulars. We're backing a long shot.
+    banner: { field: '#d9e0b8', charge: '#e8dcc4', mark: '#008300', texture: stipple }    # moss, peat

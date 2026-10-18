@@ -1,0 +1,12 @@
+# Episode 1. Chrome: title, story and each check's line. The checks under them are the rules.
+id: moat-phylactery
+episode: 1
+title: Fetch My Phylactery from the Moat
+story: >-
+  I have dropped my phylactery in the moat. Again. Whoever brings it back is
+  safe tonight. The rest of you, try not to drown. It makes paperwork.
+checks:
+  - { type: skill, skill: athletics, dc: 12, advantage: { speed: swim }, line: "swim out across the moat" }
+  - { type: skill, skill: investigation, dc: 12, line: "find the right jar in the silt" }
+  - { type: save, ability: con, dc: 12, line: "hold their breath at the bottom" }
+  - { type: skill, skill: athletics, dc: 13, advantage: { speed: swim }, line: "swim it back to shore" }

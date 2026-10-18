@@ -15,17 +15,18 @@
  *
  * Hashing must be pure JS so it runs in the browser (T2.3).
  */
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
-import { runPoints, sponsoredTavern } from '../league';
-import { missionHaul, type Mission, type MissionNode } from '../missions';
-import { formatIssuePath } from '../missions/schema';
-import { checkAbility, injuredStarter, lootScore, missionGraph } from '../resolution';
-import { retreatsBeforeBattle } from '../roster';
+import type { EffectiveStats } from '../characters';
+import { contestant } from '../contest/cards';
+import { voteModel } from '../contest/model';
+import { castMap, playChallenge, playFinale, playVote } from '../contest/run';
+import { applyEpisode, initialContest } from '../contest/state';
+import type { Contestant } from '../contest/types';
+import { formatIssuePath } from '../schema-kit';
+import { canonicalJson, lineHash } from './canonical';
 import { InvalidEventError, applyEvent, initialState } from './reducers';
 import { eventSchema } from './schema';
 import type { LeagueState } from './state';
-import type { LeagueEvent, PayloadByType } from './types';
+import type { LeagueEvent } from './types';
 
 /** A log line that is not valid JSON or does not match the event schema. */
 export class LogParseError extends Error {
@@ -79,32 +80,7 @@ export function serializeEvent(event: LeagueEvent): string {
     const issue = result.error.issues[0];
     throw new Error(`serializeEvent: ${formatIssuePath(issue?.path ?? [])}: ${issue?.message ?? 'invalid event'}`);
   }
-  return canonicalJson(event, '');
-}
-
-/** sha256 hex of one line's UTF-8 bytes. Used for `prev`. Pure JS, so it runs in the browser. */
-export function lineHash(line: string): string {
-  return bytesToHex(sha256(utf8ToBytes(line)));
-}
-
-function canonicalJson(value: unknown, at: string): string {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') return JSON.stringify(value);
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error(`serializeEvent: ${at || '(root)'}: non-finite number`);
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((item, i) => canonicalJson(item, `${at}[${i}]`)).join(',')}]`;
-  }
-  if (typeof value === 'object') {
-    const record = value as Readonly<Record<string, unknown>>;
-    const fields = Object.keys(record)
-      .filter((key) => record[key] !== undefined)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key], at ? `${at}.${key}` : key)}`);
-    return `{${fields.join(',')}}`;
-  }
-  throw new Error(`serializeEvent: ${at || '(root)'}: cannot serialize a ${typeof value}`);
+  return canonicalJson(event, 'serializeEvent');
 }
 
 /** NDJSON text → lines, dropping the one trailing empty line a final newline leaves. */
@@ -183,180 +159,53 @@ export function replayLog(ndjson: string): LeagueState {
   return { ...state, lastHash: prev };
 }
 
-export interface ResolutionMismatch {
+export interface ContestMismatch {
   readonly seq: number;
-  readonly week: number;
-  readonly tavern: string;
-  /** What disagrees, as a payload path: `run.path`, `run.nodes[2].outcome`, `run.score`, `points`, `mission`. */
-  readonly field: string;
+  /** The episode, or null for the finale. */
+  readonly episode: number | null;
+  readonly what: 'challenge' | 'vote' | 'finale';
   readonly message: string;
 }
 
 /**
- * Audit every `mission.resolved` for internal consistency, without throwing.
- * Rolls come from one real random draw (D-13), so they can't be recomputed;
- * instead each record must agree with itself and with the mission revealed
- * for its week (the latest `mission.revealed` before it):
- *
- * - The mission id matches, and walking the mission's edges (`missionGraph`)
- *   from start, following each recorded outcome, visits exactly `run.path`
- *   with one node record per check or battle, in order.
- * - Each check record names a starter from the lineup, uses the node's DC,
- *   and its outcome is `d20 + modifier ≥ dc`. One exception: a gated check
- *   (`requires`) may fail on a high roll, since nobody may have met the gate
- *   (D-39), and that needs stats this audit doesn't have.
- * - Each battle's outcome is `roll < pWin`, and a lost battle ends the path.
- * - At each battle the walk reaches, the lineup's retreat order and the loot
- *   banked so far decide whether the party turns back (D-49): the run must
- *   name that battle in `retreatedBefore` and stop there exactly when
- *   `retreatsBeforeBattle` says so.
- * - A check's `disadvantage` is exactly the hex on the tavern that week (D-52)
- *   for a check using the hexed ability, and a hexed check has no advantage
- *   (the two cancel).
- * - On a DNF the injured starter (if any) is `injuredStarter(lineup.starters,
- *   roll)`, and there is no injury without a DNF (D-51). A DNF with no
- *   injury is allowed, since a boon may prevent it (D-52).
- * - `dnf`, `retreatedBefore`, `checksPassed`, `checksAttempted`, `loot` (the
- *   `loot` of each passed check and won battle, or 0 on a DNF, D-54) and `score`
- *   (`lootScore(loot, missionHaul(mission))`, DNF or not) match the walk.
- * - `points` = `runPoints(score, scoring, home)` from `season.created`'s
- *   scoring, where home means the tavern's sponsor set this week's mission
- *   (D-47).
- *
- * Returns one entry per mismatch, in log order. If the walk itself breaks (a
- * record for the wrong node, or an outcome with no edge), that is reported
- * and the run's summary checks are skipped.
+ * Recompute every challenge, vote and the finale from the seed recorded in
+ * each `challenge.resolved`, the cast's cards (`statsOf` plus the strategy in
+ * `character.pooled`) and the season's vote model, and report each result
+ * that differs from the log. Never throws on a mismatch. For logs whose dice
+ * came from a seed: sims, the playground and tests.
  */
-export function verifyResolutions(events: ReadonlyArray<LeagueEvent>): ReadonlyArray<ResolutionMismatch> {
-  const mismatches: ResolutionMismatch[] = [];
-  const revealed = new Map<number, Mission>();
-  const hexes: Array<PayloadByType['hex.declared']> = [];
-  let season: PayloadByType['season.created'] | null = null;
-  for (const event of events) {
-    if (event.type === 'season.created') season = event.payload;
-    if (event.type === 'mission.revealed') revealed.set(event.payload.week, event.payload.mission);
-    if (event.type === 'hex.declared') hexes.push(event.payload);
-    if (event.type !== 'mission.resolved') continue;
-    const { week, tavern, run, lineup } = event.payload;
-    const report = (field: string, message: string): void => {
-      mismatches.push({ seq: event.seq, week, tavern, field, message });
-    };
-
-    if (season !== null) {
-      const { scoring } = season.config;
-      const home = sponsoredTavern(season.sponsors, season.schedule, week) === tavern;
-      const points = runPoints(run.score, scoring, home);
-      if (event.payload.points !== points) {
-        const factors = `${run.score} × ${scoring.pointsScale}${home ? ` × ${scoring.homeBonus} (home)` : ''}`;
-        report('points', `points ${event.payload.points} should be round(${factors}) = ${points}`);
+export function verifyContest(events: ReadonlyArray<LeagueEvent>, statsOf: (id: string) => EffectiveStats): ReadonlyArray<ContestMismatch> {
+  const out: ContestMismatch[] = [];
+  const created = events.find((e) => e.type === 'season.created');
+  if (created === undefined) return out;
+  const { config } = created.payload;
+  const model = voteModel(config.contest.model);
+  const cast: Contestant[] = events.flatMap((e) => (e.type === 'character.pooled' ? [contestant(statsOf(e.payload.character), e.payload.strategy)] : []));
+  const map = castMap(cast);
+  let s = initialContest(cast, model);
+  let seed: string | null = null;
+  let immune: string | null = null;
+  const same = (a: unknown, b: unknown): boolean => canonicalJson(a) === canonicalJson(b);
+  for (const e of events) {
+    if (e.type === 'challenge.resolved') {
+      seed = e.payload.seed;
+      const expected = playChallenge(s, map, e.payload.challenge, seed, e.payload.episode, config.contest.lapDc);
+      immune = e.payload.result.winner;
+      if (!same(expected, e.payload.result)) {
+        out.push({ seq: e.seq, episode: e.payload.episode, what: 'challenge', message: `the seed gives ${expected.winner} the win in ${expected.rounds.length} rounds; the log has ${e.payload.result.winner} in ${e.payload.result.rounds.length}` });
       }
-    }
-    const mission = revealed.get(week);
-    if (mission === undefined) {
-      report('mission', `no mission was revealed for week ${week}`);
-      continue;
-    }
-    if (mission.id !== event.payload.mission) {
-      report('mission', `week ${week} revealed "${mission.id}", but the run names "${event.payload.mission}"`);
-      continue;
-    }
-
-    const starters = new Set(lineup.starters);
-    const path: string[] = [];
-    let index = 0;
-    let passed = 0;
-    let attempted = 0;
-    let loot = 0;
-    let dnf = false;
-    let retreatedBefore: string | null = null;
-    let walked = true;
-    try {
-      const graph = missionGraph(mission, 'verifyResolutions');
-      let node: MissionNode | undefined = graph.start;
-      while (node !== undefined) {
-        if (node.kind === 'battle' && retreatsBeforeBattle(lineup.retreat, loot)) {
-          retreatedBefore = node.id;
-          break;
-        }
-        path.push(node.id);
-        if (node.kind === 'start') {
-          node = graph.next(node, 'always');
-          continue;
-        }
-        if (node.kind === 'end') break;
-        const at = `run.nodes[${index}]`;
-        const record = run.nodes[index];
-        index++;
-        if (record === undefined || record.node !== node.id || record.kind !== node.kind) {
-          const got = record === undefined ? 'nothing' : `a ${record.kind} record for "${record.node}"`;
-          report(at, `the walk reaches ${node.kind} "${node.id}", but the run records ${got}`);
-          walked = false;
-          break;
-        }
-        if (record.kind === 'check' && node.kind === 'check') {
-          attempted++;
-          if (record.outcome === 'pass') {
-            passed++;
-            loot += node.loot;
-          }
-          if (!starters.has(record.actor)) report(`${at}.actor`, `"${record.actor}" is not in the lineup`);
-          if (record.dc !== node.check.dc) report(`${at}.dc`, `dc ${record.dc} but the mission says ${node.check.dc}`);
-          const hex = hexes.find((h) => h.target === tavern && h.week === week)?.ability;
-          const hexed = hex !== undefined && checkAbility(node.check) === hex;
-          if (record.disadvantage && !hexed) report(`${at}.disadvantage`, 'disadvantage, but no hex covers this check');
-          if (hexed && record.advantage) report(`${at}.advantage`, `advantage, but the ${hex} hex cancels it`);
-          const total = record.d20 + record.modifier;
-          const meets = total >= record.dc;
-          if (record.outcome === 'pass' && !meets) {
-            report(`${at}.outcome`, `pass, but d20 ${record.d20} + modifier ${record.modifier} = ${total} < dc ${record.dc}`);
-          } else if (record.outcome === 'fail' && meets && node.check.requires === undefined) {
-            report(`${at}.outcome`, `fail, but d20 ${record.d20} + modifier ${record.modifier} = ${total} ≥ dc ${record.dc}`);
-          }
-          node = graph.next(node, record.outcome);
-        } else if (record.kind === 'battle') {
-          const won = record.roll < record.pWin;
-          if ((record.outcome === 'win') !== won) {
-            report(`${at}.outcome`, `${record.outcome}, but roll ${record.roll} ${won ? '<' : '≥'} pWin ${record.pWin}`);
-          }
-          if (record.outcome === 'lose') {
-            dnf = true;
-            loot = 0; // a DNF loses everything (D-54)
-            break;
-          }
-          if (node.kind === 'battle') loot += node.loot ?? 0;
-          node = graph.next(node, 'win');
-        }
+    } else if (e.type === 'vote.resolved') {
+      if (seed === null || immune === null) continue;
+      const expected = playVote(s, map, immune, seed, e.payload.episode, model);
+      if (!same(expected, e.payload.vote)) {
+        out.push({ seq: e.seq, episode: e.payload.episode, what: 'vote', message: `the seed sends ${expected.boot} home; the log has ${e.payload.vote.boot}` });
       }
-    } catch (error) {
-      report('run.path', `the recorded outcomes leave the mission graph: ${error instanceof Error ? error.message : String(error)}`);
-      walked = false;
+      s = applyEpisode(s, { episode: e.payload.episode, immune, vote: e.payload.vote }, model);
+    } else if (e.type === 'finale.resolved') {
+      if (seed === null) continue;
+      const expected = playFinale(s, map, seed, model);
+      if (!same(expected, e.payload.result)) out.push({ seq: e.seq, episode: null, what: 'finale', message: `the seed crowns ${expected.winner}; the log has ${e.payload.result.winner}` });
     }
-    if (!walked) continue;
-
-    if (index < run.nodes.length) report('run.nodes', `${run.nodes.length - index} record(s) past the end of the walk`);
-    if (path.length !== run.path.length || path.some((id, i) => id !== run.path[i])) {
-      report('run.path', `the walk visits ${path.join(' → ')}, but the run records ${run.path.join(' → ')}`);
-    }
-    if (run.retreatedBefore !== retreatedBefore) {
-      report(
-        'run.retreatedBefore',
-        `retreatedBefore is ${JSON.stringify(run.retreatedBefore)}, but the retreat order ${JSON.stringify(lineup.retreat)} ` +
-          (retreatedBefore === null ? 'never turns back on this walk' : `turns back before "${retreatedBefore}"`),
-      );
-    }
-    if (run.injury !== null && !dnf) report('run.injury', `"${run.injury.character}" is injured, but the walk has no DNF`);
-    if (run.injury !== null && dnf) {
-      const picked = injuredStarter(lineup.starters, run.injury.roll);
-      if (picked !== run.injury.character) {
-        report('run.injury', `roll ${run.injury.roll} picks starter "${picked}", but the run injures "${run.injury.character}"`);
-      }
-    }
-    if (run.dnf !== dnf) report('run.dnf', `dnf is ${run.dnf}, but the walk ${dnf ? 'loses a battle' : 'reaches an end'}`);
-    if (run.checksPassed !== passed) report('run.checksPassed', `${run.checksPassed}, but ${passed} check(s) passed`);
-    if (run.checksAttempted !== attempted) report('run.checksAttempted', `${run.checksAttempted}, but ${attempted} check(s) attempted`);
-    if (run.loot !== loot) report('run.loot', `${run.loot}, but the walk carries home ${loot}${dnf ? ' (a DNF loses everything)' : ''}`);
-    const score = lootScore(loot, missionHaul(mission));
-    if (Math.abs(run.score - score) > 1e-9) report('run.score', `score ${run.score} should be ${score}`);
   }
-  return mismatches;
+  return out;
 }

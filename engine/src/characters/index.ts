@@ -196,8 +196,7 @@ export function validateTraitRegistry(traits: ReadonlyArray<TraitDefinition>): R
  * Base + modifiers → the stats the resolver uses. Pure: the inputs are not
  * mutated and the result shares no mutable state with them.
  *
- * Traits expand to their primitives. `skill_bonus`, `save_bonus` and
- * `battle_bonus` add. `advantage` records `checkTargetKey(on)`.
+ * Traits expand to their primitives. `skill_bonus` and `save_bonus` add. `advantage` records `checkTargetKey(on)`.
  * `grant_speed` and `grant_sense` keep the larger of the base and granted
  * feet. CR is the base CR: modifiers never change it. `abilityMods` come from
  * the base ability scores.
@@ -220,7 +219,6 @@ export function effectiveStats(
   const speeds: Partial<Record<SpeedKind, number>> = { ...base.speeds };
   const senses: Partial<Record<SenseKind, number>> = { ...base.senses };
   const advantages = new Set<string>();
-  let battleBonus = 0;
 
   for (const { effect, from } of expandModifiers(character.modifiers, traits, characterId)) {
     const fail = (message: string): never => {
@@ -249,9 +247,6 @@ export function effectiveStats(
       case 'grant_sense':
         senses[effect.sense] = Math.max(senses[effect.sense] ?? 0, effect.feet);
         break;
-      case 'battle_bonus':
-        battleBonus += effect.value;
-        break;
       default: {
         const unknown: never = effect;
         throw new Error(`${characterId}: ${from}: unknown modifier kind "${String((unknown as { readonly kind?: unknown }).kind)}"`);
@@ -269,7 +264,6 @@ export function effectiveStats(
     advantages,
     speeds,
     senses,
-    battleBonus,
   };
 }
 
@@ -332,8 +326,6 @@ function stackKey(effect: ModifierEffect): string | undefined {
       return `skill_bonus:${effect.skill}`;
     case 'save_bonus':
       return `save_bonus:${effect.ability}`;
-    case 'battle_bonus':
-      return 'battle_bonus';
     default:
       return undefined;
   }
@@ -367,9 +359,6 @@ function effectProblems(effect: ModifierEffect, rule: PrimitiveRule): EffectProb
       break;
     case 'save_bonus':
       vocab('ability', effect.ability, ABILITIES);
-      range('value', effect.value, rule.min, rule.max);
-      break;
-    case 'battle_bonus':
       range('value', effect.value, rule.min, rule.max);
       break;
     case 'advantage': {

@@ -6,6 +6,7 @@
  * cost depend on the registry version, so `validateModifiers` checks those.
  */
 import { z } from 'zod';
+import { votingStrategySchema } from '../contest/schema';
 import { ABILITIES, SENSES, SKILLS, SPEEDS } from '../vocabulary';
 import type { CheckTarget, Modifier, ModifierEffect } from './types';
 
@@ -26,7 +27,6 @@ export const ModifierEffectSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('advantage'), on: CheckTargetSchema }),
   z.strictObject({ kind: z.literal('grant_speed'), speed: z.enum(SPEEDS), feet: z.number().int() }),
   z.strictObject({ kind: z.literal('grant_sense'), sense: z.enum(SENSES), feet: z.number().int() }),
-  z.strictObject({ kind: z.literal('battle_bonus'), value: z.number().int() }),
 ]);
 
 /** A modifier as authored in pool.yaml: a primitive effect or `{ kind: trait, trait: <id> }`. */
@@ -35,10 +35,11 @@ export const ModifierSchema = z.union([
   z.strictObject({ kind: z.literal('trait'), trait: z.string().min(1) }),
 ]);
 
-/** One `characters[]` entry in pool.yaml. `modifiers` may be omitted for none. */
+/** One `characters[]` entry in pool.yaml: the monster, its season modifiers (may be omitted for none) and its voting strategy. */
 export const PoolEntrySchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'id must be kebab-case'),
   modifiers: z.array(ModifierSchema).default([]),
+  strategy: votingStrategySchema,
 });
 
 /** A parsed pool.yaml entry. The loader pairs `id` with the character's base to build a `PooledCharacter`. */

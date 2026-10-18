@@ -1,5 +1,11 @@
 # Glossary
 
+> **Superseded for the playtest.** This page describes the earlier mission
+> format (parties, missions, battles, loot, gods). The game is now the Lich's
+> contest: see [lich-contest-plan.md](lich-contest-plan.md) for what is built
+> and its playtest defaults, and [survivor-format.md](survivor-format.md) for
+> the design. This page will be rewritten once the playtest settles the rules.
+
 | Term | Meaning |
 |---|---|
 | **Actor** | The starter who makes a given check: the one with the best modifier for it (best fit). Shown as `{actor}` in story text. |

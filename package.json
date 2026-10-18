@@ -2,7 +2,7 @@
   "name": "league-of-taverns",
   "private": true,
   "type": "module",
-  "description": "A fantasy-sports league where managers draft 5e monsters into taverns and send parties on weekly missions.",
+  "description": "A fantasy league for the Lich's contest: managers draft monsters into taverns, watch the contest and call the boot.",
   "packageManager": "pnpm@12.11.2",
   "engines": {
     "node": ">=22.12"
@@ -16,7 +16,7 @@
     "validate": "pnpm --filter @league-of-taverns/scripts validate",
     "draft-images": "pnpm --filter @league-of-taverns/scripts draft-images",
     "package-characters": "pnpm --filter @league-of-taverns/scripts package-characters",
-    "sim": "pnpm --filter @league-of-taverns/sims mock-season"
+    "sim": "pnpm --filter @league-of-taverns/sims sim"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

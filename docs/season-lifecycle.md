@@ -1,5 +1,11 @@
 # Season lifecycle
 
+> **Superseded for the playtest.** This page describes the earlier mission
+> format (parties, missions, battles, loot, gods). The game is now the Lich's
+> contest: see [lich-contest-plan.md](lich-contest-plan.md) for what is built
+> and its playtest defaults, and [survivor-format.md](survivor-format.md) for
+> the design. This page will be rewritten once the playtest settles the rules.
+
 One season from start to finish. Each step names who acts, the files or events
 it produces, and the script that does it. Scripts are in `scripts/src/`, and
 task ids refer to [TODO.md](../TODO.md).

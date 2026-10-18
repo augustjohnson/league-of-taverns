@@ -6,6 +6,10 @@ watch. It lists what changes, what stays, and what is still open. Nothing here
 is a rule yet: rules land in [rules.md](rules.md) and
 [decisions.md](decisions.md) once they are decided.
 
+**Built for playtesting:** [lich-contest-plan.md](lich-contest-plan.md) lists
+the default chosen for every Proposed and Open item below, and the sims that
+tuned them.
+
 Each item is tagged:
 
 - **Decided:** agreed in design discussion on 2026-10-17.

@@ -25,7 +25,6 @@ export const PRIMITIVE_RULES: ReadonlyArray<PrimitiveRule> = [
   { kind: 'advantage', cost: 2, perPoint: false },
   { kind: 'grant_speed', cost: 3, perPoint: false },
   { kind: 'grant_sense', cost: 1, perPoint: false },
-  { kind: 'battle_bonus', cost: 2, perPoint: true, min: 1, max: 1 },
 ];
 
 /** Named traits. Effects must be primitives, never other traits. */

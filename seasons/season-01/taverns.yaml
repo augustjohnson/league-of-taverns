@@ -1,0 +1,12 @@
+# The season's taverns: team names, each a franchise of the Lich's front
+# company (docs/lore.md). At most 6. Chrome only: the banner and the toast
+# never reach the engine. Banner: `field` and `charge` are pale fills, `mark`
+# is the tavern's strong colour, `texture` is one of rain | waves | thorns |
+# stipple | crosshatch | rays.
+
+season: season-01
+taverns:
+  - id: the-gilded-flagon
+    name: The Gilded Flagon
+    toast: Pay the toll, and the water will remember you.
+    banner: { field: '#d3ece8', charge: '#f3e7b9', mark: '#1baf7a', texture: waves }   # pale sea-green, halo gold

@@ -1,7 +1,7 @@
 /**
  * Build the browser playground into one self-contained HTML file.
  *
- * Usage: pnpm --filter @league-of-taverns/sims playground -- [--dir sims/fixtures/mock-season] [--out sims/output/playground/index.html]
+ * Usage: pnpm --filter @league-of-taverns/sims playground -- [--dir sims/fixtures/lich-season] [--out sims/output/playground/index.html]
  *
  * Paths are relative to the repo root. The page runs the real engine and bots
  * in the browser: open the file directly, or publish it as an Artifact. See
@@ -32,7 +32,7 @@ runMain(async (argv) => {
   const { bytes, data } = await writePlayground(out, values.dir);
   const kib = (bytes / 1024).toFixed(1);
   console.log(
-    `wrote ${relative(root, out)} (${kib} KiB: ${data.pool.length} pooled, ${data.missions.length} missions, ` +
+    `wrote ${relative(root, out)} (${kib} KiB: ${data.pool.length} pooled, ${data.challenges.length} challenges, ` +
       `${data.snapshot.length} snapshot records) in ${(performance.now() - started).toFixed(0)} ms`,
   );
   if (bytes > MAX_BYTES) throw new ValidationFailure(`the page is ${kib} KiB, over the ${MAX_BYTES / 1024} KiB limit`);

@@ -1,4 +1,4 @@
-<title>League of Taverns Playground</title>
+<title>The Lich's Contest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Public+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
@@ -171,26 +171,6 @@ tr.champ td:first-child { box-shadow: inset 3px 0 0 var(--brass); }
 .tag.bad { border-color: var(--bad); color: var(--bad); }
 .tag.good { border-color: var(--good); color: var(--good); }
 
-/* Mission graph */
-.graph { overflow-x: auto; background: var(--sunken); border: 1px solid var(--line); border-radius: var(--radius); }
-.graph svg { display: block; }
-.graph .edge { fill: none; stroke: var(--muted); stroke-width: 1.3; opacity: 0.55; }
-.graph .edge.on { stroke: var(--brass); stroke-width: 3; opacity: 1; }
-.graph .elabel { font: 600 10px var(--font-ui); fill: var(--muted); paint-order: stroke; stroke: var(--sunken); stroke-width: 4px; }
-.graph .elabel.on { fill: var(--brass); }
-.graph .node rect { fill: var(--node); stroke: var(--line); stroke-width: 1.2; }
-.graph .node.battle rect { stroke-dasharray: 4 2; stroke: var(--muted); }
-.graph .node.on rect { stroke: var(--brass); stroke-width: 2.4; }
-.graph .node.lost rect { stroke: var(--bad); stroke-width: 2.4; fill: var(--bad-soft); }
-.graph .node .id { font: 600 11.5px var(--font-ui); fill: var(--ink); }
-.graph .node .detail { font: 10px var(--font-ui); fill: var(--muted); }
-.graph .node .reach { font: 600 10.5px var(--font-num); fill: var(--brass); }
-.graph .node .out { font: 700 10px var(--font-ui); }
-.graph .node .out.pass, .graph .node .out.win { fill: var(--good); }
-.graph .node .out.fail, .graph .node .out.lose { fill: var(--bad); }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
-.legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; background: var(--brass); }
-
 /* Dice */
 .die { display: inline-grid; place-items: center; min-width: 2.1em; height: 1.75em; padding: 0 3px; border: 1.5px solid var(--ink); border-radius: 4px; font: 600 12.5px var(--font-num); background: var(--node); }
 .die.hi { border-color: var(--good); color: var(--good); }
@@ -279,9 +259,9 @@ td.flow { white-space: normal; }
 .kv .v.muted { color: var(--muted); }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 
-/* Banners: each tavern fights under its god's colours (gods/<id>/god.yaml). The page adds one generated rule per god
+/* Banners: each tavern flies its own colours (taverns.yaml). The page adds one generated rule per tavern
    (view.ts bannerCss) setting --banner-field, --banner-charge, --banner-mark and --banner-pattern on
-   [data-banner="<god>"]; everything below is shared, so no god has CSS of its own. Field and charge are pale fills and
+   [data-banner="<tavern>"]; everything below is shared, so no tavern has CSS of its own. Field and charge are pale fills and
    never carry text; the mark is the strong colour, clamped by the --bn-* dials into a line colour and a text colour.
    Banners never stand in for pass, fail or brass. */
 [data-banner] {
@@ -292,7 +272,7 @@ footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line)
   --banner-tex: color-mix(in oklch, var(--banner-charge) var(--bn-tex), var(--surface));
   --banner-line: oklch(from var(--banner-mark) clamp(var(--bn-line-lo), l, 1) c h);
   --banner-ink: oklch(from var(--banner-mark) clamp(var(--bn-ink-lo), l, var(--bn-ink-hi)) c h);
-  /* The texture vocabulary (BANNER_TEXTURES in scripts/src/lib/god-schema.ts), drawn in --banner-tex. Large surfaces only, never behind numbers. */
+  /* The texture vocabulary (BANNER_TEXTURES in scripts/src/lib/banner.ts), drawn in --banner-tex. Large surfaces only, never behind numbers. */
   --tex-rain: repeating-linear-gradient(112deg, var(--banner-tex) 0 2.5px, transparent 2.5px 11px);
   --tex-waves: radial-gradient(circle at 50% 100%, transparent 4.5px, var(--banner-tex) 5px 7px, transparent 7.5px) 0 0 / 16px 9px,
     radial-gradient(circle at 50% 100%, transparent 4.5px, var(--banner-tex) 5px 7px, transparent 7.5px) 8px 4.5px / 16px 9px;
@@ -324,7 +304,7 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 /* Cards in a row share a height; the skills row takes the slack, so the stats and the foot line up. */
 .deck { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
 .lcard { --frame: var(--sunken); --frame-edge: var(--line); --face: var(--surface); --accent: var(--muted); --accent-ink: var(--ink);
-  width: 168px; padding: 7px; border-radius: 9px; background: var(--frame); border: 1px solid var(--frame-edge); display: grid; gap: 5px; grid-template-rows: auto auto auto auto 1fr;
+  width: 176px; padding: 7px; border-radius: 9px; background: var(--frame); border: 1px solid var(--frame-edge); display: grid; gap: 5px; grid-template-rows: auto auto auto auto auto 1fr;
   box-shadow: 0 6px 14px -9px rgba(0, 0, 0, 0.45); }
 .lcard.themed { --frame: var(--banner-pattern), var(--banner-ground); --frame-edge: var(--banner-line); --face: var(--banner-bg); --accent: var(--banner-line); --accent-ink: var(--banner-ink); }
 /* A character who can't play this week (injured): greyed, the foot's tag left clear. */
@@ -348,7 +328,6 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 .lcard .sizeword { color: var(--muted); font-size: 11px; }
 .lcard .stats { display: flex; justify-content: space-between; gap: 4px; padding: 3px 6px; font: 11px var(--font-num); }
 .lcard .stats b { font-weight: 600; }
-.lcard .skills { padding: 2px 6px 4px; font-size: 11px; color: var(--muted); min-height: 2.7em; }
 .lcard .card-foot { background: none; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: center; }
 .lcard .card-foot .muted { color: var(--muted); }
 .lcard.themed .card-foot .muted { color: var(--banner-ink); }
@@ -379,20 +358,6 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
   .banner-card.raised, .banner-card.raised *, [class*="mjs-"] { animation: none !important; }
 }
 
-/* The scrying ball's tale (play.ts taleHtml): one line per check or battle. */
-.tale { margin: 0; padding-left: 1.6em; display: grid; gap: 5px; font-size: 13px; }
-.tale .die { margin-inline: 2px; }
-.tale .die.rolling { border-color: var(--brass); color: var(--ink); }
-/* Hexes (fx.ts layCurse, and the curse that opens a week's tale): a hex involving you wears a banner, yours when you
-   laid it and the rival's when it fell on you. The ground stays plain behind the text; the colour is the edge and ink. */
-.hexes { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
-.curse[data-banner] { background: var(--banner-bg); border-left: 4px solid var(--banner-line); border-radius: var(--radius); padding: 3px 8px; color: var(--banner-ink); }
-.curse[data-banner] b { color: var(--banner-ink); }
-.curse-confirm[data-banner] { background: var(--banner-bg); border: 1px solid var(--banner-line); border-radius: var(--radius); padding: 8px 10px; }
-.curse.laid { animation: banner-glow 1.1s ease-out both; }
-/* Not a list item, so the steps below still count from 1. */
-.tale > li.curse { display: block; margin-left: -1.6em; }
-
 /* The season's end (fx.ts crownChampion, hailChampion). A champion's final card flies their banner with a taller
    pennant; otherwise the champion line wears the champion's banner on its flag and ink only. */
 .season-final.champion h2 { font-size: 1.8rem; }
@@ -406,6 +371,88 @@ tr.mine[data-banner] td:first-child { box-shadow: inset 4px 0 0 var(--banner-lin
 .mini-table tr.sliding td { background: var(--surface); }
 .mini-table tr.sliding.mine[data-banner] td { background: var(--banner-bg); }
 td.move { width: 3.2em; font-size: 12px; }
+
+/* The Lich's contest: the card's contest lines (shared.ts charCard). */
+.lcard .abil { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; padding: 3px 4px; font: 600 11px var(--font-num); text-align: center; }
+.lcard .abil i { display: block; font: 9px var(--font-ui); color: var(--muted); font-style: normal; text-transform: uppercase; letter-spacing: 0.04em; }
+.lcard .abil .hi { color: var(--good); }
+.lcard .abil .lo { color: var(--bad); }
+.lcard .vote-line { padding: 3px 6px 5px; font-size: 11px; color: var(--muted); display: grid; gap: 2px; line-height: 1.3; }
+.strat { display: inline-block; justify-self: start; font: 700 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+.strat b { font-weight: 700; text-transform: none; letter-spacing: 0; }
+.strat.loyal { border-color: var(--good); color: var(--good); }
+.strat.threat { border-color: var(--bad); color: var(--bad); }
+.strat.coattails { border-color: var(--brass); color: var(--brass); }
+.strat.grudge { border-color: #8a4fb0; color: #8a4fb0; }
+.strat.floater { border-color: var(--muted); color: var(--muted); }
+.ribbon { position: absolute; top: 10px; right: -26px; transform: rotate(35deg); padding: 1px 30px; font: 700 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; background: var(--brass); color: var(--brass-ink); z-index: 1; }
+.ribbon.good { background: var(--good); color: var(--surface); }
+.stars { color: var(--brass); letter-spacing: 1px; font-size: 12px; }
+.stars .dim { opacity: 0.25; }
+.tag.owner { border-color: var(--banner-line, var(--line)); color: var(--banner-ink, var(--muted)); }
+.tag.owner .flag { width: 14px; height: 9px; border-left-width: 3px; }
+.mix { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.mix span { display: grid; gap: 2px; font-size: 11px; }
+.mix i { font-style: normal; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.mix em { display: block; height: 5px; border-radius: 2px; background: var(--brass); max-width: 100%; }
+.faces .gone { opacity: 0.35; filter: grayscale(1); }
+
+/* The room's contest messages (play.ts). */
+.sys.lich { background: color-mix(in oklch, var(--sunken) 70%, var(--brass-soft)); }
+.lich-says { font-family: var(--font-display); font-size: 1.02rem; color: var(--muted); margin: 2px 0 6px; }
+.toast { color: var(--muted); }
+.mon { display: inline-flex; align-items: center; gap: 4px; }
+.mon .pt.sm { width: 22px; height: 22px; }
+.mon .pt.md { width: 36px; height: 36px; }
+.mon .flag { width: 14px; height: 9px; border-left-width: 3px; }
+.mon.mine b { color: var(--banner-ink, var(--ink)); text-decoration: underline; text-decoration-color: var(--banner-line, var(--brass)); text-underline-offset: 2px; }
+.betrayal { margin-top: 6px; padding: 4px 8px; border-left: 3px solid var(--brass); background: var(--brass-soft); border-radius: var(--radius); font-size: 12.5px; }
+.field { display: flex; flex-wrap: wrap; gap: 3px; margin: 6px 0; }
+.field .fm { display: inline-block; transition: opacity 0.6s, filter 0.6s; }
+.field .fm.mine .pt { border-color: var(--banner-line, var(--brass)); border-width: 2px; }
+.field .fm .pt.sm { width: 26px; height: 26px; }
+.field .fm.out { opacity: 0.25; filter: grayscale(1); }
+.rounds { margin: 0; padding-left: 1.6em; display: grid; gap: 6px; font-size: 13px; }
+.rolls { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 0; font: 12px var(--font-num); }
+.roll { display: inline-flex; align-items: center; gap: 3px; }
+.roll .pt.sm { width: 20px; height: 20px; }
+.roll.pass .die { border-color: var(--good); }
+.roll.fail .die { border-color: var(--bad); color: var(--bad); }
+.dropped { font-size: 12.5px; }
+.winner, .winner-line, .boot-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.tally { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.tally .chip .pt.sm { width: 18px; height: 18px; }
+.tally .chip b { font-size: 12.5px; }
+.parchments { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; }
+.parchments > li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--radius); background: color-mix(in oklch, var(--brass-soft) 45%, transparent); border-left: 3px solid var(--brass); }
+.parchments > li.note-line, .parchments > li.calls-wrap { background: none; border-left-color: transparent; font-size: 12.5px; }
+.parchments .ord { font: 600 11px var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); min-width: 7em; display: inline-flex; align-items: center; gap: 4px; }
+.parchments .ord .pt.sm { width: 18px; height: 18px; }
+.parchments > li.boot-line { background: var(--bad-soft); border-left-color: var(--bad); }
+.parchments > li.boot-line.mine { box-shadow: inset 0 0 0 1px var(--bad); }
+.parchments > li.winner-line { background: var(--good-soft); border-left-color: var(--good); font-weight: 600; }
+.calls-out, .matchups, .ballots, .schedule { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.calls-out > li, .matchups > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 2px 6px; border-radius: var(--radius); }
+.calls-out .flag, .matchups .flag, .schedule .flag { width: 20px; height: 13px; border-left-width: 4px; }
+.calls-out .pts { margin-left: auto; font-weight: 600; }
+:is(.calls-out, .matchups) > li.mine[data-banner] { background: var(--banner-bg); }
+.matchups .side.won b { text-decoration: underline; text-decoration-color: var(--good); text-decoration-thickness: 2px; }
+.matchups .vs { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.ballots { font-size: 12.5px; grid-template-columns: repeat(auto-fill, minmax(15em, 1fr)); }
+.ballots .pt.sm { width: 18px; height: 18px; }
+.schedule { gap: 8px; }
+.schedule > li > .matchups { margin-left: 8px; }
+.headline { font-size: 14px; margin-bottom: 2px; }
+.race-foot { margin-top: 2px; text-align: right; }
+/* A reveal (fx.ts revealChallenge, readVotes, readJury): while the message is .revealing, every step not yet .shown is
+   held back. The message already holds the whole result, so a skip or a reload shows the same thing. */
+.revealing .rounds > li:not(.shown), .revealing .rounds .dropped:not(.shown), .revealing [data-winner]:not(.shown),
+.revealing [data-step]:not(.shown), .revealing .tally .chip:not(.shown), .revealing .race-foot, .revealing .spoiler, .revealing .parchments > li.rest { display: none !important; }
+.parchments > li.rest { opacity: 0.7; }
+.while-revealing { display: none; }
+.revealing .while-revealing { display: inline; }
+.revealing .rounds > li.shown, .revealing [data-step].shown { animation: msg-in 0.3s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .revealing .rounds > li.shown, .revealing [data-step].shown { animation: none; } }
 
 /* The game (play.ts).
    The Common Room is the season's story, a chat no one types into; beside it, a workspace for your move and the
@@ -525,43 +572,6 @@ details.fold > summary:hover::after { text-decoration: underline; }
 .mini-table tr.mine[data-banner] td { background: var(--banner-bg); }
 .mini-table tr.champ td:first-child { box-shadow: inset 3px 0 0 var(--brass); }
 
-/* A week's race (fx.ts raceWeek): each tavern's run as a strip, green for a pass or a win and red for a fail or a
-   loss, a battle drawn round and wide, a gold foot where loot was banked. While the message is .racing, every step,
-   end and score not yet .shown is held back, and so are the ranks and your headline. */
-.headline { font-size: 14px; margin-bottom: 2px; }
-.race { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
-.lane { border-radius: 5px; }
-.lane.mine[data-banner] { background: color-mix(in oklch, var(--banner-bg) 85%, transparent); box-shadow: inset 3px 0 0 var(--banner-line); }
-.lane > details > summary { display: grid; grid-template-columns: 1.3em 22px minmax(5em, 10em) minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 5px; }
-.lane > details > summary::after { display: none; }
-.lane > details > summary:hover { background: color-mix(in oklch, var(--sunken) 70%, transparent); }
-.lane .rk { font: 600 12px var(--font-num); color: var(--muted); text-align: right; }
-.lane .tn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lane .flag { width: 20px; height: 13px; border-left-width: 4px; }
-.lane .pts { font-size: 13px; text-align: right; min-width: 3.2em; }
-.strip { display: flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; }
-.pip { flex: none; width: 9px; height: 15px; border-radius: 2px; display: inline-block; background: var(--line); }
-.pip.ok { background: var(--good); }
-.pip.no { background: var(--bad); }
-.pip.battle { width: 15px; border-radius: 8px; }
-.pip.bank { box-shadow: inset 0 -4px 0 var(--brass); }
-.run-end { flex: none; margin-left: 4px; font: 700 9.5px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
-.run-end.home { border-color: var(--good); color: var(--good); }
-.run-end.dnf { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
-.lane-tale { padding: 2px 6px 8px 2.4em; display: grid; gap: 6px; }
-.loot-line b { font-size: 1.05em; }
-.race-foot { margin-top: 2px; text-align: right; }
-.racing .pip:not(.shown), .racing .run-end:not(.shown) { opacity: 0; }
-.racing .pip.shown { animation: pip-in 0.25s ease-out both; }
-@keyframes pip-in { from { transform: scaleY(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
-.racing .pts:not(.shown), .racing .rk, .racing [data-headline], .racing .race-foot { visibility: hidden; }
-.racing .lane.mine .tale > li:not(.shown) { display: none; }
-.racing .lane.mine .tale > li.shown { animation: msg-in 0.3s ease-out both; }
-.racing .tale li.rolling .outcome { visibility: hidden; }
-/* What a week leaves behind (fx.ts weekMoment): after a DNF your strip dims; after a retreat the loot kept is marked. */
-.msg.results[data-outcome="dnf"]:not(.racing) .lane.mine .strip { opacity: 0.55; transition: opacity 1.2s ease-out; }
-.msg.results[data-outcome="retreat"]:not(.racing) .lane.mine [data-tail="retreat"] { background: var(--good-soft); border-radius: var(--radius); padding: 2px 6px; }
-
 /* The season's end, as a message: a champion's flies their banner. */
 .msg.season-final h2 { margin: 4px 0; }
 .msg.season-final.champion { display: grid; gap: 8px; padding: 0 14px 12px; border: 1px solid var(--banner-line); background: var(--banner-bg); margin-block: 6px; }
@@ -632,7 +642,7 @@ SOFTWARE.
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <h1>League of Taverns</h1>
+      <h1>The Lich's Contest</h1>
       <p class="sub" id="subtitle">Playground</p>
     </div>
     <div class="top-actions">
@@ -672,12 +682,10 @@ SOFTWARE.
 
     <nav class="tabs" role="tablist" id="ws-tabs" aria-label="Workshop views">
       <button type="button" role="tab" id="tab-standings" aria-controls="ws-panel" data-tab="standings" aria-selected="true" title="The loaded season: the bot run, or your finished season">Standings</button>
-      <button type="button" role="tab" id="tab-weeks" aria-controls="ws-panel" data-tab="weeks" aria-selected="false" tabindex="-1">Weeks</button>
+      <button type="button" role="tab" id="tab-episodes" aria-controls="ws-panel" data-tab="episodes" aria-selected="false" tabindex="-1">Episodes</button>
       <button type="button" role="tab" id="tab-draft" aria-controls="ws-panel" data-tab="draft" aria-selected="false" tabindex="-1">Draft board</button>
-      <button type="button" role="tab" id="tab-reports" aria-controls="ws-panel" data-tab="reports" aria-selected="false" tabindex="-1">Reports</button>
-      <button type="button" role="tab" id="tab-lab" aria-controls="ws-panel" data-tab="lab" aria-selected="false" tabindex="-1" class="group-start" title="Tools">Lineup lab</button>
-      <button type="button" role="tab" id="tab-pool" aria-controls="ws-panel" data-tab="pool" aria-selected="false" tabindex="-1">Pool</button>
-      <button type="button" role="tab" id="tab-events" aria-controls="ws-panel" data-tab="events" aria-selected="false" tabindex="-1">Event log</button>
+      <button type="button" role="tab" id="tab-cast" aria-controls="ws-panel" data-tab="cast" aria-selected="false" tabindex="-1">Cast</button>
+      <button type="button" role="tab" id="tab-events" aria-controls="ws-panel" data-tab="events" aria-selected="false" tabindex="-1" class="group-start" title="Tools">Event log</button>
       <button type="button" role="tab" id="tab-batch" aria-controls="ws-panel" data-tab="batch" aria-selected="false" tabindex="-1">Batch</button>
     </nav>
 
@@ -686,8 +694,7 @@ SOFTWARE.
 
   <footer>
     Runs the real <span class="mono">@league-of-taverns/engine</span> and bots in your browser. A seed gives the same season as
-    <span class="mono">pnpm --filter @league-of-taverns/sims mock-season -- --seed &lt;seed&gt;</span>: the same draft, lineups, rolls,
-    points and champion, down to the same <span class="mono">events.ndjson</span> bytes.
-    Monster data: System Reference Document 5.1 by Wizards of the Coast LLC, CC-BY-4.0.
+    <span class="mono">pnpm sim -- --seed &lt;seed&gt;</span>: the same cast, draft, challenges, votes and champion, down to the same
+    <span class="mono">events.ndjson</span> bytes. Monster data: System Reference Document 5.1 by Wizards of the Coast LLC, CC-BY-4.0.
   </footer>
 </div>

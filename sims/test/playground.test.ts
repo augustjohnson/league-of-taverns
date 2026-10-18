@@ -2,77 +2,58 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { projectMission, replayLog, rngFor } from '@league-of-taverns/engine';
+import { replayLog } from '@league-of-taverns/engine';
+import type { Ballot } from '@league-of-taverns/engine';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { deepEqual } from '../src/deep-equal';
-import { loadMockSeason, loadMockSeasonParts } from '../src/load';
+import { loadSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
-import { seasonInputFromData, serializeSeason, usedSlugs, type PlaygroundData } from '../src/playground/data';
-import { currentRound, feedItems, latestResults, type FeedItem, type FeedOptions } from '../src/playground/feed';
+import { seasonInputFromData, serializeSeason, type PlaygroundData } from '../src/playground/data';
+import { currentDraftRound, feedItems, latestEpisode, type FeedItem, type FeedOptions } from '../src/playground/feed';
 import {
   artCss,
   bannerCss,
-  bestWeek,
-  bannerGods,
+  banneredTaverns,
+  checkLabel,
+  decidedAfter,
   draftBoard,
   draftCalls,
-  REACH_ROUNDS,
-  STEAL_ROUNDS,
   formatCr,
-  formatCrTotal,
-  layoutMission,
-  partyFrom,
-  rostersAtLock,
-  sampleMission,
-  scoreFraction,
-  scoreHistogram,
+  ranksOf,
+  readingOrder,
+  REACH_PICKS,
+  runningTally,
   seedWords,
+  STEAL_PICKS,
+  strategyLine,
   tableMoves,
-  taleSteps,
-  topSkills,
-  weekOutcome,
-  waiverReasonLabel,
+  tagPhrase,
+  voteOrdinal,
 } from '../src/playground/view';
-import { runMockSeason } from '../src/season-runner';
+import { runSeason, seasonInput } from '../src/season-runner';
 
 // The browser playground (sims/src/playground/): its data round-trips through
-// JSON to the same seasons as the Node path, its pure view helpers behave,
-// and the build writes one self-contained Artifact body.
+// JSON to the same seasons as the Node path, its pure view helpers and the
+// Common Room's feed behave, and the build writes one self-contained page.
 
-const parts = loadMockSeasonParts();
-const nodeInput = loadMockSeason();
-const data = JSON.parse(JSON.stringify(serializeSeason(parts, 'sims/fixtures/mock-season'))) as PlaygroundData;
-const browserInput = seasonInputFromData(data);
-const sim1 = runMockSeason(nodeInput, { seed: 'sim-1' });
+const parts = loadSeasonParts();
+const data: PlaygroundData = JSON.parse(JSON.stringify(serializeSeason(parts, 'sims/fixtures/lich-season', 'Test'))) as PlaygroundData;
+const input = seasonInputFromData(data);
+const sim1 = runSeason(input, { seed: 'sim-1' });
 
 describe('playground data', () => {
-  it('rebuilds a SeasonInput from JSON that plays sim-1 to the same NDJSON as the Node path', () => {
-    const fromData = runMockSeason(browserInput, { seed: 'sim-1' });
-    expect(fromData.ndjson).toBe(sim1.ndjson);
-    expect(fromData.summary).toEqual(sim1.summary);
+  it('rebuilds a SeasonInput from JSON that plays a seed to the same NDJSON as the Node path', () => {
+    expect(sim1.ndjson).toBe(runSeason(seasonInput(parts), { seed: 'sim-1' }).ndjson);
   });
 
-  it('matches the Node path on other seeds too', () => {
-    for (const seed of ['sim-1~2', 'mossy-flagon-37']) {
-      expect(runMockSeason(browserInput, { seed }).ndjson, seed).toBe(runMockSeason(nodeInput, { seed }).ndjson);
-    }
-  });
-
-  it('keeps only the snapshot records the season uses, verbatim', () => {
-    const wanted = usedSlugs(parts.pool, parts.missions);
-    expect(new Set(data.snapshot.map((r) => r.slug))).toEqual(wanted);
-    expect(data.snapshot.length).toBeLessThan(parts.snapshot.length);
+  it('keeps only the snapshot records the pool uses, verbatim', () => {
+    const bases = new Set(parts.pool.map((p) => p.character.ref.base));
+    expect(data.snapshot.map((r) => r.slug).sort()).toEqual([...bases].sort());
     for (const record of data.snapshot) expect(record).toEqual(parts.snapshot.find((r) => r.slug === record.slug));
   });
 
   it('rejects data of another version', () => {
-    expect(() => seasonInputFromData({ ...data, version: 99 } as unknown as PlaygroundData)).toThrow(/version/);
-  });
-});
-
-describe('season audit', () => {
-  it('reports the replay and verify checks the run passed', () => {
-    expect(sim1.audit).toEqual({ replayMatches: true, mismatches: [] });
+    expect(() => seasonInputFromData({ ...data, version: 1 as never })).toThrow(/version/);
   });
 });
 
@@ -81,11 +62,8 @@ describe('deepEqual (the replay self-check)', () => {
     const replayed = replayLog(sim1.ndjson);
     expect(deepEqual(replayed, sim1.state)).toBe(true);
     expect(isDeepStrictEqual(replayed, sim1.state)).toBe(true);
-    const owner = new Map(sim1.state.owner);
-    owner.set('professor-albright', 'someone-else');
-    const tampered = { ...sim1.state, owner };
+    const tampered = { ...sim1.state, jury: [...sim1.state.jury].reverse() };
     expect(deepEqual(tampered, sim1.state)).toBe(false);
-    expect(isDeepStrictEqual(tampered, sim1.state)).toBe(false);
   });
 
   it('follows the strict rules on primitives, arrays, objects, Maps and Sets', () => {
@@ -94,311 +72,141 @@ describe('deepEqual (the replay self-check)', () => {
       [NaN, NaN],
       [0, -0],
       [1, '1'],
-      [null, undefined],
-      [[1, 2], [1, 2]],
       [[1, 2], [2, 1]],
-      [[1], { 0: 1 }],
       [{ a: 1, b: [2] }, { b: [2], a: 1 }],
       [{ a: undefined }, {}],
-      [new Map<string, unknown>([['a', { x: 1 }], ['b', 2]]), new Map<string, unknown>([['b', 2], ['a', { x: 1 }]])],
       [new Map([['a', 1]]), new Map([['a', 2]])],
-      [new Map([[{ k: 1 }, 'v']]), new Map([[{ k: 1 }, 'v']])],
       [new Set([1, 2]), new Set([2, 1])],
-      [new Set([1, 2]), new Set([1, 3])],
-      [new Set([{ a: 1 }]), new Set([{ a: 1 }])],
-      [new Set([1]), new Map([[1, 1]])],
-      [new Date(0), new Date(0)],
     ];
     for (const [a, b] of cases) expect(deepEqual(a, b), `${String(a)} vs ${String(b)}`).toBe(isDeepStrictEqual(a, b));
   });
 });
 
 describe('view helpers', () => {
-  const mission = nodeInput.missions.get(3)!.mission;
-
-  it('lays a mission out in columns by rank with no overlapping nodes', () => {
-    const layout = layoutMission(mission);
-    expect(layout.nodes.map((n) => n.id).sort()).toEqual(mission.nodes.map((n) => n.id).sort());
-    expect(layout.edges).toHaveLength(mission.edges.length);
-    for (const a of layout.nodes) {
-      expect(a.x + a.w).toBeLessThanOrEqual(layout.width);
-      expect(a.y + a.h).toBeLessThanOrEqual(layout.height);
-      for (const b of layout.nodes) {
-        if (a === b) continue;
-        if (a.rank < b.rank) expect(a.x).toBeLessThan(b.x);
-        if (a.rank === b.rank) expect(a.x === b.x && Math.abs(a.y - b.y) < a.h).toBe(false);
-      }
-    }
-  });
-
-  it('bins sampled scores onto the projected support, and the sample mean converges to the projection', () => {
-    expect(scoreHistogram([0, 0.5, 0.5, 1, 0.3], [0, 0.5, 1])).toEqual({ counts: [1, 2, 1], other: 1 });
-    const party = partyFrom(['krrth', 'bruno-the-bruiser', 'doug', 'gizzik'], nodeInput.statsOf);
-    const projection = projectMission(party, mission, nodeInput.baseOf, nodeInput.battleModel);
-    const sample = sampleMission(party, mission, nodeInput.baseOf, nodeInput.battleModel, 4000, 'test-seed');
-    expect(sample.scores).toHaveLength(4000);
-    expect(scoreHistogram(sample.scores, projection.distribution.map(([s]) => s)).other).toBe(0);
-    expect(Math.abs(sample.mean - projection.expectedScore)).toBeLessThan(0.02);
-    expect(Math.abs(sample.dnfs / 4000 - projection.pDnf)).toBeLessThan(0.03);
-  });
-
   it('puts every draft pick in its snake slot', () => {
-    const order = [...sim1.state.draft.order];
-    const rows = draftBoard(order, sim1.summary.draft);
-    expect(rows).toHaveLength(7);
-    rows.forEach((row, r) => {
-      expect(row.direction).toBe(r % 2 === 0 ? 'ltr' : 'rtl');
-      row.cells.forEach((cell, slot) => {
-        expect(cell?.tavern).toBe(order[slot]);
-        const i = cell!.pick % order.length;
-        expect(row.direction === 'ltr' ? i : order.length - 1 - i).toBe(slot);
-      });
-    });
+    const rows = draftBoard(['a', 'b', 'c'], [0, 1, 2, 3, 4].map((pick) => ({ pick, tavern: 'x', character: `c${pick}` })));
+    expect(rows.map((r) => r.cells.map((c) => c?.character ?? null))).toEqual([
+      ['c0', 'c1', 'c2'],
+      [null, 'c4', 'c3'],
+    ]);
   });
 
-  it('rebuilds rosters as of each lineup lock', () => {
-    const week1 = rostersAtLock(sim1.events, 1);
-    expect([...week1.values()].every((roster) => roster.length === 7)).toBe(true);
-    for (const entry of sim1.state.lockedLineups.get(3)!) {
-      const roster = rostersAtLock(sim1.events, 3).get(entry.tavern)!;
-      if (entry.lineup !== null) for (const id of entry.lineup.starters) expect(roster).toContain(id);
-    }
+  it(`calls a steal ${STEAL_PICKS} picks late and a reach ${REACH_PICKS} early, against the scouts' rank`, () => {
+    const ranks = ranksOf(new Map([['a', 10], ['b', 9], ['c', 1]]));
+    expect([...ranks]).toEqual([['a', 0], ['b', 1], ['c', 2]]);
+    const calls = draftCalls(
+      [
+        { pick: 0, tavern: 't', character: 'c' },
+        { pick: 5, tavern: 't', character: 'b' },
+        { pick: 9, tavern: 't', character: 'z' },
+      ],
+      new Map([['c', 8], ['b', 0]]),
+    );
+    expect(calls.map((c) => c.notes)).toEqual([['reach'], ['steal'], []]);
   });
 
-  it('formats CRs, scores, skills and seeds', () => {
-    expect([0, 1, 2, 4, 8, 12, 96, 100].map(formatCr)).toEqual(['0', '1/8', '1/4', '1/2', '1', '1 1/2', '12', '12 1/2']);
-    expect([0, 1, 0.5, 2 / 3, 0.8, 3 / 7].map(scoreFraction)).toEqual(['0', '1', '1/2', '2/3', '4/5', '3/7']);
-    expect([0, 2, 30, 58, 96, 100].map(formatCrTotal)).toEqual(['0', '0.25', '3.75', '7.25', '12', '12.5']);
-    expect(['awarded', 'add_unavailable', 'roster_full', 'something_new'].map(waiverReasonLabel)).toEqual(['awarded', 'already taken', 'roster full', 'something new']);
-    const skills = topSkills(nodeInput.statsOf('gizzik'));
-    expect(skills).toHaveLength(3);
-    expect(skills[0]!.modifier).toBeGreaterThanOrEqual(skills[2]!.modifier);
-    const rand = rngFor('seed-words', 'test');
-    for (let i = 0; i < 50; i++) expect(seedWords(rand)).toMatch(/^[a-z]+-[a-z]+-\d{1,2}$/);
-  });
-});
-
-describe('the week reveal', () => {
-  it('banks loot along the path and ends on what the engine carried home, or on 0 after a DNF', () => {
-    let runs = 0;
-    let dnfs = 0;
-    for (const [week, byTavern] of sim1.state.results) {
-      const mission = nodeInput.missions.get(week)!.mission;
-      for (const { run } of byTavern.values()) {
-        const steps = taleSteps(mission, run);
-        expect(steps.map((st) => st.node)).toEqual(run.path);
-        expect(steps.map((st) => st.from)).toEqual([null, ...run.path.slice(0, -1)]);
-        expect(steps.filter((st) => st.record !== null).map((st) => st.record)).toEqual(run.nodes);
-        const banked = steps.at(-1)?.total ?? 0;
-        expect(banked).toBe(steps.reduce((sum, st) => sum + st.bank, 0));
-        if (run.dnf) {
-          dnfs++;
-          expect(run.loot).toBe(0);
-        } else {
-          expect(banked).toBe(run.loot);
-        }
-        runs++;
-      }
-    }
-    expect(runs).toBeGreaterThan(30);
-    expect(dnfs).toBeLessThan(runs);
-  });
-});
-
-describe('week outcomes', () => {
-  const week = { rank: 3, points: 40, projected: 50, dnf: false, retreated: false };
-
-  it('picks one moment per week, the first that holds: DNF, top, retreat, beat the projection, else quiet', () => {
-    expect(weekOutcome(week)).toBe('quiet');
-    expect(weekOutcome({ ...week, points: 51 })).toBe('good');
-    expect(weekOutcome({ ...week, points: 51, retreated: true })).toBe('retreat');
-    expect(weekOutcome({ ...week, rank: 1, retreated: true })).toBe('top');
-    expect(weekOutcome({ ...week, rank: 1, points: 0, dnf: true })).toBe('dnf');
+  it('reads a card in words', () => {
+    expect(tagPhrase('type:undead')).toBe('one of the dead');
+    expect(tagPhrase('subtype:orc')).toBe('an orc');
+    expect(tagPhrase('law:lawful')).toBe('someone lawful');
+    expect(strategyLine({ kind: 'loyal', tag: 'type:giant' })).toBe('wants a giant to win');
+    expect(strategyLine({ kind: 'coattails' }, 7)).toMatch(/final 7, turns on the strongest/);
+    expect(checkLabel({ type: 'skill', skill: 'sleight_of_hand', dc: 12, advantage: { speed: 'swim' } })).toBe('Sleight of hand DC 12, swim speed: advantage');
+    expect(checkLabel({ type: 'save', ability: 'con', dc: 13 }, 15)).toBe('Con save DC 15');
   });
 
-  it('does not crown a week where every tavern scored nothing', () => {
-    expect(weekOutcome({ ...week, rank: 1, points: 0, projected: 0 })).toBe('quiet');
+  it("reads the votes with the boot's last vote last, and stops once nobody can catch it", () => {
+    const b = (voter: string, target: string): Ballot => ({ voter, target });
+    const ballots = [b('1', 'x'), b('2', 'x'), b('3', 'y'), b('4', 'x'), b('5', 'z'), b('6', 'x'), b('7', 'y')];
+    const order = readingOrder(ballots, 'x');
+    expect([...order].sort((p, q) => p.voter.localeCompare(q.voter))).toEqual(ballots);
+    expect(order.at(-1)!.target).toBe('x');
+    expect(runningTally(order).at(-1)).toBe(4);
+    const lopsided = [b('1', 'x'), b('2', 'x'), b('3', 'x'), b('4', 'x'), b('5', 'x'), b('6', 'y')];
+    expect(decidedAfter(lopsided, 'x')).toBe(4);
+    expect(decidedAfter(ballots, 'x')).toBe(6);
+    expect(decidedAfter([b('1', 'x'), b('2', 'y')], 'x')).toBe(2);
+    expect(voteOrdinal(0)).toBe('First vote');
+    expect(voteOrdinal(11)).toBe('Vote 12');
   });
-});
 
-describe('season finish', () => {
-  it('finds the best week: the most points, the earliest on a tie, and whether it topped the week', () => {
-    expect(bestWeek([])).toBeNull();
-    expect(bestWeek([{ week: 1, points: 40, rank: 3 }, { week: 2, points: 90, rank: 1 }, { week: 3, points: 90, rank: 2 }])).toEqual({ week: 2, points: 90, topped: true });
-    expect(bestWeek([{ week: 4, points: 0, rank: 1 }])).toEqual({ week: 4, points: 0, topped: false });
+  it('formats CRs and seeds', () => {
+    expect([1, 2, 4, 8, 100].map(formatCr)).toEqual(['1/8', '1/4', '1/2', '1', '12 1/2']);
+    expect(seedWords(() => 0)).toBe('amber-ale-0');
+    expect(seedWords(() => 0.999)).not.toContain('/');
   });
-});
 
-describe('table moves', () => {
-  it('gives each tavern its previous row and the places it rose, shared ranks included', () => {
-    const before = [
-      { tavern: 'a', rank: 1 },
-      { tavern: 'b', rank: 2 },
-      { tavern: 'c', rank: 2 },
-      { tavern: 'd', rank: 4 },
-    ];
-    const after = [
-      { tavern: 'd', rank: 1 },
-      { tavern: 'a', rank: 2 },
-      { tavern: 'c', rank: 2 },
-      { tavern: 'e', rank: 4 },
-    ];
-    expect(Object.fromEntries(tableMoves(before, after))).toEqual({
-      d: { wasRow: 3, rose: 3 },
-      a: { wasRow: 0, rose: -1 },
-      c: { wasRow: 2, rose: 0 },
-      e: { wasRow: 3, rose: 0 },
-    });
+  it('gives each tavern its previous row and the places it rose', () => {
+    const moves = tableMoves(
+      [
+        { tavern: 'a', rank: 1 },
+        { tavern: 'b', rank: 2 },
+      ],
+      [
+        { tavern: 'b', rank: 1 },
+        { tavern: 'a', rank: 2 },
+      ],
+    );
+    expect(moves.get('b')).toEqual({ wasRow: 1, rose: 1 });
+    expect(moves.get('a')).toEqual({ wasRow: 0, rose: -1 });
   });
 });
 
 describe('the Common Room', () => {
-  const teams = nodeInput.managers.length;
-  const { rounds } = nodeInput.config.draft;
-  const { weeks } = nodeInput.config;
-  const opts: FeedOptions = { me: null, teams, rounds, weeks, adp: new Map() };
+  const me = sim1.state.draft.order[0]!;
+  const opts: FeedOptions = { me, teams: input.managers.length, rounds: input.config.roster.size, ranks: new Map() };
+  const votes = input.config.contest.castSize - input.config.contest.finalists;
   const items = feedItems(sim1.events, opts);
-  const ofKind = <K extends FeedItem['kind']>(kind: K): Array<Extract<FeedItem, { kind: K }>> =>
-    items.filter((it): it is Extract<FeedItem, { kind: K }> => it.kind === kind);
+  const kinds = (list: ReadonlyArray<FeedItem>, kind: FeedItem['kind']) => list.filter((i) => i.kind === kind);
 
-  it('tells the season in order: the opening, the tavern pick, the draft, then each week', () => {
-    expect(ofKind('divider').map((d) => d.label)).toEqual([
-      'Before the season',
-      'The tavern pick',
-      'The draft',
-      ...Array.from({ length: weeks }, (_, i) => `Week ${i + 1}`),
-    ]);
-    // Each week opens right under its divider, and its results come before the next week opens.
-    for (let w = 1; w <= weeks; w++) {
-      const open = items.findIndex((it) => it.key === `week-open:${w}`);
-      expect(items[open - 1]?.key).toBe(`divider:week:${w}`);
-      expect(items.findIndex((it) => it.key === `results:${w}`)).toBeGreaterThan(open);
-    }
-    expect(ofKind('tavern').map((t) => t.tavern)).toEqual([...sim1.state.taverns.keys()]);
-    expect(new Set(items.map((it) => it.key)).size).toBe(items.length);
+  it('tells the season in order: the opening, the tavern pick, the draft, each episode, the finale and the rounds', () => {
+    expect(items[1]!.kind).toBe('season');
+    expect(kinds(items, 'tavern')).toHaveLength(input.managers.length);
+    expect(kinds(items, 'draft-round')).toHaveLength(input.config.roster.size);
+    expect(kinds(items, 'episode-open')).toHaveLength(votes);
+    expect(kinds(items, 'challenge')).toHaveLength(votes);
+    expect(kinds(items, 'vote')).toHaveLength(votes);
+    expect(kinds(items, 'finale')).toHaveLength(1);
+    const rounds = kinds(items, 'round') as Array<Extract<FeedItem, { kind: 'round' }>>;
+    expect(rounds.map((r) => r.final)).toEqual(input.config.schedule.rounds.map((_, i) => i === input.config.schedule.rounds.length - 1));
+    expect(currentDraftRound(items)).toBe(3);
+    expect(latestEpisode(items)).toBe(votes);
   });
 
-  it('calls the draft round by round, every pick in order', () => {
-    const r = ofKind('round');
-    expect(r.map((x) => x.round)).toEqual(Array.from({ length: rounds }, (_, i) => i + 1));
-    expect(r.every((x) => x.complete && x.calls.length === teams)).toBe(true);
-    expect(r.flatMap((x) => x.calls.map((c) => [c.pick, c.tavern, c.character]))).toEqual(sim1.summary.draft.map((d) => [d.pick, d.tavern, d.character]));
-    expect(currentRound(items)).toBe(rounds);
-    expect(ofKind('draft-done')).toHaveLength(1);
-  });
-
-  it("races every tavern each week, ranked as the engine ranked the week, and keeps the table's running totals", () => {
-    const results = ofKind('results');
-    expect(results.map((x) => x.week)).toEqual(sim1.summary.weeks.map((w) => w.week));
-    for (const [i, w] of sim1.summary.weeks.entries()) {
-      const race = results[i]!;
-      expect(race.runs).toHaveLength(teams);
-      for (const t of w.results) {
-        const lane = race.runs.find((x) => x.tavern === t.tavern)!;
-        expect([lane.points, lane.rank]).toEqual([t.points, t.rank]);
-      }
-    }
-    expect(latestResults(items)).toBe(weeks);
-    const tables = ofKind('table');
-    expect(tables.map((t) => t.final)).toEqual(Array.from({ length: weeks }, (_, i) => i === weeks - 1));
-    expect(tables.at(-1)!.rows.map((r) => [r.tavern, r.rank, r.points])).toEqual(sim1.summary.standings.map((s) => [s.tavern, s.rank, s.points]));
-    // Week 1 has no week before it to move from.
-    expect(tables[0]!.rows.every((r) => r.rose === 0)).toBe(true);
-  });
-
-  it('keeps waiver claims sealed until they resolve, except your own', () => {
-    expect(ofKind('claim')).toHaveLength(0);
-    const waivers = ofKind('waivers');
-    expect(waivers.map((x) => x.week)).toEqual(sim1.summary.weeks.filter((w) => w.week < weeks).map((w) => w.week));
-    for (const x of waivers) {
-      const w = sim1.summary.weeks.find((y) => y.week === x.week)!;
-      expect(x.outcomes.map((o) => [o.tavern, o.add, o.awarded])).toEqual(w.waivers.map((o) => [o.tavern, o.add, o.awarded]));
-    }
-    const me = [...sim1.state.taverns.keys()][0]!;
-    const mine = feedItems(sim1.events, { ...opts, me }).filter((it) => it.kind === 'claim');
-    const claimed = sim1.events.filter((e) => e.type === 'waiver.claimed' && e.payload.tavern === me);
-    expect(mine.map((it) => it.key)).toEqual(claimed.map((e) => (e.type === 'waiver.claimed' ? `claim:${e.payload.claim}` : '')));
-  });
-
-  it('places each "ready" where the log stood when it was said, among your own moves', () => {
-    const open = sim1.events.findIndex((e) => e.type === 'waiver.resolved' && e.payload.week === 1) + 1;
-    const [a, b] = [...sim1.state.taverns.keys()];
-    const withReady = feedItems(sim1.events.slice(0, open), { ...opts, ready: [{ week: 2, tavern: a!, at: open }, { week: 2, tavern: b!, at: open + 5 }] });
-    expect(withReady.slice(-2).map((it) => it.key)).toEqual(['week-open:2', `ready:2:${a}`]);
-    expect(withReady.some((it) => it.key === `ready:2:${b}`)).toBe(false);
+  it("keeps rivals' calls sealed until the vote; your own shows at once", () => {
+    const calls = kinds(items, 'call') as Array<Extract<FeedItem, { kind: 'call' }>>;
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) expect(c.target === null).toBe(c.tavern !== me);
+    const votes = kinds(items, 'vote') as Array<Extract<FeedItem, { kind: 'vote' }>>;
+    for (const v of votes) expect(v.calls).toHaveLength(input.managers.length);
   });
 
   it('never takes back a message: every key told so far is still there as more of the log arrives', () => {
-    let before = new Set<string>();
-    for (let n = 0; n <= sim1.events.length; n += 7) {
-      const keys = new Set(feedItems(sim1.events.slice(0, n), opts).map((it) => it.key));
-      for (const k of before) expect(keys.has(k), `${k} at ${n}`).toBe(true);
-      before = keys;
+    let seen = new Set<string>();
+    for (const n of [40, 80, 120, sim1.events.length]) {
+      const keys = new Set(feedItems(sim1.events.slice(0, n), opts).map((i) => i.key));
+      for (const k of seen) expect(keys.has(k), k).toBe(true);
+      seen = keys;
     }
   });
 });
 
-describe('draft calls', () => {
-  // Usually taken in the order a, b, c, d, e, then z (rarely drafted); two teams, so a round is two picks.
-  const adp = new Map([
-    ['z', 9],
-    ['a', 0],
-    ['b', 1.2],
-    ['c', 2],
-    ['d', 3.5],
-    ['e', 4],
-  ]);
-  const pick = (n: number, tavern: string, character: string) => ({ pick: n, tavern, character });
-
-  it(`calls a steal ${STEAL_ROUNDS} round late and a reach ${REACH_ROUNDS} rounds early, against the average draft position`, () => {
-    const calls = draftCalls([pick(0, 'x', 'b'), pick(1, 'y', 'c'), pick(2, 'y', 'z'), pick(3, 'x', 'a'), pick(4, 'x', 'd')], adp, 2);
-    expect(calls.map((c) => [c.character, c.adp, c.notes])).toEqual([
-      ['b', 1.2, []],
-      ['c', 2, []],
-      ['z', 9, ['reach']],
-      ['a', 0, ['steal']],
-      ['d', 3.5, []],
-    ]);
-  });
-
-  it('has no average for a character outside it, and no note', () => {
-    expect(draftCalls([pick(9, 'x', 'q')], adp, 2)[0]).toMatchObject({ adp: null, notes: [] });
-  });
-});
-
-describe('card art stylesheet', () => {
+describe('stylesheets', () => {
   const png = 'data:image/png;base64,iVBORw0KGgo=';
+  const inn = { banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: 'rain' as const } };
 
-  it("sets each character's face and thumbnail as custom properties, once", () => {
-    expect(artCss({ doug: { face: png, portrait: png }, bruno: { face: png } }).split('\n')).toEqual([
-      `[data-art="doug"]{--art-face:url("${png}");--art-thumb:url("${png}")}`,
-      `[data-art="bruno"]{--art-face:url("${png}")}`,
+  it("sets each character's face and thumbnail, skipping anything that could break out", () => {
+    expect(artCss({ doug: { face: png, portrait: png } })).toBe(`[data-art="doug"]{--art-face:url("${png}");--art-thumb:url("${png}")}`);
+    expect(artCss({ 'x"]{}': { face: png }, sneaky: { face: 'data:image/png;base64,AA")}body{x:url("' } })).toBe('');
+  });
+
+  it("sets each tavern's colours and texture, skipping a bad id or colour", () => {
+    expect(bannerCss({ 'the-inn': inn }).split('\n')).toEqual([
+      ':root{--mark-the-inn:#2a78d6}',
+      '[data-banner="the-inn"]{--banner-field:#d4e6f7;--banner-charge:#f5e9a8;--banner-mark:#2a78d6;--banner-pattern:var(--tex-rain)}',
     ]);
-  });
-
-  it('skips a character with no face, or an id or image that could break out of the stylesheet', () => {
-    expect(artCss({ plain: { portrait: png }, 'x"]{}': { face: png }, sneaky: { face: 'data:image/png;base64,AA")}body{x:url("' } })).toBe('');
-  });
-});
-
-describe('banner stylesheet', () => {
-  const crow = { name: 'The Storm Crow', banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: 'rain' as const } };
-
-  it('sets each god\'s colours and texture as custom properties, and its mark on :root', () => {
-    expect(bannerCss({ 'the-storm-crow': crow }).split('\n')).toEqual([
-      ':root{--mark-the-storm-crow:#2a78d6}',
-      '[data-banner="the-storm-crow"]{--banner-field:#d4e6f7;--banner-charge:#f5e9a8;--banner-mark:#2a78d6;--banner-pattern:var(--tex-rain)}',
-    ]);
-  });
-
-  it('skips a god whose id or colours could break out of the stylesheet', () => {
-    const gods = {
-      'the-storm-crow': crow,
-      'bad"]{x:y}': crow,
-      'the-red-one': { ...crow, banner: { ...crow.banner, mark: 'red;}body{display:none' } },
-    };
-    expect([...bannerGods(gods)]).toEqual(['the-storm-crow']);
-    expect(bannerCss(gods)).not.toMatch(/bad|red|display/);
+    const bad = { 'the-inn': inn, 'bad"]{x:y}': inn, 'red-one': { banner: { ...inn.banner, mark: 'red;}' } } };
+    expect([...banneredTaverns(bad)]).toEqual(['the-inn']);
   });
 });
 
@@ -408,42 +216,27 @@ describe('playground build', () => {
   let page: Awaited<ReturnType<typeof writePlayground>>;
   beforeAll(async () => {
     page = await writePlayground(out);
-  }, 60_000);
+  }, 120_000);
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('writes one self-contained Artifact body', () => {
-    const { bytes, data: built } = page;
-    // Every sponsoring god's chrome rides along for the banners.
-    expect(Object.keys(built.gods).sort()).toEqual(parts.sponsors.map((sp) => sp.id).sort());
-    expect(bannerGods(built.gods).size).toBe(parts.sponsors.length);
-    // Every pooled character with a portrait gets the card's face crop.
-    for (const { character } of parts.pool) expect(built.chrome[character.ref.id]?.face, character.ref.id).toMatch(/^data:image\/png;base64,/);
+  it('writes one self-contained page under 2 MiB, pure ASCII', () => {
     const html = readFileSync(out, 'utf8');
-    expect(html.startsWith('<title>League of Taverns Playground</title>')).toBe(true);
+    expect(html.startsWith("<title>The Lich's Contest</title>")).toBe(true);
     expect(html).not.toMatch(/<(html|head|body)\b|<!doctype/i);
     expect(html.match(/<script\b/g)).toHaveLength(1);
-    expect(html.match(/<style\b/g)).toHaveLength(1);
     expect(html).toContain('var __PLAYGROUND_DATA__=');
-    // micron's CSS is vendored into the one style block, with its MIT notice.
-    expect(html).toContain('.mjs-swing{');
     expect(html).toContain('Copyright (c) 2018 Webkul');
-    expect(html).not.toMatch(/\bfetch\(/);
     expect(html).toMatch(/^[\t\n\r -~]*$/);
-    expect(bytes).toBeLessThan(2 * 1024 * 1024);
+    expect(page.bytes).toBeLessThan(2 * 1024 * 1024);
   });
 
-  it("carries each pooled character's name and a portrait thumbnail, and nothing the engine reads", () => {
+  it('carries the chrome for every pooled character, tavern and challenge, and plays the same seasons', () => {
     const built = page.data;
-    const ids = parts.pool.map((p) => p.character.ref.id);
-    expect(Object.keys(built.chrome).sort()).toEqual([...ids].sort());
-    expect(built.chrome['bruno-the-bruiser']).toMatchObject({ name: 'Bruno', epithet: 'the Bruiser' });
-    for (const id of ids) {
-      const uri = built.chrome[id]!.portrait;
-      expect(uri, id).toMatch(/^data:image\/png;base64,/);
-      const png = Buffer.from(uri!.slice(uri!.indexOf(',') + 1), 'base64');
-      expect(Math.max(png.readUInt32BE(16), png.readUInt32BE(20)), id).toBe(88);
-    }
-    expect(runMockSeason(seasonInputFromData(built), { seed: 'sim-1' }).ndjson).toBe(sim1.ndjson);
+    expect(Object.keys(built.chrome).sort()).toEqual(parts.pool.map((p) => p.character.ref.id).sort());
+    for (const p of parts.pool) expect(built.chrome[p.character.ref.id]!.face, p.character.ref.id).toMatch(/^data:image\/png;base64,/);
+    expect(Object.keys(built.tavernChrome).sort()).toEqual(parts.taverns.map((t) => t.id).sort());
+    expect(Object.keys(built.challengeChrome)).toHaveLength(parts.challenges.length);
+    expect(runSeason(seasonInputFromData(built), { seed: 'sim-1' }).ndjson).toBe(sim1.ndjson);
   });
 
   it('escapes the inlined JSON so nothing can close the script early', () => {

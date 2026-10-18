@@ -1,0 +1,12 @@
+# Episode 4. Chrome: title, story and each check's line. The checks under them are the rules.
+id: seat-the-guests
+episode: 4
+title: Seat My Dinner Guests
+story: >-
+  Twelve nobles, one table, and four blood feuds. Seat them so nobody dies
+  before the soup. After the soup, I don't mind.
+checks:
+  - { type: skill, skill: insight, dc: 12, line: "read the guests as they arrive" }
+  - { type: skill, skill: history, dc: 12, line: "remember who murdered whose uncle" }
+  - { type: skill, skill: persuasion, dc: 12, line: "charm the duchess into her chair" }
+  - { type: skill, skill: deception, dc: 13, line: "lie about what is in the soup" }

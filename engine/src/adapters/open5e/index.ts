@@ -71,6 +71,10 @@ export interface BaseStats {
   readonly size: string;
   /** Lowercase, e.g. "giant". */
   readonly creatureType: string;
+  /** Lowercase, e.g. "goblinoid", or "" when the stat block has none. Contest votes read it. */
+  readonly subtype: string;
+  /** Lowercase, as the stat block gives it, e.g. "chaotic evil", "unaligned", "any alignment". */
+  readonly alignment: string;
   /** Ability scores (not modifiers). */
   readonly abilities: Readonly<Record<Ability, number>>;
   /** Every skill, proficient or not (unproficient = ability modifier). */
@@ -140,6 +144,8 @@ export function toBaseStats(record: Open5eMonster): AdaptResult {
     cr,
     size: record.size.toLowerCase(),
     creatureType: record.type.toLowerCase(),
+    subtype: record.subtype.trim().toLowerCase(),
+    alignment: record.alignment.trim().toLowerCase(),
     abilities,
     skills: parseSkills(record, mods, warn),
     saves: parseSaves(record, mods),

@@ -3,7 +3,7 @@
  * senses, check outcomes, and the exact CR representation.
  *
  * Conventions (docs/schema.md § Conventions):
- * - Ids (characters, missions, traits, taverns) are kebab-case.
+ * - Ids (characters, challenges, traits, taverns) are kebab-case.
  * - Vocabulary terms (skills, modifier kinds, outcomes) are snake_case.
  */
 
@@ -61,8 +61,6 @@ export const SENSES = ['darkvision', 'blindsight', 'tremorsense', 'truesight'] a
 export type SenseKind = (typeof SENSES)[number];
 
 export type CheckOutcome = 'pass' | 'fail';
-export type BattleOutcome = 'win' | 'lose';
-export type EdgeCondition = 'always' | CheckOutcome | 'win';
 
 /**
  * Challenge rating stored exactly, as an integer count of eighths:

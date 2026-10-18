@@ -3,12 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Headless mock seasons with bot managers, plus the balance report.",
+  "description": "Season sims of the Lich's contest with bot taverns, plus the browser playground.",
   "scripts": {
     "typecheck": "tsc -p . && tsc -p src/playground",
-    "mock-season": "tsx src/mock-season.ts",
-    "playground": "tsx src/build-playground.ts",
-    "balance-report": "tsx src/balance-report.ts"
+    "sim": "tsx src/sim.ts",
+    "playground": "tsx src/build-playground.ts"
   },
   "dependencies": {
     "@league-of-taverns/bots": "workspace:*",

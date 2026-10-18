@@ -26,10 +26,9 @@ export type ModifierEffect =
   | { readonly kind: 'save_bonus'; readonly ability: Ability; readonly value: number }
   | { readonly kind: 'advantage'; readonly on: CheckTarget }
   | { readonly kind: 'grant_speed'; readonly speed: SpeedKind; readonly feet: number }
-  | { readonly kind: 'grant_sense'; readonly sense: SenseKind; readonly feet: number }
-  | { readonly kind: 'battle_bonus'; readonly value: number };
+  | { readonly kind: 'grant_sense'; readonly sense: SenseKind; readonly feet: number };
 
-/** What a check tests. Shared with mission checks. */
+/** What a check tests. Shared with challenge checks. */
 export type CheckTarget =
   | { readonly type: 'skill'; readonly skill: Skill }
   | { readonly type: 'save'; readonly ability: Ability }
@@ -63,6 +62,4 @@ export interface EffectiveStats {
   readonly advantages: ReadonlySet<string>;
   readonly speeds: Readonly<Partial<Record<SpeedKind, number>>>;
   readonly senses: Readonly<Partial<Record<SenseKind, number>>>;
-  /** Flat adjustment fed into the battle model. */
-  readonly battleBonus: number;
 }

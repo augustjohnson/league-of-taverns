@@ -1,0 +1,41 @@
+# The lich season: the Lich's contest as sims and the playground play it.
+# Hand-built, not a live season. Every value here is a playtest default
+# (docs/lich-contest-plan.md §1): sims tune them, and nothing is a rule yet.
+#
+# Validate: pnpm --filter @league-of-taverns/scripts validate -- --dir sims/fixtures/lich-season
+
+id: lich-season
+name: The Lich's Contest
+snapshot: open5e-v1-2026-10
+modifierRegistryVersion: 1
+pool: pool.yaml
+managers: managers.yaml
+taverns: taverns.yaml
+challenges: challenges
+
+budget:
+  modifierPointsPerCharacter: 3
+
+roster:
+  size: 3                           # 4 taverns × 3 = all 12 drafted
+
+draft:
+  format: snake
+  order: { mode: seeded }
+
+contest:
+  castSize: 12                      # drawn from the pool by the season seed
+  finalists: 3                      # 9 votes, then the jury
+  lapDc: 1                          # each time a challenge's checks come round again, DC +1
+  model: {}                         # vote-model overrides (engine/src/contest/model.ts); none
+
+scoring:
+  survive: 2                        # each of your monsters still in after a vote
+  immunity: 3                       # your monster wins the challenge
+  juryVote: 2                       # each jury vote your finalist receives
+  winner: 10                        # your monster becomes the Lich's assistant
+  call: 2                           # calling the boot: about one monster surviving one vote
+  earlyCallBonus: 1                 # a correct call made before the challenge
+
+schedule:
+  rounds: [3, 3, 3]                 # episodes per head-to-head round (4 taverns: a round-robin of 3); the finale is in the last

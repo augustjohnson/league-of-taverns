@@ -1,0 +1,12 @@
+# Episode 6. Chrome: title, story and each check's line. The checks under them are the rules.
+id: the-sphinx
+episode: 6
+title: Answer the Sphinx
+story: >-
+  I have borrowed a sphinx. She asks riddles. Get one wrong and you're out; I
+  have promised her a snack, so please do get some wrong.
+checks:
+  - { type: ability, ability: int, dc: 12, line: "answer the first riddle" }
+  - { type: skill, skill: arcana, dc: 12, line: "name the spell in her second" }
+  - { type: skill, skill: insight, dc: 12, line: "tell when she's bluffing" }
+  - { type: skill, skill: history, dc: 13, line: "remember the old king's horse's name" }

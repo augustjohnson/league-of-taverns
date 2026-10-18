@@ -1,0 +1,12 @@
+# Episode 7. Chrome: title, story and each check's line. The checks under them are the rules.
+id: climb-the-tower
+episode: 7
+title: Climb the Tower
+story: >-
+  Somebody left a window open at the top of the tower. Somebody is going to
+  climb up and close it. I have a lovely view of the wall.
+checks:
+  - { type: skill, skill: athletics, dc: 12, advantage: { speed: climb }, line: "climb the outside wall" }
+  - { type: save, ability: str, dc: 12, line: "hold on in the wind" }
+  - { type: skill, skill: acrobatics, dc: 12, line: "edge round the gargoyle" }
+  - { type: save, ability: con, dc: 13, line: "not look down" }
