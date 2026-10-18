@@ -86,8 +86,12 @@ three bots, with keepers' names so the table reads like people.
 - **The action bar** says what's next: your pick, or in an episode "Run the
   challenge" and "Go to the vote", with your call shown.
 
-The season is saved in localStorage as its seed, seat and your moves, and
-replayed on reload. When it ends it is audited like any run and loads into
+Before the first season you give your name and name your tavern, "The
+<adjective> <noun>", under one of six banners; both are kept in localStorage
+for later seasons. You bring that tavern (`HumanSeat.tavern`): no bot takes
+it, and a season tavern flying the same banner sits the season out. Your seat
+and the seed are random. The season is saved in localStorage as its seed,
+seat, your tavern and your moves, and replayed on reload. When it ends it is audited like any run and loads into
 **the workshop** (`src/playground/workshop.ts`): a bot run for any seed (with
 the replay and seed-audit checks and the NDJSON hash), standings and points
 per episode, an episode inspector (every roll, every ballot, and the public

@@ -302,6 +302,12 @@ export interface HumanSeat {
   /** The `manager.joined` account and the actor on the person's events. */
   readonly login: string;
   readonly githubId: number;
+  /**
+   * The tavern the person brings, an id from `SeasonInput.taverns`: no bot
+   * chooses it, and it is chosen for them on their turn. Absent, they choose
+   * from the open taverns like a bot.
+   */
+  readonly tavern?: string;
 }
 
 export interface SessionOptions extends RunOptions {
@@ -358,6 +364,7 @@ export class ContestSession {
     if (simSeed.length === 0 || simSeed.includes('/')) throw new Error(`sim seed must be non-empty with no "/", got ${JSON.stringify(simSeed)}`);
     const human = options.human ?? null;
     if (human !== null && !input.managers.some((m) => m.id === human.manager)) throw new Error(`no manager "${human.manager}" to seat a person in`);
+    if (human?.tavern !== undefined && !input.taverns.some((t) => t.id === human.tavern)) throw new Error(`no tavern "${human.tavern}" for the person to bring`);
     this.input = input;
     this.seed = simSeed;
     this.human = human;
@@ -412,9 +419,9 @@ export class ContestSession {
     return this.humanTavern === tavern;
   }
 
-  /** The season's taverns nobody has chosen yet, in file order. */
+  /** The season's taverns nobody has chosen yet, in file order, less the one the person brings. */
   openTaverns(): ReadonlyArray<string> {
-    return this.input.taverns.map((t) => t.id).filter((id) => !this.log.state.taverns.has(id));
+    return this.input.taverns.map((t) => t.id).filter((id) => id !== this.human?.tavern && !this.log.state.taverns.has(id));
   }
 
   /** A cast member's card. */
@@ -455,10 +462,12 @@ export class ContestSession {
 
   // ── the tavern pick and the draft ────────────────────────────────────────
 
-  /** Bot tavern choices, then bot picks, until the person is on the clock or the draft is done. */
+  /** Bot tavern choices (and the person's, when they bring a tavern), then bot picks, until the person is on the clock or the draft is done. */
   advanceDraft(): void {
     for (let stage = this.stage; ; stage = this.stage) {
-      if (stage.kind === 'tavern' && stage.manager !== this.human?.manager) {
+      if (stage.kind === 'tavern' && stage.manager === this.human?.manager && this.human.tavern !== undefined) {
+        this.append('tavern.chosen', { manager: stage.manager, tavern: this.human.tavern }, this.humanActor!, this.tavernPickAt());
+      } else if (stage.kind === 'tavern' && stage.manager !== this.human?.manager) {
         const bot = this.botOfManager(stage.manager);
         const tavern = bot.manager.tavern.choose(this.openTaverns(), rngFor(this.seed, `bot:${stage.manager}:tavern`));
         this.append('tavern.chosen', { manager: stage.manager, tavern }, bot.actor, this.tavernPickAt());

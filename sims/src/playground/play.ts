@@ -17,8 +17,12 @@
  * it, so nothing gets ahead of the story. Skip (or Esc) tells the rest at
  * once; a reload shows everything.
  *
- * Your season is saved in this browser as its seed, tavern seat and your
- * moves, and replayed on reload.
+ * You bring your own tavern: your name, and a tavern named "The <adjective>
+ * <noun>" under one of six banners, kept in this browser for every season.
+ * You take a random bot's seat, and the season's seed is random too.
+ *
+ * Your season is saved in this browser as its seed, seat, your tavern and
+ * your moves, and replayed on reload.
  */
 import { applyEvent, episodeScore, initialState, roundMatchups, roundOf, seasonStandings } from '@league-of-taverns/engine';
 import type { LeagueEvent, LeagueState } from '@league-of-taverns/engine';
@@ -48,10 +52,29 @@ import {
   storageGet,
   storageRemove,
   storageSet,
+  setPlayerTavern,
   strategyBadge,
+  tavernChrome,
   tavernName,
 } from './shared';
-import { checkLabel, decidedAfter, draftBoard, ranksOf, readingOrder, runningTally, seedWords, signed, voteOrdinal } from './view';
+import {
+  BANNER_CHOICES,
+  KEEPER_NAME_MAX,
+  TAVERN_WORD_MAX,
+  bannerCss,
+  checkLabel,
+  decidedAfter,
+  draftBoard,
+  ranksOf,
+  readingOrder,
+  runningTally,
+  seedWords,
+  signed,
+  tavernId,
+  tavernWord,
+  tavernWords,
+  voteOrdinal,
+} from './view';
 
 /** The room's name, in one place. */
 const ROOM = 'The Common Room';
@@ -77,11 +100,60 @@ function whose(tavern: string, me: string | null): string {
   return tavern === me ? 'your' : `${tavernName(tavern)}'s`;
 }
 
+// ── you and your tavern ────────────────────────────────────────────────────
+
+/** Who you are at the table: your name, your tavern's two words ("The <adjective> <noun>") and its banner, a `BANNER_CHOICES` id. */
+interface Profile {
+  readonly name: string;
+  readonly adjective: string;
+  readonly noun: string;
+  readonly banner: string;
+}
+
+const PROFILE_KEY = 'lot-player';
+
+function loadProfile(): Profile | null {
+  try {
+    const p = JSON.parse(storageGet(PROFILE_KEY) ?? 'null') as Partial<Profile> | null;
+    if (p === null || typeof p.name !== 'string' || typeof p.adjective !== 'string' || typeof p.noun !== 'string' || typeof p.banner !== 'string') return null;
+    return checkProfile(p as Profile).profile ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Your profile tidied, or why it can't be used. */
+function checkProfile(form: Profile): { readonly profile?: Profile; readonly error?: string } {
+  const name = form.name.trim().replace(/\s+/g, ' ');
+  if (name.length === 0) return { error: 'Tell the room your name.' };
+  if (name.length > KEEPER_NAME_MAX) return { error: `Your name is ${name.length} characters; the ledger takes ${KEEPER_NAME_MAX}.` };
+  const adjective = tavernWord(form.adjective);
+  const noun = tavernWord(form.noun);
+  if (adjective === null || noun === null) {
+    return { error: `Your tavern is "The", then an adjective, then a noun: one word each, letters only, up to ${TAVERN_WORD_MAX} long.` };
+  }
+  const tavern = `The ${adjective} ${noun}`;
+  if (tavernId(tavern) === '' || tavernId(tavern) === 'the') return { error: 'Your tavern\'s name needs letters a to z the ledger can file it under.' };
+  if (input.taverns.some((t) => t.id === tavernId(tavern) || t.name.toLowerCase() === tavern.toLowerCase())) return { error: `${tavern} is a rival's tavern. Name yours something else.` };
+  if (!BANNER_CHOICES.some((b) => b.id === form.banner)) return { error: 'Choose a banner to fly.' };
+  return { profile: { name, adjective, noun, banner: form.banner } };
+}
+
+const tavernOf = (p: Profile): { readonly id: string; readonly name: string } => {
+  const name = `The ${p.adjective} ${p.noun}`;
+  return { id: tavernId(name), name };
+};
+const bannerChoice = (id: string): (typeof BANNER_CHOICES)[number] => BANNER_CHOICES.find((b) => b.id === id) ?? BANNER_CHOICES[0]!;
+
+/** A blank form: a suggested tavern under a random banner. */
+function freshForm(): Profile {
+  return { name: '', ...tavernWords(cryptoRand), banner: BANNER_CHOICES[Math.floor(cryptoRand() * BANNER_CHOICES.length)]!.id };
+}
+
 // ── moves, saved ───────────────────────────────────────────────────────────
 
-/** One of your moves. A season is its seed, your seat and these, replayed in order, so it can be saved and restored. */
+/** One of your moves. A season is its seed, your seat, your tavern and these, replayed in order, so it can be saved and restored. */
 type PlayMove =
-  | { readonly t: 'tavern'; readonly id: string }
   | { readonly t: 'draft'; readonly id: string }
   | { readonly t: 'call'; readonly target: string }
   | { readonly t: 'challenge' }
@@ -89,11 +161,13 @@ type PlayMove =
   | { readonly t: 'finale' };
 
 interface SavedPlay {
-  readonly v: 2;
+  readonly v: 3;
   /** The season package and engine the moves were made against; anything else would replay differently. */
   readonly fingerprint: string;
   readonly manager: string;
   readonly seed: string;
+  /** You and your tavern as they were when the season started. */
+  readonly profile: Profile;
   readonly moves: ReadonlyArray<PlayMove>;
 }
 
@@ -105,9 +179,12 @@ const VIEWS: ReadonlyArray<View> = ['room', 'work', 'table'];
 
 const game = {
   session: null as ContestSession | null,
-  /** The manager seat you take. */
-  manager: input.managers[0]?.id ?? '',
-  seed: '',
+  /** The setup form: you and your tavern, as typed. Starts as your saved profile. */
+  form: loadProfile() ?? freshForm(),
+  /** True when this browser has seen you before. */
+  known: loadProfile() !== null,
+  /** The profile the season in play was started with. */
+  profile: null as Profile | null,
   error: null as string | null,
   notice: null as string | null,
   moves: [] as PlayMove[],
@@ -153,18 +230,22 @@ const folds = new Map<string, boolean>();
 
 // ── the season ─────────────────────────────────────────────────────────────
 
-function newSession(manager: string, seed: string): ContestSession {
-  const session = new ContestSession(input, { seed, human: { manager, login: 'you', githubId: 1 } });
+/**
+ * A season with you in `manager`'s seat, bringing your tavern. The season's own taverns stay for the bots, less any
+ * flying your banner, so every tavern at the table looks different.
+ */
+function newSession(manager: string, seed: string, profile: Profile): ContestSession {
+  const tavern = tavernOf(profile);
+  const { banner } = bannerChoice(profile.banner);
+  setPlayerTavern(tavern, { banner });
+  const rivals = input.taverns.filter((t) => tavernChrome[t.id]?.banner.mark !== banner.mark);
+  const session = new ContestSession({ ...input, taverns: [...rivals, tavern] }, { seed, human: { manager, login: 'you', githubId: 1, tavern: tavern.id } });
   session.advanceDraft();
   return session;
 }
 
 function applyMove(s: ContestSession, m: PlayMove): void {
   switch (m.t) {
-    case 'tavern':
-      s.chooseTavern(m.id);
-      s.advanceDraft();
-      break;
     case 'draft':
       s.draftPick(m.id);
       s.advanceDraft();
@@ -187,7 +268,8 @@ function applyMove(s: ContestSession, m: PlayMove): void {
 function save(): void {
   const s = game.session;
   if (s === null) return;
-  const saved: SavedPlay = { v: 2, fingerprint: PLAY_FINGERPRINT, manager: s.human!.manager, seed: s.seed, moves: game.moves };
+  if (game.profile === null) return;
+  const saved: SavedPlay = { v: 3, fingerprint: PLAY_FINGERPRINT, manager: s.human!.manager, seed: s.seed, profile: game.profile, moves: game.moves };
   storageSet(PLAY_KEY, JSON.stringify(saved));
 }
 
@@ -207,10 +289,10 @@ function restore(): void {
   if (raw === null) return;
   try {
     const saved = JSON.parse(raw) as SavedPlay;
-    if (saved.v !== 2 || saved.fingerprint !== PLAY_FINGERPRINT) throw new Error('it was played against another version of the season or engine');
-    const session = newSession(saved.manager, saved.seed);
+    if (saved.v !== 3 || saved.fingerprint !== PLAY_FINGERPRINT) throw new Error('it was played against another version of the season or engine');
+    const session = newSession(saved.manager, saved.seed, saved.profile);
     for (const m of saved.moves) applyMove(session, m);
-    Object.assign(game, { session, manager: saved.manager, seed: saved.seed, moves: [...saved.moves] });
+    Object.assign(game, { session, profile: saved.profile, moves: [...saved.moves] });
     foldTo(session.events.length);
     if (session.stage.kind === 'complete') loadIntoWorkshop(session);
   } catch (e) {
@@ -220,13 +302,21 @@ function restore(): void {
 }
 
 function start(): void {
-  const seed = game.seed.trim() || seedWords(cryptoRand);
   game.error = null;
   game.notice = null;
+  const { profile, error } = checkProfile(game.form);
+  if (profile === undefined) {
+    game.error = error ?? 'Your tavern is not ready.';
+    renderAll();
+    return;
+  }
+  storageSet(PROFILE_KEY, JSON.stringify(profile));
+  // You take a random bot's seat; the draft order is the seed's either way.
+  const manager = input.managers[Math.floor(cryptoRand() * input.managers.length)]!.id;
   try {
-    const session = newSession(game.manager, seed);
+    const session = newSession(manager, seedWords(cryptoRand), profile);
     clearRoom();
-    Object.assign(game, { session, seed, moves: [], filter: '', confirmReset: false });
+    Object.assign(game, { session, profile, form: profile, known: true, moves: [], filter: '', confirmReset: false });
     save();
     // The preseason is already done when the room opens; the tavern pick is told as it happens.
     const first = session.events.findIndex((e) => e.type === 'tavern.chosen');
@@ -240,7 +330,7 @@ function start(): void {
 
 function reset(): void {
   clearRoom();
-  Object.assign(game, { session: null, error: null, notice: null, seed: '', moves: [], confirmReset: false });
+  Object.assign(game, { session: null, profile: null, error: null, notice: null, moves: [], confirmReset: false });
   storageRemove(PLAY_KEY);
   renderAll();
 }
@@ -457,7 +547,6 @@ function afterTelling(): void {
   if (s === null || !caughtUp()) return;
   const stage = s.stage;
   const yours =
-    (stage.kind === 'tavern' && stage.manager === s.human?.manager) ||
     (stage.kind === 'draft' && stage.tavern === s.humanTavern) ||
     stage.kind === 'challenge' ||
     stage.kind === 'vote' ||
@@ -478,7 +567,7 @@ function stampTaken(character: string, tavern: string): void {
 let workTimer = 0;
 
 function bannerColours(tavern: string | null): Banner | undefined {
-  return tavern === null || bannerOf(tavern) === null ? undefined : data.tavernChrome[tavern]!.banner;
+  return tavern === null || bannerOf(tavern) === null ? undefined : tavernChrome[tavern]!.banner;
 }
 
 // ── the scouts ─────────────────────────────────────────────────────────────
@@ -625,14 +714,14 @@ function itemHtml(item: FeedItem, ctx: Ctx): string {
     }
     case 'tavern': {
       const mine = item.tavern === me;
-      const toast = data.tavernChrome[item.tavern]?.toast;
+      const toast = tavernChrome[item.tavern]?.toast;
       return msg(item, {
         avatar: tavernAvatar(item.tavern),
         author: esc(tavernName(item.tavern)),
         note: mine ? 'you' : esc(keeper(item.manager)),
         cls: mine ? 'mine' : '',
         attrs: mine ? bannerAttr(item.tavern) : '',
-        body: `${mine ? 'You take' : `${esc(keeper(item.manager))} takes`} the tavern.${toast === undefined ? '' : ` <i class="toast">"${esc(toast)}"</i>`}`,
+        body: mine ? 'You open your doors.' : `${esc(keeper(item.manager))} takes the tavern.${toast === undefined ? '' : ` <i class="toast">"${esc(toast)}"</i>`}`,
       });
     }
     case 'draft-round': {
@@ -944,22 +1033,62 @@ function roundHtml(item: Extract<FeedItem, { kind: 'round' }>, ctx: Ctx): string
 
 // ── setup ──────────────────────────────────────────────────────────────────
 
+/** The banner choices' colours, once, as `choice-<id>` banners for the setup's swatches and preview. */
+const choiceStyle = document.createElement('style');
+choiceStyle.textContent = bannerCss(Object.fromEntries(BANNER_CHOICES.map((b) => [`choice-${b.id}`, { banner: b.banner }])));
+document.head.append(choiceStyle);
+
+/** Your tavern as the form has it, for the preview: its name (or a stand-in while a word is missing) and banner. */
+function previewOf(form: Profile): { readonly name: string; readonly keeper: string } {
+  const word = (raw: string, stand: string): string => tavernWord(raw) ?? (raw.trim() === '' ? stand : raw.trim());
+  return { name: `The ${word(form.adjective, '…')} ${word(form.noun, '…')}`, keeper: form.name.trim() === '' ? 'kept by you' : `kept by ${form.name.trim()}` };
+}
+
 function setupHtml(): string {
-  const options = input.managers.map((m) => `<option value="${esc(m.id)}" ${m.id === game.manager ? 'selected' : ''}>${esc(KEEPERS[seatOf.get(m.id) ?? 0] ?? m.id)}'s seat (${esc(m.bot)} bot)</option>`).join('');
+  const f = game.form;
+  const preview = previewOf(f);
+  const rivals = input.managers.length - 1;
+  const banners = BANNER_CHOICES.map(
+    (b) =>
+      `<label class="bpick" data-banner="choice-${esc(b.id)}"><input type="radio" name="g-banner" value="${esc(b.id)}" data-action="g-banner"${b.id === f.banner ? ' checked' : ''}>` +
+      `<i class="flag" data-banner="choice-${esc(b.id)}" aria-hidden="true"></i><span>${esc(b.label)}</span></label>`,
+  ).join('');
   return (
     `<li class="welcome" data-key="welcome"><div class="card">` +
-    `<h2>The Lich's contest</h2>` +
+    `<div class="row spread"><h2>The Lich's contest</h2><span class="chip brass">Play vs bots</span></div>` +
+    (game.known && f.name.trim() !== '' ? `<p><b>Welcome back, ${esc(f.name.trim())}.</b></p>` : '') +
     `<p>The Lich wants a new assistant. ${config.contest.castSize} monsters compete: each episode one wins his task and is safe, and the rest vote one of their own out. The voted-out choose the winner.</p>` +
-    `<p>You run a tavern against ${input.managers.length - 1} keepers. Draft ${config.roster.size} monsters, then watch, and call the boot each episode. Taverns meet head to head; the best record after ${config.schedule.rounds.length} rounds wins.</p>` +
-    `<p class="small muted">Everything that happens is told here, in ${ROOM}. The keepers think quickly, but not instantly.</p>` +
-    (game.error === null ? '' : `<div class="error">${esc(game.error)}</div>`) +
+    `<p>You keep a tavern against ${rivals} bot taverns. Draft ${config.roster.size} monsters, then watch, and call the boot each episode. Taverns meet head to head; the best record after ${config.schedule.rounds.length} rounds wins.</p>` +
+    `<form class="setup" id="g-setup" novalidate>` +
+    `<div class="field"><label class="label" for="g-name">Your name</label><input type="text" id="g-name" data-action="g-name" value="${esc(f.name)}" maxlength="${KEEPER_NAME_MAX}" autocomplete="nickname" spellcheck="false" placeholder="What the regulars call you"></div>` +
+    `<div class="field"><span class="label" id="g-tavern-label">Your tavern</span><div class="tavern-name" role="group" aria-labelledby="g-tavern-label">` +
+    `<span class="the">The</span>` +
+    `<input type="text" id="g-adj" data-action="g-adj" value="${esc(f.adjective)}" maxlength="${TAVERN_WORD_MAX}" aria-label="Adjective" placeholder="Adjective" spellcheck="false" autocomplete="off">` +
+    `<input type="text" id="g-noun" data-action="g-noun" value="${esc(f.noun)}" maxlength="${TAVERN_WORD_MAX}" aria-label="Noun" placeholder="Noun" spellcheck="false" autocomplete="off">` +
+    `<button type="button" class="small" data-action="g-suggest" title="Suggest a name">Suggest</button></div></div>` +
+    `<fieldset class="field"><legend class="label">Your banner</legend><div class="bpicks">${banners}</div></fieldset>` +
+    `<div class="you banner-card" id="g-preview" data-banner="choice-${esc(bannerChoice(f.banner).id)}"><div class="pennant" aria-hidden="true"></div>` +
+    `<div class="you-line"><i class="flag" aria-hidden="true"></i><b class="you-name" id="g-preview-name">${esc(preview.name)}</b><span class="small" id="g-preview-keeper">${esc(preview.keeper)}</span></div></div>` +
+    (game.error === null ? '' : `<div class="error" role="alert">${esc(game.error)}</div>`) +
     (game.notice === null ? '' : `<p class="hint" role="status">${esc(game.notice)}</p>`) +
-    `<div class="row"><label class="label" for="g-seat">Seat</label><select id="g-seat" data-action="g-seat">${options}</select>` +
-    `<label class="label" for="g-seed">Seed</label><input type="text" id="g-seed" data-action="g-seed" placeholder="random" value="${esc(game.seed)}" spellcheck="false" autocomplete="off"></div>` +
-    `<div class="row"><button type="button" class="primary" data-action="g-start">Start the season</button></div>` +
-    `<p class="hint">The seed draws the cast and drives the contest and the keepers, so the same seed and the same moves give the same season. Your season is saved in this browser as you play.</p>` +
+    `<div class="row"><button type="submit" class="primary">Play vs the bots</button></div>` +
+    `</form>` +
+    `<p class="hint">Everything that happens is told here, in ${ROOM}. Your name and tavern are kept in this browser for your next season, and the season itself is saved as you play.</p>` +
     `</div></li>`
   );
+}
+
+/** The setup's text boxes, by action, and the profile field each fills. */
+const FORM_FIELDS: Readonly<Record<string, 'name' | 'adjective' | 'noun'>> = { 'g-name': 'name', 'g-adj': 'adjective', 'g-noun': 'noun' };
+
+/** Follow the form as you type, without re-rendering it. */
+function updatePreview(): void {
+  const el = document.getElementById('g-preview');
+  if (el === null) return;
+  const p = previewOf(game.form);
+  el.dataset.banner = `choice-${bannerChoice(game.form.banner).id}`;
+  $('g-preview-name').textContent = p.name;
+  $('g-preview-keeper').textContent = p.keeper;
 }
 
 // ── the action bar ─────────────────────────────────────────────────────────
@@ -984,10 +1113,7 @@ function renderBar(): void {
     game.view === 'work' ? '' : `<button type="button" class="small${stage.kind === 'challenge' || stage.kind === 'vote' ? ' narrow-only' : ''}" data-action="g-view" data-view="work">${label}</button>`;
   switch (stage.kind) {
     case 'tavern':
-      bar.innerHTML =
-        stage.manager === s.human?.manager
-          ? `${err}<div class="bar-line" data-clock><b>Your turn to choose a tavern.</b></div><button type="button" class="primary" data-action="g-view" data-view="work">Choose a tavern</button>`
-          : `<div class="bar-line muted">Waiting on ${esc(keeper(stage.manager))}…</div>`;
+      bar.innerHTML = `<div class="bar-line muted">Waiting on ${esc(keeper(stage.manager))}…</div>`;
       return;
     case 'draft': {
       const n = input.managers.length;
@@ -1035,7 +1161,7 @@ function renderHead(): void {
   const voted = st.jury.length;
   const where =
     s === null
-      ? 'A season against the bots'
+      ? 'Play vs bots'
       : st.taverns.size < s.state.managers.size
         ? `Tavern pick · ${st.taverns.size + 1} of ${s.state.managers.size}`
         : !st.draft.complete
@@ -1048,7 +1174,7 @@ function renderHead(): void {
   const rows = seasonStandings(st);
   const row = rows.find((r) => r.tavern === me);
   const rec = row === undefined || st.finalizedRounds.size === 0 ? '' : ` · ${row.wins}–${row.losses}${row.ties > 0 ? `–${row.ties}` : ''}, ${ordinal(row.rank)}`;
-  const chrome = told ? data.tavernChrome[me] : undefined;
+  const chrome = told ? tavernChrome[me] : undefined;
   const reset =
     s === null
       ? ''
@@ -1058,11 +1184,11 @@ function renderHead(): void {
   head.innerHTML =
     (told
       ? `<div class="you${bannerOf(me) === null ? '' : ' banner-card'}"${bannerAttr(me)}>${bannerOf(me) === null ? '' : '<div class="pennant" aria-hidden="true"></div>'}` +
-        `<div class="you-line">${flagOf(me)}<b class="you-name">${esc(tavernName(me))}</b><span class="small">${esc(where)}${rec}</span></div>` +
+        `<div class="you-line">${flagOf(me)}<b class="you-name">${esc(tavernName(me))}</b><span class="small">${game.profile === null ? '' : `kept by ${esc(game.profile.name)} · `}${esc(where)}${rec}</span></div>` +
         (chrome?.toast === undefined ? '' : `<p class="banner-call">"${esc(chrome.toast)}"</p>`) +
         `</div>`
       : `<div class="you plain"><div class="you-line"><b class="you-name">${s === null ? 'No season yet' : 'No tavern yet'}</b><span class="small">${esc(where)}</span></div></div>`) +
-    `<div class="head-actions">${reset}${s === null ? '' : `<span class="small muted">seed ${esc(s.seed)}</span>`}</div>`;
+    `<div class="head-actions">${reset}</div>`;
 }
 
 // ── tabs ───────────────────────────────────────────────────────────────────
@@ -1118,29 +1244,26 @@ function workHtml(): string {
   const told = caughtUp();
   const stage = s.stage;
   if (!shown.state.draft.complete || (told && stage.kind === 'draft')) {
-    if (shown.state.taverns.size < s.state.managers.size || (told && stage.kind === 'tavern')) return workTaverns(s, told);
+    if (shown.state.taverns.size < s.state.managers.size || (told && stage.kind === 'tavern')) return workTaverns(s);
     return workDraft(s, told);
   }
   if (shown.state.phase === 'complete') return workDone(s);
   return workCast(s, told);
 }
 
-function workTaverns(s: ContestSession, told: boolean): string {
+function workTaverns(s: ContestSession): string {
   const state = shown.state;
-  const yours = told && s.stage.kind === 'tavern' && s.stage.manager === s.human?.manager;
-  const rows = input.taverns
+  const rows = s.input.taverns
     .map((t) => {
       const owner = state.taverns.get(t.id)?.managerId;
-      const toast = data.tavernChrome[t.id]?.toast;
-      const action =
-        owner === undefined
-          ? `<button type="button" class="small${yours ? ' primary' : ''}" data-action="g-tavern" data-id="${esc(t.id)}" ${yours ? '' : 'disabled title="Not your turn yet"'}>Choose</button>`
-          : `<span class="small">${esc(keeper(owner))}</span>`;
-      return `<tr class="${owner === undefined ? '' : 'taken-row'}"${bannerAttr(t.id)}><td>${action}</td><td>${flagOf(t.id)} <b>${esc(t.name)}</b></td><td class="small wrap-ok"><i>${toast === undefined ? '' : `"${esc(toast)}"`}</i></td></tr>`;
+      const mine = t.id === s.human?.tavern;
+      const toast = tavernChrome[t.id]?.toast;
+      const held = mine ? 'yours' : owner === undefined ? 'open' : keeper(owner);
+      return `<tr class="${owner === undefined && !mine ? '' : 'taken-row'}${mine ? ' mine' : ''}"${bannerAttr(t.id)}><td class="small">${esc(held)}</td><td>${flagOf(t.id)} <b>${esc(t.name)}</b></td><td class="small wrap-ok"><i>${toast === undefined ? '' : `"${esc(toast)}"`}</i></td></tr>`;
     })
     .join('');
   return (
-    `<section class="card"><div class="row spread"><h2>Choose your tavern</h2><span class="muted small">${yours ? 'your turn' : 'in reverse draft order'}</span></div>` +
+    `<section class="card"><div class="row spread"><h2>The taverns</h2><span class="muted small">the bots choose in reverse draft order</span></div>` +
     `<p class="small">Every tavern is a franchise of the Lich's front company, and its regulars dream of the job going to their favourite. The taverns differ only in name and banner.</p>` +
     `<div class="scroll"><table><tbody>${rows}</tbody></table></div></section>`
   );
@@ -1328,7 +1451,7 @@ function renderTable(): void {
       const mine = r.tavern === me;
       return (
         `<tr class="${mine ? 'mine' : ''}"${mine ? bannerAttr(r.tavern) : ''}><td class="n">${r.rank}</td><td>${flagOf(r.tavern)} <b>${esc(tavernName(r.tavern))}</b></td>` +
-        `<td class="small">${mine ? 'you' : `${esc(keeper(m))} <span class="muted">${esc(botOfManager.get(m) ?? '')}</span>`}</td><td class="n"><b>${r.wins}–${r.losses}${r.ties > 0 ? `–${r.ties}` : ''}</b></td><td class="n">${r.points}</td></tr>`
+        `<td class="small">${mine ? esc(game.profile === null ? 'you' : `${game.profile.name} (you)`) : `${esc(keeper(m))} <span class="muted">${esc(botOfManager.get(m) ?? '')}</span>`}</td><td class="n"><b>${r.wins}–${r.losses}${r.ties > 0 ? `–${r.ties}` : ''}</b></td><td class="n">${r.points}</td></tr>`
       );
     })
     .join('');
@@ -1390,8 +1513,11 @@ function onClick(action: string, el: HTMLElement): void {
   const id = el.dataset.id;
   const s = game.session;
   switch (action) {
-    case 'g-start':
-      start();
+    case 'g-suggest':
+      game.form = { ...game.form, ...tavernWords(cryptoRand) };
+      ($('g-adj') as HTMLInputElement).value = game.form.adjective;
+      ($('g-noun') as HTMLInputElement).value = game.form.noun;
+      updatePreview();
       return;
     case 'g-skip':
       skip();
@@ -1416,9 +1542,6 @@ function onClick(action: string, el: HTMLElement): void {
     case 'g-reset-cancel':
       game.confirmReset = false;
       renderHead();
-      return;
-    case 'g-tavern':
-      if (id !== undefined) move([{ t: 'tavern', id }]);
       return;
     case 'g-draft':
       if (id !== undefined) move([{ t: 'draft', id }]);
@@ -1472,8 +1595,9 @@ function onClick(action: string, el: HTMLElement): void {
 
 function onChange(action: string, target: HTMLInputElement | HTMLSelectElement): void {
   switch (action) {
-    case 'g-seat':
-      game.manager = target.value;
+    case 'g-banner':
+      game.form = { ...game.form, banner: target.value };
+      updatePreview();
       return;
     case 'g-sort':
       game.draftSort = target.value as typeof game.draftSort;
@@ -1503,13 +1627,22 @@ export function initGame({ onComplete }: { readonly onComplete: (s: ContestSessi
     const el = target.closest<HTMLElement>('[data-action]');
     if (el?.dataset.action !== undefined && !(el instanceof HTMLSelectElement) && !(el instanceof HTMLInputElement)) onClick(el.dataset.action, el);
   });
+  root.addEventListener('submit', (ev) => {
+    if ((ev.target as HTMLElement).id !== 'g-setup') return;
+    ev.preventDefault();
+    start();
+  });
   root.addEventListener('change', (ev) => {
     const target = ev.target as HTMLInputElement | HTMLSelectElement;
     if (target.dataset.action !== undefined) onChange(target.dataset.action, target);
   });
   root.addEventListener('input', (ev) => {
     const target = ev.target as HTMLInputElement;
-    if (target.dataset.action === 'g-seed') game.seed = target.value;
+    const field = FORM_FIELDS[target.dataset.action ?? ''];
+    if (field !== undefined) {
+      game.form = { ...game.form, [field]: target.value };
+      updatePreview();
+    }
     if (target.dataset.action === 'g-filter') {
       game.filter = target.value;
       renderWork();

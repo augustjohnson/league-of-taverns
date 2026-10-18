@@ -5,7 +5,7 @@
  * card-art stylesheets to the page.
  */
 import type { Ability, CrEighths, VotingStrategy } from '@league-of-taverns/engine';
-import { seasonInputFromData, type ChallengeChrome, type PlaygroundChrome, type PlaygroundData } from './data';
+import { seasonInputFromData, type ChallengeChrome, type PlaygroundChrome, type PlaygroundData, type TavernChrome } from './data';
 import { abilityLine, artCss, bannerCss, banneredTaverns, formatCr, signed, strategyLine, strategyName, tagLabel } from './view';
 
 declare const __PLAYGROUND_DATA__: PlaygroundData;
@@ -23,8 +23,10 @@ export const crOf = (id: string): CrEighths => {
   if (cr === undefined) throw new Error(`"${id}" is not pooled`);
   return cr;
 };
-export const tavernById = new Map(input.taverns.map((t) => [t.id, t]));
+export const tavernById = new Map<string, { readonly id: string; readonly name: string }>(input.taverns.map((t) => [t.id, t]));
 export const tavernName = (id: string): string => tavernById.get(id)?.name ?? id;
+/** Each tavern's chrome: the season's, plus the player's own tavern once there is one (`setPlayerTavern`). */
+export const tavernChrome: Record<string, TavernChrome> = { ...data.tavernChrome };
 
 /** A challenge's chrome, or a plain stand-in from its id. */
 export function challengeChrome(episode: number): ChallengeChrome {
@@ -36,10 +38,28 @@ export function challengeChrome(episode: number): ChallengeChrome {
 
 // Banners: each tavern flies its own colours (taverns.yaml). One generated rule per tavern sets its colours as custom
 // properties; page.html § Banners does the rest.
-export const BANNERED = banneredTaverns(data.tavernChrome);
+export const BANNERED = new Set(banneredTaverns(data.tavernChrome));
 const bannerStyle = document.createElement('style');
 bannerStyle.textContent = bannerCss(data.tavernChrome);
 document.head.append(bannerStyle);
+const playerBannerStyle = document.createElement('style');
+document.head.append(playerBannerStyle);
+let playerTavern: string | null = null;
+
+/** Name the player's own tavern and fly its banner, replacing any earlier one. It must not reuse a season tavern's id. */
+export function setPlayerTavern(tavern: { readonly id: string; readonly name: string }, chrome: TavernChrome): void {
+  if (input.taverns.some((t) => t.id === tavern.id)) throw new Error(`"${tavern.name}" is a rival's tavern`);
+  if (playerTavern !== null) {
+    tavernById.delete(playerTavern);
+    delete tavernChrome[playerTavern];
+    BANNERED.delete(playerTavern);
+  }
+  playerTavern = tavern.id;
+  tavernById.set(tavern.id, tavern);
+  tavernChrome[tavern.id] = chrome;
+  for (const id of banneredTaverns({ [tavern.id]: chrome })) BANNERED.add(id);
+  playerBannerStyle.textContent = bannerCss({ [tavern.id]: chrome });
+}
 // Card art: each character's face crop and thumbnail as custom properties, once, out of the card markup.
 const artStyle = document.createElement('style');
 artStyle.textContent = artCss(data.chrome);

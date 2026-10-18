@@ -7,6 +7,7 @@
 import { SKILLS } from '@league-of-taverns/engine';
 import type { Actor, Ballot, ChallengeCheck, EffectiveStats, LeagueEvent, Modifier, Skill, VotingStrategy } from '@league-of-taverns/engine';
 import type { Aggregate } from '../season-runner';
+import type { Banner } from '@league-of-taverns/scripts/lib/banner';
 import type { TavernChrome } from './data';
 
 // ── draft board ────────────────────────────────────────────────────────────
@@ -341,6 +342,50 @@ const SEED_NOUNS = ['ale', 'anvil', 'barrel', 'candle', 'flagon', 'goblet', 'hea
 export function seedWords(rand: () => number): string {
   const pick = <T>(list: ReadonlyArray<T>): T => list[Math.floor(rand() * list.length)]!;
   return `${pick(SEED_ADJECTIVES)}-${pick(SEED_NOUNS)}-${Math.floor(rand() * 100)}`;
+}
+
+// ── your tavern ────────────────────────────────────────────────────────────
+
+/** The banners a player can fly: the six from the old gods, named for their colours. Each has its own texture. */
+export const BANNER_CHOICES: ReadonlyArray<{ readonly id: string; readonly label: string; readonly banner: Banner }> = [
+  { id: 'moss', label: 'Moss and peat', banner: { field: '#d9e0b8', charge: '#e8dcc4', mark: '#008300', texture: 'stipple' } },
+  { id: 'ember', label: 'Slate and ember', banner: { field: '#dde1e6', charge: '#f7cfae', mark: '#eb6834', texture: 'crosshatch' } },
+  { id: 'sea', label: 'Sea-glass and pearl', banner: { field: '#cdeae2', charge: '#f4efe2', mark: '#1baf7a', texture: 'waves' } },
+  { id: 'dusk', label: 'Dusk and candle', banner: { field: '#e0dbf2', charge: '#f8e2a6', mark: '#4a3aa7', texture: 'rays' } },
+  { id: 'storm', label: 'Sky and lightning', banner: { field: '#d4e6f7', charge: '#f5e9a8', mark: '#2a78d6', texture: 'rain' } },
+  { id: 'rose', label: 'Sage and rose', banner: { field: '#dfe8d0', charge: '#f4cfd8', mark: '#e87ba4', texture: 'thorns' } },
+];
+
+/** The longest word a tavern name takes, and a keeper's name. */
+export const TAVERN_WORD_MAX = 14;
+export const KEEPER_NAME_MAX = 24;
+
+/**
+ * One word of a tavern name, tidied: trimmed, first letter capitalised. Null
+ * unless it is a single word of letters, with at most an inner apostrophe or
+ * hyphen ("Hog's", "Half-Drunk"), at most `TAVERN_WORD_MAX` long.
+ */
+export function tavernWord(raw: string): string | null {
+  const w = raw.trim();
+  if (w.length === 0 || w.length > TAVERN_WORD_MAX || !/^\p{L}+(?:['\u2019-]\p{L}+)*$/u.test(w)) return null;
+  return w.charAt(0).toLocaleUpperCase() + w.slice(1);
+}
+
+/** "The Salty Anvil" → "the-salty-anvil". Letters outside a–z are dropped (accents first lose their marks). */
+export function tavernId(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/['\u2019]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** A suggested adjective and noun for a tavern name, from `rand` (any [0, 1) source). */
+export function tavernWords(rand: () => number): { readonly adjective: string; readonly noun: string } {
+  const pick = (list: ReadonlyArray<string>): string => tavernWord(list[Math.floor(rand() * list.length)]!)!;
+  return { adjective: pick(SEED_ADJECTIVES), noun: pick(SEED_NOUNS) };
 }
 
 // ── tables ─────────────────────────────────────────────────────────────────
