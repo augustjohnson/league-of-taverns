@@ -228,16 +228,14 @@ describe('the share', () => {
     return input.config.schedule.rounds.length;
   };
 
-  it('reads in four parts: the vote, the exit prediction, the tavern and the head-to-head', () => {
-    const share: Share = { kind: 'vote', episode: 6, votes: 9, call: CALL_MARKS.none, faces: [FACES.safe, FACES.gone, FACES.immune], h2h: { mine: 19, theirs: 22, rival: 'The Sleeping Giant' } };
-    expect(shareText(share)).toBe('Vote 6 of 9\nExit Prediction:\n💤\nMy Tavern:\n😌🪦🛡️\nHead to Head:\n19–22 (The Sleeping Giant)');
-    expect(shareText({ kind: 'finale', right: 6, votes: 9, faces: [FACES.winner, FACES.gone, FACES.gone], h2h: null })).toBe('The finale\nExit Prediction:\n6 of 9\nMy Tavern:\n👑🪦🪦');
+  it('reads in three parts: the vote, the exit prediction and the tavern', () => {
+    const share: Share = { kind: 'vote', episode: 6, votes: 9, call: CALL_MARKS.none, faces: [FACES.safe, FACES.gone, FACES.immune] };
+    expect(shareText(share)).toBe('Vote 6 of 9\nExit Prediction:\n💤\nMy Tavern:\n😌🪦🛡️');
+    expect(shareText({ kind: 'finale', right: 6, votes: 9, faces: [FACES.winner, FACES.gone, FACES.gone] })).toBe('The finale\nExit Prediction:\n6 of 9\nMy Tavern:\n👑🪦🪦');
     expect(shareEmoji(share)).toEqual(['💤', '😌', '🛡️', '🪦']);
   });
 
   it(`keeps every line within ${SHARE_LINE_MAX} characters, so no chat bubble wraps it`, () => {
-    const long: Share = { kind: 'vote', episode: 2, votes: 9, call: CALL_MARKS.right, faces: [FACES.safe], h2h: { mine: 104, theirs: 98, rival: 'The Tarnished Wyvernmonger' } };
-    expect(shareText(long).split('\n').slice(-2)).toEqual(['104–98', '(The Tarnished Wyvernmonger)']);
     for (const card of [...votes.map((v) => v.share!), finale.share!]) {
       for (const line of shareText(card.share).split('\n')) expect([...line].length, line).toBeLessThanOrEqual(SHARE_LINE_MAX);
     }
@@ -268,16 +266,6 @@ describe('the share', () => {
     }
     const crowned = roster.map((id) => (id === sim1.state.finale!.winner ? FACES.winner : sim1.state.finale!.finalists.includes(id) ? FACES.finalist : FACES.gone));
     expect(finale.share!.share.faces).toEqual(crowned);
-  });
-
-  it("ends each round's last vote on the score the round's results report", () => {
-    const rounds = items.filter((i) => i.kind === 'round') as Array<Extract<FeedItem, { kind: 'round' }>>;
-    for (const round of rounds) {
-      const m = round.matchups.find((x) => x.home === me || x.away === me)!;
-      const [mine, theirs] = m.home === me ? [m.homePoints, m.awayPoints] : [m.awayPoints, m.homePoints];
-      const last = round.final ? finale.share!.share : votes.filter((v) => roundOfVote(v.episode) === round.round).at(-1)!.share!.share;
-      expect(last.h2h).toMatchObject({ mine, theirs });
-    }
   });
 
   it(`explains every emoji in round ${TEACH_ROUNDS}'s shares, then only ones not seen before`, () => {

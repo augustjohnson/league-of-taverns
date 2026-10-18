@@ -132,7 +132,7 @@ the audit recomputes them from the seed.
 5. **The vote** is read one parchment at a time. The boot leaves for the
    jury, the calls are revealed, points land. Under it, your **share**: a few
    short lines for a group chat (Wordle style, no names) with your exit
-   prediction, a face per monster and the head-to-head score, sent through
+   prediction and a face per monster, sent through
    the phone's share sheet or copied. The first round explains its emoji;
    after that, only new ones.
 6. After the round's last episode: the round's head-to-head results and the

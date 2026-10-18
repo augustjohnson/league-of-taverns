@@ -1,11 +1,11 @@
 /**
  * The share: after each vote, a few lines of plain text you can paste into
- * a group chat, Wordle style. It says how your exit prediction did, how each
- * of your monsters did, and where your head-to-head stands. It names no one,
- * so it spoils nothing. Pure (no DOM): feed.ts builds one per vote and play.ts
+ * a group chat, Wordle style. It says how your exit prediction did and how
+ * each of your monsters did: your choices, not the scoreboard. It names no
+ * one, so it spoils nothing. Pure (no DOM): feed.ts builds one per vote and play.ts
  * shows it under the vote with a Copy button.
  */
-import { aliveAt, roundOf, roundPoints, schedule, seasonVotes } from '@league-of-taverns/engine';
+import { aliveAt, seasonVotes } from '@league-of-taverns/engine';
 import type { LeagueState } from '@league-of-taverns/engine';
 
 /** Your exit prediction at a vote. */
@@ -47,16 +47,9 @@ export const MEANINGS: Readonly<Record<CallMark | Face, string>> = {
   '🏅': 'Reached the final',
 };
 
-export interface HeadToHead {
-  readonly mine: number;
-  readonly theirs: number;
-  /** The rival's tavern name, or null when you have no matchup this round. */
-  readonly rival: string | null;
-}
-
 export type Share =
-  | { readonly kind: 'vote'; readonly episode: number; readonly votes: number; readonly call: CallMark; readonly faces: ReadonlyArray<Face>; readonly h2h: HeadToHead | null }
-  | { readonly kind: 'finale'; readonly right: number; readonly votes: number; readonly faces: ReadonlyArray<Face>; readonly h2h: HeadToHead | null };
+  | { readonly kind: 'vote'; readonly episode: number; readonly votes: number; readonly call: CallMark; readonly faces: ReadonlyArray<Face> }
+  | { readonly kind: 'finale'; readonly right: number; readonly votes: number; readonly faces: ReadonlyArray<Face> };
 
 /** `me`'s share for `episode`'s vote, from the state just after it. Null before the vote or without a tavern. */
 export function voteShare(state: LeagueState, me: string, episode: number): Share | null {
@@ -80,7 +73,7 @@ export function voteShare(state: LeagueState, me: string, episode: number): Shar
     : drew.has(id) ? FACES.scared
     : FACES.safe,
   );
-  return { kind: 'vote', episode, votes: seasonVotes(state), call: mark, faces, h2h: headToHead(state, me, roundOf(config, episode)) };
+  return { kind: 'vote', episode, votes: seasonVotes(state), call: mark, faces };
 }
 
 /** `me`'s share for the finale. Null before it or without a tavern. */
@@ -94,14 +87,7 @@ export function finaleShare(state: LeagueState, me: string): Share | null {
     if (entry.vote != null && state.calls.get(i + 1)?.get(me)?.target === entry.vote.boot) right++;
   }
   const faces = tavern.roster.map((id): Face => (id === finale.winner ? FACES.winner : finale.finalists.includes(id) ? FACES.finalist : FACES.gone));
-  return { kind: 'finale', right, votes: seasonVotes(state), faces, h2h: headToHead(state, me, config.schedule.rounds.length) };
-}
-
-function headToHead(state: LeagueState, me: string, round: number): HeadToHead | null {
-  const pair = schedule(state)[round - 1]?.find(([home, away]) => home === me || away === me);
-  if (pair === undefined) return null;
-  const rival = pair[0] === me ? pair[1] : pair[0];
-  return { mine: roundPoints(state, me, round), theirs: roundPoints(state, rival, round), rival: state.taverns.get(rival)?.name ?? rival };
+  return { kind: 'finale', right, votes: seasonVotes(state), faces };
 }
 
 /**
@@ -109,14 +95,6 @@ function headToHead(state: LeagueState, me: string, round: number): HeadToHead |
  * without wrapping (an iMessage bubble on a 375-point screen holds about 28).
  */
 export const SHARE_LINE_MAX = 28;
-
-/** The head-to-head score, with the rival on its own line when one line would wrap. */
-function scoreLines(h2h: HeadToHead): ReadonlyArray<string> {
-  const score = `${h2h.mine}–${h2h.theirs}`;
-  if (h2h.rival === null) return [score];
-  const line = `${score} (${h2h.rival})`;
-  return [...line].length <= SHARE_LINE_MAX ? [line] : [score, `(${h2h.rival})`];
-}
 
 /** The share as the text you paste. */
 export function shareText(share: Share): string {
@@ -126,7 +104,6 @@ export function shareText(share: Share): string {
     share.kind === 'vote' ? share.call : `${share.right} of ${share.votes}`,
     'My Tavern:',
     share.faces.join(''),
-    ...(share.h2h === null ? [] : ['Head to Head:', ...scoreLines(share.h2h)]),
   ].join('\n');
 }
 
