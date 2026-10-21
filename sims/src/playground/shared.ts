@@ -10,6 +10,13 @@ import { abilityLine, artCss, bannerCss, banneredTaverns, formatCr, signed, stra
 
 declare const __PLAYGROUND_DATA__: PlaygroundData;
 
+// ── names ──────────────────────────────────────────────────────────────────
+
+/** The site. It can host more than one game; for now it has one. */
+export const SITE_NAME = 'League of Taverns';
+/** The game this page plays: a season of the Lich's contest, your tavern against the bots'. */
+export const GAME_NAME = "The Lich's Assistant";
+
 // ── season data ────────────────────────────────────────────────────────────
 
 export const data = __PLAYGROUND_DATA__;

@@ -388,6 +388,49 @@ export function tavernWords(rand: () => number): { readonly adjective: string; r
   return { adjective: pick(SEED_ADJECTIVES), noun: pick(SEED_NOUNS) };
 }
 
+/**
+ * The season's taverns that sit at the table beside yours: none flying your
+ * banner's mark, and one fewer than the seats, so every tavern at the table
+ * looks different and none goes unchosen. When more than enough remain,
+ * `rand` picks which sit the season out.
+ */
+export function rivalTaverns<T>(taverns: ReadonlyArray<T>, markOf: (t: T) => string | undefined, mark: string, seats: number, rand: () => number): ReadonlyArray<T> {
+  const rivals = taverns.filter((t) => markOf(t) !== mark);
+  while (rivals.length > seats - 1) rivals.splice(Math.floor(rand() * rivals.length), 1);
+  return rivals;
+}
+
+/** Who you are at the table: your name, your tavern's two words ("The <adjective> <noun>") and its banner, a `BANNER_CHOICES` id. */
+export interface Profile {
+  readonly name: string;
+  readonly adjective: string;
+  readonly noun: string;
+  readonly banner: string;
+}
+
+/** Your tavern's name and id. */
+export function tavernOf(p: Pick<Profile, 'adjective' | 'noun'>): { readonly id: string; readonly name: string } {
+  const name = `The ${p.adjective} ${p.noun}`;
+  return { id: tavernId(name), name };
+}
+
+/** A profile tidied, or why it can't be used. `rivals` are the season's own taverns, whose names are taken. */
+export function checkProfile(form: Profile, rivals: ReadonlyArray<{ readonly id: string; readonly name: string }>): { readonly profile?: Profile; readonly error?: string } {
+  const name = form.name.trim().replace(/\s+/g, ' ');
+  if (name.length === 0) return { error: 'Tell the room your name.' };
+  if (name.length > KEEPER_NAME_MAX) return { error: `Your name is ${name.length} characters; the ledger takes ${KEEPER_NAME_MAX}.` };
+  const adjective = tavernWord(form.adjective);
+  const noun = tavernWord(form.noun);
+  if (adjective === null || noun === null) {
+    return { error: `Your tavern is "The", then an adjective, then a noun: one word each, letters only, up to ${TAVERN_WORD_MAX} long.` };
+  }
+  const tavern = tavernOf({ adjective, noun });
+  if (tavern.id === '' || tavern.id === 'the') return { error: "Your tavern's name needs letters a to z the ledger can file it under." };
+  if (rivals.some((t) => t.id === tavern.id || t.name.toLowerCase() === tavern.name.toLowerCase())) return { error: `${tavern.name} is a rival's tavern. Name yours something else.` };
+  if (!BANNER_CHOICES.some((b) => b.id === form.banner)) return { error: 'Choose a banner to fly.' };
+  return { profile: { name, adjective, noun, banner: form.banner } };
+}
+
 // ── tables ─────────────────────────────────────────────────────────────────
 
 /**

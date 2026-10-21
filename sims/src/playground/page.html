@@ -1,5 +1,11 @@
-<title>The Lich's Contest</title>
+<title>League of Taverns</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Keep a tavern, draft monsters and call the boot. Now playing: The Lich's Assistant, a season of the Lich's contest against the bot taverns.">
+<meta name="application-name" content="League of Taverns">
+<meta name="apple-mobile-web-app-title" content="Taverns">
+<meta name="theme-color" content="#e9eee8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111915" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%238b6414'/%3E%3Cpath d='M18 12v42' stroke='%23fffaf0' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M20 14h28l-7 9 7 9H20z' fill='%23fffaf0'/%3E%3C/svg%3E">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Public+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
@@ -93,8 +99,6 @@ pre, .die, .sum, td.n, .kv .v, .bar .num { font-variant-ligatures: none; }
 a { color: var(--brass); }
 
 header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; border-bottom: 2px solid var(--brass); padding-bottom: 10px; }
-header.top .sub { color: var(--muted); font-size: 13px; }
-header.top .sub b { color: var(--ink); font-weight: 600; }
 
 button, input, select { font: inherit; color: inherit; }
 button {
@@ -468,9 +472,38 @@ body[data-mode="game"] .wrap { max-width: 1380px; height: 100vh; height: 100dvh;
 body[data-mode="game"] footer { display: none; }
 .workshop { display: grid; gap: 14px; }
 .workshop > * { min-width: 0; }
-header.top .brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+header.top .brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-width: 0; }
 header.top h1 { font-size: 1.6rem; }
-.top-actions { display: flex; gap: 6px; }
+header.top .brand .sub { font: 400 1.05rem/1.2 var(--font-display); color: var(--brass); }
+.top-actions { display: flex; gap: 6px; align-items: center; flex: none; }
+/* You, in the header: your banner and name, opening your profile. */
+.me { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; max-width: 46vw; padding: 4px 10px 4px 8px; }
+.me span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me .flag { width: 22px; height: 16px; flex: none; }
+/* The menu: the workshop and the theme, out of the way. */
+.menu { position: relative; }
+.menu > summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu > summary:hover, .menu[open] > summary { border-color: var(--brass); }
+.menu > summary svg { width: 18px; height: 18px; fill: var(--ink); }
+.menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 200px; display: grid; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }
+.menu-pop button { border: none; background: none; text-align: left; padding: 10px 12px; border-radius: var(--radius); }
+.menu-pop button:hover { background: var(--sunken); }
+/* The profile sheet: a dialog on a wide screen, the whole screen on a phone. */
+dialog.sheet { padding: 0; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; overscroll-behavior: contain; }
+dialog.sheet::backdrop { background: rgb(10 16 13 / 0.55); }
+.sheet-body { padding: 18px 16px 16px; }
+.sheet-head { display: grid; gap: 2px; }
+.sheet-head h2 { font-size: 1.6rem; }
+.sheet-actions { position: sticky; bottom: 0; display: flex; gap: 8px; justify-content: flex-end; padding: 10px 0 2px; background: var(--surface); border-top: 1px solid var(--line); }
+.sheet-actions button { min-height: 44px; padding-inline: 18px; }
+@media (max-width: 600px) {
+  dialog.sheet { width: 100%; max-width: 100%; height: 100%; max-height: 100%; margin: 0; border: none; border-radius: 0; }
+  .sheet-actions button { flex: 1; }
+}
+/* Before a season: the game and a start button. */
+.lobby .start { justify-self: start; min-height: 44px; padding-inline: 22px; font-size: 1rem; }
+.game[data-idle] .g-head, .game[data-idle] .g-tabs, .game[data-idle] .g-side, .game[data-idle] .g-bar { display: none !important; }
 .game { display: grid; min-height: 0; gap: 8px 16px; grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "head" "tabs" "main" "bar"; }
 .g-head { grid-area: head; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: stretch; }
@@ -489,12 +522,18 @@ header.top h1 { font-size: 1.6rem; }
   .game[data-view] .g-room { display: flex; }
   .game[data-view="room"] #g-work, .game[data-view="work"] #g-work, .game[data-view="table"] #g-table { display: grid; }
   .narrow-only { display: none !important; }
+  .game[data-idle] { grid-template-columns: minmax(0, 760px); justify-content: center; grid-template-areas: "head" "room" "room" "bar"; }
 }
 /* A phone: the header shrinks to a line, and your tavern to its name and the week. */
 @media (max-width: 959px) {
   header.top { flex-wrap: nowrap; align-items: center; padding-bottom: 6px; }
   header.top h1 { font-size: 1.25rem; }
-  header.top .sub, .you .banner-call, .head-actions .muted { display: none; }
+  header.top .brand { display: grid; gap: 0; }
+  header.top .brand .sub { font-size: 0.9rem; }
+  .you .banner-call, .head-actions .muted { display: none; }
+  .lobby .start { justify-self: stretch; }
+  /* 16px or more, so a phone doesn't zoom in on a field you tap. */
+  input[type="text"], input[type="number"], select { font-size: 16px; }
   .g-head { flex-wrap: nowrap; }
   .you { flex: 1 1 auto; padding: 4px 10px; }
   .you.banner-card .pennant { height: 6px; }
@@ -661,14 +700,22 @@ SOFTWARE.
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <h1>The Lich's Contest</h1>
-      <p class="sub" id="subtitle">Playground</p>
+      <h1>League of Taverns</h1>
+      <p class="sub" id="subtitle">The Lich's Assistant</p>
     </div>
     <div class="top-actions">
-      <button type="button" class="small" id="mode">Workshop</button>
-      <button type="button" class="small" id="theme" title="Switch colour theme">Theme: auto</button>
+      <button type="button" class="me" id="me" aria-haspopup="dialog"></button>
+      <details class="menu" id="menu">
+        <summary title="Menu" aria-label="Menu"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.8"/><circle cx="10" cy="10" r="1.8"/><circle cx="16" cy="10" r="1.8"/></svg></summary>
+        <div class="menu-pop">
+          <button type="button" id="mode">Workshop</button>
+          <button type="button" id="theme" title="Switch colour theme">Theme: auto</button>
+        </div>
+      </details>
     </div>
   </header>
+
+  <dialog id="profile" class="sheet" aria-labelledby="p-title"></dialog>
 
   <section id="game" class="game" data-view="room" aria-label="Your season against the bots">
     <div id="g-head" class="g-head"></div>
@@ -712,6 +759,7 @@ SOFTWARE.
   </section>
 
   <footer>
+    <p id="build-info"></p>
     Runs the real <span class="mono">@league-of-taverns/engine</span> and bots in your browser. A seed gives the same season as
     <span class="mono">pnpm sim -- --seed &lt;seed&gt;</span>: the same cast, draft, challenges, votes and champion, down to the same
     <span class="mono">events.ndjson</span> bytes. Monster data: System Reference Document 5.1 by Wizards of the Coast LLC, CC-BY-4.0.
