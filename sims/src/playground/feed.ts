@@ -5,11 +5,14 @@
  *
  * The room shows the league as someone at the bar would see it: every
  * tavern's picks, every challenge and every ballot, but no rival's call
- * until the vote is read (your own call shows to you at once). Items are
+ * until the vote is read (your own call shows to you at once). Each vote and
+ * the finale carry your share, with the emoji it uses for the first time, so
+ * the room can teach them as they appear. Items are
  * keyed, so a re-render keeps a message that hasn't changed.
  */
 import { applyEvent, episodeScore, finaleScore, initialState, roundMatchups, seasonStandings } from '@league-of-taverns/engine';
 import type { Challenge, ChallengeResult, FinaleResult, LeagueEvent, LeagueState, MatchupResult, ScoreLine, VoteResult } from '@league-of-taverns/engine';
+import { finaleShare, shareEmoji, voteShare, type Share } from './share';
 import { draftCalls, tableMoves, type DraftCall } from './view';
 
 export interface FeedTableRow {
@@ -70,11 +73,28 @@ export type FeedItem =
       readonly calls: ReadonlyArray<FeedCall>;
       /** Monsters still in after the vote. */
       readonly left: number;
+      readonly share: ShareCard | null;
     }
-  | { readonly kind: 'finale'; readonly key: string; readonly seq: number; readonly result: FinaleResult; readonly scores: ReadonlyArray<{ readonly tavern: string; readonly score: ScoreLine }> }
+  | {
+      readonly kind: 'finale';
+      readonly key: string;
+      readonly seq: number;
+      readonly result: FinaleResult;
+      readonly scores: ReadonlyArray<{ readonly tavern: string; readonly score: ScoreLine }>;
+      readonly share: ShareCard | null;
+    }
   | { readonly kind: 'round'; readonly key: string; readonly seq: number; readonly round: number; readonly matchups: ReadonlyArray<MatchupResult>; readonly rows: ReadonlyArray<FeedTableRow>; readonly final: boolean };
 
 export type FeedKind = FeedItem['kind'];
+
+/** Head-to-head rounds in which the room explains every emoji in your share; after them, only one no earlier share used. */
+export const TEACH_ROUNDS = 1;
+
+/** Your share at a vote or the finale, and the emoji to explain under it. */
+export interface ShareCard {
+  readonly share: Share;
+  readonly teach: ReadonlyArray<string>;
+}
 
 export interface FeedOptions {
   /** Your tavern, or null (before you choose one, or a season of bots). Your own call shows at once; rivals' wait for the vote. */
@@ -97,6 +117,14 @@ export function feedItems(events: ReadonlyArray<LeagueEvent>, opts: FeedOptions)
   let state: LeagueState = initialState();
   let lastTable: ReadonlyArray<{ tavern: string; rank: number }> | null = null;
   const called = new Map<string, number>();
+  const taught = new Set<string>();
+  const card = (share: Share | null, round: number): ShareCard | null => {
+    if (share === null) return null;
+    const used = shareEmoji(share);
+    const teach = round <= TEACH_ROUNDS ? used : used.filter((e) => !taught.has(e));
+    for (const e of used) taught.add(e);
+    return { share, teach };
+  };
 
   const showSeason = (): void => {
     if (seasonShown) return;
@@ -167,13 +195,21 @@ export function feedItems(events: ReadonlyArray<LeagueEvent>, opts: FeedOptions)
           const c = standing?.get(tavern);
           return { tavern, target: c?.target ?? null, early: c?.early ?? false, right: c !== undefined && c.target === vote.boot, score: episodeScore(state, tavern, episode) };
         });
-        items.push({ kind: 'vote', key: `vote:${episode}`, seq: e.seq, episode, immune, vote, calls, left: state.alive.length });
+        const share = card(opts.me === null ? null : voteShare(state, opts.me, episode), roundIndex(state, episode));
+        items.push({ kind: 'vote', key: `vote:${episode}`, seq: e.seq, episode, immune, vote, calls, left: state.alive.length, share });
         if (state.config !== null && state.jury.length < state.config.contest.castSize - state.config.contest.finalists) openEpisode(episode + 1);
         break;
       }
       case 'finale.resolved':
         items.push({ kind: 'divider', key: 'divider:finale', label: 'The finale' });
-        items.push({ kind: 'finale', key: 'finale', seq: e.seq, result: e.payload.result, scores: [...state.taverns.keys()].map((tavern) => ({ tavern, score: finaleScore(state, tavern) })) });
+        items.push({
+          kind: 'finale',
+          key: 'finale',
+          seq: e.seq,
+          result: e.payload.result,
+          scores: [...state.taverns.keys()].map((tavern) => ({ tavern, score: finaleScore(state, tavern) })),
+          share: card(opts.me === null ? null : finaleShare(state, opts.me), Infinity),
+        });
         break;
       case 'round.finalized': {
         const { round } = e.payload;

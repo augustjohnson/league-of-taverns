@@ -28,9 +28,10 @@ import { applyEvent, episodeScore, initialState, rngFor, roundMatchups, roundOf,
 import type { LeagueEvent, LeagueState } from '@league-of-taverns/engine';
 import type { Banner } from '@league-of-taverns/scripts/lib/banner';
 import { ContestSession } from '../season-runner';
-import { currentDraftRound, feedItems, latestEpisode, type FeedItem } from './feed';
+import { currentDraftRound, feedItems, latestEpisode, type FeedItem, type ShareCard } from './feed';
 import { clockBack, crownChampion, hailChampion, micron, pacer, raiseBanner, readJury, readVotes, reducedMotion, revealChallenge, roundMoment, slideStandings, turnCard, type Pacer } from './fx';
 import { bannerChoice, choiceAttr, getProfile, noteSeason, openProfile } from './profile';
+import { finaleShare, MEANINGS, shareText, voteShare } from './share';
 import {
   $,
   ABILITY_NAMES,
@@ -877,6 +878,7 @@ function voteHtml(item: Extract<FeedItem, { kind: 'vote' }>, ctx: Ctx): string {
       `<ol class="parchments">${ballots}${revote}${draw}` +
       `<li data-step="boot" class="boot-line${bootOwner !== undefined && bootOwner === me ? ' mine' : ''}">${monster(boot, state, me, 'md')} <span>${bootOwner === me && me !== null ? '<b>Your monster</b> is out.' : 'is out.'} The dead have room for one more. <span class="muted">${item.left} left.</span></span></li>` +
       `<li data-step="calls" class="calls-wrap">${fold(`${item.key}:calls`, latest, `<span class="small">The calls, unsealed${myCall === undefined ? '' : `: you ${myCall.right ? '<b class="pass">called it</b>' : myCall.target === null ? 'made no call' : 'missed'}`}</span>`, `<ul class="calls-out">${callLines}</ul>`)}</li></ol>` +
+      shareHtml(item.share) +
       `<div class="spoiler">${fold(`${item.key}:who`, false, '<span class="small">Who voted for whom</span>', `<ul class="ballots">${byWhom}</ul>`)}</div>` +
       (latest ? `<p class="race-foot"><button type="button" class="link small" data-action="g-replay" data-key="${esc(item.key)}">Hear it again</button></p>` : ''),
   });
@@ -908,8 +910,102 @@ function finaleHtml(item: Extract<FeedItem, { kind: 'finale' }>, ctx: Ctx): stri
       chips +
       `<ol class="parchments">${lines}${result.draw === null ? '' : '<li data-step="note" class="note-line">A tie. The Lich draws a name.</li>'}` +
       `<li data-step="winner" class="winner-line">${monster(result.winner, state, me, 'md')} <span>is the Lich's new assistant${owner === undefined ? '' : `, and ${whose(owner, me)} candidate`}.</span></li></ol>` +
-      (scores === '' ? '' : `<ul class="calls-out">${scores}</ul>`),
+      (scores === '' ? '' : `<ul class="calls-out">${scores}</ul>`) +
+      shareHtml(item.share),
   });
+}
+
+// ── the share ──────────────────────────────────────────────────────────────
+
+/** Your share under a vote or the finale: the text to paste, a Copy button, and what any emoji still to learn means. */
+function shareHtml(card: ShareCard | null): string {
+  if (card === null) return '';
+  const teach = card.teach.map((e) => `<li><span class="emo">${e}</span> ${esc(MEANINGS[e as keyof typeof MEANINGS])}</li>`).join('');
+  return (
+    `<div class="spoiler share-card"><div class="share-head"><b>Share ${card.share.kind === 'vote' ? 'this vote' : 'your season'}</b> <span class="small muted">no names, no spoilers</span></div>` +
+    `<pre class="share-text">${esc(shareText(card.share))}</pre>` +
+    (teach === '' ? '' : `<ul class="share-teach">${teach}</ul>`) +
+    `<p class="share-foot">${
+      canShareSheet()
+        ? '<button type="button" class="primary" data-action="g-share-sheet">Share</button> <button type="button" class="small" data-action="g-share">Copy</button>'
+        : '<button type="button" class="small" data-action="g-share">Copy for the group chat</button>'
+    } <span class="small muted" aria-live="polite" data-share-msg></span></p></div>`
+  );
+}
+
+/** The system share sheet (iOS, Android, macOS Safari) is there: secure page, and not blocked in a frame. */
+function canShareSheet(): boolean {
+  return typeof navigator.share === 'function' && window.isSecureContext;
+}
+
+/**
+ * Open the system share sheet with `text`; if it is refused (no sheet, or a
+ * frame that blocks it), copy instead. Called straight from the tap, so the
+ * sheet keeps the user's gesture. `done` hears what happened.
+ */
+function sendShare(text: string, done: (outcome: 'shared' | 'copied' | 'select') => void): void {
+  const copy = (): void => {
+    try {
+      navigator.clipboard.writeText(text).then(() => done('copied'), () => done('select'));
+    } catch {
+      done('select');
+    }
+  };
+  if (!canShareSheet()) return copy();
+  navigator.share({ text }).then(
+    () => done('shared'),
+    (err: unknown) => {
+      // Closing the sheet is a choice, not a failure.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      copy();
+    },
+  );
+}
+
+/** The share for the latest vote (or the season, once it is over), for the action bar. */
+function latestShare(): { label: string; text: string } | null {
+  const s = game.session;
+  const me = s?.humanTavern ?? null;
+  if (s === null || me === null) return null;
+  const finale = finaleShare(s.state, me);
+  if (finale !== null) return { label: 'Share your season', text: shareText(finale) };
+  const voted = s.state.episodes.filter((e) => e.vote != null).length;
+  const share = voted === 0 ? null : voteShare(s.state, me, voted);
+  return share === null ? null : { label: `Share vote ${voted}`, text: shareText(share) };
+}
+
+const shareBarButton = (): string => {
+  const latest = latestShare();
+  return latest === null ? '' : `<button type="button" class="small" data-action="g-share-latest">${esc(latest.label)}</button>`;
+};
+
+/** Share a card's text (`sheet`) or copy it; when the clipboard is out of reach, select it for Ctrl+C. */
+function shareCard(el: HTMLElement, sheet: boolean): void {
+  const box = el.closest<HTMLElement>('.share-card');
+  const pre = box?.querySelector<HTMLElement>('.share-text');
+  const note = box?.querySelector<HTMLElement>('[data-share-msg]');
+  if (pre == null || note == null) return;
+  const text = pre.textContent ?? '';
+  const done = (outcome: 'shared' | 'copied' | 'select'): void => {
+    if (outcome !== 'select') {
+      note.textContent = outcome === 'shared' ? 'Shared.' : 'Copied.';
+      return;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(pre);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    note.textContent = 'Selected: press Ctrl+C or Cmd+C.';
+  };
+  if (sheet) sendShare(text, done);
+  else {
+    try {
+      navigator.clipboard.writeText(text).then(() => done('copied'), () => done('select'));
+    } catch {
+      done('select');
+    }
+  }
 }
 
 // ── a head-to-head round ───────────────────────────────────────────────────
@@ -1034,7 +1130,7 @@ function renderBar(): void {
       const call = me === null ? undefined : s.callsFor(stage.episode).get(me);
       bar.innerHTML =
         `${err}<div class="bar-line" data-clock><b>Episode ${stage.episode}.</b> <span class="small">${call === undefined ? `Call the boot now for +${config.scoring.earlyCallBonus}, or wait for the challenge.` : `Your early call: <b>${esc(charName(call.target))}</b>.`}</span></div>` +
-        `<span class="bar-actions">${toWork(call === undefined ? 'Call early' : 'Change call')}<button type="button" class="primary" data-action="g-challenge">Run the challenge</button></span>`;
+        `<span class="bar-actions">${shareBarButton()}${toWork(call === undefined ? 'Call early' : 'Change call')}<button type="button" class="primary" data-action="g-challenge">Run the challenge</button></span>`;
       return;
     }
     case 'vote': {
@@ -1046,12 +1142,12 @@ function renderBar(): void {
       return;
     }
     case 'finale':
-      bar.innerHTML = `${err}<div class="bar-line" data-clock><b>The final ${s.state.alive.length}.</b> <span class="small">The dead are waiting to vote.</span></div><button type="button" class="primary" data-action="g-finale">Read the jury's votes</button>`;
+      bar.innerHTML = `${err}<div class="bar-line" data-clock><b>The final ${s.state.alive.length}.</b> <span class="small">The dead are waiting to vote.</span></div><span class="bar-actions">${shareBarButton()}<button type="button" class="primary" data-action="g-finale">Read the jury's votes</button></span>`;
       return;
     case 'complete':
       bar.innerHTML =
         `<div class="bar-line"><b>The season is over.</b></div>` +
-        `<span class="bar-actions"><button type="button" class="small" data-action="g-workshop">Open it in the workshop</button><button type="button" class="primary" data-action="g-reset">New season</button></span>`;
+        `<span class="bar-actions">${shareBarButton()}<button type="button" class="small" data-action="g-workshop">Open it in the workshop</button><button type="button" class="primary" data-action="g-reset">New season</button></span>`;
       return;
   }
 }
@@ -1478,6 +1574,23 @@ function onClick(action: string, el: HTMLElement): void {
         move([{ t: 'finale' }]);
       }
       return;
+    case 'g-share':
+      shareCard(el, false);
+      return;
+    case 'g-share-sheet':
+      shareCard(el, true);
+      return;
+    case 'g-share-latest': {
+      const latest = latestShare();
+      if (latest === null) return;
+      sendShare(latest.text, (outcome) => {
+        el.textContent = outcome === 'shared' ? 'Shared' : outcome === 'copied' ? 'Copied' : "Couldn't copy";
+        setTimeout(() => {
+          if (el.isConnected) el.textContent = latest.label;
+        }, 2000);
+      });
+      return;
+    }
     case 'g-replay': {
       const key = el.dataset.key;
       const msgEl = key === undefined ? null : $('g-feed').querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
