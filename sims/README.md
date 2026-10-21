@@ -27,16 +27,16 @@ pnpm sim -- [--dir sims/fixtures/lich-season] [--runs 100] [--seed sim-1] [--out
 
 Each run plays a whole season: the cast drawn by the seed, the tavern pick,
 the snake draft, then for each of the 9 episodes the bots' early calls, the
-challenge, their late calls and the vote, the head-to-head rounds, and the
-finale. Every event goes through the engine's `applyEvent`; at the end the
+challenge, their late calls and the vote, and the finale. Every event goes through the engine's `applyEvent`; at the end the
 NDJSON is replayed (`replayLog`) and the whole contest recomputed from its
 seed (`verifyContest`), and any disagreement stops the run.
 
-The report prints, per bot, titles, record, points and calling accuracy, and
+The report prints, per bot, titles, points and calling accuracy, and
 for the contest the numbers from docs/survivor-format.md §7: how often the
 favourite boot went home, the correlation of challenge power with finishing
 place, the spread of winners, win rate by voting strategy, the share of
-points from calls and how many matchups calls decided. `--model` overrides
+points from calls and how many titles calls decided (the champion would
+change without call points). `--model` overrides
 vote-model dials (engine/src/contest/model.ts) for a tuning sweep.
 
 Seeds: run 1 uses `--seed` itself and run n uses `<seed>~<n>`, so
@@ -68,9 +68,9 @@ three bots, with keepers' names so the table reads like people.
   for each episode the Lich's summons, the calls (rivals' sealed, yours
   shown to you), **the challenge in the scrying ball** round by round, and
   **the vote read one parchment at a time**, stopping once nobody can catch
-  the boot, then the calls unsealed with each tavern's points. Each
-  head-to-head round ends with its matchups and the table; the finale reads
-  the jury's votes.
+  the boot, then the calls unsealed with each tavern's points and your share.
+  The crier follows each vote with the table as it stands; the finale reads
+  the jury's votes, then the final table.
 - **The pacing.** The engine and bots decide at once, but the room tells it
   at a person's pace: a rival is on the clock before its pick lands, and
   whispers its call before the challenge. Skip (or Esc), a reload and
@@ -81,8 +81,7 @@ three bots, with keepers' names so the table reads like people.
   in words, and the scouts' rating as stars; the season's ability mix as a
   hint), then **the cast** during the contest: everyone still in, yours
   first, with immunity wins and last vote's ballots, to call from.
-- **Standings:** record, points, the round-robin schedule with live scores,
-  and every tavern's candidates.
+- **Standings:** every tavern by points, and its candidates.
 - **The action bar** says what's next: your pick, or in an episode "Run the
   challenge" and "Go to the vote", with your call shown.
 

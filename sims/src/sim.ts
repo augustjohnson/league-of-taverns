@@ -78,16 +78,15 @@ function print(season: string, seed: string, totals: Aggregate, summaries: Reado
     const only = summaries[0]!;
     console.log(`winner of the contest: ${only.winner}; champion tavern: ${only.champions.map((c) => `${c.tavern} (${c.bot})`).join(' and ')}`);
     for (const row of only.standings) {
-      console.log(`  ${row.rank}. ${row.tavern.padEnd(20)} ${row.bot.padEnd(10)} ${row.wins}-${row.losses}${row.ties > 0 ? `-${row.ties}` : ''}  ${String(row.points).padStart(4)} pts (${row.callPoints} from calls)`);
+      console.log(`  ${row.rank}. ${row.tavern.padEnd(20)} ${row.bot.padEnd(10)} ${String(row.points).padStart(4)} pts (${row.callPoints} from calls)`);
     }
   }
-  const header = ['bot', 'seats', 'titles', 'titles/seat', 'mean W', 'mean pts', 'calls right', 'early'];
+  const header = ['bot', 'seats', 'titles', 'titles/seat', 'mean pts', 'calls right', 'early'];
   const rows = Object.entries(totals.byBot).map(([bot, a]) => [
     bot,
     String(a.seats),
     Number.isInteger(a.titles) ? String(a.titles) : a.titles.toFixed(1),
     a.titlesPerSeat.toFixed(3),
-    a.meanWins.toFixed(2),
     a.meanPoints.toFixed(1),
     pct(a.callRate),
     pct(a.earlyShare),
@@ -101,6 +100,6 @@ function print(season: string, seed: string, totals: Aggregate, summaries: Reado
   console.log(`  power vs placement        r = ${totals.powerPlacement.toFixed(3)} (positive: stronger lasts longer)`);
   console.log(`  winners                   ${totals.distinctWinners} different; most: ${totals.topWinners.map((w) => `${w.id} ${w.wins}`).join(', ')}`);
   console.log(`  win rate by strategy      ${Object.entries(totals.strategyWins).map(([k, s]) => `${k} ${(100 * s.rate).toFixed(1)}%`).join(', ')} (par ${(100 / (summaries[0]?.cast.length ?? 20)).toFixed(1)}%)`);
-  console.log(`  calls                     ${pct(totals.callPointShare)} of all points; decided ${pct(totals.callDecidedShare)} of matchups`);
+  console.log(`  calls                     ${pct(totals.callPointShare)} of all points; decided ${pct(totals.callDecidedShare)} of titles`);
   console.log(`  revotes / draws           ${totals.revotesPerSeason.toFixed(2)} / ${totals.drawsPerSeason.toFixed(2)} per season`);
 }

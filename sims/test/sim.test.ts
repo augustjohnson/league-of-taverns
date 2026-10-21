@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contestSeed, episodesOf, replayLog, serializeEvent, verifyContest } from '@league-of-taverns/engine';
+import { contestSeed, replayLog, seasonStandings, serializeEvent, verifyContest } from '@league-of-taverns/engine';
 import { loadSeasonInput } from '../src/load';
 import { ContestSession, aggregate, drawCast, runSeason, runSeed } from '../src/season-runner';
 
@@ -9,24 +9,22 @@ const sim1 = runSeason(input, { seed: 'sim-1' });
 const { events, state, summary } = sim1;
 const CAST = input.config.contest.castSize;
 const VOTES = CAST - input.config.contest.finalists;
-const ROUNDS = input.config.schedule.rounds.length;
 const TAVERNS = input.managers.length;
 
 describe('one seeded season', () => {
-  it('runs from season.created to the last round and completes', () => {
+  it('runs from season.created to the finale and completes', () => {
     expect(events[0]!.type).toBe('season.created');
-    expect(events.at(-1)).toMatchObject({ type: 'round.finalized', payload: { round: ROUNDS } });
+    expect(events.at(-1)!.type).toBe('finale.resolved');
     expect(state.phase).toBe('complete');
   });
 
   it('writes the events in lifecycle order', () => {
-    const order = ['season.created', 'character.pooled', 'manager.joined', 'tavern.chosen', 'draft.pick', 'call.made', 'challenge.resolved', 'vote.resolved', 'finale.resolved', 'round.finalized'];
+    const order = ['season.created', 'character.pooled', 'manager.joined', 'tavern.chosen', 'draft.pick', 'call.made', 'challenge.resolved', 'vote.resolved', 'finale.resolved'];
     const first = order.map((t) => events.findIndex((e) => e.type === t));
     expect(first.every((i) => i >= 0)).toBe(true);
     expect(first.slice(0, 5)).toEqual([...first.slice(0, 5)].sort((a, b) => a - b));
     expect(events.filter((e) => e.type === 'character.pooled')).toHaveLength(CAST);
     expect(events.filter((e) => e.type === 'vote.resolved')).toHaveLength(VOTES);
-    expect(events.filter((e) => e.type === 'round.finalized')).toHaveLength(ROUNDS);
   });
 
   it('stamps contiguous seqs and ordered timestamps', () => {
@@ -42,14 +40,13 @@ describe('one seeded season', () => {
     expect(challenge.type === 'challenge.resolved' && challenge.payload.seed).toBe(contestSeed(input.config.id, 'sim-1'));
   });
 
-  it('drafts 3 each, closes a round after its last episode, and every tavern plays every other once', () => {
+  it('drafts 3 each, ends on the finale, and ranks every tavern by its points', () => {
     expect([...state.taverns.values()].every((t) => t.roster.length === 3)).toBe(true);
-    const rounds = events.flatMap((e, i) => (e.type === 'round.finalized' ? [{ round: e.payload.round, i }] : []));
-    for (const { round, i } of rounds.slice(0, -1)) {
-      const last = episodesOf(input.config, round).at(-1)!;
-      expect(events[i - 1]).toMatchObject({ type: 'vote.resolved', payload: { episode: last } });
-    }
-    expect(summary.matchups).toBe((TAVERNS * (TAVERNS - 1)) / 2);
+    expect(events.at(-1)!.type).toBe('finale.resolved');
+    expect(summary.standings.map((r) => [r.tavern, r.points])).toEqual(seasonStandings(state).map((r) => [r.tavern, r.points]));
+    expect(summary.standings).toHaveLength(TAVERNS);
+    const top = Math.max(...summary.standings.map((r) => r.points));
+    expect(summary.champions.map((c) => c.tavern).sort()).toEqual(summary.standings.filter((r) => r.points === top).map((r) => r.tavern).sort());
   });
 
   it('summarizes the cast with places 1..cast, the winner first', () => {

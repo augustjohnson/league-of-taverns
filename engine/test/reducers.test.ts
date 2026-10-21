@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyEvent, InvalidEventError } from '../src/events/reducers';
-import { aliveAt, episodeScore, episodeStage, finaleScore, matchups, seasonStandings } from '../src/events/selectors';
+import { aliveAt, episodeScore, episodeStage, finaleScore, seasonStandings, tavernPoints } from '../src/events/selectors';
 import type { LeagueState } from '../src/events/state';
 import type { EventOf, EventType } from '../src/events/types';
 import { CAST, CHALLENGES, COMMISSIONER, LogBuilder, MANAGER, TAVERNS, draft, miniConfig, miniSeason, preseason, SEED } from './support/league-log';
@@ -93,10 +93,9 @@ describe('the contest', () => {
     expect(codeOf(midEpisode1, 'vote.resolved', { episode: 1, vote: { ...realVote.payload.vote, boot: other } })).toBe('vote.result');
   });
 
-  it('the finale comes after the last vote, and the last round needs it', () => {
+  it('the finale comes after the last vote, once, and completes the season', () => {
     expect(codeOf(midEpisode1, 'finale.resolved', { result: final.finale! })).toBe('finale.votes_left');
-    expect(codeOf(afterDraft, 'round.finalized', { round: 1 })).toBe('round.episodes_left');
-    expect(codeOf(afterDraft, 'round.finalized', { round: 2 })).toBe('round.bad_round');
+    expect(codeOf(final, 'finale.resolved', { result: final.finale! })).toBe('finale.wrong_phase');
     expect(final.phase).toBe('complete');
   });
 
@@ -104,7 +103,6 @@ describe('the contest', () => {
     expect(final.jury).toHaveLength(8);
     expect(final.alive).toHaveLength(2);
     expect(final.finale!.finalists).toEqual(final.alive);
-    expect(final.finalizedRounds).toEqual(new Set([1, 2, 3]));
   });
 });
 
@@ -129,12 +127,21 @@ describe('scores and standings', () => {
     if (owner !== undefined) expect(finaleScore(final, owner).winner).toBe(miniConfig().scoring.winner);
   });
 
-  it('every pair meets in the round-robin, and the table adds up the matchups', () => {
-    const all = matchups(final);
-    expect(all).toHaveLength(6);
+  it('the table ranks every tavern by its points over every vote and the finale', () => {
     const rows = seasonStandings(final);
-    expect(rows.reduce((n, r) => n + r.wins + r.losses + r.ties, 0)).toBe(12);
+    expect(rows.map((r) => r.tavern).sort()).toEqual([...TAVERNS].sort());
+    for (const r of rows) {
+      let sum = finaleScore(final, r.tavern).total;
+      for (let e = 1; e <= 8; e++) sum += episodeScore(final, r.tavern, e).total;
+      expect(r.points).toBe(sum);
+      expect(tavernPoints(final, r.tavern)).toBe(sum);
+    }
+    expect(rows.map((r) => r.points)).toEqual([...rows.map((r) => r.points)].sort((a, b) => b - a));
     expect(rows[0]!.rank).toBe(1);
+  });
+
+  it('counts only votes held: before the first vote, every tavern is at zero', () => {
+    for (const r of seasonStandings(midEpisode1)) expect(r.points).toBe(0);
   });
 });
 

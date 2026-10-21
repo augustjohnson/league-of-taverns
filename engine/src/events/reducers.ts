@@ -33,7 +33,6 @@
  * | `challenge.resolved` | `challenge.wrong_phase`, `challenge.bad_episode`, `challenge.commitment`, `challenge.result` |
  * | `vote.resolved` | `vote.wrong_phase`, `vote.bad_episode`, `vote.no_challenge`, `vote.result` |
  * | `finale.resolved` | `finale.wrong_phase`, `finale.votes_left`, `finale.result` |
- * | `round.finalized` | `round.wrong_phase`, `round.bad_round`, `round.episodes_left`, `round.no_finale` |
  *
  * ## Rules
  *
@@ -55,12 +54,11 @@
  *   boot must follow from its ballots (`voteProblem`); likewise the finale
  *   (`finaleProblem`). The dice themselves are audited against the seed by
  *   `verifyContest`.
- * - Rounds are finalized in order once their episodes are voted; the last
- *   needs the finale and completes the season.
+ * - The finale completes the season.
  */
 import { REGISTRY_VERSION, TRAITS, validateModifiers } from '../characters';
 import { challengeProblem, finaleProblem, voteProblem } from '../contest/check';
-import { MAX_TAVERNS, configIssues, episodesOf, votesIn, type SeasonConfig } from '../league';
+import { MAX_TAVERNS, configIssues, votesIn, type SeasonConfig } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
 import { challengeSha256 } from './canonical';
@@ -97,7 +95,6 @@ export function initialState(): LeagueState {
     episodes: [],
     calls: new Map(),
     finale: null,
-    finalizedRounds: new Set(),
   };
 }
 
@@ -304,23 +301,7 @@ const handlers: { readonly [T in EventType]: Handler<T> } = {
     if (openEpisode(state) !== null) fail(event, 'finale.votes_left', 'votes are still to come');
     const problem = finaleProblem(state.alive, state.jury, event.payload.result);
     if (problem !== null) fail(event, 'finale.result', problem);
-    return { ...state, finale: event.payload.result };
-  },
-
-  'round.finalized': (state, event) => {
-    const config = configOf(state);
-    const { round } = event.payload;
-    if (state.phase !== 'contest') fail(event, 'round.wrong_phase', 'rounds are finalized during the contest');
-    if (round !== state.finalizedRounds.size + 1 || round > config.schedule.rounds.length) {
-      fail(event, 'round.bad_round', `the next round to finalize is ${state.finalizedRounds.size + 1}`);
-    }
-    const left = episodesOf(config, round).filter((e) => state.episodes[e - 1]?.vote == null);
-    if (left.length > 0) fail(event, 'round.episodes_left', `episodes ${left.join(', ')} have not been voted`);
-    const last = round === config.schedule.rounds.length;
-    if (last && state.finale === null) fail(event, 'round.no_finale', 'the last round needs the finale');
-    const finalizedRounds = new Set(state.finalizedRounds);
-    finalizedRounds.add(round);
-    return { ...state, finalizedRounds, phase: last ? 'complete' : state.phase };
+    return { ...state, finale: event.payload.result, phase: 'complete' };
   },
 };
 

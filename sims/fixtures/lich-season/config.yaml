@@ -36,6 +36,3 @@ scoring:
   winner: 10                        # your monster becomes the Lich's assistant
   call: 2                           # calling the boot: about one monster surviving one vote
   earlyCallBonus: 1                 # a correct call made before the challenge
-
-schedule:
-  rounds: [3, 3, 3]                 # episodes per head-to-head round (4 taverns: a round-robin of 3); the finale is in the last

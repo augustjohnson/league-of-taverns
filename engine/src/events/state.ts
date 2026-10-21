@@ -60,7 +60,6 @@ export interface LeagueState {
   /** Calls by episode, then tavern. */
   readonly calls: ReadonlyMap<number, ReadonlyMap<string, CallState>>;
   readonly finale: FinaleResult | null;
-  readonly finalizedRounds: ReadonlySet<number>;
 }
 
 export interface PooledEntry {

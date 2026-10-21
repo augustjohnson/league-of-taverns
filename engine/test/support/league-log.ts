@@ -16,7 +16,7 @@ import { serializeEvent } from '../../src/events/replay';
 import { onTheClock, tavernPickOnTheClock } from '../../src/events/selectors';
 import type { LeagueState } from '../../src/events/state';
 import type { Actor, EventOf, EventType, LeagueEvent, PayloadByType } from '../../src/events/types';
-import { episodesOf, type SeasonConfig } from '../../src/league';
+import type { SeasonConfig } from '../../src/league';
 import { contestSeed, rngFor } from '../../src/rng';
 import type { CrEighths } from '../../src/vocabulary';
 import type { EffectiveStats } from '../../src/characters';
@@ -48,7 +48,6 @@ export function miniConfig(overrides: Partial<SeasonConfig> = {}): SeasonConfig 
     draft: { format: 'snake', order: { mode: 'seeded' } },
     contest: { castSize: 10, finalists: 2, lapDc: 1, model: {} },
     scoring: { survive: 2, immunity: 3, juryVote: 2, winner: 10, call: 2, earlyCallBonus: 1 },
-    schedule: { rounds: [3, 3, 2] },
     ...overrides,
   };
 }
@@ -167,11 +166,8 @@ export function miniSeason(): MiniSeason {
     const vote = playVote(s, map, result.winner, SEED, episode, model);
     log.append('vote.resolved', { episode, vote });
     s = applyEpisode(s, { episode, immune: result.winner, vote }, model);
-    const round = config.schedule.rounds.findIndex((_, i) => episodesOf(config, i + 1).at(-1) === episode) + 1;
-    if (round > 0 && round < config.schedule.rounds.length) log.append('round.finalized', { round });
   }
   log.append('finale.resolved', { result: playFinale(s, map, SEED, model) });
-  log.append('round.finalized', { round: config.schedule.rounds.length });
   return { log, afterPreseason, afterDraft, midEpisode1: midEpisode1!, final: log.state };
 }
 

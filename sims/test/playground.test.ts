@@ -2,14 +2,14 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { replayLog } from '@league-of-taverns/engine';
+import { replayLog, seasonStandings } from '@league-of-taverns/engine';
 import type { Ballot } from '@league-of-taverns/engine';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { deepEqual } from '../src/deep-equal';
 import { loadSeasonParts } from '../src/load';
 import { renderPage, scriptSafeJson, writePlayground } from '../src/playground-build';
 import { seasonInputFromData, serializeSeason, type PlaygroundData } from '../src/playground/data';
-import { currentDraftRound, feedItems, latestEpisode, TEACH_ROUNDS, type FeedItem, type FeedOptions } from '../src/playground/feed';
+import { currentDraftRound, feedItems, latestEpisode, TEACH_VOTES, type FeedItem, type FeedOptions } from '../src/playground/feed';
 import { CALL_MARKS, FACES, MEANINGS, SHARE_LINE_MAX, shareEmoji, shareText, type Share } from '../src/playground/share';
 import { bannerSchema } from '@league-of-taverns/scripts/lib/banner';
 import {
@@ -213,7 +213,7 @@ describe('the Common Room', () => {
   const items = feedItems(sim1.events, opts);
   const kinds = (list: ReadonlyArray<FeedItem>, kind: FeedItem['kind']) => list.filter((i) => i.kind === kind);
 
-  it('tells the season in order: the opening, the tavern pick, the draft, each episode, the finale and the rounds', () => {
+  it('tells the season in order: the opening, the tavern pick, the draft, each episode and its table, the finale and the final table', () => {
     expect(items[1]!.kind).toBe('season');
     expect(kinds(items, 'tavern')).toHaveLength(input.managers.length);
     expect(kinds(items, 'draft-round')).toHaveLength(input.config.roster.size);
@@ -221,8 +221,18 @@ describe('the Common Room', () => {
     expect(kinds(items, 'challenge')).toHaveLength(votes);
     expect(kinds(items, 'vote')).toHaveLength(votes);
     expect(kinds(items, 'finale')).toHaveLength(1);
-    const rounds = kinds(items, 'round') as Array<Extract<FeedItem, { kind: 'round' }>>;
-    expect(rounds.map((r) => r.final)).toEqual(input.config.schedule.rounds.map((_, i) => i === input.config.schedule.rounds.length - 1));
+    const tables = kinds(items, 'table') as Array<Extract<FeedItem, { kind: 'table' }>>;
+    expect(tables.map((t) => t.final)).toEqual([...Array.from({ length: votes }, () => false), true]);
+    for (const [i, t] of tables.entries()) {
+      const after = items.indexOf(t) - 1;
+      expect(items[after]!.kind, `table ${i + 1}`).toBe(i < votes ? 'vote' : 'finale');
+    }
+    const last = tables.at(-1)!;
+    expect(last.rows.map((r) => [r.tavern, r.points])).toEqual(seasonStandings(sim1.state).map((r) => [r.tavern, r.points]));
+    for (const [i, t] of tables.entries()) {
+      const before = new Map((tables[i - 1]?.rows ?? []).map((r) => [r.tavern, r.points]));
+      for (const r of t.rows) expect(r.gained).toBe(r.points - (before.get(r.tavern) ?? 0));
+    }
     expect(currentDraftRound(items)).toBe(3);
     expect(latestEpisode(items)).toBe(votes);
   });
@@ -252,11 +262,6 @@ describe('the share', () => {
   const votes = items.filter((i) => i.kind === 'vote') as Array<Extract<FeedItem, { kind: 'vote' }>>;
   const finale = items.find((i) => i.kind === 'finale') as Extract<FeedItem, { kind: 'finale' }>;
   const roster = sim1.state.taverns.get(me)!.roster;
-  const roundOfVote = (episode: number): number => {
-    let end = 0;
-    for (const [i, n] of input.config.schedule.rounds.entries()) if (episode <= (end += n)) return i + 1;
-    return input.config.schedule.rounds.length;
-  };
 
   it('reads in three parts: the vote, the exit prediction and the tavern', () => {
     const share: Share = { kind: 'vote', episode: 6, votes: 9, call: CALL_MARKS.none, faces: [FACES.safe, FACES.gone, FACES.immune] };
@@ -298,11 +303,11 @@ describe('the share', () => {
     expect(finale.share!.share.faces).toEqual(crowned);
   });
 
-  it(`explains every emoji in round ${TEACH_ROUNDS}'s shares, then only ones not seen before`, () => {
+  it(`explains every emoji in the first ${TEACH_VOTES} votes' shares, then only ones not seen before`, () => {
     const seen = new Set<string>();
-    for (const card of [...votes.map((v) => ({ round: roundOfVote(v.episode), card: v.share! })), { round: Infinity, card: finale.share! }]) {
+    for (const card of [...votes.map((v) => ({ episode: v.episode, card: v.share! })), { episode: Infinity, card: finale.share! }]) {
       const used = shareEmoji(card.card.share);
-      expect(card.card.teach).toEqual(card.round <= TEACH_ROUNDS ? used : used.filter((e) => !seen.has(e)));
+      expect(card.card.teach).toEqual(card.episode <= TEACH_VOTES ? used : used.filter((e) => !seen.has(e)));
       for (const e of used) seen.add(e);
     }
     for (const e of seen) expect(MEANINGS[e as keyof typeof MEANINGS]).toBeTruthy();

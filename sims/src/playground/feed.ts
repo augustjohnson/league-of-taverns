@@ -6,23 +6,22 @@
  * The room shows the league as someone at the bar would see it: every
  * tavern's picks, every challenge and every ballot, but no rival's call
  * until the vote is read (your own call shows to you at once). Each vote and
- * the finale carry your share, with the emoji it uses for the first time, so
- * the room can teach them as they appear. Items are
- * keyed, so a re-render keeps a message that hasn't changed.
+ * the finale carry your share, with the emoji to explain under it, and are
+ * followed by the table as it stands. Items are keyed, so a re-render keeps a
+ * message that hasn't changed.
  */
-import { applyEvent, episodeScore, finaleScore, initialState, roundMatchups, seasonStandings } from '@league-of-taverns/engine';
-import type { Challenge, ChallengeResult, FinaleResult, LeagueEvent, LeagueState, MatchupResult, ScoreLine, VoteResult } from '@league-of-taverns/engine';
+import { applyEvent, episodeScore, finaleScore, initialState, seasonStandings } from '@league-of-taverns/engine';
+import type { Challenge, ChallengeResult, FinaleResult, LeagueEvent, LeagueState, ScoreLine, VoteResult } from '@league-of-taverns/engine';
 import { finaleShare, shareEmoji, voteShare, type Share } from './share';
 import { draftCalls, tableMoves, type DraftCall } from './view';
 
 export interface FeedTableRow {
   readonly tavern: string;
   readonly rank: number;
-  readonly wins: number;
-  readonly losses: number;
-  readonly ties: number;
   readonly points: number;
-  /** The row the tavern stood in after the round before (0-based), and the places it rose since. */
+  /** Points scored since the table before. */
+  readonly gained: number;
+  /** The row the tavern stood in at the table before (0-based), and the places it rose since. */
   readonly wasRow: number;
   readonly rose: number;
 }
@@ -49,7 +48,7 @@ export type FeedItem =
       readonly complete: boolean;
     }
   | { readonly kind: 'draft-done'; readonly key: string; readonly rounds: number; readonly undrafted: ReadonlyArray<string> }
-  | { readonly kind: 'episode-open'; readonly key: string; readonly episode: number; readonly round: number; readonly alive: ReadonlyArray<string> }
+  | { readonly kind: 'episode-open'; readonly key: string; readonly episode: number; readonly alive: ReadonlyArray<string> }
   | {
       readonly kind: 'call';
       readonly key: string;
@@ -83,12 +82,21 @@ export type FeedItem =
       readonly scores: ReadonlyArray<{ readonly tavern: string; readonly score: ScoreLine }>;
       readonly share: ShareCard | null;
     }
-  | { readonly kind: 'round'; readonly key: string; readonly seq: number; readonly round: number; readonly matchups: ReadonlyArray<MatchupResult>; readonly rows: ReadonlyArray<FeedTableRow>; readonly final: boolean };
+  | {
+      readonly kind: 'table';
+      readonly key: string;
+      readonly seq: number;
+      /** The vote it follows; for the final table, the season's last vote. */
+      readonly episode: number;
+      readonly rows: ReadonlyArray<FeedTableRow>;
+      /** After the finale: the season's result. */
+      readonly final: boolean;
+    };
 
 export type FeedKind = FeedItem['kind'];
 
-/** Head-to-head rounds in which the room explains every emoji in your share; after them, only one no earlier share used. */
-export const TEACH_ROUNDS = 1;
+/** Votes whose share explains every emoji in it; after them, only ones no earlier share used. */
+export const TEACH_VOTES = 3;
 
 /** Your share at a vote or the finale, and the emoji to explain under it. */
 export interface ShareCard {
@@ -115,13 +123,28 @@ export function feedItems(events: ReadonlyArray<LeagueEvent>, opts: FeedOptions)
   let seasonShown = false;
   const picks: Array<{ pick: number; tavern: string; character: string; seq: number }> = [];
   let state: LeagueState = initialState();
-  let lastTable: ReadonlyArray<{ tavern: string; rank: number }> | null = null;
+  let lastTable: ReadonlyArray<{ tavern: string; rank: number; points: number }> | null = null;
+  /** The table as it stands, after the vote or the finale just applied. */
+  const tableItem = (seq: number, episode: number, final: boolean): FeedItem => {
+    const table = seasonStandings(state);
+    const moves = tableMoves(lastTable ?? table, table);
+    const before = new Map((lastTable ?? []).map((r) => [r.tavern, r.points]));
+    lastTable = table;
+    return {
+      kind: 'table',
+      key: final ? 'table:final' : `table:${episode}`,
+      seq,
+      episode,
+      rows: table.map((r) => ({ tavern: r.tavern, rank: r.rank, points: r.points, gained: r.points - (before.get(r.tavern) ?? 0), wasRow: moves.get(r.tavern)?.wasRow ?? 0, rose: moves.get(r.tavern)?.rose ?? 0 })),
+      final,
+    };
+  };
   const called = new Map<string, number>();
   const taught = new Set<string>();
-  const card = (share: Share | null, round: number): ShareCard | null => {
+  const card = (share: Share | null, episode: number): ShareCard | null => {
     if (share === null) return null;
     const used = shareEmoji(share);
-    const teach = round <= TEACH_ROUNDS ? used : used.filter((e) => !taught.has(e));
+    const teach = episode <= TEACH_VOTES ? used : used.filter((e) => !taught.has(e));
     for (const e of used) taught.add(e);
     return { share, teach };
   };
@@ -132,8 +155,7 @@ export function feedItems(events: ReadonlyArray<LeagueEvent>, opts: FeedOptions)
     items.push({ kind: 'divider', key: 'divider:season', label: 'Before the contest' }, { kind: 'season', key: 'season', managers: [...managers], cast: [...cast] });
   };
   const openEpisode = (episode: number): void => {
-    const round = roundIndex(state, episode);
-    items.push({ kind: 'divider', key: `divider:episode:${episode}`, label: `Episode ${episode}` }, { kind: 'episode-open', key: `episode-open:${episode}`, episode, round, alive: [...state.alive] });
+    items.push({ kind: 'divider', key: `divider:episode:${episode}`, label: `Episode ${episode}` }, { kind: 'episode-open', key: `episode-open:${episode}`, episode, alive: [...state.alive] });
   };
   /** Draft picks so far, as rounds: a round's item grows pick by pick, so it is rebuilt each time. */
   const roundItem = (round: number): FeedItem => {
@@ -195,8 +217,9 @@ export function feedItems(events: ReadonlyArray<LeagueEvent>, opts: FeedOptions)
           const c = standing?.get(tavern);
           return { tavern, target: c?.target ?? null, early: c?.early ?? false, right: c !== undefined && c.target === vote.boot, score: episodeScore(state, tavern, episode) };
         });
-        const share = card(opts.me === null ? null : voteShare(state, opts.me, episode), roundIndex(state, episode));
+        const share = card(opts.me === null ? null : voteShare(state, opts.me, episode), episode);
         items.push({ kind: 'vote', key: `vote:${episode}`, seq: e.seq, episode, immune, vote, calls, left: state.alive.length, share });
+        items.push(tableItem(e.seq, episode, false));
         if (state.config !== null && state.jury.length < state.config.contest.castSize - state.config.contest.finalists) openEpisode(episode + 1);
         break;
       }
@@ -210,41 +233,14 @@ export function feedItems(events: ReadonlyArray<LeagueEvent>, opts: FeedOptions)
           scores: [...state.taverns.keys()].map((tavern) => ({ tavern, score: finaleScore(state, tavern) })),
           share: card(opts.me === null ? null : finaleShare(state, opts.me), Infinity),
         });
+        items.push(tableItem(e.seq, state.jury.length, true));
         break;
-      case 'round.finalized': {
-        const { round } = e.payload;
-        const table = seasonStandings(state);
-        const moves = tableMoves(lastTable ?? table, table);
-        const final = state.phase === 'complete';
-        items.push({
-          kind: 'round',
-          key: `round:${round}`,
-          seq: e.seq,
-          round,
-          matchups: roundMatchups(state, round),
-          rows: table.map((r) => ({ tavern: r.tavern, rank: r.rank, wins: r.wins, losses: r.losses, ties: r.ties, points: r.points, wasRow: moves.get(r.tavern)?.wasRow ?? 0, rose: moves.get(r.tavern)?.rose ?? 0 })),
-          final,
-        });
-        lastTable = table;
-        break;
-      }
       default:
         break;
     }
   }
   if (!seasonShown && managers.length > 0) showSeason();
   return items;
-}
-
-/** The head-to-head round an episode is in (1-based). */
-function roundIndex(state: LeagueState, episode: number): number {
-  const rounds = state.config?.schedule.rounds ?? [];
-  let end = 0;
-  for (const [i, n] of rounds.entries()) {
-    end += n;
-    if (episode <= end) return i + 1;
-  }
-  return rounds.length;
 }
 
 /** The round of the latest draft pick in `items`, or 0 before the draft: earlier rounds fold once the next starts. */

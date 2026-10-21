@@ -12,13 +12,12 @@ describe('the lich season', () => {
     expect(validateSeason(LICH_SEASON).issues).toEqual([]);
   });
 
-  it('is a cast of 12 from a pool of 48, four bot taverns of 3, 9 votes in 3 rounds', () => {
+  it('is a cast of 12 from a pool of 48, four bot taverns of 3, 9 votes', () => {
     expect(season.config.contest).toMatchObject({ castSize: 12, finalists: 3 });
     expect(season.pool.characters).toHaveLength(48);
     expect(season.managers.managers.every((m) => 'bot' in m.account)).toBe(true);
     expect(season.taverns).toHaveLength(4);
     expect(season.challenges).toHaveLength(9);
-    expect(season.config.schedule.rounds).toEqual([3, 3, 3]);
   });
 
   it('tests every ability about as often (no more than half again the rarest)', () => {

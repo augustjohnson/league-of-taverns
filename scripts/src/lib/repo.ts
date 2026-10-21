@@ -42,7 +42,7 @@ export const REPO_ROOT = new URL('../../../', import.meta.url);
 /** Repo root as a file URL or a filesystem path. Loaders default to `REPO_ROOT`; tests pass a temp dir. */
 export type RepoRoot = URL | string;
 
-// Season files (config, pool, managers, schedule) load through ./season.ts.
+// Season files (config, pool, managers, taverns) load through ./season.ts.
 
 /** data/open5e/manifest.json entries, shape-checked. Extra keys are allowed. */
 const manifestSchema = z.looseObject({

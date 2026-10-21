@@ -7,7 +7,7 @@ import type { EventOf, EventType, LeagueEvent } from '../src/events/types';
 import { miniSeason, statsOf } from './support/league-log';
 
 const { log } = miniSeason();
-const TYPES: ReadonlyArray<EventType> = ['season.created', 'character.pooled', 'manager.joined', 'tavern.chosen', 'draft.pick', 'call.made', 'challenge.resolved', 'vote.resolved', 'finale.resolved', 'round.finalized'];
+const TYPES: ReadonlyArray<EventType> = ['season.created', 'character.pooled', 'manager.joined', 'tavern.chosen', 'draft.pick', 'call.made', 'challenge.resolved', 'vote.resolved', 'finale.resolved'];
 const fixtures = Object.fromEntries(TYPES.map((t) => [t, log.events.find((e) => e.type === t)!])) as { [T in EventType]: EventOf<T> };
 const ndjson = (lines: ReadonlyArray<string>): string => `${lines.join('\n')}\n`;
 
@@ -46,8 +46,8 @@ describe('events', () => {
   });
 
   it('serializes canonically: sorted keys, no whitespace, no trailing newline', () => {
-    const line = serializeEvent(fixtures['round.finalized']);
-    expect(line).toMatch(/^\{"actor":\{"kind":"system","workflow":"episode"\},"at":"2026-11-02T18:04:11Z","payload":\{"round":1\},"prev":"[0-9a-f]{64}","season":"season-01","seq":\d+,"type":"round\.finalized","v":1\}$/);
+    const line = serializeEvent(fixtures['call.made']);
+    expect(line).toMatch(/^\{"actor":\{"kind":"bot","strategy":"test"\},"at":"[0-9T:-]+Z","payload":\{"episode":1,"target":"[a-z0-9-]+","tavern":"[a-z0-9-]+"\},"prev":"[0-9a-f]{64}","season":"season-01","seq":\d+,"type":"call\.made","v":1\}$/);
   });
 
   it('refuses to serialize an event that does not match the schema', () => {
@@ -75,7 +75,7 @@ describe('events', () => {
   });
 
   it('rejects an unknown event type and a strategy off the list', () => {
-    expect(() => parseLog(JSON.stringify({ ...fixtures['round.finalized'], type: 'week.finalized' }))).toThrow(/^events line 1: type: /);
+    expect(() => parseLog(JSON.stringify({ ...fixtures['call.made'], type: 'round.finalized' }))).toThrow(/^events line 1: type: /);
     const pooled = fixtures['character.pooled'];
     expect(() => parseLog(JSON.stringify({ ...pooled, payload: { ...pooled.payload, strategy: { kind: 'kingmaker' } } }))).toThrow(/payload\.strategy/);
   });

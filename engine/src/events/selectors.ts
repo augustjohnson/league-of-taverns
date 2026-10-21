@@ -10,7 +10,7 @@
 import { applyEpisode, initialContest, type ContestState } from '../contest/state';
 import type { VoteModel } from '../contest/model';
 import type { Contestant } from '../contest/types';
-import { episodesOf, roundRobin, standings, votesIn, type MatchupResult, type StandingRow } from '../league';
+import { standings, votesIn, type StandingRow } from '../league';
 import { draftOrderSeed, rngFor } from '../rng';
 import { draftOrder, snakePickOwner } from '../roster';
 import { openEpisode } from './reducers';
@@ -122,47 +122,22 @@ export function finaleScore(state: LeagueState, tavern: string): ScoreLine {
   return line({ survive: 0, immunity: 0, call: 0, early: 0, jury: votes * config.scoring.juryVote, winner: roster.includes(finale.winner) ? config.scoring.winner : 0 });
 }
 
-/** `tavern`'s points over round `round`'s episodes, plus the finale in the last round. */
-export function roundPoints(state: LeagueState, tavern: string, round: number): number {
-  const config = state.config;
-  if (config === null) return 0;
+/** `tavern`'s points so far: every vote held, plus the finale once it is in. */
+export function tavernPoints(state: LeagueState, tavern: string): number {
   let total = 0;
-  for (const e of episodesOf(config, round)) total += episodeScore(state, tavern, e).total;
-  if (round === config.schedule.rounds.length) total += finaleScore(state, tavern).total;
-  return total;
+  for (let e = 1; e <= state.episodes.length; e++) total += episodeScore(state, tavern, e).total;
+  return total + finaleScore(state, tavern).total;
 }
 
-/** The head-to-head schedule: each round's pairs, by the round-robin over the snake order. Empty before the draft. */
-export function schedule(state: LeagueState): ReadonlyArray<ReadonlyArray<readonly [string, string]>> {
-  const config = state.config;
-  if (config === null || state.draft.order.length === 0) return [];
-  return roundRobin(state.draft.order, config.schedule.rounds.length);
-}
-
-/** The matchups of round `round`, scored as they stand (final once the round is finalized). */
-export function roundMatchups(state: LeagueState, round: number): ReadonlyArray<MatchupResult> {
-  return (schedule(state)[round - 1] ?? []).map(([home, away]) => {
-    const homePoints = roundPoints(state, home, round);
-    const awayPoints = roundPoints(state, away, round);
-    return { round, home, away, homePoints, awayPoints, winner: homePoints === awayPoints ? null : homePoints > awayPoints ? home : away };
-  });
-}
-
-/** Every finalized round's matchups, in order. */
-export function matchups(state: LeagueState): ReadonlyArray<MatchupResult> {
-  return [...state.finalizedRounds].sort((a, b) => a - b).flatMap((r) => roundMatchups(state, r));
-}
-
-/** Each tavern's total points over the finalized rounds. */
+/** Each tavern's points so far. */
 export function seasonPoints(state: LeagueState): ReadonlyMap<string, number> {
-  const rounds = [...state.finalizedRounds];
-  return new Map([...state.taverns.keys()].map((t) => [t, rounds.reduce((sum, r) => sum + roundPoints(state, t, r), 0)]));
+  return new Map([...state.taverns.keys()].map((t) => [t, tavernPoints(state, t)]));
 }
 
-/** The table over the finalized rounds: wins, then points. */
+/** The table as it stands: by total points (final once the season is complete). */
 export function seasonStandings(state: LeagueState): ReadonlyArray<StandingRow> {
   const order = state.draft.order.length > 0 ? state.draft.order : [...state.taverns.keys()];
-  return standings(order, matchups(state), seasonPoints(state));
+  return standings(order, seasonPoints(state));
 }
 
 /** The number of votes in the season (0 before `season.created`). */

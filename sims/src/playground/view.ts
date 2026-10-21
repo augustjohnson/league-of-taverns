@@ -312,20 +312,17 @@ export function eventSummary(event: LeagueEvent): string {
     }
     case 'finale.resolved':
       return `the jury chooses ${event.payload.result.winner}`;
-    case 'round.finalized':
-      return `round ${event.payload.round} final`;
   }
 }
 
 /** The CLI's per-bot table (sim.ts `print`), as rows of cells. */
 export function aggregateRows(totals: Aggregate): { readonly header: ReadonlyArray<string>; readonly rows: ReadonlyArray<ReadonlyArray<string>> } {
-  const header = ['bot', 'seats', 'titles', 'titles/seat', 'mean W', 'mean pts', 'calls right', 'early'];
+  const header = ['bot', 'seats', 'titles', 'titles/seat', 'mean pts', 'calls right', 'early'];
   const rows = Object.entries(totals.byBot).map(([bot, a]) => [
     bot,
     String(a.seats),
     Number.isInteger(a.titles) ? String(a.titles) : a.titles.toFixed(1),
     a.titlesPerSeat.toFixed(3),
-    a.meanWins.toFixed(2),
     a.meanPoints.toFixed(1),
     pct(a.callRate),
     pct(a.earlyShare),

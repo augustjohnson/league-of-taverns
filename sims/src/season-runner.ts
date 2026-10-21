@@ -34,18 +34,15 @@ import {
   episodeOdds,
   episodeScore,
   episodeStage,
-  episodesOf,
   freeAgents,
   initialState,
   lineHash,
-  matchups,
   onTheClock,
   playChallenge,
   playFinale,
   playVote,
   replayLog,
   rngFor,
-  roundOf,
   seasonStandings,
   serializeEvent,
   tavernPickOnTheClock,
@@ -220,15 +217,14 @@ export interface RunSummary {
   /** Every tavern ranked first. More than one only on an exact tie. */
   readonly champions: ReadonlyArray<{ readonly tavern: string; readonly bot: Seat }>;
   readonly taverns: ReadonlyArray<{ readonly tavern: string; readonly name: string; readonly bot: Seat; readonly roster: ReadonlyArray<string> }>;
-  readonly standings: ReadonlyArray<{ readonly rank: number; readonly tavern: string; readonly bot: Seat; readonly wins: number; readonly losses: number; readonly ties: number; readonly points: number; readonly callPoints: number }>;
+  readonly standings: ReadonlyArray<{ readonly rank: number; readonly tavern: string; readonly bot: Seat; readonly points: number; readonly callPoints: number }>;
   readonly draft: ReadonlyArray<{ readonly pick: number; readonly tavern: string; readonly bot: Seat; readonly character: string }>;
   readonly episodes: ReadonlyArray<EpisodeSummary>;
   /** The cast in cast order: each one's strategy, power and placement (1 = winner, 20 = first out). */
   readonly cast: ReadonlyArray<{ readonly id: string; readonly strategy: VotingStrategy['kind']; readonly power: number; readonly place: number; readonly owner: string | null }>;
   readonly winner: string;
-  /** Matchups whose winner would change without call points. */
-  readonly callDecided: number;
-  readonly matchups: number;
+  /** The champion would change without call points: calls decided the title. */
+  readonly callDecided: boolean;
 }
 
 export interface SeasonResult {
@@ -554,13 +550,9 @@ export class ContestSession {
     const vote = playVote(this.contest(), this.castById, immune, this.contestSeed, episode, this.input.model);
     const system: Actor = { kind: 'system', workflow: 'episode' };
     this.append('vote.resolved', { episode, vote }, system, base + 21 * HOUR);
-    const { config } = this.input;
-    const round = roundOf(config, episode);
-    const last = round === config.schedule.rounds.length;
-    if (!last && episodesOf(config, round).at(-1) === episode) this.append('round.finalized', { round }, system, base + 21 * HOUR + 5 * MINUTE);
   }
 
-  /** The jury's vote, then the last round closes and the season is complete. */
+  /** The jury's vote, which completes the season. */
   runFinale(): void {
     const stage = this.stage;
     if (stage.kind !== 'finale') throw new Error(`no finale yet: the session is at ${stage.kind}`);
@@ -568,7 +560,6 @@ export class ContestSession {
     const at = this.episodeAt(votes + 1) + 20 * HOUR;
     const system: Actor = { kind: 'system', workflow: 'finale' };
     this.append('finale.resolved', { result: playFinale(this.contest(), this.castById, this.contestSeed, this.input.model) }, system, at);
-    this.append('round.finalized', { round: this.input.config.schedule.rounds.length }, system, at + 5 * MINUTE);
   }
 
   /** Play whatever comes next until the person has a decision (the draft) or the season is over. Bots only past the draft. */
@@ -730,22 +721,12 @@ export class ContestSession {
     finalists.forEach((id, i) => place.set(id, i + 1));
     [...state.jury].reverse().forEach((id, i) => place.set(id, finalists.length + i + 1));
     const table = seasonStandings(state).map((r) => ({ ...r, bot: seat(r.tavern), callPoints: callPoints.get(r.tavern) ?? 0 }));
-    // A matchup is decided by calls when taking away both sides' call points changes its winner.
-    let callDecided = 0;
-    const all = matchups(state);
-    const callIn = (tavern: string, round: number): number => {
-      const eps = episodesOf(input.config, round);
-      return eps.reduce((sum, ep) => {
-        const s = episodeScore(state, tavern, ep);
-        return sum + s.call + s.early;
-      }, 0);
+    // Calls decide the title when taking every tavern's call points away changes who is first.
+    const firsts = (points: (r: (typeof table)[number]) => number): string => {
+      const top = Math.max(...table.map(points));
+      return table.filter((r) => points(r) === top).map((r) => r.tavern).sort().join(' ');
     };
-    for (const m of all) {
-      const h = m.homePoints - callIn(m.home, m.round);
-      const a = m.awayPoints - callIn(m.away, m.round);
-      const without = h === a ? null : h > a ? m.home : m.away;
-      if (without !== m.winner) callDecided++;
-    }
+    const callDecided = firsts((r) => r.points) !== firsts((r) => r.points - r.callPoints);
     return {
       seed: this.seed,
       season: input.config.id,
@@ -758,7 +739,6 @@ export class ContestSession {
       cast: this.cast.map((c) => ({ id: c.id, strategy: c.strategy.kind, power: c.power, place: place.get(c.id) ?? 0, owner: state.owner.get(c.id) ?? null })),
       winner: finale.winner,
       callDecided,
-      matchups: all.length,
     };
   }
 }
@@ -804,7 +784,6 @@ export interface BotAggregate {
   /** titles / seats. 1 / taverns is par. */
   readonly titlesPerSeat: number;
   readonly meanPoints: number;
-  readonly meanWins: number;
   /** Share of votes this bot called right. */
   readonly callRate: number;
   /** Share of its calls made early. */
@@ -823,7 +802,7 @@ export interface Aggregate {
   readonly strategyWins: Readonly<Record<string, { readonly seats: number; readonly wins: number; readonly rate: number }>>;
   readonly distinctWinners: number;
   readonly topWinners: ReadonlyArray<{ readonly id: string; readonly wins: number }>;
-  /** Share of matchups whose winner would change without call points. */
+  /** Share of seasons whose champion would change without call points. */
   readonly callDecidedShare: number;
   /** Share of all points that came from calls. */
   readonly callPointShare: number;
@@ -832,10 +811,10 @@ export interface Aggregate {
 }
 
 export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
-  const tally = new Map<string, { seats: number; titles: number; points: number; wins: number; calls: number; right: number; early: number; votes: number }>();
+  const tally = new Map<string, { seats: number; titles: number; points: number; calls: number; right: number; early: number; votes: number }>();
   const of = (id: string) => {
     let t = tally.get(id);
-    if (t === undefined) tally.set(id, (t = { seats: 0, titles: 0, points: 0, wins: 0, calls: 0, right: 0, early: 0, votes: 0 }));
+    if (t === undefined) tally.set(id, (t = { seats: 0, titles: 0, points: 0, calls: 0, right: 0, early: 0, votes: 0 }));
     return t;
   };
   for (const id of BOT_IDS) of(id);
@@ -846,7 +825,6 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
   const strategy = new Map<string, { seats: number; wins: number }>();
   const winners = new Map<string, number>();
   let decided = 0;
-  let matchupsN = 0;
   let callPts = 0;
   let allPts = 0;
   let revotes = 0;
@@ -857,7 +835,6 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
       const t = of(row.bot);
       t.seats++;
       t.points += row.points;
-      t.wins += row.wins + row.ties / 2;
       callPts += row.callPoints;
       allPts += row.points;
     }
@@ -885,8 +862,7 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
       strategy.set(c.strategy, s);
     }
     winners.set(run.winner, (winners.get(run.winner) ?? 0) + 1);
-    decided += run.callDecided;
-    matchupsN += run.matchups;
+    if (run.callDecided) decided++;
   }
   const ratio = (a: number, b: number): number => (b === 0 ? 0 : a / b);
   const byBot: Record<string, BotAggregate> = {};
@@ -897,7 +873,6 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
       titles: t.titles,
       titlesPerSeat: ratio(t.titles, t.seats),
       meanPoints: ratio(t.points, t.seats),
-      meanWins: ratio(t.wins, t.seats),
       callRate: ratio(t.right, t.votes),
       earlyShare: ratio(t.early, t.calls),
     };
@@ -911,7 +886,7 @@ export function aggregate(runs: ReadonlyArray<RunSummary>): Aggregate {
     strategyWins: Object.fromEntries([...strategy].map(([k, s]) => [k, { ...s, rate: ratio(s.wins, s.seats) }])),
     distinctWinners: winners.size,
     topWinners: [...winners].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, wins]) => ({ id, wins })),
-    callDecidedShare: ratio(decided, matchupsN),
+    callDecidedShare: ratio(decided, runs.length),
     callPointShare: ratio(callPts, allPts),
     revotesPerSeason: ratio(revotes, runs.length),
     drawsPerSeason: ratio(draws, runs.length),

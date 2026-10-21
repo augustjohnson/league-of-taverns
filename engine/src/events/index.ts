@@ -16,15 +16,12 @@ export {
   finaleScore,
   freeAgents,
   immuneAt,
-  matchups,
   onTheClock,
   openEpisode,
-  roundMatchups,
-  roundPoints,
-  schedule,
   seasonPoints,
   seasonStandings,
   seasonVotes,
+  tavernPoints,
   tavernPickOnTheClock,
 } from './selectors';
 export type { ScoreLine } from './selectors';
