@@ -5,8 +5,8 @@
  *
  * Effects come in tiers so the big ones stay rare and keep meaning something:
  * a nod (one micron interaction on one element), a cheer (one burst of
- * party.js sparkles) and a fanfare (confetti), which only winning a
- * head-to-head round or the season earns.
+ * party.js sparkles) and a fanfare (confetti), which only taking the lead
+ * or winning the season earns.
  * The CSS half is page.html § Moments, with micron's CSS vendored below it.
  */
 import { Color, Rect, confetti, settings, sparkles, variation } from 'party-js';

@@ -117,8 +117,9 @@ the audit recomputes them from the seed.
 
 ## 5. The playtest loop
 
-1. Give your name and your tavern ("The <adjective> <noun>", under one of
-   six banners). You take a random bot's seat on a random seed. The bots
+1. On your first visit, give your name and your tavern ("The <adjective>
+   <noun>", under one of six banners); then start a season of The Lich's
+   Assistant. You take a random bot's seat on a random seed. The bots
    choose taverns from the rest, then the snake draft (3 rounds), told pick
    by pick.
 2. Each episode: the Lich summons the contestants. You may **call the boot
